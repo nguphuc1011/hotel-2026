@@ -120,4 +120,5 @@ export interface TimeRules {
   };
   early_rules: Array<{ from: string; to: string; percent: number }>;
   late_rules: Array<{ from: string; to: string; percent: number }>;
+  full_day_late_after?: string; // MỚI: Mốc tính 1 ngày (VD: 18:00)
 }
