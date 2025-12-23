@@ -16,6 +16,7 @@ export interface Room {
   };
   enable_overnight: boolean;
   current_booking_id?: string;
+  current_booking?: Booking & { customer?: Customer };
 }
 
 export interface Customer {

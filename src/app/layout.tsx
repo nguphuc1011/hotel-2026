@@ -21,9 +21,9 @@ export default function RootLayout({
         <div className="flex h-screen flex-col overflow-hidden">
           {/* Header - Glassmorphism */}
           <header className="glass sticky top-0 z-50 flex h-16 items-center justify-between px-4 sm:px-6 shadow-sm">
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg" />
-              <span className="text-lg sm:text-xl font-semibold tracking-tight whitespace-nowrap">
+            <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg flex-shrink-0" />
+              <span className="text-lg sm:text-xl font-semibold tracking-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] sm:max-w-none">
                 Hotel<span className="opacity-50">2026</span>
               </span>
             </div>

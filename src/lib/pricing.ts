@@ -1,5 +1,5 @@
 import { differenceInMinutes, parse, isAfter, addDays, startOfDay } from 'date-fns';
-import { Booking, TimeRules } from '@/types';
+import { Booking, TimeRules, Room } from '@/types';
 
 export interface PricingResult {
   price: number;
@@ -8,7 +8,8 @@ export interface PricingResult {
 
 export class PricingLogic {
   static calculate(
-    booking: Partial<Booking> & { prices?: { next_hour: number } }, 
+    booking: Partial<Booking>, 
+    room: Room,
     timeRules: TimeRules
   ): PricingResult {
     if (!booking.check_in_at || !booking.initial_price) {
@@ -24,7 +25,7 @@ export class PricingLogic {
 
     switch (booking.rental_type) {
       case 'hourly':
-        const nextHourPrice = booking.prices?.next_hour || booking.initial_price;
+        const nextHourPrice = room.prices?.next_hour || booking.initial_price;
         return this.calculateHourly(booking.initial_price, nextHourPrice, diffMinutes);
       
       case 'daily':

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useHotel } from '@/hooks/useHotel';
 import { RoomCard } from '@/components/dashboard/RoomCard';
 import { CheckInModal } from '@/components/dashboard/CheckInModal';
+import { FolioModal } from '@/components/dashboard/FolioModal';
 import { motion } from 'framer-motion';
 import { Room } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -11,16 +12,62 @@ import { supabase } from '@/lib/supabase';
 export default function Dashboard() {
   const { rooms, settings, isLoading, mutateRooms } = useHotel();
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [folioRoom, setFolioRoom] = useState<Room | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
 
   const timeRules = settings?.find((s: any) => s.key === 'time_rules')?.value;
 
-  const handleRoomClick = (room: Room) => {
+  const handleRoomClick = async (room: Room) => {
     if (room.status === 'available') {
       setSelectedRoom(room);
-    } else {
-      // TODO: Handle checkout / details
-      alert('Tính năng xem chi tiết/Check-out đang phát triển');
+    } else if (['hourly', 'daily', 'overnight'].includes(room.status)) {
+      setFolioRoom(room);
+    } else if (['dirty', 'repair'].includes(room.status)) {
+      if (window.confirm(`Xác nhận phòng ${room.room_number} đã sẵn sàng đón khách?`)) {
+        try {
+          const { error } = await supabase
+            .from('rooms')
+            .update({ status: 'available', current_booking_id: null })
+            .eq('id', room.id);
+          
+          if (error) throw error;
+          mutateRooms();
+        } catch (error) {
+          console.error('Error updating status:', error);
+          alert('Không thể cập nhật trạng thái phòng');
+        }
+      }
+    }
+  };
+
+  const handlePayment = async (amount: number) => {
+    // Placeholder for payment logic
+    if (!folioRoom) return;
+    
+    try {
+      // 1. Update booking status to completed
+      if (folioRoom.current_booking_id) {
+         await supabase
+          .from('bookings')
+          .update({ 
+            status: 'completed', 
+            check_out_at: new Date().toISOString(),
+            // total_amount: amount 
+          })
+          .eq('id', folioRoom.current_booking_id);
+      }
+
+      // 2. Set room to dirty
+      await supabase
+        .from('rooms')
+        .update({ status: 'dirty', current_booking_id: null })
+        .eq('id', folioRoom.id);
+
+      mutateRooms();
+      alert(`Thanh toán phòng ${folioRoom.room_number} thành công!`);
+    } catch (error) {
+      console.error(error);
+      alert('Lỗi thanh toán');
     }
   };
 
@@ -211,7 +258,7 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" // Mobile First: grid-cols-2
+        className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 xl:gap-8"
       >
         {rooms.map((room) => (
           <RoomCard 
@@ -228,6 +275,16 @@ export default function Dashboard() {
           timeRules={timeRules}
           onClose={() => setSelectedRoom(null)}
           onConfirm={handleCheckIn}
+        />
+      )}
+
+      {folioRoom && (
+        <FolioModal
+          room={folioRoom}
+          timeRules={timeRules}
+          isOpen={!!folioRoom}
+          onClose={() => setFolioRoom(null)}
+          onPayment={handlePayment}
         />
       )}
     </div>

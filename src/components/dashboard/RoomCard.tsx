@@ -3,7 +3,18 @@
 import { Room } from '@/types';
 import { cn, formatCurrency } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { Clock, Moon, Sun, User, Sparkles, Wrench, CheckCircle2 } from 'lucide-react';
+import { 
+  CheckCircle, 
+  User, 
+  Sun, 
+  Moon, 
+  Brush, 
+  Wrench, 
+  Coins, 
+  Clock 
+} from 'lucide-react';
+import { differenceInHours, differenceInMinutes } from 'date-fns';
+import { useMemo, useEffect, useState } from 'react';
 
 interface RoomCardProps {
   room: Room;
@@ -12,103 +23,134 @@ interface RoomCardProps {
 
 const statusConfig = {
   available: {
-    label: 'Trống',
-    icon: CheckCircle2,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-100/50',
-    border: 'border-emerald-200',
-    shadow: 'shadow-emerald-500/10',
+    label: 'Sẵn sàng',
+    color: 'bg-[#155e75]', // Cyan 800
+    icon: CheckCircle,
+    textColor: 'text-white'
   },
   hourly: {
-    label: 'Theo giờ',
-    icon: Clock,
-    color: 'text-blue-600',
-    bg: 'bg-blue-100/50',
-    border: 'border-blue-200',
-    shadow: 'shadow-blue-500/10',
+    label: 'Khách giờ',
+    color: 'bg-[#f59e0b]', // Amber 500
+    icon: User,
+    textColor: 'text-black'
   },
   daily: {
-    label: 'Theo ngày',
+    label: 'Khách ngày',
+    color: 'bg-[#1e40af]', // Blue 800
     icon: Sun,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-100/50',
-    border: 'border-indigo-200',
-    shadow: 'shadow-indigo-500/10',
+    textColor: 'text-white'
   },
   overnight: {
     label: 'Qua đêm',
+    color: 'bg-[#1e40af]', // Blue 800 (Shared with daily)
     icon: Moon,
-    color: 'text-purple-600',
-    bg: 'bg-purple-100/50',
-    border: 'border-purple-200',
-    shadow: 'shadow-purple-500/10',
+    textColor: 'text-white'
   },
   dirty: {
     label: 'Chờ dọn',
-    icon: Sparkles,
-    color: 'text-amber-600',
-    bg: 'bg-amber-100/50',
-    border: 'border-amber-200',
-    shadow: 'shadow-amber-500/10',
+    color: 'bg-[#f97316]', // Orange 500
+    icon: Brush,
+    textColor: 'text-white'
   },
   repair: {
-    label: 'Sửa chữa',
+    label: 'Đang sửa',
+    color: 'bg-[#1e293b]', // Slate 800
     icon: Wrench,
-    color: 'text-rose-600',
-    bg: 'bg-rose-100/50',
-    border: 'border-rose-200',
-    shadow: 'shadow-rose-500/10',
+    textColor: 'text-white'
   },
 };
 
 export function RoomCard({ room, onClick }: RoomCardProps) {
   const config = statusConfig[room.status] || statusConfig.available;
-  const Icon = config.icon;
+  const BgIcon = config.icon;
+  const [duration, setDuration] = useState('');
+
+  // Calculate duration for occupied rooms
+  useEffect(() => {
+    if (room.status === 'available' || !room.current_booking?.check_in_at) return;
+
+    const updateDuration = () => {
+      const start = new Date(room.current_booking!.check_in_at);
+      const now = new Date();
+      const hours = differenceInHours(now, start);
+      const minutes = differenceInMinutes(now, start) % 60;
+      setDuration(`${hours}h ${minutes}p`);
+    };
+
+    updateDuration();
+    const interval = setInterval(updateDuration, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, [room.status, room.current_booking]);
+
+  const isOccupied = ['hourly', 'daily', 'overnight'].includes(room.status);
 
   return (
     <motion.button
-      whileHover={{ scale: 1.02, y: -2 }}
+      whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onClick?.(room)}
       className={cn(
-        "relative flex h-full w-full flex-col justify-between overflow-hidden rounded-[24px] border p-6 text-left transition-all duration-300",
-        "bg-white dark:bg-zinc-900",
-        config.border,
-        config.shadow,
-        "shadow-lg hover:shadow-xl"
+        "group relative flex w-full flex-col justify-between overflow-hidden p-6 transition-all shadow-lg hover:shadow-2xl",
+        "h-[200px] sm:h-[256px]", // Height: Mobile 200px, Desktop 256px
+        "rounded-[2rem]", // Super large radius
+        config.color,
+        config.textColor
       )}
     >
-      {/* Background Gradient Splash */}
-      <div className={cn("absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-20 blur-3xl", config.bg.replace('/50', ''))} />
-
-      <div className="z-10 flex w-full items-start justify-between">
-        <div className="flex flex-col">
-          <span className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
-            {room.room_number}
-          </span>
-          <span className="text-sm font-medium text-zinc-400">
-            {room.room_type} • {room.area}
-          </span>
-        </div>
-        <div className={cn("rounded-full p-2.5 backdrop-blur-md", config.bg, config.color)}>
-          <Icon size={24} strokeWidth={2.5} />
-        </div>
+      {/* Background Icon */}
+      <div className="absolute -bottom-8 -right-8 transition-transform duration-500 group-hover:scale-110">
+        <BgIcon 
+          size={160} // text-[10rem] approx 160px
+          className="opacity-10" 
+          strokeWidth={1}
+        />
       </div>
 
-      <div className="z-10 mt-6 space-y-1">
-        <div className="flex items-center justify-between">
-          <span className={cn("text-xs font-bold uppercase tracking-wider", config.color)}>
-            {config.label}
-          </span>
-        </div>
-        
-        {/* Dynamic Price Display */}
-        <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {formatCurrency(room.prices?.hourly || 0)}
-          </span>
-          <span className="text-xs text-zinc-400">/ giờ đầu</span>
-        </div>
+      {/* Header: Room Number & Badge */}
+      <div className="z-10 flex w-full items-start justify-between">
+        <span className="text-5xl font-black tracking-tighter">
+          {room.room_number}
+        </span>
+        <span className={cn(
+          "rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-wider backdrop-blur-md",
+          "bg-black/10"
+        )}>
+          {room.room_type}
+        </span>
+      </div>
+
+      {/* Footer: Data Display */}
+      <div className="z-10 mt-auto">
+        {isOccupied ? (
+          <div className="flex flex-col items-start gap-1">
+            <span className="text-sm font-bold italic uppercase opacity-60">
+              {room.current_booking?.customer?.full_name || 'Khách vãng lai'}
+            </span>
+            <div className="flex items-center gap-2 rounded-lg bg-black/20 px-3 py-1.5 backdrop-blur-sm">
+              <Clock className="animate-pulse" size={16} />
+              <span className="font-mono text-lg font-bold">{duration}</span>
+            </div>
+          </div>
+        ) : room.status === 'available' ? (
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-white/20 p-2 backdrop-blur-sm">
+              <Coins size={20} className="text-white" />
+            </div>
+            <div className="flex flex-col items-start leading-none">
+              <span className="text-xs opacity-80">Giá giờ đầu</span>
+              <span className="text-lg font-bold">
+                {formatCurrency(room.prices?.hourly || 0)}
+              </span>
+            </div>
+          </div>
+        ) : (
+          // Dirty/Repair state
+          <div className="flex items-center gap-2 opacity-80">
+            <span className="text-sm font-medium uppercase tracking-widest">
+              {config.label}
+            </span>
+          </div>
+        )}
       </div>
     </motion.button>
   );

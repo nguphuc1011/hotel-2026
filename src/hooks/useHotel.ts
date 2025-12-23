@@ -6,12 +6,31 @@ import { Room } from '@/types';
 import { useEffect } from 'react';
 
 const fetcher = async (key: string) => {
-  // Use correct column name for ordering
+  if (key === 'rooms') {
+    const { data: rooms, error: roomsError } = await supabase
+      .from('rooms')
+      .select('*')
+      .order('room_number');
+      
+    if (roomsError) throw roomsError;
+
+    const { data: bookings, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('*, customer:customers(*)')
+      .eq('status', 'active');
+
+    if (bookingsError) console.error('Error fetching bookings:', bookingsError);
+
+    return rooms.map(room => ({
+      ...room,
+      current_booking: bookings?.find(b => b.room_id === room.id)
+    }));
+  }
+
+  // Default fetcher for other keys
   let query = supabase.from(key).select('*');
   
-  if (key === 'rooms') {
-    query = query.order('room_number');
-  } else if (key === 'services') {
+  if (key === 'services') {
     query = query.order('name');
   }
 
