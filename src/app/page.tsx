@@ -281,7 +281,7 @@ export default function Dashboard() {
       {folioRoom && (
         <FolioModal
           room={folioRoom}
-          timeRules={timeRules}
+          settings={settings}
           isOpen={!!folioRoom}
           onClose={() => setFolioRoom(null)}
           onPayment={handlePayment}

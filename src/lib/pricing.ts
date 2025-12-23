@@ -1,188 +1,152 @@
-import { differenceInMinutes, parse, isAfter, addDays, startOfDay } from 'date-fns';
-import { Booking, TimeRules, Room } from '@/types';
+import { differenceInMinutes, parse, isAfter, addDays, startOfDay, differenceInHours } from 'date-fns';
+import { TimeRules, Room, Setting } from '@/types';
 
-export interface PricingResult {
-  price: number;
-  note: string;
+export interface PricingBreakdown {
+  total_amount: number;      // Tổng phải thu
+  room_charge: number;       // Tiền phòng gốc (bao gồm cả phụ thu)
+  service_charge: number;    // Tiền dịch vụ (mặc định 0 trong hàm này)
+  surcharge: number;         // Tiền phụ thu trễ giờ/sớm
+  tax_details: {
+    room_tax: number;        // (Tiền phòng + phụ thu) * % Thuế Lưu trú
+    service_tax: number;     // Tiền dịch vụ * % Thuế Dịch vụ
+  };
+  summary: {
+    days?: number;
+    hours?: number;
+    rental_type: string;
+    is_overnight: boolean;
+  };
 }
 
-export class PricingLogic {
-  static calculate(
-    booking: Partial<Booking>, 
-    room: Room,
-    timeRules: TimeRules
-  ): PricingResult {
-    if (!booking.check_in_at || !booking.initial_price) {
-      return { price: 0, note: '' };
-    }
+/**
+ * BỘ NÃO TÍNH GIÁ HOTEL 2026
+ * Xử lý logic Hourly, Daily, Overnight và Thuế AI 2026
+ */
+export function calculateRoomPrice(
+  checkInTime: Date,
+  checkOutTime: Date,
+  settings: Setting[],
+  roomPrices: Room['prices'],
+  rentalType: 'hourly' | 'daily' | 'overnight'
+): PricingBreakdown {
+  
+  // 1. Lấy cấu hình hệ thống
+  const systemSetting = settings.find(s => s.key === 'system_settings');
+  const timeRules: TimeRules & { full_day_late_after?: string } = systemSetting?.value || {
+    check_in: '14:00',
+    check_out: '12:00',
+    overnight: { start: '22:00', end: '08:00' },
+    early_rules: [],
+    late_rules: [],
+    full_day_late_after: '18:00'
+  };
 
-    const checkIn = new Date(booking.check_in_at);
-    const checkOut = booking.check_out_at ? new Date(booking.check_out_at) : new Date();
-    const diffMinutes = differenceInMinutes(checkOut, checkIn);
+  const taxConfig = systemSetting?.tax_config || { stay_tax: 5, service_tax: 1.5 };
+  
+  let room_charge = 0;
+  let surcharge = 0;
+  let summary = {
+    rental_type: rentalType,
+    is_overnight: false,
+    days: 0,
+    hours: 0
+  };
 
-    // Guard: Negative time
-    if (diffMinutes < 0) return { price: 0, note: 'Lỗi thời gian' };
+  const diffMinutes = differenceInMinutes(checkOutTime, checkInTime);
+  const minutes = Math.max(0, diffMinutes);
 
-    switch (booking.rental_type) {
-      case 'hourly':
-        const nextHourPrice = room.prices?.next_hour || booking.initial_price;
-        return this.calculateHourly(booking.initial_price, nextHourPrice, diffMinutes);
-      
-      case 'daily':
-        return this.calculateDaily(booking.initial_price, checkIn, checkOut, timeRules);
-      
-      case 'overnight':
-        return { price: booking.initial_price, note: 'Qua đêm' };
-        
-      default:
-        return { price: booking.initial_price, note: '' };
-    }
-  }
+  // 2. Xử lý theo từng loại hình thuê
+  if (rentalType === 'hourly') {
+    // Logic: Giá giờ đầu + (Tổng giờ - 1) * Giá giờ tiếp. Làm tròn lên (61p = 2h)
+    const totalHours = Math.max(1, Math.ceil(minutes / 60));
+    room_charge = roomPrices.hourly + (totalHours - 1) * roomPrices.next_hour;
+    summary.hours = totalHours;
+  } 
+  else if (rentalType === 'overnight') {
+    // Logic: Giá phẳng cho khung giờ đêm
+    room_charge = roomPrices.overnight;
+    summary.is_overnight = true;
+  } 
+  else if (rentalType === 'daily') {
+    // Logic Thuê Ngày (Phức tạp nhất)
+    const diffDays = Math.max(1, Math.ceil(minutes / (24 * 60)));
+    room_charge = diffDays * roomPrices.daily;
+    summary.days = diffDays;
 
-  static checkOvernightAutoSuggest(checkIn: Date, timeRules: TimeRules): boolean {
-    if (!timeRules?.overnight) return false;
-    
-    const [startH, startM] = timeRules.overnight.start.split(':').map(Number);
-    const [endH, endM] = timeRules.overnight.end.split(':').map(Number);
-    
-    const currentH = checkIn.getHours();
-    const currentM = checkIn.getMinutes();
-    
-    // Convert to minutes for easier comparison
-    const currentMins = currentH * 60 + currentM;
-    const startMins = startH * 60 + startM;
-    const endMins = endH * 60 + endM;
+    // Tính phụ thu trễ giờ (Late Surcharge) cho ngày cuối cùng
+    const [coH, coM] = timeRules.check_out.split(':').map(Number);
+    const [lateH, lateM] = (timeRules.full_day_late_after || '18:00').split(':').map(Number);
 
-    // Case 1: Overnight spans across midnight (e.g. 21:00 - 06:00)
-    if (startMins > endMins) {
-      return currentMins >= startMins || currentMins <= endMins;
-    }
-    
-    // Case 2: Overnight within same day (rare, but possible)
-    return currentMins >= startMins && currentMins <= endMins;
-  }
-
-  private static calculateHourly(basePrice: number, nextHourPrice: number, minutes: number): PricingResult {
-    const hours = Math.max(1, Math.ceil(minutes / 60));
-    
-    if (hours === 1) {
-      return { price: basePrice, note: '1 giờ đầu' };
-    }
-
-    const price = basePrice + (hours - 1) * nextHourPrice;
-    return { price, note: `${hours} giờ` };
-  }
-
-  private static calculateDaily(
-    dailyPrice: number, 
-    checkIn: Date, 
-    checkOut: Date, 
-    timeRules: TimeRules
-  ): PricingResult {
-    if (!timeRules) {
-      // Fallback simple daily logic
-      const days = Math.max(1, Math.ceil(differenceInMinutes(checkOut, checkIn) / (24 * 60)));
-      return { price: days * dailyPrice, note: `${days} ngày` };
-    }
-
-    // Logic from Doc 2.2.2 & 2.2.3
-    const checkOutConfig = timeRules.check_out || "12:00";
-    const [coH, coM] = checkOutConfig.split(':').map(Number);
-
-    // Standard checkout time for the NEXT day relative to check-in
-    // Start with checkIn date, move to next day, set time to checkout time
-    let standardCheckOut = new Date(checkIn);
-    standardCheckOut = addDays(standardCheckOut, 1);
+    // Mốc trả phòng chuẩn của ngày cuối
+    const standardCheckOut = new Date(checkOutTime);
     standardCheckOut.setHours(coH, coM, 0, 0);
 
-    // If actual checkout is BEFORE standard checkout (early checkout), still count as 1 day
-    // The loop/logic below handles "how many days" based on standard chunks
+    // Mốc "Ăn gian" (Late Threshold)
+    const lateThreshold = new Date(checkOutTime);
+    lateThreshold.setHours(lateH, lateM, 0, 0);
 
-    let dayCount = 1;
-    let extraCharge = 0;
-    let note = '';
-
-    // Calculate total days based on standard 24h cycles roughly, but aligned to checkout time
-    // Logic: Each passing of the checkout time adds a day
-    
-    // We can simplify:
-    // 1. Calculate base days until the last "standard checkout" passed
-    // 2. Check the remaining time against "late rules"
-
-    // Let's stick closer to the doc's 2.2.2 logic:
-    // "standardCheckOut" is the first checkout point.
-    
-    // If checkOut is after standardCheckOut, we calculate difference
-    const diffMinutesAfterCheckout = differenceInMinutes(checkOut, standardCheckOut);
-
-    if (diffMinutesAfterCheckout > 0) {
-      // Passed the first day's checkout time
-      // Calculate how many FULL days passed after that
-      const extraDays = Math.floor(diffMinutesAfterCheckout / (24 * 60));
-      dayCount += extraDays;
+    if (isAfter(checkOutTime, lateThreshold)) {
+      // Trường hợp 1: Trả sau Late Threshold -> Tính thêm 1 ngày
+      surcharge = roomPrices.daily;
+      summary.days! += 1;
+    } 
+    else if (isAfter(checkOutTime, standardCheckOut)) {
+      // Trường hợp 2: Trả sau 12:00 nhưng trước Late Threshold -> Tính % theo late_rules
+      const checkOutStr = `${checkOutTime.getHours().toString().padStart(2, '0')}:${checkOutTime.getMinutes().toString().padStart(2, '0')}`;
       
-      // Remaining minutes after removing full extra days
-      const remainingMinutes = diffMinutesAfterCheckout % (24 * 60);
-      
-      // Now check if remaining minutes exceed threshold or trigger percentage charge
-      // Doc 2.2.2 uses "fullDayLateAfter" (threshold to add full day)
-      // Doc 2.2.3/User Request uses "late_rules" (percentage)
-      
-      // We prioritize the percentage rules first for granularity, 
-      // but if it exceeds a certain point (like 100% or strict threshold), it becomes a day.
-      
-      // Check percentage rules
-      let appliedRule = null;
-      if (timeRules.late_rules && timeRules.late_rules.length > 0) {
-        const hoursLate = remainingMinutes / 60;
-        appliedRule = [...timeRules.late_rules]
-          .sort((a, b) => parseFloat(b.to) - parseFloat(a.to))
-          .find(rule => hoursLate >= parseFloat(rule.from) && hoursLate <= parseFloat(rule.to));
-          
-        // If no rule found but hoursLate > max rule, assume full day? 
-        // Or check against fullDayLateAfter if explicit rules don't cover it.
-      }
+      // Tìm rule phù hợp nhất (lấy mốc % cao nhất thỏa mãn)
+      const applicableRule = [...(timeRules.late_rules || [])]
+        .sort((a, b) => b.percent - a.percent)
+        .find(rule => checkOutStr >= rule.from && checkOutStr <= rule.to);
 
-      if (appliedRule) {
-        extraCharge += (appliedRule.percent / 100) * dailyPrice;
-        note = ` (Phụ thu ${appliedRule.percent}%)`;
-      } else {
-        // No specific rule matched, check if it's "very late" -> +1 day
-        // Default threshold logic if no rules match? 
-        // Let's assume if it exceeds the last rule's 'to', it's another day.
-        // OR simply: if remainingMinutes > 0 and no rule matches, it might be small enough to ignore OR big enough to be a day.
-        // Let's use a safe fallback: > 4 hours = 1 day if no rule?
-        // Actually, let's look at standard practice: usually > 12:00 next day is +1 day.
-        // If we are here, we already have dayCount days.
-        
-        // If remainingMinutes > 0, we should probably charge something.
-        // If we strictly follow Doc 2.2.2:
-        // "lateAfterMinutes = ... lateThreshold = ..."
-        // "if checkOut >= lateThreshold -> dayCount += 1"
-        
-        // Let's implement the Doc 2.2.2 "threshold" logic as the "full day" trigger
-        // And use 2.2.3 percentage for "between checkout and threshold"
-        
-        // Assuming '18:00' is the threshold for full day (common in VN)
-        const lateThresholdHour = 18; 
-        const minutesUntilThreshold = (lateThresholdHour * 60) - (coH * 60 + coM);
-        
-        if (remainingMinutes >= minutesUntilThreshold) {
-           dayCount += 1;
-           note = ' (Quá giờ - Tính 1 ngày)';
-           // Reset extra charge if we count as full day? Usually yes.
-           extraCharge = 0; 
-        } else if (!appliedRule) {
-           // No rule matched, but less than threshold.
-           // Maybe simple fraction? Or ignore. 
-           // Let's leave extraCharge as 0.
-        }
+      if (applicableRule) {
+        surcharge = (roomPrices.daily * applicableRule.percent) / 100;
       }
     }
-
-    return { 
-      price: (dayCount * dailyPrice) + extraCharge, 
-      note: `Ở ${dayCount} ngày${note}` 
-    };
   }
+
+  // 3. Logic Tách Thuế 2026
+  const room_tax = ((room_charge + surcharge) * taxConfig.stay_tax) / 100;
+  const service_charge = 0; // Sẽ tính thêm ở FolioModal nếu có
+  const service_tax = (service_charge * taxConfig.service_tax) / 100;
+
+  const total_amount = room_charge + surcharge + service_charge + room_tax + service_tax;
+
+  return {
+    total_amount: Math.round(total_amount),
+    room_charge: room_charge,
+    service_charge: service_charge,
+    surcharge: Math.round(surcharge),
+    tax_details: {
+      room_tax: Math.round(room_tax),
+      service_tax: Math.round(service_tax)
+    },
+    summary
+  };
+}
+
+/**
+ * Gợi ý loại hình thuê dựa trên thời điểm check-in
+ */
+export function suggestRentalType(checkIn: Date, timeRules: TimeRules): 'hourly' | 'daily' | 'overnight' {
+  if (!timeRules?.overnight) return 'hourly';
+  
+  const [startH, startM] = timeRules.overnight.start.split(':').map(Number);
+  const [endH, endM] = timeRules.overnight.end.split(':').map(Number);
+  
+  const currentH = checkIn.getHours();
+  const currentM = checkIn.getMinutes();
+  const currentMins = currentH * 60 + currentM;
+  const startMins = startH * 60 + startM;
+  const endMins = endH * 60 + endM;
+
+  // Nếu trong khung giờ đêm
+  const isNight = startMins > endMins 
+    ? (currentMins >= startMins || currentMins <= endMins)
+    : (currentMins >= startMins && currentMins <= endMins);
+
+  if (isNight) return 'overnight';
+  
+  // Mặc định là theo giờ, người dùng có thể đổi sang ngày
+  return 'hourly';
 }
