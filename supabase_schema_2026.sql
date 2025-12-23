@@ -9,6 +9,13 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='settings' AND column_name='tax_config') THEN
         ALTER TABLE settings ADD COLUMN tax_config JSONB DEFAULT '{"vat": 8, "service_fee": 5}'::jsonb;
     END IF;
+
+    -- Đảm bảo cột 'key' là duy nhất để dùng lệnh upsert
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='settings' AND column_name='key') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_name='settings' AND constraint_type='UNIQUE' AND constraint_name='settings_key_key') THEN
+            ALTER TABLE settings ADD CONSTRAINT settings_key_key UNIQUE (key);
+        END IF;
+    END IF;
 END $$;
 
 -- 2. Cập nhật bảng 'services' (Kho & Phân loại Thuế)

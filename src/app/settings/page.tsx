@@ -51,14 +51,14 @@ export default function SettingsPage() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      // Lấy dòng cài đặt đầu tiên như yêu cầu
+      // Tìm cấu hình hệ thống theo key 'system_settings'
       const { data, error } = await supabase
         .from('settings')
         .select('*')
-        .limit(1)
-        .single();
+        .eq('key', 'system_settings')
+        .maybeSingle(); // Dùng maybeSingle thay vì single để không văng lỗi nếu chưa có dòng nào
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
 
       if (data) {
         setSettingId(data.id);
@@ -80,6 +80,7 @@ export default function SettingsPage() {
       }
     } catch (err) {
       console.error('Error fetching settings:', err);
+      // Không alert ở đây để tránh làm phiền người dùng nếu chỉ là do mạng lag
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,10 @@ export default function SettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
+      
+      // Payload chuẩn cho cả insert và update
       const payload = {
+        key: 'system_settings', // Đảm bảo luôn có key cố định
         value: timeRules,
         tax_code: taxConfig.tax_code,
         tax_config: {
@@ -97,28 +101,29 @@ export default function SettingsPage() {
         }
       };
 
-      let error;
-      if (settingId) {
-        const { error: updateError } = await supabase
-          .from('settings')
-          .update(payload)
-          .eq('id', settingId);
-        error = updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('settings')
-          .insert([{ ...payload, key: 'system_settings' }]);
-        error = insertError;
-      }
+      // Sử dụng upsert để tự động xử lý: Nếu đã có thì update, chưa có thì insert
+      // onConflict: 'key' giúp xác định dòng dựa trên cột 'key' thay vì 'id'
+      const { data, error } = await supabase
+        .from('settings')
+        .upsert([payload], { 
+          onConflict: 'key',
+          ignoreDuplicates: false 
+        })
+        .select()
+        .single();
 
       if (error) throw error;
       
+      if (data) {
+        setSettingId(data.id);
+      }
+      
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
-      fetchSettings(); // Refresh data
+      // Không cần fetchSettings() lại vì đã có data mới nhất từ .select().single()
     } catch (err) {
       console.error('Error saving settings:', err);
-      alert('Có lỗi xảy ra khi lưu cài đặt!');
+      alert('Có lỗi xảy ra khi lưu cài đặt! (Chi tiết: ' + (err as any).message + ')');
     } finally {
       setSaving(false);
     }
