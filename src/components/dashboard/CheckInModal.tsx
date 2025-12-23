@@ -50,7 +50,7 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="relative z-10 w-full max-w-2xl overflow-hidden rounded-t-[32px] bg-white shadow-2xl dark:bg-zinc-900 sm:rounded-[32px]"
+          className="relative z-10 w-full max-w-2xl overflow-hidden rounded-t-[32px] bg-white shadow-2xl sm:rounded-[32px]"
           drag="y"
           dragConstraints={{ top: 0, bottom: 0 }}
           dragElastic={0.2}
@@ -61,19 +61,19 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
           }}
         >
           {/* Mobile Drag Handle */}
-          <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-zinc-200 sm:hidden dark:bg-zinc-700" />
+          <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-zinc-200 sm:hidden" />
 
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-100 p-6 pt-8 dark:border-zinc-800 sm:pt-6">
+          <div className="flex items-center justify-between border-b border-zinc-100 p-6 pt-8 sm:pt-6">
             <div>
-              <h2 className="text-2xl font-black text-zinc-900 dark:text-white">
+              <h2 className="text-2xl font-black text-zinc-900">
                 Nhận phòng {room.room_number}
               </h2>
               <p className="text-sm text-zinc-500">{room.room_type} • {room.area}</p>
             </div>
             <button 
               onClick={onClose}
-              className="hidden rounded-full bg-zinc-100 p-2 text-zinc-500 hover:bg-zinc-200 sm:block dark:bg-zinc-800 dark:text-zinc-400"
+              className="hidden rounded-full bg-zinc-100 p-2 text-zinc-500 hover:bg-zinc-200 sm:block"
             >
               <X size={20} />
             </button>
@@ -107,10 +107,10 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
               </div>
 
               {/* Price Preview Box */}
-              <div className="rounded-2xl bg-zinc-50 p-6 dark:bg-zinc-800/50">
+              <div className="rounded-2xl bg-zinc-50 p-6">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-zinc-500">Đơn giá dự kiến</span>
-                  <span className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white">
+                  <span className="text-3xl font-black tracking-tight text-zinc-900">
                     {formatCurrency(currentPrice)}
                   </span>
                 </div>
@@ -127,7 +127,7 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
                       placeholder="Tên khách hàng"
                       value={customer.name}
                       onChange={e => setCustomer({...customer, name: e.target.value})}
-                      className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-medium text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:text-white"
+                      className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-medium text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -138,7 +138,7 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
                         placeholder="Số điện thoại"
                         value={customer.phone}
                         onChange={e => setCustomer({...customer, phone: e.target.value})}
-                        className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-medium text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:text-white"
+                        className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-medium text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div className="relative">
@@ -148,7 +148,7 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
                         placeholder="CMND / CCCD"
                         value={customer.idCard}
                         onChange={e => setCustomer({...customer, idCard: e.target.value})}
-                        className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-medium text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:text-white"
+                        className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-medium text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -159,7 +159,7 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
                       placeholder="Tiền đặt cọc (VNĐ)"
                       value={deposit || ''}
                       onChange={e => setDeposit(Number(e.target.value))}
-                      className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-bold text-blue-600 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:text-blue-400"
+                      className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-bold text-blue-600 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -169,7 +169,7 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
               <div className="grid gap-3 pt-4 sm:grid-cols-2">
                 <button
                   onClick={onClose}
-                  className="h-14 w-full rounded-2xl border-2 border-zinc-100 bg-white text-lg font-bold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-300"
+                  className="h-14 w-full rounded-2xl border-2 border-zinc-100 bg-white text-lg font-bold text-zinc-600 hover:bg-zinc-50"
                 >
                   Hủy bỏ
                 </button>
@@ -196,9 +196,9 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
 
 function TypeOption({ active, onClick, icon: Icon, label, color }: any) {
   const colorStyles: any = {
-    blue: "bg-blue-50 text-blue-600 ring-blue-500 dark:bg-blue-500/20 dark:text-blue-400",
-    indigo: "bg-indigo-50 text-indigo-600 ring-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-400",
-    purple: "bg-purple-50 text-purple-600 ring-purple-500 dark:bg-purple-500/20 dark:text-purple-400",
+    blue: "bg-blue-50 text-blue-600 ring-blue-500",
+    indigo: "bg-indigo-50 text-indigo-600 ring-indigo-500",
+    purple: "bg-purple-50 text-purple-600 ring-purple-500",
   };
 
   return (
@@ -208,18 +208,18 @@ function TypeOption({ active, onClick, icon: Icon, label, color }: any) {
         "relative flex flex-col items-center justify-center gap-3 rounded-2xl p-4 transition-all duration-200",
         active 
           ? `ring-2 ${colorStyles[color]} shadow-sm` 
-          : "bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+          : "bg-white hover:bg-zinc-50"
       )}
     >
       <div className={cn(
         "flex h-12 w-12 items-center justify-center rounded-xl",
-        active ? "bg-white/50" : "bg-zinc-100 dark:bg-zinc-700"
+        active ? "bg-white/50" : "bg-zinc-100"
       )}>
         <Icon size={24} className={active ? "text-current" : "text-zinc-500"} />
       </div>
       <span className={cn(
         "text-sm font-bold",
-        active ? "text-current" : "text-zinc-600 dark:text-zinc-400"
+        active ? "text-current" : "text-zinc-600"
       )}>
         {label}
       </span>

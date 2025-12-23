@@ -63,21 +63,21 @@ export function FolioModal({ room, timeRules, isOpen, onClose, onPayment }: Foli
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative z-10 w-full max-w-lg overflow-hidden rounded-t-[2rem] bg-white shadow-2xl dark:bg-zinc-900 sm:rounded-[2rem]"
+            className="relative z-10 w-full max-w-lg overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2rem]"
           >
             {/* Mobile Drag Handle */}
-            <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-zinc-200 sm:hidden dark:bg-zinc-700" />
+            <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-zinc-200 sm:hidden" />
 
-            <div className="flex items-center justify-between border-b border-zinc-100 p-6 pt-8 dark:border-zinc-800 sm:pt-6">
+            <div className="flex items-center justify-between border-b border-zinc-100 p-6 pt-8 sm:pt-6">
               <div>
-                <h2 className="text-2xl font-black text-zinc-900 dark:text-white">
+                <h2 className="text-2xl font-black text-zinc-900">
                   Phòng {room.room_number}
                 </h2>
                 <p className="text-sm font-medium text-zinc-500">Quản lý thanh toán</p>
               </div>
               <button
                 onClick={onClose}
-                className="rounded-full bg-zinc-100 p-2 text-zinc-500 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+                className="rounded-full bg-zinc-100 p-2 text-zinc-500 hover:bg-zinc-200"
               >
                 <X size={24} />
               </button>
@@ -86,10 +86,10 @@ export function FolioModal({ room, timeRules, isOpen, onClose, onPayment }: Foli
             <div className="max-h-[80vh] overflow-y-auto p-6">
               <div className="space-y-6">
                 {/* Customer Info */}
-                <div className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
+                <div className="rounded-2xl bg-zinc-50 p-4">
                   <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-zinc-400">Khách hàng</h3>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100">
+                    <div className="flex items-center gap-3 text-zinc-900">
                       <User size={18} className="text-zinc-400" />
                       <span className="font-bold">{customer?.full_name || 'Khách vãng lai'}</span>
                     </div>
@@ -104,24 +104,24 @@ export function FolioModal({ room, timeRules, isOpen, onClose, onPayment }: Foli
 
                 {/* Pricing Info */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded-2xl bg-blue-50 p-4 dark:bg-blue-500/10">
+                  <div className="rounded-2xl bg-blue-50 p-4">
                     <div className="flex items-center gap-2 text-blue-600">
                       <Clock size={16} />
                       <span className="text-xs font-bold uppercase">Thời gian</span>
                     </div>
-                    <p className="mt-1 text-2xl font-black text-blue-700 dark:text-blue-400">
+                    <p className="mt-1 text-2xl font-black text-blue-700">
                       {duration}
                     </p>
                     <p className="text-[10px] font-medium text-blue-600/60 uppercase">
                       {booking?.rental_type === 'hourly' ? 'Theo giờ' : booking?.rental_type === 'daily' ? 'Theo ngày' : 'Qua đêm'}
                     </p>
                   </div>
-                  <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
+                  <div className="rounded-2xl bg-emerald-50 p-4">
                     <div className="flex items-center gap-2 text-emerald-600">
                       <Receipt size={16} />
                       <span className="text-xs font-bold uppercase">Tạm tính</span>
                     </div>
-                    <p className="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-400">
+                    <p className="mt-1 text-2xl font-black text-emerald-700">
                       {formatCurrency(pricing.price)}
                     </p>
                     <p className="text-[10px] font-medium text-emerald-600/60 uppercase">
@@ -132,17 +132,17 @@ export function FolioModal({ room, timeRules, isOpen, onClose, onPayment }: Foli
 
                 {/* Deposit & Prepayments */}
                 {(booking?.deposit_amount || 0) > 0 && (
-                  <div className="flex items-center justify-between rounded-2xl border-2 border-dashed border-zinc-100 p-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between rounded-2xl border-2 border-dashed border-zinc-100 p-4">
                     <span className="text-sm font-medium text-zinc-500">Tiền đặt cọc đã nhận</span>
                     <span className="font-bold text-rose-500">-{formatCurrency(booking?.deposit_amount || 0)}</span>
                   </div>
                 )}
 
                 {/* Final Amount */}
-                <div className="rounded-2xl bg-zinc-900 p-6 dark:bg-white">
+                <div className="rounded-2xl bg-zinc-900 p-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-zinc-400 dark:text-zinc-500">Tổng thanh toán</span>
-                    <span className="text-3xl font-black tracking-tight text-white dark:text-zinc-900">
+                    <span className="text-sm font-medium text-zinc-400">Tổng thanh toán</span>
+                    <span className="text-3xl font-black tracking-tight text-white">
                       {formatCurrency(Math.max(0, pricing.price - (booking?.deposit_amount || 0)))}
                     </span>
                   </div>

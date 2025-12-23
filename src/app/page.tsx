@@ -207,7 +207,7 @@ export default function Dashboard() {
     return (
       <div className="flex h-full flex-col items-center justify-center space-y-4">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Chưa có dữ liệu phòng</h2>
+          <h2 className="text-2xl font-bold text-zinc-900">Chưa có dữ liệu phòng</h2>
           <p className="text-zinc-500">Database đang trống. Hãy khởi tạo dữ liệu mẫu để bắt đầu.</p>
         </div>
         <button
@@ -225,7 +225,7 @@ export default function Dashboard() {
     <div className="space-y-8 pb-20"> {/* Add padding bottom for mobile scroll */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+          <h1 className="text-3xl font-black tracking-tight text-zinc-900 sm:text-4xl">
             Sơ đồ phòng
           </h1>
           <div className="flex items-center gap-3">
@@ -235,18 +235,18 @@ export default function Dashboard() {
             <button 
               onClick={seedRooms}
               disabled={isSeeding}
-              className="rounded-lg bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-500 hover:bg-zinc-200 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-400"
+              className="rounded-lg bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-500 hover:bg-zinc-200 disabled:opacity-50"
             >
               {isSeeding ? 'Đang nạp...' : 'Khởi tạo lại dữ liệu'}
             </button>
           </div>
         </div>
         
-        <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm dark:bg-zinc-900">
+        <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm">
           {['Tất cả', 'Trống', 'Đang ở', 'Chờ dọn'].map((filter) => (
             <button
               key={filter}
-              className="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+              className="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
             >
               {filter}
             </button>

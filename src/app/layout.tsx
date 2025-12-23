@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
+    <html lang="vi" data-theme="light" className="light">
       <body className={cn(inter.className, "min-h-screen selection:bg-blue-500/30")}>
         <div className="flex h-screen flex-col overflow-hidden">
           {/* Header - Glassmorphism */}
