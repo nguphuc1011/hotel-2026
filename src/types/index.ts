@@ -15,6 +15,7 @@ export interface Room {
     daily: number;
   };
   enable_overnight: boolean;
+  voice_alias?: string; // MỚI: Tên gọi giọng nói cho AI
   current_booking_id?: string;
   current_booking?: Booking & { customer?: Customer };
 }
@@ -27,6 +28,7 @@ export interface Customer {
   plate_number?: string;
   total_spent: number;
   visit_count: number;
+  ocr_data?: any; // MỚI: Dữ liệu OCR từ CCCD
 }
 
 export interface Service {
@@ -36,6 +38,21 @@ export interface Service {
   price: number;
   stock: number;
   icon?: string;
+  tax_type: 'service' | 'accommodation' | 'goods'; // MỚI: Phân loại thuế
+  keywords?: string[]; // MỚI: Từ khóa nhận diện giọng nói
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  action: string;
+  entity_id: string;
+  old_value: any;
+  new_value: any;
+  reason?: string;
+  ip_address?: string;
+  suspicion_score: number; // MỚI: Điểm nghi vấn AI (0-1)
+  created_at: string;
 }
 
 export interface Booking {
@@ -86,6 +103,12 @@ export interface Setting {
   id: string;
   key: string;
   value: any;
+  tax_code?: string; // MỚI: Mã số thuế
+  tax_config?: {     // MỚI: Cấu hình thuế suất
+    vat: number;
+    service_fee: number;
+    [key: string]: any;
+  };
 }
 
 export interface TimeRules {

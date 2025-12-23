@@ -348,47 +348,16 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: any) {
 }
 ```
 
-#### **E. src/components/dashboard/RoomCard.tsx (Giao diện thẻ phòng)**
-Thẻ phòng thông minh với trạng thái màu sắc động và hiệu ứng hover mượt mà.
+### **3. HẠ TẦNG AI & LUẬT THUẾ 2026**
+Hệ thống đã được cấu hình sẵn các trường dữ liệu để tích hợp AI (Giọng nói, OCR, Chống gian lận) và tuân thủ các quy định về thuế mới.
 
-```tsx
-'use client';
+#### **A. Database Schema (Supabase)**
+- **AI Giọng nói**: Cột `voice_alias` trong `rooms` và `keywords` trong `services`.
+- **AI OCR**: Cột `ocr_data` trong `customers` lưu trữ thông tin quét CCCD.
+- **AI Thám tử**: Bảng `audit_logs` với `suspicion_score` để phát hiện bất thường.
+- **Luật Thuế 2026**: Phân loại `tax_type` cho dịch vụ và cấu hình `tax_config` tập trung.
 
-import { Room } from '@/types';
-import { cn, formatCurrency } from '@/lib/utils';
-import { motion } from 'framer-motion';
-import { CheckCircle2, Clock, Sun, Moon, Sparkles, Wrench } from 'lucide-react';
+#### **B. Row Level Security (RLS)**
+- `audit_logs`: Chỉ cho phép `SELECT/INSERT`, ngăn chặn tuyệt đối việc sửa xóa để bảo vệ dữ liệu kiểm toán.
+- `settings`: Chỉ tài khoản có Role `admin` mới được quyền cập nhật cấu hình hệ thống.
 
-const statusConfig = {
-  available: { label: 'Trống', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100/50', border: 'border-emerald-200' },
-  hourly: { label: 'Theo giờ', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-100/50', border: 'border-blue-200' },
-  daily: { label: 'Theo ngày', icon: Sun, color: 'text-indigo-600', bg: 'bg-indigo-100/50', border: 'border-indigo-200' },
-  overnight: { label: 'Qua đêm', icon: Moon, color: 'text-purple-600', bg: 'bg-purple-100/50', border: 'border-purple-200' },
-  dirty: { label: 'Chờ dọn', icon: Sparkles, color: 'text-amber-600', bg: 'bg-amber-100/50', border: 'border-amber-200' },
-  repair: { label: 'Sửa chữa', icon: Wrench, color: 'text-rose-600', bg: 'bg-rose-100/50', border: 'border-rose-200' },
-};
-
-export function RoomCard({ room, onClick }: any) {
-  const config = statusConfig[room.status] || statusConfig.available;
-  const Icon = config.icon;
-
-  return (
-    <motion.button whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }} onClick={() => onClick?.(room)} className={cn("relative flex h-full w-full flex-col justify-between overflow-hidden rounded-[24px] border p-6 text-left transition-all bg-white dark:bg-zinc-900 shadow-lg", config.border)}>
-      <div className="z-10 flex w-full items-start justify-between">
-        <div className="flex flex-col">
-          <span className="text-3xl font-black text-zinc-900 dark:text-zinc-50">{room.room_number}</span>
-          <span className="text-sm text-zinc-400">{room.room_type} • {room.area}</span>
-        </div>
-        <div className={cn("rounded-full p-2.5 backdrop-blur-md", config.bg, config.color)}><Icon size={24} strokeWidth={2.5} /></div>
-      </div>
-      <div className="z-10 mt-6 space-y-1">
-        <span className={cn("text-xs font-bold uppercase tracking-wider", config.color)}>{config.label}</span>
-        <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-bold">{formatCurrency(room.prices?.hourly || 0)}</span>
-          <span className="text-xs text-zinc-400">/ giờ đầu</span>
-        </div>
-      </div>
-    </motion.button>
-  );
-}
-```
