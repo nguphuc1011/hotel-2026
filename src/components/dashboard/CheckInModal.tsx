@@ -277,7 +277,7 @@ export function CheckInModal({ room, services, customers, timeRules, onClose, on
                     <FileText size={10} /> Tiền Cọc
                   </p>
                   <button 
-                    onClick={() => setDeposit(totalAmount)}
+                    onClick={() => setDeposit(price + serviceTotal)}
                     className="text-[9px] font-black text-blue-500 hover:text-blue-700 transition-colors uppercase"
                   >
                     [Tất cả]

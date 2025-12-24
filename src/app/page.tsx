@@ -344,7 +344,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8 pb-20"> {/* Add padding bottom for mobile scroll */}
+    <div className="space-y-2 pb-20"> {/* Add padding bottom for mobile scroll */}
       <DashboardHeader 
         activeFilterIds={activeFilterIds}
         onToggleFilter={onToggleFilter}
@@ -353,7 +353,7 @@ export default function Dashboard() {
 
       <motion.div 
         layout
-        className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 xl:gap-8"
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4 pt-0"
       >
         <AnimatePresence mode='popLayout'>
           {filteredRooms.map((room) => (

@@ -12,8 +12,22 @@ import { Toaster } from 'sonner';
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
 export const metadata: Metadata = {
-  title: "Hotel Manager 2026",
-  description: "High-end Hotel Management System",
+  title: "Hotel 2026",
+  description: "Quản lý khách sạn đơn giản và hiệu quả",
+  applicationName: "Hotel 2026",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Hotel 2026",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  themeColor: "#FFFFFF",
+  manifest: "/manifest.json",
+  icons: {
+    apple: "/icons/icon-192x192.png",
+  },
 };
 
 export default function RootLayout({
@@ -25,15 +39,7 @@ export default function RootLayout({
     <html lang="vi" data-theme="light" className="light">
       <body className={cn(inter.className, "min-h-screen bg-slate-50 selection:bg-blue-500/30 flex flex-col")}>
         <Toaster position="top-center" richColors />
-        {/* Normal Header (Not Fixed) */}
-        <header className="w-full h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 flex-shrink-0">
-          <Link href="/" className="font-bold text-lg text-slate-800">
-            Hotel 2026
-          </Link>
-          <button className="h-9 w-9 rounded-full bg-slate-200 flex items-center justify-center">
-            <UserCircle className="h-6 w-6 text-slate-500" />
-          </button>
-        </header>
+        {/* <Header /> */}
 
         {/* Main Content */}
         <main className="flex-1 pb-24 px-4 max-w-md mx-auto w-full">
@@ -66,9 +72,9 @@ export default function RootLayout({
               <div className="absolute left-1/2 -translate-x-1/2 -top-5">
                 <Link 
                   href="/" 
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] active:scale-95 transition-all duration-300"
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-black shadow-[0_8px_20px_rgba(0,0,0,0.15)] border border-slate-100 active:scale-95 transition-all duration-300"
                 >
-                  <LayoutGrid className="h-7 w-7" />
+                  <LayoutGrid className="h-7 w-7 fill-black/10" />
                 </Link>
               </div>
 

@@ -15,7 +15,7 @@ export function DashboardHeader({
   roomCounts,
 }: DashboardHeaderProps) {
   return (
-    <div className="pt-4 pb-2">
+    <div className="pt-2 pb-0">
       <RoomStatusFilter 
         activeFilterIds={activeFilterIds}
         onToggleFilter={onToggleFilter}
