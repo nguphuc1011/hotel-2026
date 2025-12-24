@@ -12,6 +12,8 @@ import { BottomNav } from "@/components/layout/BottomNav";
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
 
+
+
 export const metadata: Metadata = {
   title: "Hotel 2026",
   description: "Quản lý khách sạn đơn giản và hiệu quả",
@@ -24,11 +26,19 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  themeColor: "#FFFFFF",
   manifest: "/manifest.json",
   icons: {
-    apple: "/icons/icon-192x192.png",
+    apple: "https://cdn-icons-png.flaticon.com/512/2983/2983803.png",
   },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#FFFFFF",
 };
 
 export default function RootLayout({
@@ -49,6 +59,8 @@ export default function RootLayout({
 
         <BottomNav />
       </body>
+
+
 
     </html>
   );

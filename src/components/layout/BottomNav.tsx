@@ -3,53 +3,89 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutGrid, Settings, FileText, Package } from 'lucide-react';
+import { LayoutGrid, Settings, BarChart3 } from 'lucide-react';
 
 const navLinks = [
-  { href: '/', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/services', label: 'Dịch vụ', icon: Package },
-  { href: '/reports', label: 'Báo cáo', icon: FileText },
-  { href: '/settings', label: 'Cài đặt', icon: Settings },
+  { href: '/reports', label: 'BÁO CÁO', icon: BarChart3 },
+  { href: '/', label: 'SƠ ĐỒ', icon: LayoutGrid },
+  { href: '/settings', label: 'CÀI ĐẶT', icon: Settings },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[100] flex items-center bg-white/70 backdrop-blur-xl border-t border-white/40 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-      {navLinks.map((link) => {
-        const isActive = pathname.startsWith(link.href) && link.href !== '/' || pathname === link.href;
-        const Icon = link.icon;
-        
-        return (
-          <Link
-            key={link.href}
-            href={link.href}
-            className="flex flex-col items-center justify-center gap-1 flex-1 min-w-0 py-1"
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] h-24 flex items-end justify-center pointer-events-none pb-safe">
+      <div className="relative w-full max-w-md h-20 pointer-events-auto">
+        {/* Solid White Background with Notch - Subtle Top Shadow */}
+        <div className="absolute inset-0 overflow-hidden">
+          <svg
+            width="100%"
+            height="100%"
+            viewBox="0 0 400 80"
+            preserveAspectRatio="none"
+            className="text-white drop-shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
           >
-            <div className={cn(
-              "p-2 rounded-xl transition-all duration-300",
-              isActive && link.href === '/' ? "bg-white/40 backdrop-blur-md shadow-sm ring-1 ring-white/50" : 
-              isActive ? "bg-blue-50/50 text-blue-600 backdrop-blur-sm" : "text-slate-500"
-            )}>
+            <path
+              d="M0 80 L0 20 L140 20 C160 20 165 70 200 70 S240 20 260 20 L400 20 L400 80 Z"
+              fill="currentColor"
+            />
+          </svg>
+        </div>
 
-              <Icon className={cn(
-                'h-6 w-6 transition-colors',
-                isActive && link.href === '/' ? 'text-black fill-black/10' : ''
-              )} />
-            </div>
-            <span className={cn(
-              'text-[10px] font-bold uppercase tracking-tight transition-colors',
-              isActive && link.href === '/' ? 'text-black font-black' :
-              isActive ? 'text-blue-600 font-black' : 'text-slate-400'
-            )}>
-              {link.href === '/' ? 'Sơ đồ' : link.label}
-            </span>
-          </Link>
-        );
-      })}
+        {/* Navigation Items */}
+        <div className="relative h-full flex items-center px-6 pt-4">
+          {navLinks.map((link, index) => {
+            const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
+            const Icon = link.icon;
+
+            // Center Item (Floating Button with Glassmorphism)
+            if (index === 1) {
+              return (
+                <div key={link.href} className="flex-1 flex justify-center -mt-12">
+                  <Link
+                    href={link.href}
+                    className={cn(
+                      "w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 shadow-[0_8px_20px_rgba(0,0,0,0.15)] backdrop-blur-xl",
+                      isActive 
+                        ? "bg-slate-900/90 text-white" 
+                        : "bg-white/60 text-slate-600 border-[0.5px] border-white/40"
+                    )}
+                  >
+                    <Icon className="h-8 w-8" />
+                  </Link>
+                </div>
+              );
+            }
+
+            // Side Items
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="flex-1 flex flex-col items-center justify-center gap-1 group"
+              >
+                <div className={cn(
+                  "transition-all duration-300 mb-0.5",
+                  isActive ? "text-slate-900 scale-110" : "text-slate-400 group-hover:text-slate-600"
+                )}>
+                  <Icon className="h-6 w-6" />
+                </div>
+                <span className={cn(
+                  "text-[11px] font-bold tracking-tight transition-colors",
+                  isActive ? "text-slate-900" : "text-zinc-500"
+                )}>
+                  {link.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </nav>
   );
 }
+
+
 
 

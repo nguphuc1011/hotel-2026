@@ -346,12 +346,13 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-2 pb-20"> {/* Add padding bottom for mobile scroll */}
+    <div className="space-y-4 pb-20"> {/* Add padding bottom for mobile scroll */}
       <DashboardHeader 
         activeFilterIds={activeFilterIds}
         onToggleFilter={onToggleFilter}
         roomCounts={roomCounts}
       />
+
 
       <motion.div 
         layout
