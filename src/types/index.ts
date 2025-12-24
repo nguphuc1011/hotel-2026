@@ -91,6 +91,16 @@ export interface Invoice {
   created_at?: string;
 }
 
+export interface Profile {
+  id: string;
+  username: string;
+  full_name: string;
+  role: 'admin' | 'staff' | 'manager';
+  phone?: string;
+  permissions?: string[];
+  created_at?: string;
+}
+
 export interface Expense {
   id: string;
   amount: number;

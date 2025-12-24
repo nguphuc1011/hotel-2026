@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useHotel } from '@/hooks/useHotel';
 import { RoomCard } from '@/components/dashboard/RoomCard';
 import { CheckInModal } from '@/components/dashboard/CheckInModal';
 import { FolioModal } from '@/components/dashboard/FolioModal';
-import { motion } from 'framer-motion';
 import { Room } from '@/types';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 
 export default function Dashboard() {
@@ -14,8 +15,30 @@ export default function Dashboard() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [folioRoom, setFolioRoom] = useState<Room | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [activeFilterIds, setActiveFilterIds] = useState<string[]>(['available', 'hourly', 'daily', 'dirty', 'repair']);
 
   const timeRules = settings?.find((s: any) => s.key === 'time_rules')?.value;
+
+  const roomCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    rooms.forEach(room => {
+      counts[room.status] = (counts[room.status] || 0) + 1;
+    });
+    return counts;
+  }, [rooms]);
+
+  const onToggleFilter = (id: string) => {
+    setActiveFilterIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(i => i !== id) 
+        : [...prev, id]
+    );
+  };
+
+  const filteredRooms = rooms.filter(room => {
+    if (room.status === 'overnight') return activeFilterIds.includes('daily');
+    return activeFilterIds.includes(room.status);
+  });
 
   const handleRoomClick = async (room: Room) => {
     if (room.status === 'available') {
@@ -223,50 +246,32 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pb-20"> {/* Add padding bottom for mobile scroll */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900 sm:text-4xl">
-            Sơ đồ phòng
-          </h1>
-          <div className="flex items-center gap-3">
-            <p className="text-lg text-zinc-500">
-              {rooms?.filter(r => r.status === 'available').length || 0} phòng trống • {rooms?.length || 0} tổng số
-            </p>
-            <button 
-              onClick={seedRooms}
-              disabled={isSeeding}
-              className="rounded-lg bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-500 hover:bg-zinc-200 disabled:opacity-50"
-            >
-              {isSeeding ? 'Đang nạp...' : 'Khởi tạo lại dữ liệu'}
-            </button>
-          </div>
-        </div>
-        
-        <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm">
-          {['Tất cả', 'Trống', 'Đang ở', 'Chờ dọn'].map((filter) => (
-            <button
-              key={filter}
-              className="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-            >
-              {filter}
-            </button>
-          ))}
-        </div>
-      </div>
+      <DashboardHeader 
+        activeFilterIds={activeFilterIds}
+        onToggleFilter={onToggleFilter}
+        roomCounts={roomCounts}
+      />
 
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        layout
         className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 xl:gap-8"
       >
-        {rooms.map((room) => (
-          <RoomCard 
-            key={room.id} 
-            room={room} 
-            onClick={handleRoomClick}
-          />
-        ))}
+        <AnimatePresence mode='popLayout'>
+          {filteredRooms.map((room) => (
+            <motion.div
+              layout
+              key={room.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+            >
+              <RoomCard 
+                room={room} 
+                onClick={handleRoomClick}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </motion.div>
 
       {selectedRoom && (

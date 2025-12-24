@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Phone, CreditCard, Clock, Calendar, Moon, Save } from 'lucide-react';
+import { X, User, Phone, CreditCard, Clock, Calendar, Moon, Save, MessageSquare } from 'lucide-react';
 import { Room, TimeRules } from '@/types';
 import { cn, formatCurrency } from '@/lib/utils';
-import { PricingLogic } from '@/lib/pricing';
+import { suggestRentalType } from '@/lib/pricing';
 
 interface CheckInModalProps {
   room: Room;
@@ -15,17 +15,22 @@ interface CheckInModalProps {
 }
 
 export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInModalProps) {
-  const [type, setType] = useState<'hourly' | 'daily' | 'overnight'>('hourly');
+  const [type, setType] = useState<'hourly' | 'daily' | 'overnight'>(() => {
+    if (timeRules) {
+      return suggestRentalType(new Date(), timeRules);
+    }
+    return 'hourly';
+  });
   const [customer, setCustomer] = useState({ name: '', phone: '', idCard: '' });
   const [deposit, setDeposit] = useState<number>(0);
   const [note, setNote] = useState('');
 
-  // Auto-suggest overnight logic on mount
-  useState(() => {
-    if (timeRules && PricingLogic.checkOvernightAutoSuggest(new Date(), timeRules)) {
-      setType('overnight');
+  // Auto-suggest overnight logic on mount or when timeRules changes
+  useEffect(() => {
+    if (timeRules) {
+      setType(suggestRentalType(new Date(), timeRules));
     }
-  });
+  }, [timeRules]);
 
   // Calculate estimated price based on current selection (simplified preview)
   const currentPrice = type === 'hourly' ? (room.prices?.hourly || 0) : 
@@ -160,6 +165,15 @@ export function CheckInModal({ room, timeRules, onClose, onConfirm }: CheckInMod
                       value={deposit || ''}
                       onChange={e => setDeposit(Number(e.target.value))}
                       className="h-14 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 text-lg font-bold text-blue-600 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="relative">
+                    <MessageSquare className="absolute left-4 top-4 text-zinc-400" size={20} />
+                    <textarea
+                      placeholder="Ghi chú thêm..."
+                      value={note}
+                      onChange={e => setNote(e.target.value)}
+                      className="h-24 w-full rounded-2xl border-0 bg-zinc-100 pl-12 pr-4 pt-4 text-lg font-medium text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 resize-none"
                     />
                   </div>
                 </div>
