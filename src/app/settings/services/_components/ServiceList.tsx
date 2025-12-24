@@ -78,8 +78,18 @@ export default function ServiceList() {
   }, []);
 
   useEffect(() => {
-    fetchServices();
-    fetchCategories();
+    let isMounted = true;
+    
+    const loadData = async () => {
+      if (!isMounted) return;
+      await Promise.all([fetchServices(), fetchCategories()]);
+    };
+
+    loadData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [fetchServices, fetchCategories]);
 
   const handleServiceSubmit = async (e: React.FormEvent) => {
@@ -454,15 +464,28 @@ export default function ServiceList() {
   );
 }
 
-function FormInput({ label, value, onChange, type = 'text', placeholder, options }: any) {
+interface FormInputProps {
+  label: string;
+  value: any;
+  onChange: (val: any) => void;
+  type?: 'text' | 'number' | 'currency' | 'select';
+  placeholder?: string;
+  options?: Array<{ id: string; name: string }>;
+}
+
+function FormInput({ label, value, onChange, type = 'text', placeholder, options }: FormInputProps) {
   const [displayValue, setDisplayValue] = useState(type === 'currency' ? formatInputCurrency(value?.toString() || '0') : value);
 
   useEffect(() => {
-    if (type === 'currency') {
-      setDisplayValue(formatInputCurrency(value?.toString() || '0'));
-    } else {
-      setDisplayValue(value);
+    let isMounted = true;
+    if (isMounted) {
+      if (type === 'currency') {
+        setDisplayValue(formatInputCurrency(value?.toString() || '0'));
+      } else {
+        setDisplayValue(value);
+      }
     }
+    return () => { isMounted = false; };
   }, [value, type]);
 
   return (

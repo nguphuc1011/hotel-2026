@@ -487,12 +487,25 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
 }
 
 // --- CURRENCY INPUT COMPONENT --- //
-function FormCurrencyInput({ label, icon, value, onChange, error }: any) {
+interface FormCurrencyInputProps {
+  label: string;
+  icon?: React.ReactNode;
+  value: number;
+  onChange: (val: number) => void;
+  error?: any;
+}
+
+function FormCurrencyInput({ label, icon, value, onChange, error }: FormCurrencyInputProps) {
   const [displayValue, setDisplayValue] = useState(formatInputCurrency(value?.toString() || '0'));
 
   useEffect(() => {
-    setDisplayValue(formatInputCurrency(value?.toString() || '0'));
-  }, [value]);
+    let isMounted = true;
+    const formatted = formatInputCurrency(value?.toString() || '0');
+    if (isMounted && displayValue !== formatted) {
+      setDisplayValue(formatted);
+    }
+    return () => { isMounted = false; };
+  }, [value, displayValue]);
 
   return (
     <div className="space-y-1.5">
@@ -521,7 +534,16 @@ function FormCurrencyInput({ label, icon, value, onChange, error }: any) {
 }
 
 // --- FORM INPUT COMPONENT --- //
-function FormInput({ label, name, register, error, type = 'text', placeholder }: any) {
+interface FormInputProps {
+  label: string;
+  name: string;
+  register: any;
+  error?: any;
+  type?: string;
+  placeholder?: string;
+}
+
+function FormInput({ label, name, register, error, type = 'text', placeholder }: FormInputProps) {
   return (
     <div className="space-y-1.5">
       <label htmlFor={name} className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">{label}</label>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Room, Service, Customer } from '@/types';
+import { Room, Service, Customer, TimeRules, CheckInData } from '@/types';
 import { cn, formatCurrency, formatInputCurrency, parseCurrency } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MoreHorizontal, User, Smartphone, CreditCard, Clock, Settings, FileText, Calendar } from 'lucide-react';
@@ -12,9 +12,9 @@ interface CheckInModalProps {
   room: Room | null;
   services: Service[];
   customers: Customer[];
-  timeRules: any;
+  timeRules: TimeRules;
   onClose: () => void;
-  onConfirm: (data: any) => void;
+  onConfirm: (data: CheckInData) => void;
 }
 
 export function CheckInModal({ room, services, customers, timeRules, onClose, onConfirm }: CheckInModalProps) {
@@ -24,11 +24,21 @@ export function CheckInModal({ room, services, customers, timeRules, onClose, on
   const [deposit, setDeposit] = useState(0);
   const [displayPrice, setDisplayPrice] = useState('0');
   const [displayDeposit, setDisplayDeposit] = useState('0');
-  const [servicesUsed, setServicesUsed] = useState<any[]>([]);
+  const [servicesUsed, setServicesUsed] = useState<Array<{ service_id: string; quantity: number; price: number }>>([]);
   const [note, setNote] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
-  // Synchronize numeric price with display string
+  // Synchronize numeric price when room or rentalType changes
+  useEffect(() => {
+    if (room && room.prices) {
+      const priceForType = room.prices[rentalType as keyof typeof room.prices];
+      if (typeof priceForType === 'number') {
+        setPrice(priceForType);
+      }
+    }
+  }, [room, rentalType]);
+
+  // Synchronize display strings when numeric values change
   useEffect(() => {
     setDisplayPrice(formatCurrency(price));
   }, [price]);
@@ -41,7 +51,6 @@ export function CheckInModal({ room, services, customers, timeRules, onClose, on
     const term = customer.name.toLowerCase();
     if (!term || !isFocused) return [];
     
-    // Fuzzy search logic from duan.md
     const removeDau = (str: string) => {
       return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     };
@@ -55,19 +64,8 @@ export function CheckInModal({ room, services, customers, timeRules, onClose, on
       return removeDau(fullName).includes(searchStr) ||
              phone.includes(term) ||
              idCard.includes(term);
-    }).slice(0, 5); // Limit to top 5 as per duan.md
+    }).slice(0, 5);
   }, [customer.name, customers, isFocused]);
-
-  // Mặc định chọn ngày khi mở modal (Xóa useEffect suggestRentalType cũ)
-  
-  useEffect(() => {
-    if (room && room.prices) {
-      const priceForType = room.prices[rentalType as keyof typeof room.prices];
-      if (typeof priceForType === 'number') {
-        setPrice(priceForType);
-      }
-    }
-  }, [room, rentalType]);
 
   const handleSelectCustomer = (selected: Customer) => {
     setCustomer({
@@ -98,9 +96,10 @@ export function CheckInModal({ room, services, customers, timeRules, onClose, on
   };
 
   const serviceTotal = servicesUsed.reduce((sum, s) => sum + (s.price * s.quantity), 0);
-  const totalAmount = price + deposit + serviceTotal;
+  const totalAmount = price + serviceTotal;
 
   if (!room) return null;
+
 
   return (
     <AnimatePresence mode="wait">

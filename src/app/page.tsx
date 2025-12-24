@@ -33,7 +33,7 @@ export default function Dashboard() {
     onConfirm: () => {},
   });
 
-  const systemSettings = settings?.find((s: any) => s.key === 'system_settings')?.value;
+  const systemSettings = settings?.find((s: Setting) => s.key === 'system_settings')?.value;
   const timeRules = systemSettings || {
     check_in: '14:00',
     check_out: '12:00',
@@ -145,7 +145,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleCheckIn = async (data: any) => {
+  const handleCheckIn = async (data: CheckInData) => {
     try {
       if (!selectedRoom) return;
 
@@ -251,15 +251,16 @@ export default function Dashboard() {
       setSelectedRoom(null);
       mutateRooms(); // Refresh data immediately
       
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       console.error('Chi tiết lỗi Check-in:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        fullError: error
+        message: err.message,
+        details: err.details,
+        hint: err.hint,
+        code: err.code,
+        fullError: err
       });
-      toast.error(`Lỗi khi nhận phòng: ${error.message || 'Lỗi không xác định'}`);
+      toast.error(`Lỗi khi nhận phòng: ${err.message || 'Lỗi không xác định'}`);
     }
   };
 
@@ -308,9 +309,10 @@ export default function Dashboard() {
       
       mutateRooms();
       toast.success('Đã khởi tạo 12 phòng mẫu thành công!');
-    } catch (error: any) {
-      console.error('Seed error:', error);
-      toast.error(`Lỗi khởi tạo: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as any;
+      console.error('Seed error:', err);
+      toast.error(`Lỗi khởi tạo: ${err.message}`);
     } finally {
       setIsSeeding(false);
     }

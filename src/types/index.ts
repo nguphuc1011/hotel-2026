@@ -15,7 +15,7 @@ export interface Room {
     daily: number;
   };
   enable_overnight: boolean;
-  voice_alias?: string; // MỚI: Tên gọi giọng nói cho AI
+  voice_alias?: string;
   current_booking_id?: string;
   current_booking?: Booking & { customer?: Customer };
 }
@@ -29,7 +29,7 @@ export interface Customer {
   total_spent: number;
   visit_count: number;
   notes?: string;
-  ocr_data?: any; // MỚI: Dữ liệu OCR từ CCCD
+  ocr_data?: any;
 }
 
 export interface Service {
@@ -39,8 +39,8 @@ export interface Service {
   price: number;
   stock: number;
   icon?: string;
-  tax_type: 'service' | 'accommodation' | 'goods'; // MỚI: Phân loại thuế
-  keywords?: string[]; // MỚI: Từ khóa nhận diện giọng nói
+  tax_type: 'service' | 'accommodation' | 'goods';
+  keywords?: string[];
 }
 
 export interface AuditLog {
@@ -52,7 +52,7 @@ export interface AuditLog {
   new_value: any;
   reason?: string;
   ip_address?: string;
-  suspicion_score: number; // MỚI: Điểm nghi vấn AI (0-1)
+  suspicion_score: number;
   created_at: string;
 }
 
@@ -117,8 +117,8 @@ export interface Setting {
   id: string;
   key: string;
   value: any;
-  tax_code?: string; // MỚI: Mã số thuế
-  tax_config?: {     // MỚI: Cấu hình thuế suất
+  tax_code?: string;
+  tax_config?: {
     vat: number;
     service_fee: number;
     [key: string]: any;
@@ -134,5 +134,24 @@ export interface TimeRules {
   };
   early_rules: Array<{ from: string; to: string; percent: number }>;
   late_rules: Array<{ from: string; to: string; percent: number }>;
-  full_day_late_after?: string; // MỚI: Mốc tính 1 ngày (VD: 18:00)
+  full_day_late_after?: string;
+}
+
+export interface CheckInData {
+  room_id: string;
+  customer: {
+    name: string;
+    phone: string;
+    idCard: string;
+    plate_number: string;
+  };
+  rentalType: string;
+  price: number;
+  deposit: number;
+  services: Array<{
+    service_id: string;
+    quantity: number;
+    price: number;
+  }>;
+  notes: string;
 }

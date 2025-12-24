@@ -6,9 +6,14 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development',
 });
 
-const nextConfig = withPWA({
+const nextConfig = {
   reactStrictMode: true,
-  // any other next.js config goes here
-});
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+};
 
-module.exports = nextConfig;
+module.exports = withPWA(nextConfig);

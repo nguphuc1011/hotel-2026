@@ -39,7 +39,11 @@ export default function StockHistory() {
   }, []);
 
   useEffect(() => {
-    fetchLogs();
+    let isMounted = true;
+    if (isMounted) {
+      fetchLogs();
+    }
+    return () => { isMounted = false; };
   }, [fetchLogs]);
 
   const filteredLogs = logs.filter(log => 

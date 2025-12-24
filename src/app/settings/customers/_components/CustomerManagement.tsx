@@ -29,10 +29,6 @@ export default function CustomerManagement() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
   const fetchCustomers = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -45,6 +41,10 @@ export default function CustomerManagement() {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);

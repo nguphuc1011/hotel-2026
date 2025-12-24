@@ -33,7 +33,7 @@ export function FolioModal({ room, settings, services, isOpen, onClose, onPaymen
   }, [servicesUsed, services]);
 
   const prepaymentsTotal = useMemo(() => {
-    return prepayments.reduce((total: number, item: any) => total + item.amount, 0);
+    return prepayments.reduce((total: number, item: { amount: number }) => total + item.amount, 0);
   }, [prepayments]);
 
   useEffect(() => {
