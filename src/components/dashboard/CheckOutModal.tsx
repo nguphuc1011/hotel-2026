@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase-client';
+import { supabase } from '@/lib/supabase';
 import { Room, Setting, Service } from '@/types';
 import { calculatePrice } from '@/lib/pricing';
 
@@ -97,49 +97,57 @@ export function CheckOutModal({ isOpen, onOpenChange, room, settings, services, 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Thanh toán - Phòng {room.room_number}</DialogTitle>
-        </DialogHeader>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Dịch vụ đã sử dụng</h3>
-            <ServiceSelector 
-              services={services} 
-              selectedServices={selectedServices} 
-              onSelectionChange={setSelectedServices} 
-            />
-          </div>
+      <DialogContent className="p-0">
+        <div className="flex-1 overflow-y-auto">
+          <DialogHeader className="px-6 pt-8 pb-4">
+            <DialogTitle className="text-xl font-black text-zinc-900 uppercase">Thanh toán - Phòng {room.room_number}</DialogTitle>
+          </DialogHeader>
+          
+          <div className="px-6 space-y-6 pb-40">
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Dịch vụ đã sử dụng</h3>
+              <ServiceSelector 
+                services={services} 
+                selectedServices={selectedServices} 
+                onChange={setSelectedServices} 
+              />
+            </div>
 
-          <div className="space-y-6 rounded-lg bg-slate-50 p-4">
-            <h3 className="font-semibold text-lg border-b pb-2">Chi tiết hóa đơn</h3>
-            <BillSummary 
-              priceDetails={priceDetails}
-              roomTotal={roomTotal}
-              servicesTotal={servicesTotal}
-              surcharge={surcharge}
-              totalAmount={totalAmount}
-            />
-            <PaymentDetails
-              paymentMethod={paymentMethod}
-              onPaymentMethodChange={setPaymentMethod}
-              surcharge={surcharge}
-              onSurchargeChange={setSurcharge}
-              notes={notes}
-              onNotesChange={setNotes}
-            />
+            <div className="space-y-6 rounded-[2rem] bg-slate-50 p-6 shadow-sm border border-slate-100">
+              <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest border-b pb-2">Chi tiết hóa đơn</h3>
+              <BillSummary 
+                priceDetails={priceDetails}
+                roomTotal={roomTotal}
+                servicesTotal={servicesTotal}
+                surcharge={surcharge}
+                totalAmount={totalAmount}
+              />
+              <PaymentDetails
+                paymentMethod={paymentMethod}
+                onPaymentMethodChange={setPaymentMethod}
+                surcharge={surcharge}
+                onSurchargeChange={setSurcharge}
+                notes={notes}
+                onNotesChange={setNotes}
+              />
+            </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Hủy</Button>
-          </DialogClose>
-          <Button onClick={handleConfirmCheckout} disabled={isSubmitting}>
-            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận thanh toán'}
-          </Button>
-        </DialogFooter>
+        <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-2xl border-t border-white/20 z-10">
+          <div className="flex gap-3">
+            <DialogClose asChild>
+              <Button variant="outline" className="flex-1 h-14 rounded-2xl font-bold text-zinc-500 border-none bg-zinc-100">Hủy</Button>
+            </DialogClose>
+            <Button 
+              onClick={handleConfirmCheckout} 
+              disabled={isSubmitting}
+              className="flex-[2] h-14 rounded-2xl bg-blue-600 font-bold text-white shadow-lg shadow-blue-200"
+            >
+              {isSubmitting ? 'Đang xử lý...' : 'Xác nhận thanh toán'}
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

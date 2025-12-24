@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { TimeRules } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 // --- Reusable Tab Components ---
 const TabButton = ({ label, isActive, onClick }: { label: string, isActive: boolean, onClick: () => void }) => (
@@ -49,7 +50,6 @@ const tabs = [
 export default function GeneralSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showToast, setShowToast] = useState(false);
   const [activeTab, setActiveTab] = useState(tabs[0].id);
 
   const [timeRules, setTimeRules] = useState<TimeRules & { full_day_late_after?: string }>({
@@ -120,11 +120,10 @@ export default function GeneralSettingsPage() {
 
       if (error) throw error;
       
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+      toast.success('Đã lưu cài đặt thành công!');
     } catch (err) {
       console.error('Error saving settings:', err);
-      alert('Có lỗi xảy ra khi lưu cài đặt!');
+      toast.error('Có lỗi xảy ra khi lưu cài đặt!');
     } finally {
       setSaving(false);
     }
@@ -217,23 +216,6 @@ export default function GeneralSettingsPage() {
           )}
         </button>
       </div>
-
-      {/* Success Toast */}
-       <AnimatePresence>
-        {showToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed inset-x-4 bottom-36 z-50 flex justify-center pointer-events-none"
-          >
-            <div className="flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-white shadow-lg">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-bold">Đã lưu thành công!</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

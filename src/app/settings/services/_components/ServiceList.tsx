@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MoreHorizontal, Plus, Trash2, Edit, Package, Search, Tag, DollarSign, X, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, formatInputCurrency, parseCurrency } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type Service = {
   id: string;
@@ -46,6 +47,18 @@ export default function ServiceList() {
   
   // Stock update state
   const [stockChange, setStockChange] = useState({ amount: 0, reason: '' });
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
 
   const fetchServices = useCallback(async () => {
     setLoading(true);
@@ -133,13 +146,22 @@ export default function ServiceList() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Xóa dịch vụ này?')) return;
-    const { error } = await supabase.from('services').delete().eq('id', id);
-    if (error) toast.error('Lỗi khi xóa');
-    else {
-      toast.success('Đã xóa');
-      fetchServices();
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xóa dịch vụ?',
+      description: 'Bạn có chắc chắn muốn xóa dịch vụ này? Hành động này không thể hoàn tác.',
+      variant: 'danger',
+      onConfirm: async () => {
+        const { error } = await supabase.from('services').delete().eq('id', id);
+        if (error) {
+          toast.error('Lỗi khi xóa');
+        } else {
+          toast.success('Đã xóa');
+          fetchServices();
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const filteredServices = services.filter(s => 
@@ -222,7 +244,7 @@ export default function ServiceList() {
               <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-4">
                 <div className="space-y-0.5">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Giá bán</p>
-                  <p className="text-lg font-black text-blue-600">{formatCurrency(service.price)}<span className="text-xs font-bold text-slate-400">/{service.unit}</span></p>
+                  <p className="text-lg font-black text-blue-600">{formatCurrency(service.price)}đ<span className="text-xs font-bold text-slate-400">/{service.unit}</span></p>
                 </div>
                 
                 <button 
@@ -263,22 +285,22 @@ export default function ServiceList() {
       {/* Form Modal */}
       <AnimatePresence>
         {isFormOpen && (
-          <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-0">
             <motion.div
               initial={{ opacity: 0, y: 100 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 100 }}
-              className="relative w-full max-w-lg rounded-[2.5rem] bg-slate-50 p-8 shadow-2xl"
+              className="relative w-full h-full bg-slate-50 p-8 shadow-2xl flex flex-col overflow-y-auto rounded-none"
             >
               <form onSubmit={handleServiceSubmit} className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between pt-4">
                   <h3 className="text-xl font-bold text-slate-800">{selectedService ? 'Sửa dịch vụ' : 'Thêm dịch vụ mới'}</h3>
-                  <button type="button" onClick={() => setIsFormOpen(false)} className="rounded-full bg-slate-200 p-2 text-slate-500 hover:bg-slate-300 transition-colors">
-                    <X size={20} />
+                  <button type="button" onClick={() => setIsFormOpen(false)} className="rounded-full bg-slate-200 p-3 text-slate-500 hover:bg-slate-300 transition-all">
+                    <X size={24} />
                   </button>
                 </div>
 
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
+                <div className="space-y-6 flex-1">
                   <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 space-y-4">
                     <div className="flex items-center gap-2 text-blue-600 mb-2">
                       <Tag size={18} />
@@ -319,9 +341,9 @@ export default function ServiceList() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormInput 
                         label="Giá bán" 
-                        type="number"
+                        type="currency"
                         value={formData.price} 
-                        onChange={v => setFormData({...formData, price: Number(v)})} 
+                        onChange={v => setFormData({...formData, price: v})} 
                       />
                       <FormInput 
                         label="Tồn ban đầu" 
@@ -362,17 +384,24 @@ export default function ServiceList() {
       {/* Stock Update Modal */}
       <AnimatePresence>
         {isStockOpen && selectedService && (
-          <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-0">
             <motion.div
               initial={{ opacity: 0, y: 100 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 100 }}
-              className="relative w-full max-w-md rounded-[2.5rem] bg-slate-50 p-8 shadow-2xl"
+              className="relative w-full h-full bg-slate-50 p-8 shadow-2xl flex flex-col overflow-y-auto rounded-none"
             >
-              <h3 className="mb-1 text-xl font-bold text-slate-800">Cập nhật kho</h3>
-              <p className="mb-6 text-sm font-bold text-slate-400 uppercase tracking-widest">{selectedService.name}</p>
+              <div className="flex items-center justify-between pt-4 mb-8">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">Cập nhật kho</h3>
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{selectedService.name}</p>
+                </div>
+                <button type="button" onClick={() => setIsStockOpen(false)} className="rounded-full bg-slate-200 p-3 text-slate-500 hover:bg-slate-300 transition-all">
+                  <X size={24} />
+                </button>
+              </div>
               
-              <form onSubmit={handleStockUpdate} className="space-y-6">
+              <form onSubmit={handleStockUpdate} className="space-y-6 flex-1">
                 <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 space-y-4">
                   <div className="flex items-center justify-between px-2">
                     <span className="text-xs font-bold text-slate-400 uppercase">Tồn hiện tại</span>
@@ -412,11 +441,30 @@ export default function ServiceList() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        variant={confirmConfig.variant}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
 
 function FormInput({ label, value, onChange, type = 'text', placeholder, options }: any) {
+  const [displayValue, setDisplayValue] = useState(type === 'currency' ? formatInputCurrency(value?.toString() || '0') : value);
+
+  useEffect(() => {
+    if (type === 'currency') {
+      setDisplayValue(formatInputCurrency(value?.toString() || '0'));
+    } else {
+      setDisplayValue(value);
+    }
+  }, [value, type]);
+
   return (
     <div className="space-y-1.5">
       <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">{label}</label>
@@ -428,6 +476,21 @@ function FormInput({ label, value, onChange, type = 'text', placeholder, options
         >
           {options.map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}
         </select>
+      ) : type === 'currency' ? (
+        <div className="relative">
+          <input 
+            type="text"
+            value={displayValue}
+            onChange={e => {
+              const formatted = formatInputCurrency(e.target.value);
+              setDisplayValue(formatted);
+              onChange(parseCurrency(formatted));
+            }}
+            placeholder={placeholder}
+            className="h-14 w-full rounded-2xl border-transparent bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300"
+          />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 font-bold">đ</span>
+        </div>
       ) : (
         <input 
           type={type}

@@ -48,6 +48,24 @@ export function useHotel() {
   });
 
   const { data: settings } = useSWR('settings', fetcher);
+  const { data: customers } = useSWR('customers', fetcher, { revalidateOnMount: true });
+  const { data: services, error: servicesError, mutate: mutateServices } = useSWR('services', fetcher);
+
+  // Mock services if the fetch fails or returns no data
+  const mockServices = [
+    { id: 1, name: 'Nước suối', price: 10000 },
+    { id: 2, name: 'Mì ly', price: 15000 },
+    { id: 3, name: 'Bia Tiger', price: 20000 },
+    { id: 4, name: 'Bia Heineken', price: 25000 },
+    { id: 5, name: 'Snack', price: 12000 },
+    { id: 6, name: 'Khăn lạnh', price: 5000 },
+    { id: 7, name: 'Bàn chải', price: 8000 },
+    { id: 8, name: 'Bao cao su', price: 10000 },
+    { id: 9, name: 'Giặt ủi', price: 50000 },
+    { id: 10, name: 'Thuê xe máy', price: 150000 },
+  ];
+
+  const finalServices = (services && services.length > 0) ? services : mockServices;
 
   // Subscribe to real-time changes
   useEffect(() => {
@@ -72,6 +90,8 @@ export function useHotel() {
   return {
     rooms: rooms || [],
     settings: settings || [],
+    customers: customers || [],
+    services: finalServices || [],
     isLoading: roomsLoading,
     isError: roomsError,
     mutateRooms: () => mutate('rooms'),

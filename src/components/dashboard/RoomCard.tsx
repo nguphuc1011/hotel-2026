@@ -139,7 +139,7 @@ export function RoomCard({ room, onClick }: RoomCardProps) {
             <div className="flex flex-col items-start leading-none">
               <span className="text-xs opacity-80">Giá giờ đầu</span>
               <span className="text-lg font-bold">
-                {formatCurrency(room.prices?.hourly || 0)}
+                {formatCurrency(room.prices?.hourly || 0)}đ
               </span>
             </div>
           </div>

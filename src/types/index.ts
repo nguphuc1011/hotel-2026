@@ -28,6 +28,7 @@ export interface Customer {
   plate_number?: string;
   total_spent: number;
   visit_count: number;
+  notes?: string;
   ocr_data?: any; // MỚI: Dữ liệu OCR từ CCCD
 }
 
@@ -79,6 +80,9 @@ export interface Booking {
   }>;
   room_charge_locked: number;
   status: BookingStatus;
+  rooms?: {
+    room_number: string;
+  };
 }
 
 export interface Invoice {

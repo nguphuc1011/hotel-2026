@@ -5,19 +5,42 @@ import { useHotel } from '@/hooks/useHotel';
 import { RoomCard } from '@/components/dashboard/RoomCard';
 import { CheckInModal } from '@/components/dashboard/CheckInModal';
 import { FolioModal } from '@/components/dashboard/FolioModal';
-import { Room } from '@/types';
+import CustomerInsightsModal from '@/components/dashboard/CustomerInsightsModal';
+import { Room, Customer, Booking } from '@/types';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function Dashboard() {
-  const { rooms, settings, isLoading, mutateRooms } = useHotel();
+  const { rooms, settings, customers, services, isLoading, mutateRooms } = useHotel();
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [folioRoom, setFolioRoom] = useState<Room | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [activeFilterIds, setActiveFilterIds] = useState<string[]>(['available', 'hourly', 'daily', 'dirty', 'repair']);
+  const [customerInsightsData, setCustomerInsightsData] = useState<{ customer: Customer, bookings: Booking[] } | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
 
-  const timeRules = settings?.find((s: any) => s.key === 'time_rules')?.value;
+  const systemSettings = settings?.find((s: any) => s.key === 'system_settings')?.value;
+  const timeRules = systemSettings || {
+    check_in: '14:00',
+    check_out: '12:00',
+    overnight: { start: '22:00', end: '08:00' },
+    early_rules: [],
+    late_rules: [],
+  };
 
   const roomCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -46,51 +69,79 @@ export default function Dashboard() {
     } else if (['hourly', 'daily', 'overnight'].includes(room.status)) {
       setFolioRoom(room);
     } else if (['dirty', 'repair'].includes(room.status)) {
-      if (window.confirm(`Xác nhận phòng ${room.room_number} đã sẵn sàng đón khách?`)) {
-        try {
-          const { error } = await supabase
-            .from('rooms')
-            .update({ status: 'available', current_booking_id: null })
-            .eq('id', room.id);
-          
-          if (error) throw error;
-          mutateRooms();
-        } catch (error) {
-          console.error('Error updating status:', error);
-          alert('Không thể cập nhật trạng thái phòng');
+      setConfirmConfig({
+        isOpen: true,
+        title: 'Xác nhận dọn phòng',
+        description: `Xác nhận phòng ${room.room_number} đã sẵn sàng đón khách?`,
+        onConfirm: async () => {
+          try {
+            const { error } = await supabase
+              .from('rooms')
+              .update({ status: 'available', current_booking_id: null })
+              .eq('id', room.id);
+            
+            if (error) throw error;
+            mutateRooms();
+            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          } catch (error) {
+            console.error('Error updating status:', error);
+            toast.error('Không thể cập nhật trạng thái phòng');
+          }
         }
-      }
+      });
     }
   };
 
   const handlePayment = async (amount: number) => {
-    // Placeholder for payment logic
     if (!folioRoom) return;
     
     try {
       // 1. Update booking status to completed
       if (folioRoom.current_booking_id) {
-         await supabase
+        const { data: booking } = await supabase
           .from('bookings')
           .update({ 
             status: 'completed', 
             check_out_at: new Date().toISOString(),
-            // total_amount: amount 
+            final_amount: amount
           })
-          .eq('id', folioRoom.current_booking_id);
+          .eq('id', folioRoom.current_booking_id)
+          .select('customer_id')
+          .single();
+
+        // 2. Update customer stats if linked
+        if (booking?.customer_id) {
+          // Lấy thông tin hiện tại của khách hàng
+          const { data: customer } = await supabase
+            .from('customers')
+            .select('visit_count, total_spent')
+            .eq('id', booking.customer_id)
+            .single();
+
+          if (customer) {
+            await supabase
+              .from('customers')
+              .update({
+                visit_count: (customer.visit_count || 0) + 1,
+                total_spent: (customer.total_spent || 0) + amount
+              })
+              .eq('id', booking.customer_id);
+          }
+        }
       }
 
-      // 2. Set room to dirty
+      // 3. Set room to dirty
       await supabase
         .from('rooms')
         .update({ status: 'dirty', current_booking_id: null })
         .eq('id', folioRoom.id);
 
       mutateRooms();
-      alert(`Thanh toán phòng ${folioRoom.room_number} thành công!`);
+      setFolioRoom(null);
+      toast.success(`Thanh toán phòng ${folioRoom.room_number} thành công!`);
     } catch (error) {
       console.error(error);
-      alert('Lỗi thanh toán');
+      toast.error('Lỗi thanh toán');
     }
   };
 
@@ -101,36 +152,68 @@ export default function Dashboard() {
       let customerId = null;
       
       // 1. Create/Find Customer
-      if (data.customer && data.customer.name) {
-        // Try to find existing first to avoid unique constraint errors if not handled
-        const { data: existingCust } = await supabase
+      const customerName = data.customer?.name?.trim() || 'KHÁCH VÃNG LAI';
+      const customerPhone = data.customer?.phone?.trim() || '';
+      const customerIdCard = data.customer?.idCard?.trim() || '';
+      const customerPlate = data.customer?.plate_number?.trim() || '';
+
+      // Try to find existing first by phone or id_card (only if provided and not empty)
+      let existingCust = null;
+      const searchConditions = [];
+      if (customerPhone) searchConditions.push(`phone.eq.${customerPhone}`);
+      if (customerIdCard) searchConditions.push(`id_card.eq.${customerIdCard}`);
+
+      if (searchConditions.length > 0) {
+        const { data: found } = await supabase
           .from('customers')
-          .select('id')
-          .or(`phone.eq.${data.customer.phone},id_card.eq.${data.customer.idCard}`)
+          .select('id, plate_number')
+          .or(searchConditions.join(','))
           .maybeSingle();
+        existingCust = found;
+      }
 
-        if (existingCust) {
-          customerId = existingCust.id;
-          // Optional: Update visit count or info
-        } else {
-          const { data: newCust, error: custError } = await supabase
+      if (existingCust) {
+        customerId = existingCust.id;
+        // Cập nhật biển số xe nếu chưa có hoặc khác
+        if (customerPlate && customerPlate !== existingCust.plate_number) {
+          await supabase
             .from('customers')
-            .insert([{
-              full_name: data.customer.name,
-              phone: data.customer.phone,
-              id_card: data.customer.idCard,
-              visit_count: 1,
-              total_spent: 0
-            }])
-            .select()
-            .single();
+            .update({ plate_number: customerPlate })
+            .eq('id', customerId);
+        }
 
-          if (custError) {
-             console.error('Error creating customer:', custError);
-             // Proceed without customer or throw? Let's proceed but warn.
-          } else {
-            customerId = newCust.id;
-          }
+        // Fetch full customer data and their bookings for the insights modal
+        const { data: fullCustomer } = await supabase.from('customers').select('*').eq('id', customerId).single();
+        const { data: customerBookings } = await supabase
+          .from('bookings')
+          .select('*, rooms(room_number)')
+          .eq('customer_id', customerId)
+          .eq('status', 'completed')
+          .order('check_out_at', { ascending: false })
+          .limit(1);
+
+        if (fullCustomer) {
+          setCustomerInsightsData({ customer: fullCustomer, bookings: customerBookings || [] });
+        }
+      } else {
+        // Create new customer (including KHÁCH VÃNG LAI)
+        const { data: newCust, error: custError } = await supabase
+          .from('customers')
+          .insert([{
+            full_name: customerName,
+            phone: customerPhone,
+            id_card: customerIdCard,
+            plate_number: customerPlate,
+            visit_count: 1,
+            total_spent: 0
+          }])
+          .select()
+          .single();
+
+        if (custError) {
+          console.error('Error creating customer:', custError);
+        } else {
+          customerId = newCust.id;
         }
       }
 
@@ -144,6 +227,7 @@ export default function Dashboard() {
           rental_type: data.rentalType,
           initial_price: data.price,
           deposit_amount: data.deposit || 0,
+          notes: data.notes,
           room_charge_locked: 0,
           status: 'active'
         }])
@@ -164,24 +248,39 @@ export default function Dashboard() {
       if (roomError) throw roomError;
 
       // Success
-      alert(`Đã nhận phòng ${selectedRoom.room_number} thành công!`);
       setSelectedRoom(null);
       mutateRooms(); // Refresh data immediately
       
     } catch (error: any) {
-      console.error('Check-in error:', error);
-      alert(`Lỗi khi nhận phòng: ${error.message}`);
+      console.error('Chi tiết lỗi Check-in:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        fullError: error
+      });
+      toast.error(`Lỗi khi nhận phòng: ${error.message || 'Lỗi không xác định'}`);
     }
   };
 
   const seedRooms = async () => {
     if (rooms.length > 0) {
-      const confirmReset = window.confirm(
-        'Bạn có chắc chắn muốn nạp lại dữ liệu mẫu? Hành động này sẽ cập nhật lại giá và thông tin cho các phòng hiện có.'
-      );
-      if (!confirmReset) return;
+      setConfirmConfig({
+        isOpen: true,
+        title: 'Nạp lại dữ liệu?',
+        description: 'Bạn có chắc chắn muốn nạp lại dữ liệu mẫu? Hành động này sẽ cập nhật lại giá và thông tin cho các phòng hiện có.',
+        variant: 'danger',
+        onConfirm: () => {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          executeSeed();
+        }
+      });
+      return;
     }
+    executeSeed();
+  };
 
+  const executeSeed = async () => {
     setIsSeeding(true);
     try {
       const sampleRooms = Array.from({ length: 12 }, (_, i) => {
@@ -208,10 +307,10 @@ export default function Dashboard() {
       if (error) throw error;
       
       mutateRooms();
-      alert('Đã khởi tạo 12 phòng mẫu thành công!');
+      toast.success('Đã khởi tạo 12 phòng mẫu thành công!');
     } catch (error: any) {
       console.error('Seed error:', error);
-      alert(`Lỗi khởi tạo: ${error.message}`);
+      toast.error(`Lỗi khởi tạo: ${error.message}`);
     } finally {
       setIsSeeding(false);
     }
@@ -277,6 +376,8 @@ export default function Dashboard() {
       {selectedRoom && (
         <CheckInModal 
           room={selectedRoom} 
+          services={services}
+          customers={customers}
           timeRules={timeRules}
           onClose={() => setSelectedRoom(null)}
           onConfirm={handleCheckIn}
@@ -287,11 +388,29 @@ export default function Dashboard() {
         <FolioModal
           room={folioRoom}
           settings={settings}
+          services={services}
           isOpen={!!folioRoom}
           onClose={() => setFolioRoom(null)}
           onPayment={handlePayment}
         />
       )}
+
+      {customerInsightsData && (
+        <CustomerInsightsModal
+          customer={customerInsightsData.customer}
+          bookings={customerInsightsData.bookings}
+          onClose={() => setCustomerInsightsData(null)}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        variant={confirmConfig.variant}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

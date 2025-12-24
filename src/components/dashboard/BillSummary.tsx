@@ -20,32 +20,32 @@ export function BillSummary({ priceDetails, roomTotal, servicesTotal, surcharge,
         {priceDetails?.breakdown.map((item, index) => (
           <div key={index} className="flex justify-between items-center mb-1">
             <span className="text-slate-600">{item.label}</span>
-            <span className="font-medium">{formatCurrency(item.price)}</span>
+            <span className="font-medium">{formatCurrency(item.price)}đ</span>
           </div>
         ))}
       </ScrollArea>
       <Separator />
       <div className="flex justify-between items-center font-semibold">
         <span>Tổng tiền phòng</span>
-        <span>{formatCurrency(roomTotal)}</span>
+        <span>{formatCurrency(roomTotal)}đ</span>
       </div>
 
       <Separator className="my-4"/>
 
       <div className="flex justify-between items-center">
         <span className="text-slate-600">Tiền dịch vụ</span>
-        <span className="font-medium">{formatCurrency(servicesTotal)}</span>
+        <span className="font-medium">{formatCurrency(servicesTotal)}đ</span>
       </div>
       <div className="flex justify-between items-center">
         <span className="text-slate-600">Phụ phí</span>
-        <span className="font-medium">{formatCurrency(surcharge)}</span>
+        <span className="font-medium">{formatCurrency(surcharge)}đ</span>
       </div>
       
       <Separator />
 
       <div className="flex justify-between items-center text-base font-bold pt-2">
         <span>TỔNG CỘNG</span>
-        <span className="text-blue-600">{formatCurrency(totalAmount)}</span>
+        <span className="text-blue-600">{formatCurrency(totalAmount)}đ</span>
       </div>
     </div>
   );

@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 // --- ZOD SCHEMA --- //
 const staffSchema = z.object({
@@ -59,6 +60,18 @@ export default function StaffPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Profile | null>(null);
   const [activeTab, setActiveTab] = useState<'list' | 'roles'>('list');
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
 
   // --- DATA FETCHING --- //
   useEffect(() => {
@@ -153,17 +166,25 @@ export default function StaffPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Bạn có chắc muốn xóa nhân viên này?')) return;
-    
-    try {
-      const { error } = await supabase.from('profiles').delete().eq('id', id);
-      if (error) throw error;
-      toast.success('Đã xóa nhân viên');
-      fetchStaff();
-    } catch (error: any) {
-      toast.error(error.message || 'Lỗi khi xóa');
-      setStaff(prev => prev.filter(s => s.id !== id));
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xóa nhân viên?',
+      description: 'Bạn có chắc chắn muốn xóa nhân viên này? Hành động này không thể hoàn tác.',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('profiles').delete().eq('id', id);
+          if (error) throw error;
+          toast.success('Đã xóa nhân viên');
+          fetchStaff();
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        } catch (error: any) {
+          toast.error(error.message || 'Lỗi khi xóa');
+          setStaff(prev => prev.filter(s => s.id !== id));
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const filteredStaff = staff.filter(s => 
@@ -321,7 +342,7 @@ export default function StaffPage() {
       {/* Modal / Dialog */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-0">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -334,9 +355,9 @@ export default function StaffPage() {
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              className="relative w-full max-w-lg bg-white rounded-t-[3rem] sm:rounded-[3rem] p-8 shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="relative w-full h-full bg-white p-8 shadow-2xl overflow-y-auto flex flex-col rounded-none"
             >
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-8 pt-4">
                 <div>
                   <h2 className="text-2xl font-black text-slate-800">
                     {editingStaff ? 'Sửa nhân viên' : 'Thêm nhân viên'}
@@ -345,7 +366,7 @@ export default function StaffPage() {
                 </div>
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-90 transition-transform"
+                  className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-90 transition-all"
                 >
                   <X size={24} />
                 </button>
@@ -483,6 +504,15 @@ export default function StaffPage() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        variant={confirmConfig.variant}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

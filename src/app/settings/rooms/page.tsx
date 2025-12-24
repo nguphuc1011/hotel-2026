@@ -6,12 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { Room } from '@/types';
-import { cn, formatCurrency } from '@/lib/utils';
-import { PlusCircle, Edit, Trash2, X, Save, ChevronLeft, Plus, Search, Building2, MapPin, DollarSign, Mic } from 'lucide-react';
+import { cn, formatCurrency, formatInputCurrency, parseCurrency } from '@/lib/utils';
+import { PlusCircle, Edit, Trash2, X, Save, ChevronLeft, Plus, Search, Building2, MapPin, DollarSign, Mic, Clock, Calendar, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 // --- ZOD SCHEMA --- //
 const roomSchema = z.object({
@@ -37,6 +38,18 @@ export default function RoomsPage() {
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
 
   // --- DATA FETCHING --- //
   useEffect(() => {
@@ -96,15 +109,22 @@ export default function RoomsPage() {
   };
 
   const handleDeleteRoom = async (roomId: string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa phòng này?')) return;
-
-    const { error } = await supabase.from('rooms').delete().eq('id', roomId);
-    if (error) {
-      toast.error('Xóa phòng thất bại.');
-    } else {
-      toast.success('Đã xóa phòng thành công.');
-      fetchRooms();
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xóa phòng?',
+      description: 'Bạn có chắc chắn muốn xóa phòng này? Hành động này không thể hoàn tác.',
+      variant: 'danger',
+      onConfirm: async () => {
+        const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+        if (error) {
+          toast.error('Xóa phòng thất bại.');
+        } else {
+          toast.success('Đã xóa phòng thành công.');
+          fetchRooms();
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   if (loading) {
@@ -173,7 +193,7 @@ export default function RoomsPage() {
                             <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 uppercase tracking-tighter">Qua đêm</span>
                           )}
                         </div>
-                        <p className="text-sm font-bold text-slate-400">{formatCurrency(room.prices?.daily || 0)} / ngày</p>
+                        <p className="text-sm font-bold text-slate-400">{formatCurrency(room.prices?.daily || 0)}đ / ngày</p>
                       </div>
                       <div className="flex gap-1">
                         <button 
@@ -200,7 +220,7 @@ export default function RoomsPage() {
                         <span className="text-xs font-bold text-slate-500">Bán đêm</span>
                       </div>
                       <div className="text-xs font-bold text-blue-600">
-                        {formatCurrency(room.prices?.hourly || 0)}/h đầu
+                        {formatCurrency(room.prices?.hourly || 0)}đ/h đầu
                       </div>
                     </div>
                   </motion.div>
@@ -237,6 +257,15 @@ export default function RoomsPage() {
         onClose={handleCloseModal}
         room={editingRoom}
         onSave={fetchRooms}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        variant={confirmConfig.variant}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   );
@@ -315,22 +344,22 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0">
           <motion.div
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
-            className="relative w-full max-w-lg rounded-[2.5rem] bg-slate-50 p-8 shadow-2xl"
+            className="relative w-full h-full bg-slate-50 p-8 shadow-2xl flex flex-col overflow-y-auto rounded-none"
           >
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between pt-4">
                 <h2 className="text-xl font-bold text-slate-800">{room ? 'Sửa thông tin phòng' : 'Tạo phòng mới'}</h2>
-                <button type="button" onClick={onClose} className="rounded-full bg-slate-200 p-2 text-slate-500 hover:bg-slate-300 transition-colors">
-                  <X size={20} />
+                <button type="button" onClick={onClose} className="rounded-full bg-slate-200 p-3 text-slate-500 hover:bg-slate-300 transition-all">
+                  <X size={24} />
                 </button>
               </div>
 
-              <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
+              <div className="space-y-6 flex-1">
                 {/* Basic Info Card */}
                 <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 space-y-4">
                    <div className="flex items-center gap-2 text-blue-600 mb-2">
@@ -349,11 +378,60 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
                     <DollarSign size={18} />
                     <span className="font-bold text-sm">Cài đặt giá (VNĐ)</span>
                   </div>
+                  
                   <div className="grid grid-cols-2 gap-4">
-                    <FormInput label="Giờ đầu" name="prices.hourly" type="number" register={register} error={errors.prices?.hourly} />
-                    <FormInput label="Giờ tiếp" name="prices.next_hour" type="number" register={register} error={errors.prices?.next_hour} />
-                    <FormInput label="Theo ngày" name="prices.daily" type="number" register={register} error={errors.prices?.daily} />
-                    <FormInput label="Qua đêm" name="prices.overnight" type="number" register={register} error={errors.prices?.overnight} />
+                    <Controller
+                      name="prices.hourly"
+                      control={control}
+                      render={({ field }) => (
+                        <FormCurrencyInput 
+                          label="Giá giờ đầu" 
+                          icon={<Clock size={14} />}
+                          value={field.value} 
+                          onChange={field.onChange} 
+                          error={errors.prices?.hourly} 
+                        />
+                      )}
+                    />
+                    <Controller
+                      name="prices.next_hour"
+                      control={control}
+                      render={({ field }) => (
+                        <FormCurrencyInput 
+                          label="Giá giờ tiếp theo" 
+                          icon={<Clock size={14} className="opacity-50" />}
+                          value={field.value} 
+                          onChange={field.onChange} 
+                          error={errors.prices?.next_hour} 
+                        />
+                      )}
+                    />
+                    <Controller
+                      name="prices.daily"
+                      control={control}
+                      render={({ field }) => (
+                        <FormCurrencyInput 
+                          label="Giá theo ngày" 
+                          icon={<Calendar size={14} />}
+                          value={field.value} 
+                          onChange={field.onChange} 
+                          error={errors.prices?.daily} 
+                        />
+                      )}
+                    />
+                    <Controller
+                      name="prices.overnight"
+                      control={control}
+                      render={({ field }) => (
+                        <FormCurrencyInput 
+                          label="Giá qua đêm" 
+                          icon={<Smartphone size={14} />}
+                          value={field.value} 
+                          onChange={field.onChange} 
+                          error={errors.prices?.overnight} 
+                        />
+                      )}
+                    />
                   </div>
                 </div>
 
@@ -405,6 +483,40 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+// --- CURRENCY INPUT COMPONENT --- //
+function FormCurrencyInput({ label, icon, value, onChange, error }: any) {
+  const [displayValue, setDisplayValue] = useState(formatInputCurrency(value?.toString() || '0'));
+
+  useEffect(() => {
+    setDisplayValue(formatInputCurrency(value?.toString() || '0'));
+  }, [value]);
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider flex items-center gap-1">
+        {icon} {label}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          value={displayValue}
+          onChange={(e) => {
+            const formatted = formatInputCurrency(e.target.value);
+            setDisplayValue(formatted);
+            onChange(parseCurrency(formatted));
+          }}
+          className={cn(
+            'h-14 w-full rounded-2xl border-transparent bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300',
+            error ? 'ring-2 ring-red-500' : ''
+          )}
+        />
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 font-bold">đ</span>
+      </div>
+      {error && <p className="ml-1 text-[10px] font-bold text-red-500 uppercase tracking-tighter">{error.message}</p>}
+    </div>
   );
 }
 

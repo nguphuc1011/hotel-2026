@@ -6,6 +6,7 @@ import { Plus, Trash2, Edit, Tag, Search, X, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type Category = {
   id: string;
@@ -20,6 +21,18 @@ export default function ServiceCategories() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({ name: '', description: '' });
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
@@ -69,13 +82,22 @@ export default function ServiceCategories() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa?')) return;
-    const { error } = await supabase.from('service_categories').delete().eq('id', id);
-    if (error) toast.error('Lỗi khi xóa. Có thể có dịch vụ đang thuộc loại này.');
-    else {
-      toast.success('Đã xóa');
-      fetchCategories();
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xóa loại dịch vụ?',
+      description: 'Bạn có chắc chắn muốn xóa? Hành động này không thể hoàn tác.',
+      variant: 'danger',
+      onConfirm: async () => {
+        const { error } = await supabase.from('service_categories').delete().eq('id', id);
+        if (error) {
+          toast.error('Lỗi khi xóa. Có thể có dịch vụ đang thuộc loại này.');
+        } else {
+          toast.success('Đã xóa');
+          fetchCategories();
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const filteredCategories = categories.filter(c => 
@@ -221,6 +243,15 @@ export default function ServiceCategories() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        variant={confirmConfig.variant}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

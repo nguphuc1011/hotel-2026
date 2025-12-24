@@ -5,14 +5,14 @@ import { X } from "lucide-react"
 const Dialog = ({ children, open, onOpenChange }: any) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-0">
       {children}
     </div>
   )
 }
 
 const DialogContent = ({ children, className }: any) => (
-  <div className={cn("relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl overflow-y-auto max-h-[90vh]", className)}>
+  <div className={cn("relative w-full h-full bg-white shadow-2xl overflow-y-auto flex flex-col", className)}>
     {children}
   </div>
 )

@@ -1,25 +1,40 @@
 'use client';
 
-import { Room, Setting } from '@/types';
+import { Room, Setting, Service } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Receipt, CreditCard, Clock, User, Phone, Info } from 'lucide-react';
+import { X, Receipt, CreditCard, Clock, User, Phone, Info, ShoppingCart, DollarSign } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { calculateRoomPrice, PricingBreakdown } from '@/lib/pricing';
 import { differenceInHours, differenceInMinutes } from 'date-fns';
 
 interface FolioModalProps {
   room: Room | null;
   settings: Setting[];
+  services: Service[];
   isOpen: boolean;
   onClose: () => void;
   onPayment: (amount: number) => void;
 }
 
-export function FolioModal({ room, settings, isOpen, onClose, onPayment }: FolioModalProps) {
+export function FolioModal({ room, settings, services, isOpen, onClose, onPayment }: FolioModalProps) {
   const [loading, setLoading] = useState(false);
   const [pricing, setPricing] = useState<PricingBreakdown | null>(null);
   const [duration, setDuration] = useState('');
+
+  const servicesUsed = useMemo(() => room?.current_booking?.services_used || [], [room]);
+  const prepayments = useMemo(() => room?.current_booking?.prepayments || [], [room]);
+
+  const serviceTotal = useMemo(() => {
+    return servicesUsed.reduce((total: number, item: any) => {
+      const serviceInfo = services.find(s => s.id === item.service_id);
+      return total + (serviceInfo?.price || 0) * item.quantity;
+    }, 0);
+  }, [servicesUsed, services]);
+
+  const prepaymentsTotal = useMemo(() => {
+    return prepayments.reduce((total: number, item: any) => total + item.amount, 0);
+  }, [prepayments]);
 
   useEffect(() => {
     if (room?.current_booking && settings) {
@@ -42,6 +57,13 @@ export function FolioModal({ room, settings, isOpen, onClose, onPayment }: Folio
     }
   }, [room, settings]);
 
+  const finalTotal = useMemo(() => {
+    if (!pricing || !room?.current_booking) return 0;
+    const deposit = room.current_booking.deposit_amount || 0;
+    return Math.max(0, pricing.total_amount + serviceTotal - deposit - prepaymentsTotal);
+  }, [pricing, room, serviceTotal, prepaymentsTotal]);
+
+
   if (!room || !room.current_booking) return null;
 
   const booking = room.current_booking;
@@ -50,7 +72,7 @@ export function FolioModal({ room, settings, isOpen, onClose, onPayment }: Folio
   const handlePayment = async () => {
     if (!pricing) return;
     setLoading(true);
-    onPayment(pricing.total_amount);
+    onPayment(finalTotal);
     setLoading(false);
     onClose();
   };
@@ -58,7 +80,7 @@ export function FolioModal({ room, settings, isOpen, onClose, onPayment }: Folio
   return (
     <AnimatePresence>
       {isOpen && pricing && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -71,10 +93,10 @@ export function FolioModal({ room, settings, isOpen, onClose, onPayment }: Folio
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative z-10 w-full max-w-lg overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2rem]"
+            className="relative z-10 w-full h-full overflow-hidden bg-white shadow-2xl flex flex-col rounded-none"
           >
-            {/* Mobile Drag Handle */}
-            <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-zinc-200 sm:hidden" />
+            {/* Mobile Drag Handle - Hidden for full screen */}
+            {/* <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-zinc-200 sm:hidden" /> */}
 
             <div className="flex items-center justify-between border-b border-zinc-100 p-6 pt-8 sm:pt-6">
               <div>
@@ -128,7 +150,7 @@ export function FolioModal({ room, settings, isOpen, onClose, onPayment }: Folio
                       <span className="text-[10px] font-bold uppercase">Tiền phòng</span>
                     </div>
                     <p className="mt-1 text-2xl font-black text-emerald-700">
-                      {formatCurrency(pricing.room_charge)}
+                      {formatCurrency(pricing.room_charge)}đ
                     </p>
                     <p className="text-[10px] font-medium text-emerald-600/60 uppercase">
                       {pricing.summary.days ? `${pricing.summary.days} ngày` : `${pricing.summary.hours} giờ`}
@@ -136,13 +158,37 @@ export function FolioModal({ room, settings, isOpen, onClose, onPayment }: Folio
                   </div>
                 </div>
 
+                {/* Services Used */}
+                {servicesUsed.length > 0 && (
+                  <div className="rounded-2xl border border-zinc-100 p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-purple-600">
+                        <ShoppingCart size={16} />
+                        <h3 className="text-[10px] font-bold uppercase tracking-wider">Dịch vụ đã dùng</h3>
+                    </div>
+                    {servicesUsed.map((item: any) => {
+                      const serviceInfo = services.find(s => s.id === item.service_id);
+                      if (!serviceInfo) return null;
+                      return (
+                        <div key={item.service_id} className="flex justify-between text-sm">
+                          <span className="text-zinc-500">{serviceInfo.name} (x{item.quantity})</span>
+                          <span className="font-bold text-zinc-900">{formatCurrency(serviceInfo.price * item.quantity)}đ</span>
+                        </div>
+                      );
+                    })}
+                     <div className="pt-2 border-t border-dashed border-zinc-100 flex justify-between items-center">
+                        <span className="text-sm font-medium text-zinc-500">Tổng tiền dịch vụ</span>
+                        <span className="font-bold text-purple-600">+{formatCurrency(serviceTotal)}đ</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Tax & Surcharge Details (2026 AI Feature) */}
                 <div className="rounded-2xl border border-zinc-100 p-4 space-y-3">
                   <h3 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Chi tiết thuế & Phụ thu (2026)</h3>
                   
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-500">Phụ thu trễ giờ</span>
-                    <span className="font-bold text-orange-600">+{formatCurrency(pricing.surcharge)}</span>
+                    <span className="font-bold text-orange-600">+{formatCurrency(pricing.surcharge)}đ</span>
                   </div>
 
                   <div className="flex justify-between text-sm">
@@ -150,13 +196,23 @@ export function FolioModal({ room, settings, isOpen, onClose, onPayment }: Folio
                       <span className="text-zinc-500">Thuế lưu trú</span>
                       <Info size={12} className="text-zinc-300" />
                     </div>
-                    <span className="font-bold text-zinc-900">{formatCurrency(pricing.tax_details.room_tax)}</span>
+                    <span className="font-bold text-zinc-900">{formatCurrency(pricing.tax_details.room_tax)}đ</span>
                   </div>
 
                   <div className="pt-2 border-t border-dashed border-zinc-100 flex justify-between items-center">
                     <span className="text-sm font-medium text-zinc-500">Tiền đặt cọc</span>
-                    <span className="font-bold text-rose-500">-{formatCurrency(booking.deposit_amount || 0)}</span>
+                    <span className="font-bold text-rose-500">-{formatCurrency(booking.deposit_amount || 0)}đ</span>
                   </div>
+
+                  {prepaymentsTotal > 0 && (
+                     <div className="pt-2 border-t border-dashed border-zinc-100 flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-green-600">
+                            <DollarSign size={14} />
+                            <span className="text-sm font-medium text-zinc-500">Đã trả trước</span>
+                        </div>
+                        <span className="font-bold text-green-600">-{formatCurrency(prepaymentsTotal)}đ</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Final Total */}
@@ -165,13 +221,14 @@ export function FolioModal({ room, settings, isOpen, onClose, onPayment }: Folio
                     <span className="text-xs font-bold uppercase tracking-widest opacity-50">Tổng thanh toán</span>
                     <CreditCard size={20} className="opacity-50" />
                   </div>
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-black">
-                      {formatCurrency(Math.max(0, pricing.total_amount - (booking.deposit_amount || 0)))}
+                      {formatCurrency(finalTotal)}
                     </span>
+                    <span className="text-xl font-bold opacity-50 ml-1">đ</span>
                   </div>
                   <p className="mt-2 text-[10px] font-medium opacity-40 italic">
-                    * Đã bao gồm thuế lưu trú và phụ thu theo quy định 2026.
+                    * Đã bao gồm thuế, phụ thu và dịch vụ theo quy định 2026.
                   </p>
                 </div>
               </div>

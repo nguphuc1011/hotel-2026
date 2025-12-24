@@ -7,6 +7,7 @@ import Link from "next/link";
 
 
 import { LayoutGrid, BarChart, Cog, UserCircle } from 'lucide-react';
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="vi" data-theme="light" className="light">
       <body className={cn(inter.className, "min-h-screen bg-slate-50 selection:bg-blue-500/30 flex flex-col")}>
+        <Toaster position="top-center" richColors />
         {/* Normal Header (Not Fixed) */}
         <header className="w-full h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 flex-shrink-0">
           <Link href="/" className="font-bold text-lg text-slate-800">
