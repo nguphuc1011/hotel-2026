@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ArrowUpCircle, ArrowDownCircle, Search, History, Package } from 'lucide-react';
-import { toast } from 'sonner';
+import { useNotification } from '@/context/NotificationContext';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,7 @@ type StockLog = {
 };
 
 export default function StockHistory() {
+  const { showNotification } = useNotification();
   const [logs, setLogs] = useState<StockLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,10 +34,10 @@ export default function StockHistory() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) toast.error('Lỗi khi tải lịch sử kho');
+    if (error) showNotification('Lỗi khi tải lịch sử kho', 'error');
     else setLogs(data as StockLog[]);
     setLoading(false);
-  }, []);
+  }, [showNotification]);
 
   useEffect(() => {
     let isMounted = true;

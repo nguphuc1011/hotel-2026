@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 
-import { Toaster } from 'sonner';
 import { BottomNav } from "@/components/layout/BottomNav";
 
 import { NotificationProvider } from "@/context/NotificationContext";

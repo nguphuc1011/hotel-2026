@@ -1,4 +1,6 @@
 
+'use client';
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Edit, Printer, DollarSign, Trash2, ChevronDown, User, Clock, Plus, Minus, Search, Save, CheckCircle, Info, LogIn, LogOut, FileText, ShoppingCart, Star, Coffee, Utensils, Beer, Cigarette, Wine } from 'lucide-react';
@@ -95,10 +97,10 @@ export default function FolioModal({
       const totalMinutes = differenceInMinutes(now, start);
       const hours = Math.floor(totalMinutes / 60);
       const minutes = totalMinutes % 60;
-      return `${hours}h ${minutes}p`;
+      return `Đã ${hours}h ${minutes}p`;
     } else {
       const days = differenceInCalendarDays(now, start);
-      return `${Math.max(1, days)} ngày`;
+      return `Đã ${Math.max(1, days)} ngày`;
     }
   }, [room?.current_booking?.check_in_at, room?.current_booking?.rental_type]);
 

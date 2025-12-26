@@ -31,7 +31,7 @@ const statusConfig = {
   available: {
     label: 'Sẵn sàng',
     color: 'bg-[#155e75]', // Cyan 800
-    icon: CheckCircle,
+    icon: Sun,
     textColor: 'text-white'
   },
   hourly: {
@@ -135,8 +135,8 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
       <div className="absolute -bottom-8 -right-8 transition-transform duration-500 group-hover:scale-110">
         <BgIcon 
           size={160} 
-          className="opacity-20" 
-          strokeWidth={1}
+          className="opacity-15" 
+          strokeWidth={2}
         />
       </div>
 
@@ -186,10 +186,10 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
               <BgIcon size={20} className={cn(config.textColor === 'text-black' ? 'text-black' : 'text-white')} />
             </div>
             <div className="flex flex-col items-start leading-none">
-              <span className={cn("text-xs font-bold opacity-80 mb-0.5", config.textColor)}>
-                Đã {duration}
+              <span className={cn("text-[13px] font-bold opacity-90 mb-0.5", config.textColor)}>
+                Đã ở: {duration}
               </span>
-              <span className={cn("text-[18px] font-black tracking-tight", config.textColor)}>
+              <span className={cn("text-[20px] font-black tracking-tight", config.textColor)}>
                 {formatCurrency(amountToCollect)}đ
               </span>
             </div>
@@ -200,8 +200,8 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
               <Sun size={20} className="text-white" />
             </div>
             <div className="flex flex-col items-start leading-none">
-              <span className="text-xs font-bold opacity-80 mb-0.5 text-white">Giá ngày</span>
-              <span className="text-[18px] font-black tracking-tight text-white">
+              <span className="text-[13px] font-bold opacity-90 mb-0.5 text-white">Giá ngày</span>
+              <span className="text-[20px] font-black tracking-tight text-white">
                 {formatCurrency(room.prices?.daily || 0)}đ
               </span>
             </div>

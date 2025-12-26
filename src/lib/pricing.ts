@@ -1,24 +1,5 @@
 import { differenceInMinutes, parse, isAfter, addDays, startOfDay, differenceInHours, differenceInCalendarDays, addHours, parseISO } from 'date-fns';
-import { TimeRules, Room, Setting } from '@/types';
-
-export interface PricingBreakdown {
-  total_amount: number;
-  suggested_total: number;
-  room_charge: number;
-  service_charge: number;
-  surcharge: number;
-  tax_details: {
-    room_tax: number;
-    service_tax: number;
-  };
-  summary: {
-    days?: number;
-    hours?: number;
-    rental_type: string;
-    is_overnight: boolean;
-    duration_text: string;
-  };
-}
+import { TimeRules, Room, Setting, PricingBreakdown } from '@/types';
 
 /**
  * BỘ NÃO TÍNH GIÁ HOTEL 2026 - PHIÊN BẢN LOGIC MỚI

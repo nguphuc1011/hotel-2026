@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, Edit, Tag, Search, X, Save } from 'lucide-react';
-import { toast } from 'sonner';
+import { useNotification } from '@/context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -15,6 +15,7 @@ type Category = {
 };
 
 export default function ServiceCategories() {
+  const { showNotification } = useNotification();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -42,12 +43,12 @@ export default function ServiceCategories() {
       .order('name', { ascending: true });
 
     if (error) {
-      toast.error('Lỗi khi tải danh sách loại dịch vụ.');
+      showNotification('Lỗi khi tải danh sách loại dịch vụ.', 'error');
     } else {
       setCategories(data as Category[]);
     }
     setLoading(false);
-  }, []);
+  }, [showNotification]);
 
   useEffect(() => {
     fetchCategories();
@@ -62,9 +63,9 @@ export default function ServiceCategories() {
         .from('service_categories')
         .update({ name, description })
         .eq('id', selectedCategory.id);
-      if (error) toast.error('Lỗi khi cập nhật');
+      if (error) showNotification('Lỗi khi cập nhật', 'error');
       else {
-        toast.success('Đã cập nhật');
+        showNotification('Đã cập nhật', 'success');
         setIsDialogOpen(false);
         fetchCategories();
       }
@@ -72,9 +73,9 @@ export default function ServiceCategories() {
       const { error } = await supabase
         .from('service_categories')
         .insert([{ name, description }]);
-      if (error) toast.error('Lỗi khi thêm mới');
+      if (error) showNotification('Lỗi khi thêm mới', 'error');
       else {
-        toast.success('Đã thêm mới');
+        showNotification('Đã thêm mới', 'success');
         setIsDialogOpen(false);
         fetchCategories();
       }
@@ -90,9 +91,9 @@ export default function ServiceCategories() {
       onConfirm: async () => {
         const { error } = await supabase.from('service_categories').delete().eq('id', id);
         if (error) {
-          toast.error('Lỗi khi xóa. Có thể có dịch vụ đang thuộc loại này.');
+          showNotification('Lỗi khi xóa. Có thể có dịch vụ đang thuộc loại này.', 'error');
         } else {
-          toast.success('Đã xóa');
+          showNotification('Đã xóa', 'success');
           fetchCategories();
         }
         setConfirmConfig(prev => ({ ...prev, isOpen: false }));

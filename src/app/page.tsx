@@ -6,12 +6,11 @@ import { RoomCard } from '@/components/dashboard/RoomCard';
 import { CheckInModal } from '@/components/dashboard/CheckInModal';
 import FolioModal from '@/components/dashboard/FolioModal';
 import CustomerInsightsModal from '@/components/dashboard/CustomerInsightsModal';
-import { Room, Customer, Booking } from '@/types';
+import { Room, Customer, Booking, Setting } from '@/types';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
-import { NotificationBanner } from '@/components/layout/NotificationBanner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function Dashboard() {

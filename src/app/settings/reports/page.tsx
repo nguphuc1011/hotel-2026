@@ -20,7 +20,7 @@ import {
 import { cn, formatCurrency } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { toast } from 'sonner';
+import { useNotification } from '@/context/NotificationContext';
 
 const REPORT_TYPES = [
   { id: 'revenue', title: 'Báo cáo Doanh thu', icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -36,6 +36,7 @@ const PERIODS = [
 ];
 
 export default function ReportsPage() {
+  const { showNotification } = useNotification();
   const [selectedType, setSelectedType] = useState('revenue');
   const [selectedPeriod, setSelectedPeriod] = useState('month');
 
@@ -65,9 +66,9 @@ export default function ReportsPage() {
   const activeData = mockData[selectedPeriod as keyof typeof mockData];
 
   const handleExport = (format: string) => {
-    toast.success(`Đang chuẩn bị tệp ${format}...`);
+    showNotification(`Đang chuẩn bị tệp ${format}...`, 'info');
     setTimeout(() => {
-      toast.success(`Đã xuất báo cáo thành công!`);
+      showNotification(`Đã xuất báo cáo thành công!`, 'success');
     }, 1500);
   };
 

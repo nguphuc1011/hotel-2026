@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MoreHorizontal, Plus, Trash2, Edit, Package, Search, Tag, DollarSign, X, Save } from 'lucide-react';
-import { toast } from 'sonner';
+import { useNotification } from '@/context/NotificationContext';
 import { formatCurrency, cn, formatInputCurrency, parseCurrency } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -25,6 +25,7 @@ type Category = {
 };
 
 export default function ServiceList() {
+  const { showNotification } = useNotification();
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,10 +68,10 @@ export default function ServiceList() {
       .select(`*, service_categories ( name )`)
       .order('name', { ascending: true });
 
-    if (error) toast.error('Lỗi khi tải dịch vụ');
+    if (error) showNotification('Lỗi khi tải dịch vụ', 'error');
     else setServices(data as Service[]);
     setLoading(false);
-  }, []);
+  }, [showNotification]);
 
   const fetchCategories = useCallback(async () => {
     const { data, error } = await supabase.from('service_categories').select('id, name').order('name');
@@ -105,17 +106,17 @@ export default function ServiceList() {
 
     if (selectedService) {
       const { error } = await supabase.from('services').update(data).eq('id', selectedService.id);
-      if (error) toast.error('Lỗi cập nhật');
+      if (error) showNotification('Lỗi cập nhật', 'error');
       else {
-        toast.success('Đã cập nhật');
+        showNotification('Đã cập nhật', 'success');
         setIsFormOpen(false);
         fetchServices();
       }
     } else {
       const { error } = await supabase.from('services').insert([data]);
-      if (error) toast.error('Lỗi thêm mới');
+      if (error) showNotification('Lỗi thêm mới', 'error');
       else {
-        toast.success('Đã thêm mới');
+        showNotification('Đã thêm mới', 'success');
         setIsFormOpen(false);
         fetchServices();
       }
@@ -134,7 +135,7 @@ export default function ServiceList() {
       .eq('id', selectedService.id);
 
     if (updateError) {
-      toast.error('Lỗi cập nhật kho');
+      showNotification('Lỗi cập nhật kho', 'error');
       return;
     }
 
@@ -150,7 +151,7 @@ export default function ServiceList() {
       }
     }]);
 
-    toast.success('Cập nhật kho thành công');
+    showNotification('Cập nhật kho thành công', 'success');
     setIsStockOpen(false);
     fetchServices();
   };
@@ -164,9 +165,9 @@ export default function ServiceList() {
       onConfirm: async () => {
         const { error } = await supabase.from('services').delete().eq('id', id);
         if (error) {
-          toast.error('Lỗi khi xóa');
+          showNotification('Lỗi khi xóa', 'error');
         } else {
-          toast.success('Đã xóa');
+          showNotification('Đã xóa', 'success');
           fetchServices();
         }
         setConfirmConfig(prev => ({ ...prev, isOpen: false }));

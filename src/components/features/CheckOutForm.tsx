@@ -3,7 +3,7 @@
 import { Room } from "@/types";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
+import { useNotification } from "@/context/NotificationContext";
 import { Button } from "@/components/ui/button";
 import { Clock, List, DollarSign, ShoppingCart } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
@@ -27,13 +27,14 @@ interface CheckoutDetails {
 }
 
 export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
+  const { showNotification } = useNotification();
   const [details, setDetails] = useState<CheckoutDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   useEffect(() => {
     if (!room.current_booking_id) {
-      toast.error("Lỗi: Không tìm thấy mã đặt phòng.");
+      showNotification("Lỗi: Không tìm thấy mã đặt phòng.", "error");
       setIsLoading(false);
       return;
     }
@@ -46,18 +47,18 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
         setDetails(data);
       } catch (error: any) {
         console.error("Error fetching checkout details:", error);
-        toast.error("Không thể lấy chi tiết hóa đơn: " + error.message);
+        showNotification("Không thể lấy chi tiết hóa đơn: " + error.message, "error");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDetails();
-  }, [room.current_booking_id]);
+  }, [room.current_booking_id, showNotification]);
 
   const handleCheckout = async () => {
     if (!room.current_booking_id) {
-      toast.error("Lỗi: Không tìm thấy mã đặt phòng để thanh toán.");
+      showNotification("Lỗi: Không tìm thấy mã đặt phòng để thanh toán.", "error");
       return;
     }
     setIsCheckingOut(true);
@@ -65,12 +66,12 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
       const { error } = await supabase.rpc('handle_checkout', { p_booking_id: room.current_booking_id });
       if (error) throw error;
       
-      toast.success(`Phòng ${room.room_number} đã được thanh toán thành công!`)
+      showNotification(`Phòng ${room.room_number} đã được thanh toán thành công!`, "success")
       onCheckoutSuccess();
 
     } catch (error: any) {
       console.error("Checkout error:", error);
-      toast.error("Lỗi khi thanh toán: " + error.message);
+      showNotification("Lỗi khi thanh toán: " + error.message, "error");
     } finally {
       setIsCheckingOut(false);
     }

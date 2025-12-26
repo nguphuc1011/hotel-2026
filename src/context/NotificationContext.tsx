@@ -45,6 +45,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 export function useNotification() {
   const context = useContext(NotificationContext);
   if (context === undefined) {
+    // Return a dummy context for server-side rendering to avoid ReferenceError
+    if (typeof window === 'undefined') {
+      return { 
+        notification: null, 
+        showNotification: () => {}, 
+        hideNotification: () => {} 
+      };
+    }
     throw new Error('useNotification must be used within a NotificationProvider');
   }
   return context;

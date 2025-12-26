@@ -24,7 +24,7 @@ import {
   Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
+import { useNotification } from '@/context/NotificationContext';
 import Link from 'next/link';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
@@ -54,6 +54,7 @@ const PERMISSIONS = [
 ];
 
 export default function StaffPage() {
+  const { showNotification } = useNotification();
   const [staff, setStaff] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,19 +143,19 @@ export default function StaffPage() {
           .eq('id', editingStaff.id);
         
         if (error) throw error;
-        toast.success('Cập nhật nhân viên thành công!');
+        showNotification('Cập nhật nhân viên thành công!', 'success');
       } else {
         const { error } = await supabase
           .from('profiles')
           .insert([data]);
         
         if (error) throw error;
-        toast.success('Thêm nhân viên mới thành công!');
+        showNotification('Thêm nhân viên mới thành công!', 'success');
       }
       setIsModalOpen(false);
       fetchStaff();
     } catch (error: any) {
-      toast.error(error.message || 'Lỗi khi lưu dữ liệu');
+      showNotification(error.message || 'Lỗi khi lưu dữ liệu', 'error');
       // Update local state if DB fails for demo purposes
       if (editingStaff) {
         setStaff(prev => prev.map(s => s.id === editingStaff.id ? { ...s, ...data } : s));
@@ -175,11 +176,11 @@ export default function StaffPage() {
         try {
           const { error } = await supabase.from('profiles').delete().eq('id', id);
           if (error) throw error;
-          toast.success('Đã xóa nhân viên');
+          showNotification('Đã xóa nhân viên', 'success');
           fetchStaff();
           setConfirmConfig(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
-          toast.error(error.message || 'Lỗi khi xóa');
+          showNotification(error.message || 'Lỗi khi xóa', 'error');
           setStaff(prev => prev.filter(s => s.id !== id));
           setConfirmConfig(prev => ({ ...prev, isOpen: false }));
         }

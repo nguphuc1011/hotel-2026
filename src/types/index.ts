@@ -146,6 +146,25 @@ export interface TimeRules {
   daily_grace_period_hours?: number;
 }
 
+export interface PricingBreakdown {
+  total_amount: number;
+  suggested_total: number;
+  room_charge: number;
+  service_charge: number;
+  surcharge: number;
+  tax_details: {
+    room_tax: number;
+    service_tax: number;
+  };
+  summary: {
+    days?: number;
+    hours?: number;
+    rental_type: string;
+    is_overnight: boolean;
+    duration_text: string;
+  };
+}
+
 export interface CheckInData {
   room_id: string;
   customer: {

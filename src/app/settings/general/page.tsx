@@ -10,7 +10,6 @@ import {
   Save, 
   Receipt,
   AlertCircle,
-  CheckCircle2,
   Wrench,
   ChevronLeft
 } from 'lucide-react';
@@ -18,7 +17,10 @@ import { supabase } from '@/lib/supabase';
 import { TimeRules } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { toast } from 'sonner';
+import { useNotification } from '../../../context/NotificationContext';
+
+// Force dynamic to avoid prerender issues on some environments
+export const dynamic = 'force-dynamic';
 
 // --- Reusable Tab Components ---
 const TabButton = ({ label, isActive, onClick }: { label: string, isActive: boolean, onClick: () => void }) => (
@@ -51,7 +53,8 @@ export default function GeneralSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState(tabs[0].id);
-  const { showNotification } = useNotification();
+  const context = useNotification();
+  const showNotification = context ? context.showNotification : () => {};
 
   const [timeRules, setTimeRules] = useState<TimeRules>({
     check_in: '14:00',
