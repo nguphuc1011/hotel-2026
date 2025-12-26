@@ -28,7 +28,7 @@ export const PrintableInvoice = React.forwardRef<HTMLDivElement, PrintableInvoic
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div>
           <p><span className="font-bold">Phòng:</span> {room.room_number}</p>
-          <p><span className="font-bold">Khách hàng:</span> {booking.customers?.full_name || 'Khách lẻ'}</p>
+          <p><span className="font-bold">Khách hàng:</span> {(booking as any).customer?.full_name || (booking as any).customers?.full_name || 'Khách lẻ'}</p>
         </div>
         <div>
           <p className="text-right"><span className="font-bold">Ngày in:</span> {formatDateTime(new Date().toISOString())}</p>
@@ -46,23 +46,23 @@ export const PrintableInvoice = React.forwardRef<HTMLDivElement, PrintableInvoic
           <p>Trả phòng:</p>
           <p>{formatDateTime(new Date().toISOString())}</p>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-xs text-slate-500">
           <p>Loại thuê:</p>
-          <p>{booking.rental_type}</p>
+          <p>{booking.rental_type === 'hourly' ? 'Theo giờ' : booking.rental_type === 'daily' ? 'Theo ngày' : 'Qua đêm'}</p>
         </div>
-        <div className="flex justify-between font-bold">
-          <p>Thành tiền ({pricing?.note}):</p>
-          <p>{formatCurrency(pricing?.price)}</p>
+        <div className="flex justify-between font-bold mt-2 pt-2 border-t">
+          <p>Thành tiền phòng:</p>
+          <p>{formatCurrency(pricing?.room_charge || 0)}</p>
         </div>
       </div>
 
-      {services.length > 0 && (
+      {services && services.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-bold border-b pb-1 mb-2">Chi tiết dịch vụ</h2>
-          {services.map(s => (
-            <div key={s.id} className="flex justify-between">
-              <p>{s.services.name} (x{s.quantity})</p>
-              <p>{formatCurrency(s.quantity * s.price)}</p>
+          {services.map((s, idx) => (
+            <div key={s.id || idx} className="flex justify-between">
+              <p>{s.name || s.services?.name || 'Dịch vụ'} (x{s.quantity})</p>
+              <p>{formatCurrency(s.total || (s.quantity * s.price))}</p>
             </div>
           ))}
           <div className="flex justify-between font-bold mt-2 border-t pt-1">
@@ -75,7 +75,7 @@ export const PrintableInvoice = React.forwardRef<HTMLDivElement, PrintableInvoic
       <div className="border-t-2 border-dashed pt-4">
         <div className="flex justify-between">
           <p>Tổng cộng:</p>
-          <p>{formatCurrency((pricing?.price || 0) + totalServiceCost)}</p>
+          <p>{formatCurrency((pricing?.room_charge || 0) + totalServiceCost)}</p>
         </div>
         <div className="flex justify-between">
           <p>Đã trả trước:</p>

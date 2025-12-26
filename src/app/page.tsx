@@ -127,19 +127,32 @@ export default function Dashboard() {
     setFolioRoomId(null);
   };
 
-  const handlePayment = async (bookingId: string, amount: number) => {
+  const handlePayment = async (bookingId: string, amount: number, auditNote?: string) => {
     if (!folioRoom) return;
 
     try {
       console.log('Bắt đầu thanh toán cho phòng:', folioRoom.room_number);
 
-      // 1. Update booking status and final amount
+      // 1. Get current notes to append audit info
+      const { data: currentBooking } = await supabase
+        .from('bookings')
+        .select('notes')
+        .eq('id', bookingId)
+        .single();
+
+      const updatedNotes = [
+        currentBooking?.notes,
+        auditNote ? `[THANH TOÁN] ${auditNote}` : ''
+      ].filter(Boolean).join('\n');
+
+      // 2. Update booking status, final amount and notes
       const { data: booking, error: bookingError } = await supabase
         .from('bookings')
         .update({
           status: 'completed',
           check_out_at: new Date().toISOString(),
           final_amount: amount,
+          notes: updatedNotes,
         })
         .eq('id', bookingId)
         .select('customer_id')
@@ -303,41 +316,6 @@ export default function Dashboard() {
         } catch (error) {
           console.error('Lỗi khi hủy phòng:', error);
           showNotification('Lỗi khi hủy phòng', 'error');
-        }
-      }
-    });
-  };
-
-  const handleChangeRoom = (bookingId: string) => {
-    showNotification('Tính năng Đổi phòng đang được phát triển', 'info');
-  };
-
-  const handleEditBooking = () => {
-    if (!folioRoom?.current_booking) return;
-    
-    // LogNV sửa thông tin
-    const currentLogs = folioRoom.current_booking.notes || '';
-    const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const newLog = `\n[NV sửa bill lúc ${timeStr}]`;
-    
-    setConfirmConfig({
-      isOpen: true,
-      title: 'Xác nhận sửa Bill',
-      description: 'Hệ thống sẽ ghi lại nhật ký chỉnh sửa của nhân viên. Bạn có chắc chắn muốn tiếp tục?',
-      onConfirm: async () => {
-        try {
-          await supabase
-            .from('bookings')
-            .update({ 
-              notes: currentLogs + newLog 
-            })
-            .eq('id', folioRoom.current_booking_id);
-          
-          mutateRooms();
-          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-          showNotification('Đã ghi nhận nhật ký sửa bill', 'success');
-        } catch (error) {
-          showNotification('Lỗi khi ghi nhật ký', 'error');
         }
       }
     });
@@ -602,20 +580,18 @@ export default function Dashboard() {
         onConfirm={handleCheckIn}
       />
 
-      <FolioModal
-          room={folioRoom}
-          allRooms={rooms}
-          settings={settings}
-          services={services}
-          isOpen={!!folioRoomId}
-          onClose={() => setFolioRoomId(null)}
-          onPayment={handlePayment}
-          onUpdate={mutateRooms}
-          onCancel={handleCancel}
-          onChangeRoom={handleChangeRoom}
-          onEditBooking={handleEditBooking}
-          onMerge={handleMerge}
-        />
+      <FolioModal 
+         isOpen={!!folioRoomId}
+         onClose={() => setFolioRoomId(null)}
+         room={folioRoom}
+         settings={settings}
+         services={services}
+         customers={customers}
+         onPayment={handlePayment}
+         onUpdate={mutateRooms}
+         onCancel={handleCancel}
+         isAdmin={true}
+       />
 
       {customerInsightsData && (
         <CustomerInsightsModal

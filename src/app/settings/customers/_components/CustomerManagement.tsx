@@ -27,7 +27,13 @@ export default function CustomerManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [notes, setNotes] = useState('');
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    phone: '',
+    id_card: '',
+    plate_number: '',
+    notes: ''
+  });
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -50,30 +56,49 @@ export default function CustomerManagement() {
     setSearchTerm(e.target.value);
   };
 
-  const handleEditNotes = (customer: Customer) => {
+  const handleEditCustomer = (customer: Customer) => {
     setEditingCustomer(customer);
-    setNotes(customer.notes || '');
+    setEditForm({
+      full_name: customer.full_name || '',
+      phone: customer.phone || '',
+      id_card: customer.id_card || '',
+      plate_number: customer.plate_number || '',
+      notes: customer.notes || ''
+    });
   };
 
-  const handleSaveNotes = async () => {
+  const handleSaveCustomer = async () => {
     if (!editingCustomer) return;
 
     const { error } = await supabase
       .from('customers')
-      .update({ notes })
+      .update({
+        full_name: editForm.full_name,
+        phone: editForm.phone,
+        id_card: editForm.id_card,
+        plate_number: editForm.plate_number,
+        notes: editForm.notes
+      })
       .eq('id', editingCustomer.id);
 
     if (!error) {
       fetchCustomers();
       setEditingCustomer(null);
-      setNotes('');
+    } else {
+      console.error('Lỗi khi cập nhật khách hàng:', error);
+      if (error.message.includes('column') || error.code === '42703') {
+        alert('Lỗi: Cơ sở dữ liệu thiếu cột "plate_number" hoặc "notes". Vui lòng chạy câu lệnh SQL để cập nhật bảng customers.');
+      } else {
+        alert('Không thể lưu thay đổi: ' + error.message);
+      }
     }
   };
 
   const filteredCustomers = customers.filter(c =>
     c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.id_card?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.id_card?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.plate_number?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -158,7 +183,7 @@ export default function CustomerManagement() {
                 </div>
               </div>
               <button 
-                onClick={() => handleEditNotes(customer)}
+                onClick={() => handleEditCustomer(customer)}
                 className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
               >
                 <Edit2 size={18} />
@@ -202,7 +227,7 @@ export default function CustomerManagement() {
         )}
       </div>
 
-      {/* Edit Notes Modal */}
+      {/* Edit Customer Modal */}
       <AnimatePresence>
         {editingCustomer && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
@@ -212,11 +237,11 @@ export default function CustomerManagement() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
-              <div className="p-8">
+              <div className="p-8 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-black text-slate-800">Ghi chú khách hàng</h2>
-                    <p className="text-sm font-bold text-slate-400">{editingCustomer.full_name}</p>
+                    <h2 className="text-xl font-black text-slate-800">Sửa thông tin khách hàng</h2>
+                    <p className="text-sm font-bold text-slate-400">ID: {editingCustomer.id.slice(0, 8)}...</p>
                   </div>
                   <button 
                     onClick={() => setEditingCustomer(null)}
@@ -226,14 +251,59 @@ export default function CustomerManagement() {
                   </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Nội dung ghi chú</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Họ và tên</label>
+                    <input
+                      type="text"
+                      value={editForm.full_name}
+                      onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                      className="w-full h-12 rounded-2xl bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all border-transparent"
+                      placeholder="Nhập họ tên khách hàng..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Số điện thoại</label>
+                      <input
+                        type="text"
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        className="w-full h-12 rounded-2xl bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all border-transparent"
+                        placeholder="09xxx..."
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Số CCCD</label>
+                      <input
+                        type="text"
+                        value={editForm.id_card}
+                        onChange={(e) => setEditForm({ ...editForm, id_card: e.target.value })}
+                        className="w-full h-12 rounded-2xl bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all border-transparent"
+                        placeholder="001xxx..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Biển số xe</label>
+                    <input
+                      type="text"
+                      value={editForm.plate_number}
+                      onChange={(e) => setEditForm({ ...editForm, plate_number: e.target.value })}
+                      className="w-full h-12 rounded-2xl bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all border-transparent"
+                      placeholder="29A-xxxxx..."
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Ghi chú</label>
                     <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      className="w-full h-40 rounded-3xl bg-slate-50 p-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300 resize-none border-transparent"
-                      placeholder="Nhập ghi chú về thói quen, sở thích hoặc lưu ý đặc biệt..."
+                      value={editForm.notes}
+                      onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                      className="w-full h-32 rounded-3xl bg-slate-50 p-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300 resize-none border-transparent"
+                      placeholder="Nhập ghi chú về thói quen, sở thích..."
                     />
                   </div>
 
@@ -245,11 +315,11 @@ export default function CustomerManagement() {
                       Hủy
                     </button>
                     <button 
-                      onClick={handleSaveNotes}
+                      onClick={handleSaveCustomer}
                       className="flex-[2] flex h-14 items-center justify-center rounded-2xl bg-blue-600 font-bold text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
                     >
                       <Save className="mr-2" size={20} />
-                      Lưu ghi chú
+                      Lưu thay đổi
                     </button>
                   </div>
                 </div>

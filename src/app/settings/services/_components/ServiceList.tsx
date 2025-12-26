@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { MoreHorizontal, Plus, Trash2, Edit, Package, Search, Tag, DollarSign, X, Save } from 'lucide-react';
+import { Plus, Trash2, Edit, Package, Search, Tag, DollarSign, X, Save, AlertCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useNotification } from '@/context/NotificationContext';
-import { formatCurrency, cn, formatInputCurrency, parseCurrency } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { formatCurrency, cn } from '@/lib/utils';
 
 type Service = {
   id: string;
@@ -29,73 +27,79 @@ export default function ServiceList() {
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isStockOpen, setIsStockOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  
-  // Form state
+  const [submitting, setSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     price: 0,
-    unit: '',
+    unit: 'Cái',
     is_active: true,
     stock: 0,
     service_category_id: ''
   });
-  
-  // Stock update state
-  const [stockChange, setStockChange] = useState({ amount: 0, reason: '' });
-  const [confirmConfig, setConfirmConfig] = useState<{
-    isOpen: boolean;
-    title: string;
-    description: string;
-    onConfirm: () => void;
-    variant?: 'danger' | 'info';
-  }>({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {},
+
+  const [stockData, setStockData] = useState({
+    quantity: 1,
+    type: 'IMPORT' as 'IMPORT' | 'EXPORT',
+    reason: ''
   });
 
-  const fetchServices = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('services')
-      .select(`*, service_categories ( name )`)
-      .order('name', { ascending: true });
+    setError(null);
+    try {
+      // Fetch categories first
+      const { data: catData, error: catError } = await supabase
+        .from('service_categories')
+        .select('id, name')
+        .order('name');
+      
+      if (catError) {
+        if (catError.message.includes('relation') || catError.message.includes('not found')) {
+          throw new Error('Cơ sở dữ liệu chưa được thiết lập. Vui lòng chạy lệnh SQL Reset.');
+        }
+        throw catError;
+      }
+      setCategories(catData || []);
 
-    if (error) showNotification('Lỗi khi tải dịch vụ', 'error');
-    else setServices(data as Service[]);
-    setLoading(false);
+      // Fetch services
+      const { data: servData, error: servError } = await supabase
+        .from('services')
+        .select(`*, service_categories ( name )`)
+        .order('name', { ascending: true });
+
+      if (servError) {
+        if (servError.message.includes('relation') || servError.message.includes('not found')) {
+          throw new Error('Cơ sở dữ liệu chưa được thiết lập. Vui lòng chạy lệnh SQL Reset.');
+        }
+        throw servError;
+      }
+      setServices(servData as Service[] || []);
+    } catch (err: any) {
+      console.error('Lỗi tải dữ liệu:', err);
+      setError(err.message || 'Không thể kết nối đến cơ sở dữ liệu');
+      showNotification('Lỗi tải dữ liệu', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, [showNotification]);
 
-  const fetchCategories = useCallback(async () => {
-    const { data, error } = await supabase.from('service_categories').select('id, name').order('name');
-    if (!error) setCategories(data);
-  }, []);
-
   useEffect(() => {
-    let isMounted = true;
-    
-    const loadData = async () => {
-      if (!isMounted) return;
-      await Promise.all([fetchServices(), fetchCategories()]);
-    };
+    fetchData();
+  }, [fetchData]);
 
-    loadData();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchServices, fetchCategories]);
-
-  const handleServiceSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const data = {
+    if (submitting) return;
+    setSubmitting(true);
+
+    const payload = {
       name: formData.name,
       price: formData.price,
       unit: formData.unit,
@@ -104,126 +108,160 @@ export default function ServiceList() {
       service_category_id: formData.service_category_id || null
     };
 
-    if (selectedService) {
-      const { error } = await supabase.from('services').update(data).eq('id', selectedService.id);
-      if (error) showNotification('Lỗi cập nhật', 'error');
-      else {
-        showNotification('Đã cập nhật', 'success');
-        setIsFormOpen(false);
-        fetchServices();
+    try {
+      let result;
+      if (selectedService) {
+        result = await supabase.from('services').update(payload).eq('id', selectedService.id);
+      } else {
+        result = await supabase.from('services').insert([payload]);
       }
-    } else {
-      const { error } = await supabase.from('services').insert([data]);
-      if (error) showNotification('Lỗi thêm mới', 'error');
-      else {
-        showNotification('Đã thêm mới', 'success');
-        setIsFormOpen(false);
-        fetchServices();
-      }
+
+      if (result.error) throw result.error;
+
+      showNotification(selectedService ? 'Đã cập nhật' : 'Đã thêm mới', 'success');
+      setIsFormOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error('Lỗi lưu dịch vụ:', err);
+      alert(`LỖI LƯU DỮ LIỆU:\n${err.message}\n\nMẹo: Kiểm tra xem bạn đã chạy SQL khởi tạo chưa?`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleStockUpdate = async (e: React.FormEvent) => {
+  const handleStockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedService) return;
+    if (!selectedService || submitting) return;
+    setSubmitting(true);
 
-    const newStock = (selectedService.stock || 0) + stockChange.amount;
-    
-    const { error: updateError } = await supabase
-      .from('services')
-      .update({ stock: newStock })
-      .eq('id', selectedService.id);
+    try {
+      const currentStock = selectedService.stock || 0;
+      const change = stockData.type === 'IMPORT' ? stockData.quantity : -stockData.quantity;
+      const newStock = currentStock + change;
 
-    if (updateError) {
-      showNotification('Lỗi cập nhật kho', 'error');
-      return;
-    }
-
-    await supabase.from('stock_history').insert([{
-      service_id: selectedService.id,
-      action_type: stockChange.amount > 0 ? 'IMPORT' : 'EXPORT',
-      quantity: Math.abs(stockChange.amount),
-      details: {
-        reason: stockChange.reason,
-        stock_before: selectedService.stock || 0,
-        stock_after: newStock,
-        service_name: selectedService.name
+      if (newStock < 0) {
+        throw new Error('Số lượng tồn kho không thể âm');
       }
-    }]);
 
-    showNotification('Cập nhật kho thành công', 'success');
-    setIsStockOpen(false);
-    fetchServices();
+      // 1. Cập nhật bảng services
+      const { error: updateError } = await supabase
+        .from('services')
+        .update({ stock: newStock })
+        .eq('id', selectedService.id);
+
+      if (updateError) throw updateError;
+
+      // 2. Thêm vào lịch sử stock_history
+      const { error: historyError } = await supabase
+        .from('stock_history')
+        .insert([{
+          service_id: selectedService.id,
+          action_type: stockData.type,
+          quantity: stockData.quantity,
+          details: {
+            reason: stockData.reason || (stockData.type === 'IMPORT' ? 'Nhập kho bổ sung' : 'Xuất kho'),
+            stock_before: currentStock,
+            stock_after: newStock,
+            service_name: selectedService.name
+          }
+        }]);
+
+      if (historyError) throw historyError;
+
+      showNotification(`Đã ${stockData.type === 'IMPORT' ? 'nhập' : 'xuất'} kho thành công`, 'success');
+      setIsStockOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error('Lỗi cập nhật kho:', err);
+      alert(`LỖI:\n${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    setConfirmConfig({
-      isOpen: true,
-      title: 'Xóa dịch vụ?',
-      description: 'Bạn có chắc chắn muốn xóa dịch vụ này? Hành động này không thể hoàn tác.',
-      variant: 'danger',
-      onConfirm: async () => {
-        const { error } = await supabase.from('services').delete().eq('id', id);
-        if (error) {
-          showNotification('Lỗi khi xóa', 'error');
-        } else {
-          showNotification('Đã xóa', 'success');
-          fetchServices();
-        }
-        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-      }
-    });
+    if (!confirm('Bạn có chắc chắn muốn xóa dịch vụ này?')) return;
+
+    try {
+      const { error } = await supabase.from('services').delete().eq('id', id);
+      if (error) throw error;
+      showNotification('Đã xóa thành công', 'success');
+      fetchData();
+    } catch (err: any) {
+      console.error('Lỗi xóa:', err);
+      showNotification('Lỗi khi xóa dịch vụ', 'error');
+    }
   };
 
-  const filteredServices = services.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.service_categories?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredServices = services.filter(s => {
+    if (!s) return false;
+    const name = s.name || '';
+    const catName = s.service_categories?.name || '';
+    const query = searchQuery.toLowerCase();
+    return name.toLowerCase().includes(query) || catName.toLowerCase().includes(query);
+  });
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <AlertCircle className="h-16 w-16 text-rose-500 mb-4" />
+        <h2 className="text-xl font-bold text-slate-800 mb-2">Trang Dịch vụ đang gặp sự cố</h2>
+        <p className="text-slate-500 mb-6 max-w-md">{error}</p>
+        <button 
+          onClick={() => fetchData()}
+          className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold"
+        >
+          Thử tải lại trang
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Tìm tên dịch vụ, loại..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-14 w-full rounded-2xl bg-slate-200/50 pl-12 pr-4 text-base font-medium text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
-        />
+      {/* Search & Add */}
+      <div className="flex gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Tìm dịch vụ..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-12 w-full rounded-xl bg-white border border-slate-200 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <button
+          onClick={() => {
+            setSelectedService(null);
+            setFormData({ name: '', price: 0, unit: 'Cái', is_active: true, stock: 0, service_category_id: '' });
+            setIsFormOpen(true);
+          }}
+          className="h-12 px-6 rounded-xl bg-blue-600 text-white font-bold flex items-center gap-2"
+        >
+          <Plus size={20} />
+          Thêm
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Grid List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-40 animate-pulse rounded-[2rem] bg-slate-100" />
-          ))
+          [1,2,3].map(i => <div key={i} className="h-32 bg-slate-100 animate-pulse rounded-2xl" />)
         ) : filteredServices.length === 0 ? (
-          <div className="col-span-full flex flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-200 py-20 text-slate-400 bg-white/50">
-            <Package className="h-12 w-12 opacity-20 mb-4" />
-            <p className="text-lg font-bold">Không tìm thấy dịch vụ</p>
+          <div className="col-span-full py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400">
+            <Package size={48} className="mx-auto mb-4 opacity-20" />
+            <p className="font-bold">Chưa có dịch vụ nào</p>
           </div>
         ) : (
-          filteredServices.map((service) => (
-            <motion.div
-              key={service.id}
-              layout
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="group relative overflow-hidden rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm transition-all hover:shadow-md active:scale-[0.98]"
-            >
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <h4 className="text-lg font-black text-slate-800 line-clamp-1">{service.name}</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                      {service.service_categories?.name || 'Chưa phân loại'}
-                    </span>
-                    {!service.is_active && (
-                      <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-500 uppercase tracking-tighter">Ngừng bán</span>
-                    )}
-                  </div>
+          filteredServices.map(service => (
+            <div key={service.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-lg">{service?.name || 'Không tên'}</h3>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">
+                    {service?.service_categories?.name || 'Chưa phân loại'}
+                  </span>
                 </div>
                 <div className="flex gap-1">
                   <button 
@@ -239,292 +277,197 @@ export default function ServiceList() {
                       });
                       setIsFormOpen(true);
                     }}
-                    className="rounded-full p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                    className="p-2 text-slate-400 hover:text-blue-600"
                   >
                     <Edit size={18} />
                   </button>
-                  <button 
-                    onClick={() => handleDelete(service.id)}
-                    className="rounded-full p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                  >
+                  <button onClick={() => handleDelete(service.id)} className="p-2 text-slate-400 hover:text-rose-600">
                     <Trash2 size={18} />
                   </button>
                 </div>
               </div>
-
-              <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-4">
-                <div className="space-y-0.5">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Giá bán</p>
-                  <p className="text-lg font-black text-blue-600">{formatCurrency(service.price)}đ<span className="text-xs font-bold text-slate-400">/{service.unit}</span></p>
+              <div className="flex justify-between items-end border-t pt-4 gap-4">
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Giá bán</p>
+                  <p className="font-black text-blue-600">{formatCurrency(service.price)}đ/{service.unit}</p>
                 </div>
                 
-                <button 
-                  onClick={() => {
-                    setSelectedService(service);
-                    setStockChange({ amount: 0, reason: '' });
-                    setIsStockOpen(true);
-                  }}
-                  className={cn(
-                    "flex flex-col items-end rounded-2xl px-4 py-2 transition-all active:scale-95",
-                    (service.stock || 0) <= 5 ? "bg-rose-50 text-rose-600" : "bg-slate-50 text-slate-600"
-                  )}
-                >
-                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Tồn kho</span>
-                  <span className="text-sm font-black">{service.stock !== null ? service.stock : '-'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Tồn kho</p>
+                    <p className="font-bold text-slate-800">{service.stock ?? 0}</p>
+                  </div>
+                  
+                  <button 
+                    onClick={() => {
+                      setSelectedService(service);
+                      setStockData({ quantity: 1, type: 'IMPORT', reason: '' });
+                      setIsStockOpen(true);
+                    }}
+                    className="flex items-center gap-2 bg-slate-100 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-xl transition-all group"
+                    title="Nhập/Xuất kho"
+                  >
+                    <Package size={16} className="text-slate-500 group-hover:text-white" />
+                    <span className="text-xs font-bold">Nhập/Xuất</span>
+                  </button>
+                </div>
               </div>
-            </motion.div>
+            </div>
           ))
         )}
       </div>
 
-      {/* Floating Action Button */}
-      <div className="fixed bottom-20 left-4 right-4 z-40 max-w-md mx-auto">
-        <button
-          onClick={() => {
-            setSelectedService(null);
-            setFormData({ name: '', price: 0, unit: 'Cái', is_active: true, stock: 0, service_category_id: '' });
-            setIsFormOpen(true);
-          }}
-          className="flex h-[56px] w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 text-base font-bold text-white shadow-xl shadow-blue-200 active:scale-[0.96] transition-all"
-        >
-          <Plus className="h-5 w-5" />
-          THÊM DỊCH VỤ MỚI
-        </button>
-      </div>
+      {/* Simplified Modal */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl p-8 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">{selectedService ? 'Sửa dịch vụ' : 'Thêm dịch vụ mới'}</h3>
+              <button onClick={() => setIsFormOpen(false)}><X /></button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 uppercase">Tên dịch vụ</label>
+                <input 
+                  required
+                  value={formData.name}
+                  onChange={e => setFormData({...formData, name: e.target.value})}
+                  className="w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500"
+                />
+              </div>
 
-      {/* Form Modal */}
-      <AnimatePresence>
-        {isFormOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-0">
-            <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              className="relative w-full h-full bg-slate-50 p-8 shadow-2xl flex flex-col overflow-y-auto rounded-none"
-            >
-              <form onSubmit={handleServiceSubmit} className="space-y-6">
-                <div className="flex items-center justify-between pt-4">
-                  <h3 className="text-xl font-bold text-slate-800">{selectedService ? 'Sửa dịch vụ' : 'Thêm dịch vụ mới'}</h3>
-                  <button type="button" onClick={() => setIsFormOpen(false)} className="rounded-full bg-slate-200 p-3 text-slate-500 hover:bg-slate-300 transition-all">
-                    <X size={24} />
-                  </button>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Giá bán</label>
+                  <input 
+                    type="number"
+                    required
+                    value={formData.price}
+                    onChange={e => setFormData({...formData, price: Number(e.target.value)})}
+                    className="w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500"
+                  />
                 </div>
-
-                <div className="space-y-6 flex-1">
-                  <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 space-y-4">
-                    <div className="flex items-center gap-2 text-blue-600 mb-2">
-                      <Tag size={18} />
-                      <span className="font-bold text-sm">Thông tin dịch vụ</span>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <FormInput 
-                        label="Tên dịch vụ" 
-                        value={formData.name} 
-                        onChange={v => setFormData({...formData, name: v})} 
-                        placeholder="VD: Coca Cola"
-                      />
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormInput 
-                          label="Loại" 
-                          type="select"
-                          value={formData.service_category_id} 
-                          onChange={v => setFormData({...formData, service_category_id: v})}
-                          options={[{id: '', name: 'Chưa phân loại'}, ...categories]}
-                        />
-                        <FormInput 
-                          label="Đơn vị tính" 
-                          value={formData.unit} 
-                          onChange={v => setFormData({...formData, unit: v})} 
-                          placeholder="VD: Lon, Cái..."
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 space-y-4">
-                    <div className="flex items-center gap-2 text-emerald-600 mb-2">
-                      <DollarSign size={18} />
-                      <span className="font-bold text-sm">Giá & Kho</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormInput 
-                        label="Giá bán" 
-                        type="currency"
-                        value={formData.price} 
-                        onChange={v => setFormData({...formData, price: v})} 
-                      />
-                      <FormInput 
-                        label="Tồn ban đầu" 
-                        type="number"
-                        value={formData.stock} 
-                        onChange={v => setFormData({...formData, stock: Number(v)})} 
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-bold text-slate-800">Đang kinh doanh</p>
-                        <p className="text-xs text-slate-400">Hiển thị để khách đặt</p>
-                      </div>
-                      <input 
-                        type="checkbox"
-                        checked={formData.is_active}
-                        onChange={e => setFormData({...formData, is_active: e.target.checked})}
-                        className="h-6 w-11 rounded-full bg-slate-200 transition-all focus:ring-blue-500 appearance-none cursor-pointer checked:bg-blue-600 relative after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all checked:after:translate-x-5"
-                      />
-                    </div>
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Đơn vị</label>
+                  <input 
+                    value={formData.unit}
+                    onChange={e => setFormData({...formData, unit: e.target.value})}
+                    className="w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500"
+                  />
                 </div>
+              </div>
 
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setIsFormOpen(false)} className="flex-1 h-14 rounded-2xl bg-slate-200 font-bold text-slate-600 hover:bg-slate-300 transition-colors">Hủy</button>
-                  <button type="submit" className="flex-[2] flex h-14 items-center justify-center rounded-2xl bg-blue-600 font-bold text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
-                    <Save className="mr-2" size={20}/>
-                    {selectedService ? 'Lưu thay đổi' : 'Thêm mới'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 uppercase">Loại dịch vụ</label>
+                <select 
+                  value={formData.service_category_id}
+                  onChange={e => setFormData({...formData, service_category_id: e.target.value})}
+                  className="w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500"
+                >
+                  <option value="">Chưa phân loại</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
 
-      {/* Stock Update Modal */}
-      <AnimatePresence>
-        {isStockOpen && selectedService && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-0">
-            <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              className="relative w-full h-full bg-slate-50 p-8 shadow-2xl flex flex-col overflow-y-auto rounded-none"
-            >
-              <div className="flex items-center justify-between pt-4 mb-8">
-                <div>
-                  <h3 className="text-xl font-bold text-slate-800">Cập nhật kho</h3>
-                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{selectedService.name}</p>
-                </div>
-                <button type="button" onClick={() => setIsStockOpen(false)} className="rounded-full bg-slate-200 p-3 text-slate-500 hover:bg-slate-300 transition-all">
-                  <X size={24} />
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setIsFormOpen(false)} className="flex-1 h-12 rounded-xl bg-slate-100 font-bold">Hủy</button>
+                <button 
+                  type="submit" 
+                  disabled={submitting}
+                  className="flex-[2] h-12 rounded-xl bg-blue-600 text-white font-bold disabled:opacity-50"
+                >
+                  {submitting ? 'Đang lưu...' : 'Lưu dữ liệu'}
                 </button>
               </div>
-              
-              <form onSubmit={handleStockUpdate} className="space-y-6 flex-1">
-                <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 space-y-4">
-                  <div className="flex items-center justify-between px-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase">Tồn hiện tại</span>
-                    <span className="text-lg font-black text-slate-800">{selectedService.stock || 0}</span>
-                  </div>
-
-                  <FormInput 
-                    label="Số lượng thay đổi" 
-                    type="number"
-                    placeholder="+ nhập, - xuất"
-                    value={stockChange.amount}
-                    onChange={v => setStockChange({...stockChange, amount: Number(v)})}
-                  />
-                  
-                  <FormInput 
-                    label="Lý do" 
-                    placeholder="VD: Nhập hàng mới..."
-                    value={stockChange.reason}
-                    onChange={v => setStockChange({...stockChange, reason: v})}
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setIsStockOpen(false)} className="flex-1 h-14 rounded-2xl bg-slate-200 font-bold text-slate-600 hover:bg-slate-300 transition-colors">Hủy</button>
-                  <button 
-                    type="submit"
-                    className={cn(
-                      "flex-[2] h-14 rounded-2xl font-bold text-white transition-all shadow-lg",
-                      stockChange.amount >= 0 ? "bg-emerald-600 shadow-emerald-100" : "bg-rose-600 shadow-rose-100"
-                    )}
-                  >
-                    {stockChange.amount >= 0 ? 'NHẬP KHO' : 'XUẤT KHO'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+            </form>
           </div>
-        )}
-      </AnimatePresence>
-
-      <ConfirmDialog
-        isOpen={confirmConfig.isOpen}
-        title={confirmConfig.title}
-        description={confirmConfig.description}
-        variant={confirmConfig.variant}
-        onConfirm={confirmConfig.onConfirm}
-        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
-      />
-    </div>
-  );
-}
-
-interface FormInputProps {
-  label: string;
-  value: any;
-  onChange: (val: any) => void;
-  type?: 'text' | 'number' | 'currency' | 'select';
-  placeholder?: string;
-  options?: Array<{ id: string; name: string }>;
-}
-
-function FormInput({ label, value, onChange, type = 'text', placeholder, options }: FormInputProps) {
-  const [displayValue, setDisplayValue] = useState(type === 'currency' ? formatInputCurrency(value?.toString() || '0') : value);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (isMounted) {
-      if (type === 'currency') {
-        setDisplayValue(formatInputCurrency(value?.toString() || '0'));
-      } else {
-        setDisplayValue(value);
-      }
-    }
-    return () => { isMounted = false; };
-  }, [value, type]);
-
-  return (
-    <div className="space-y-1.5">
-      <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">{label}</label>
-      {type === 'select' ? (
-        <select 
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="h-14 w-full rounded-2xl border-transparent bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all appearance-none"
-        >
-          {options.map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
-      ) : type === 'currency' ? (
-        <div className="relative">
-          <input 
-            type="text"
-            value={displayValue}
-            onChange={e => {
-              const formatted = formatInputCurrency(e.target.value);
-              setDisplayValue(formatted);
-              onChange(parseCurrency(formatted));
-            }}
-            placeholder={placeholder}
-            className="h-14 w-full rounded-2xl border-transparent bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300"
-          />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 font-bold">đ</span>
         </div>
-      ) : (
-        <input 
-          type={type}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="h-14 w-full rounded-2xl border-transparent bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300"
-        />
+      )}
+      {/* Stock Management Modal */}
+      {isStockOpen && selectedService && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold">Quản lý kho</h3>
+                <p className="text-sm text-slate-500">{selectedService.name}</p>
+              </div>
+              <button onClick={() => setIsStockOpen(false)}><X /></button>
+            </div>
+
+            <form onSubmit={handleStockSubmit} className="space-y-6">
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setStockData({ ...stockData, type: 'IMPORT' })}
+                  className={cn(
+                    "flex-1 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all",
+                    stockData.type === 'IMPORT' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500"
+                  )}
+                >
+                  <ArrowUpCircle size={18} />
+                  Nhập kho
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockData({ ...stockData, type: 'EXPORT' })}
+                  className={cn(
+                    "flex-1 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all",
+                    stockData.type === 'EXPORT' ? "bg-white text-rose-600 shadow-sm" : "text-slate-500"
+                  )}
+                >
+                  <ArrowDownCircle size={18} />
+                  Xuất kho
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Số lượng</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={stockData.quantity}
+                    onChange={e => setStockData({ ...stockData, quantity: Number(e.target.value) })}
+                    className="w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500 text-lg font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Lý do (Tùy chọn)</label>
+                  <input
+                    placeholder={stockData.type === 'IMPORT' ? "VD: Nhập hàng mới" : "VD: Xuất hủy, hỏng"}
+                    value={stockData.reason}
+                    onChange={e => setStockData({ ...stockData, reason: e.target.value })}
+                    className="w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-2xl flex justify-between items-center">
+                <span className="text-sm font-medium text-blue-700">Tồn kho sau xử lý:</span>
+                <span className="text-xl font-black text-blue-700">
+                  {(selectedService.stock || 0) + (stockData.type === 'IMPORT' ? stockData.quantity : -stockData.quantity)}
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className={cn(
+                  "w-full h-14 rounded-2xl text-white font-bold text-lg shadow-lg transition-all active:scale-[0.98]",
+                  stockData.type === 'IMPORT' ? "bg-emerald-500 hover:bg-emerald-600" : "bg-rose-500 hover:bg-rose-600",
+                  submitting && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                {submitting ? 'Đang xử lý...' : (stockData.type === 'IMPORT' ? 'Xác nhận nhập kho' : 'Xác nhận xuất kho')}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
 }
-

@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ArrowUpCircle, ArrowDownCircle, Search, History, Package } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Search, History, Package, AlertCircle } from 'lucide-react';
 import { useNotification } from '@/context/NotificationContext';
-import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 type StockLog = {
@@ -25,36 +24,52 @@ export default function StockHistory() {
   const { showNotification } = useNotification();
   const [logs, setLogs] = useState<StockLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('stock_history')
-      .select('*')
-      .order('created_at', { ascending: false });
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from('stock_history')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) showNotification('Lỗi khi tải lịch sử kho', 'error');
-    else setLogs(data as StockLog[]);
-    setLoading(false);
+      if (error) throw error;
+      setLogs(data as StockLog[] || []);
+    } catch (err: any) {
+      console.error('Lỗi tải lịch sử kho:', err);
+      setError(err.message);
+      showNotification('Lỗi khi tải lịch sử kho', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, [showNotification]);
 
   useEffect(() => {
-    let isMounted = true;
-    if (isMounted) {
-      fetchLogs();
-    }
-    return () => { isMounted = false; };
+    fetchLogs();
   }, [fetchLogs]);
 
-  const filteredLogs = logs.filter(log => 
-    log.details.service_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.details.reason?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLogs = logs.filter(log => {
+    const name = log.details?.service_name?.toLowerCase() || '';
+    const reason = log.details?.reason?.toLowerCase() || '';
+    const query = searchTerm.toLowerCase();
+    return name.includes(query) || reason.includes(query);
+  });
+
+  if (error) {
+    return (
+      <div className="text-center py-20">
+        <AlertCircle className="h-12 w-12 text-rose-500 mx-auto mb-4" />
+        <p className="text-slate-800 font-bold mb-4">Lỗi: {error}</p>
+        <button onClick={() => fetchLogs()} className="bg-blue-600 text-white px-6 py-2 rounded-xl">Thử lại</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Search Bar */}
       <div className="relative">
         <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
         <input
@@ -62,68 +77,48 @@ export default function StockHistory() {
           placeholder="Tìm tên dịch vụ hoặc lý do..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="h-14 w-full rounded-2xl bg-slate-200/50 pl-12 pr-4 text-base font-medium text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+          className="h-12 w-full rounded-xl bg-white border border-slate-200 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {loading ? (
-          Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-[2rem] bg-slate-100" />
-          ))
+          [1,2,3].map(i => <div key={i} className="h-20 bg-slate-100 animate-pulse rounded-2xl" />)
         ) : filteredLogs.length === 0 ? (
-          <div className="col-span-full flex flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-200 py-20 text-slate-400 bg-white/50">
-            <History className="h-12 w-12 opacity-20 mb-4" />
-            <p className="text-lg font-bold">Không tìm thấy lịch sử</p>
+          <div className="py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400">
+            <History size={48} className="mx-auto mb-4 opacity-20" />
+            <p className="font-bold">Chưa có lịch sử biến động kho</p>
           </div>
         ) : (
           filteredLogs.map((log) => (
-            <motion.div
-              key={log.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="group relative overflow-hidden rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm transition-all hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "flex h-12 w-12 items-center justify-center rounded-2xl",
-                    log.action_type === 'IMPORT' ? "bg-emerald-50 text-emerald-600" : 
-                    log.action_type === 'EXPORT' ? "bg-rose-50 text-rose-600" : "bg-blue-50 text-blue-600"
-                  )}>
-                    {log.action_type === 'IMPORT' ? <ArrowUpCircle size={24} /> : <ArrowDownCircle size={24} />}
-                  </div>
-                  <div>
-                    <h4 className="text-base font-black text-slate-800">{log.details.service_name}</h4>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      {new Date(log.created_at).toLocaleString('vi-VN', { 
-                        day: '2-digit', month: '2-digit', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit'
-                      })}
-                    </p>
-                  </div>
+            <div key={log.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "h-10 w-10 flex items-center justify-center rounded-xl",
+                  log.action_type === 'IMPORT' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                )}>
+                  {log.action_type === 'IMPORT' ? <ArrowUpCircle size={20} /> : <ArrowDownCircle size={20} />}
                 </div>
-                
-                <div className="text-right">
-                  <p className={cn(
-                    "text-lg font-black",
-                    log.action_type === 'IMPORT' ? "text-emerald-600" : "text-rose-600"
-                  )}>
-                    {log.action_type === 'IMPORT' ? '+' : '-'}{log.quantity}
-                  </p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    {log.details.stock_before} → {log.details.stock_after}
+                <div>
+                  <h4 className="font-bold text-slate-800 text-sm">{log.details?.service_name || 'Dịch vụ'}</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    {new Date(log.created_at).toLocaleString('vi-VN')}
                   </p>
                 </div>
               </div>
-
-              {log.details.reason && (
-                <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
-                  <Package size={12} className="text-slate-400" />
-                  <p className="text-xs font-medium text-slate-600">{log.details.reason}</p>
-                </div>
-              )}
-            </motion.div>
+              
+              <div className="text-right">
+                <p className={cn(
+                  "font-black text-lg",
+                  log.action_type === 'IMPORT' ? "text-emerald-600" : "text-rose-600"
+                )}>
+                  {log.action_type === 'IMPORT' ? '+' : '-'}{log.quantity}
+                </p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">
+                  {log.details?.reason || 'Cập nhật kho'}
+                </p>
+              </div>
+            </div>
           ))
         )}
       </div>

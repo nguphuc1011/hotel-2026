@@ -11,7 +11,9 @@ export function calculateRoomPrice(
   settings: Setting[],
   room: Room,
   rentalType: 'hourly' | 'daily' | 'overnight',
-  serviceTotal: number = 0
+  serviceTotal: number = 0,
+  customSurcharge: number = 0,
+  pricesOverride?: { hourly: number; next_hour: number; overnight: number; daily: number }
 ): PricingBreakdown {
   const parseDate = (d: Date | string) => {
     if (d instanceof Date) return d;
@@ -39,7 +41,7 @@ export function calculateRoomPrice(
   const checkIn = parseDate(checkInTime);
   const checkOut = parseDate(checkOutTime);
 
-  let roomPrices = room.prices;
+  let roomPrices = pricesOverride || room.prices;
   if (typeof roomPrices === 'string') {
     try {
       roomPrices = JSON.parse(roomPrices);
@@ -166,36 +168,30 @@ export function calculateRoomPrice(
   } 
   else if (rentalType === 'daily') {
     const nightsStayed = differenceInCalendarDays(checkOut, checkIn);
-    const baseDays = Math.max(1, nightsStayed);
-    base_charge = baseDays * prices.daily;
-    summary.days = baseDays;
-    summary.base_price = prices.daily;
-    duration_text = `${baseDays} ngày`;
-
+    let baseDays = Math.max(1, nightsStayed);
+    
     if (enableAutoSurcharge) {
-      let addedDayForEarly = false;
-      let addedDayForLate = false;
-
       const [checkInH, checkInM] = timeRules.check_in.split(':').map(Number);
       const standardCheckIn = new Date(checkIn);
       standardCheckIn.setHours(checkInH, checkInM, 0, 0);
 
+      // Early check-in logic
       if (isAfter(standardCheckIn, checkIn)) {
         const [h, m] = timeRules.full_day_early_before.split(':').map(Number);
         const threshold = new Date(checkIn);
         threshold.setHours(h, m, 0, 0);
+        
         if (isAfter(threshold, checkIn)) {
-          summary.early_checkin_surcharge = prices.daily;
-          surcharge += prices.daily;
-          addedDayForEarly = true;
-        }
-        if (!addedDayForEarly) {
+          // Tính tròn thêm 1 ngày
+          baseDays += 1;
+        } else {
           const early = getPercentageSurcharge(checkIn, timeRules.early_rules, prices.daily);
           summary.early_checkin_surcharge = early;
           surcharge += early;
         }
       }
 
+      // Late check-out logic
       const [checkOutH, checkOutM] = timeRules.check_out.split(':').map(Number);
       const standardCheckOut = new Date(checkOut);
       standardCheckOut.setHours(checkOutH, checkOutM, 0, 0);
@@ -205,33 +201,37 @@ export function calculateRoomPrice(
         const [h, m] = timeRules.full_day_late_after.split(':').map(Number);
         const threshold = new Date(checkOut);
         threshold.setHours(h, m, 0, 0);
+        
         if (isAfter(checkOut, threshold)) {
-          summary.late_checkout_surcharge = prices.daily;
-          surcharge += prices.daily;
-          addedDayForLate = true;
-        }
-        if (!addedDayForLate) {
+          // Tính tròn thêm 1 ngày
+          baseDays += 1;
+        } else {
           const late = getPercentageSurcharge(checkOut, timeRules.late_rules, prices.daily);
           summary.late_checkout_surcharge = late;
           surcharge += late;
         }
       }
     }
+
+    base_charge = baseDays * prices.daily;
+    summary.days = baseDays;
+    summary.base_price = prices.daily;
+    duration_text = `${baseDays} ngày`;
   }
 
   summary.duration_text = duration_text;
 
   const final_base_charge = roomChargeLocked > 0 ? roomChargeLocked : base_charge;
-  const room_tax = ((final_base_charge + surcharge) * taxConfig.stay_tax) / 100;
+  const room_tax = ((final_base_charge + surcharge + customSurcharge) * taxConfig.stay_tax) / 100;
   const service_tax = (serviceTotal * taxConfig.service_tax) / 100;
-  const total_amount = final_base_charge + surcharge + serviceTotal + room_tax + service_tax;
+  const total_amount = final_base_charge + surcharge + customSurcharge + serviceTotal + room_tax + service_tax;
 
   return {
     total_amount: Math.round(total_amount),
     suggested_total: Math.round(total_amount),
     room_charge: final_base_charge,
     service_charge: serviceTotal,
-    surcharge: Math.round(surcharge),
+    surcharge: Math.round(surcharge + customSurcharge),
     tax_details: {
       room_tax: Math.round(room_tax),
       service_tax: Math.round(service_tax)

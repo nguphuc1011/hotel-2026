@@ -3,15 +3,18 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowRight, Edit, Printer, DollarSign, Trash2, ChevronDown, User, Clock, Plus, Minus, Search, Save, CheckCircle, Info, LogIn, LogOut, FileText, ShoppingCart, Star, Coffee, Utensils, Beer, Cigarette, Wine } from 'lucide-react';
-import { Room, Service, PricingBreakdown, Setting } from '@/types';
+import { X, ArrowRight, Edit, Printer, DollarSign, Trash2, ChevronDown, User, Clock, Plus, Minus, Search, Save, CircleCheck, Info, LogIn, LogOut, FileText, ShoppingCart, Star, Coffee, Utensils, Beer, Cigarette, Wine, Layers, DoorOpen } from 'lucide-react';
+import { Room, Service, PricingBreakdown, Setting, Customer } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { calculateRoomPrice } from '@/lib/pricing';
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
 import { format, parseISO, differenceInMinutes, differenceInCalendarDays } from 'date-fns';
 import { cn } from '@/lib/utils';
-import CheckoutModal, { CheckoutData } from './CheckoutModal';
+import CheckoutModal, { CheckoutData } from './CheckOutModal';
+import EditBookingModal from './EditBookingModal';
+
+import { PrintableInvoice } from './PrintableInvoice';
 
 // Mock data for icons, will be replaced with actual icons
 const Icon = ({ name, className }: { name: string, className?: string }) => {
@@ -24,7 +27,8 @@ const Icon = ({ name, className }: { name: string, className?: string }) => {
     'fa-user-circle': User,
     'fa-clock': Clock,
     'fa-save': Save,
-    'fa-check-circle': CheckCircle,
+    'fa-check-circle': CircleCheck,
+    'fa-door-open': DoorOpen,
   };
   const LucideIcon = icons[name] || Info;
   return <LucideIcon className={cn("w-5 h-5", className)} />;
@@ -57,58 +61,51 @@ const ServiceIcon = ({ name }: { name: string }) => {
 
 interface FolioModalProps {
   room: Room | null;
-  allRooms: Room[];
   settings: Setting[];
   services: Service[];
+  customers: Customer[];
   isOpen: boolean;
   onClose: () => void;
   onPayment: (bookingId: string, finalAmount: number, auditNote?: string) => void;
   onUpdate: () => void;
   onCancel: (bookingId: string) => void;
-  onChangeRoom: (bookingId: string) => void;
-  onEditBooking: (booking: any) => void;
-  onMerge: (sourceBookingId: string, targetRoomId: string, breakdown: PricingBreakdown) => void;
+  isAdmin?: boolean;
 }
 
 export default function FolioModal({
   room,
-  allRooms,
   settings,
   services,
+  customers,
   isOpen,
   onClose,
   onPayment,
   onUpdate,
   onCancel,
-  onChangeRoom,
-  onEditBooking,
-  onMerge
+  isAdmin
 }: FolioModalProps) {
 
   const [tempServices, setTempServices] = useState<Record<string, number>>({});
   const [isHeroCardExpanded, setIsHeroCardExpanded] = useState(false);
-  const [pricingBreakdown, setPricingBreakdown] = useState<PricingBreakdown | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isServicesExpanded, setIsServicesExpanded] = useState(true);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [depositValue, setDepositValue] = useState('');
+  const [showChangeRoomModal, setShowChangeRoomModal] = useState(false);
+  const [showEditBookingModal, setShowEditBookingModal] = useState(false);
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
+  const [selectedTargetRoomId, setSelectedTargetRoomId] = useState<string>('');
+  const [tick, setTick] = useState(0);
+  
   const { showNotification } = useNotification();
 
-  const duration = useMemo(() => {
-    if (!room?.current_booking?.check_in_at) return '0h 0p';
-    const start = parseISO(room.current_booking.check_in_at);
-    const now = new Date();
-    
-    if (room.current_booking.rental_type === 'hourly') {
-      const totalMinutes = differenceInMinutes(now, start);
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      return `Đã ${hours}h ${minutes}p`;
-    } else {
-      const days = differenceInCalendarDays(now, start);
-      return `Đã ${Math.max(1, days)} ngày`;
-    }
-  }, [room?.current_booking?.check_in_at, room?.current_booking?.rental_type]);
+  // Tự động làm mới tính toán mỗi phút
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const timeRules = useMemo(() => {
     const timeSettings = settings.find(s => s.key === 'time_rules');
@@ -158,25 +155,46 @@ export default function FolioModal({
     return JSON.stringify(cleanTemp) !== JSON.stringify(cleanSaved);
   }, [tempServices, savedServices]);
 
-  const updatePricing = useCallback(() => {
-    if (room?.current_booking) {
-      const breakdown = calculateRoomPrice(
-        room.current_booking.check_in_at,
-        new Date(),
-        settings,
-        room,
-        room.current_booking.rental_type,
-        serviceTotals.temp
-      );
-      setPricingBreakdown(breakdown);
-    }
-  }, [room, settings, serviceTotals.temp]);
+  const pricingBreakdown = useMemo(() => {
+    if (!room?.current_booking) return null;
 
-  useEffect(() => {
-    updatePricing();
-    const interval = setInterval(updatePricing, 60000);
-    return () => clearInterval(interval);
-  }, [updatePricing]);
+    // Tạo giá ghi đè dựa trên initial_price (giá lúc vào hoặc giá đã sửa)
+    const currentType = room.current_booking.rental_type;
+    const pricesOverride = { ...room.prices };
+    if (room.current_booking.initial_price) {
+      pricesOverride[currentType as keyof typeof pricesOverride] = room.current_booking.initial_price;
+    }
+
+    return calculateRoomPrice(
+      room.current_booking.check_in_at,
+      new Date(),
+      settings,
+      room,
+      room.current_booking.rental_type,
+      serviceTotals.temp,
+      room.current_booking.custom_surcharge || 0,
+      pricesOverride
+    );
+  }, [room, settings, serviceTotals.temp, tick]);
+
+  const duration = useMemo(() => {
+    if (pricingBreakdown?.summary?.duration_text) {
+        return pricingBreakdown.summary.duration_text;
+    }
+    if (!room?.current_booking?.check_in_at) return '0h 0p';
+    const start = parseISO(room.current_booking.check_in_at);
+    const now = new Date();
+    
+    if (room.current_booking.rental_type === 'hourly') {
+      const totalMinutes = differenceInMinutes(now, start);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return `${hours}h ${minutes}p`;
+    } else {
+      const days = differenceInCalendarDays(now, start);
+      return `${Math.max(1, days)} ngày`;
+    }
+  }, [room?.current_booking?.check_in_at, room?.current_booking?.rental_type, pricingBreakdown]);
 
   const handleQuantityChange = (serviceId: string | number, newQuantity: number) => {
     const sid = String(serviceId);
@@ -233,6 +251,185 @@ export default function FolioModal({
       showNotification(`Lỗi khi lưu: ${error.message}`, 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDepositSubmit = async () => {
+    if (!room?.current_booking || !depositValue) return;
+    
+    const amount = parseInt(depositValue.replace(/\D/g, ''), 10);
+    if (isNaN(amount) || amount <= 0) {
+      showNotification('Số tiền không hợp lệ', 'error');
+      return;
+    }
+
+    try {
+      // Cộng dồn tiền cọc mới vào tiền cọc cũ
+      const newTotalDeposit = (room.current_booking.deposit_amount || 0) + amount;
+
+      const { error } = await supabase
+        .from('bookings')
+        .update({ deposit_amount: newTotalDeposit })
+        .eq('id', room.current_booking.id);
+
+      if (error) throw error;
+
+      showNotification(`Đã cộng thêm ${formatCurrency(amount)} vào tiền cọc`, 'success');
+      setShowDepositModal(false);
+      setDepositValue('');
+      if (onUpdate) onUpdate();
+    } catch (error: any) {
+      showNotification(`Lỗi: ${error.message}`, 'error');
+    }
+  };
+
+  const handleFetchAvailableRooms = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('status', 'available')
+        .order('room_number');
+      
+      if (error) throw error;
+      setAvailableRooms(data || []);
+      setShowChangeRoomModal(true);
+    } catch (error: any) {
+      showNotification(`Lỗi tải danh sách phòng: ${error.message}`, 'error');
+    }
+  };
+
+  const handleChangeRoomSubmit = async () => {
+    if (!room?.current_booking || !selectedTargetRoomId) return;
+
+    try {
+      // 1. Update booking: room_id -> new room
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .update({ room_id: selectedTargetRoomId })
+        .eq('id', room.current_booking.id);
+
+      if (bookingError) throw bookingError;
+
+      // 2. Update old room: dirty, no booking
+      const { error: oldRoomError } = await supabase
+        .from('rooms')
+        .update({ status: 'dirty', current_booking_id: null })
+        .eq('id', room.id);
+
+      if (oldRoomError) throw oldRoomError;
+
+      // 3. Update new room: occupied, booking_id
+      const { error: newRoomError } = await supabase
+        .from('rooms')
+        .update({ 
+          status: 'occupied', // Assuming simple status mapping, or keep existing logic
+          current_booking_id: room.current_booking.id 
+        })
+        .eq('id', selectedTargetRoomId);
+
+      if (newRoomError) throw newRoomError;
+
+      showNotification('Đã đổi phòng thành công', 'success');
+      setShowChangeRoomModal(false);
+      onClose(); // Close folio modal as the room changed
+      if (onUpdate) onUpdate();
+    } catch (error: any) {
+      showNotification(`Lỗi đổi phòng: ${error.message}`, 'error');
+    }
+  };
+
+  const handleEditBookingSave = async (data: {
+    check_in_at: string;
+    initial_price: number;
+    price_change_type: 'from_start' | 'from_today';
+    customer_name: string;
+  }) => {
+    if (!room?.current_booking) return;
+
+    try {
+      const updates: any = {
+        check_in_at: data.check_in_at,
+        initial_price: data.initial_price,
+      };
+
+      // Handle "from today" logic
+      if (data.price_change_type === 'from_today') {
+        // Use the NEW check_in_at for calculation to ensure consistency
+        const targetCheckIn = data.check_in_at;
+        const now = new Date();
+
+        // 1. Calculate current charge at OLD price for the period [newCheckIn -> now]
+        // We use pricesOverride to force the OLD price for this calculation
+        const oldPricesOverride = { ...room.prices };
+        oldPricesOverride[room.current_booking.rental_type as keyof typeof oldPricesOverride] = room.current_booking.initial_price || 0;
+
+        const currentPricing = calculateRoomPrice(
+          targetCheckIn,
+          now,
+          settings,
+          room,
+          room.current_booking.rental_type,
+          0,
+          0,
+          oldPricesOverride
+        );
+
+        // 2. Calculate what the charge would be at NEW price for the same period [newCheckIn -> now]
+        const newPricesOverride = { ...room.prices };
+        newPricesOverride[room.current_booking.rental_type as keyof typeof newPricesOverride] = data.initial_price;
+        
+        const newPricing = calculateRoomPrice(
+          targetCheckIn,
+          now,
+          settings,
+          room,
+          room.current_booking.rental_type,
+          0,
+          0,
+          newPricesOverride
+        );
+
+        // 3. Difference to be added to custom_surcharge
+        // If currentPricing.room_charge (old) > newPricing.room_charge (new), diff is positive (surcharge)
+        // If currentPricing.room_charge (old) < newPricing.room_charge (new), diff is negative (discount)
+        const diff = currentPricing.room_charge - newPricing.room_charge;
+        
+        // We add this diff to the EXISTING custom_surcharge
+        updates.custom_surcharge = (room.current_booking.custom_surcharge || 0) + diff;
+      } else {
+        // If "from_start", we might want to keep or reset custom_surcharge? 
+        // Usually, if they change the price "from start", they might want to clear previous "from today" adjustments.
+        // Let's keep it for now as it might contain other manual surcharges.
+      }
+
+      // 4. Update booking
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .update(updates)
+        .eq('id', room.current_booking.id);
+
+      if (bookingError) throw bookingError;
+
+      // 5. Update customer name if changed
+      if (room.current_booking.customer_id) {
+        const { error: customerError } = await supabase
+          .from('customers')
+          .update({ full_name: data.customer_name })
+          .eq('id', room.current_booking.customer_id);
+        
+        if (customerError) throw customerError;
+      }
+
+      showNotification('Đã cập nhật thông tin và tính toán lại tiền', 'success');
+      setShowEditBookingModal(false);
+      if (onUpdate) onUpdate();
+    } catch (error: any) {
+      showNotification(`Lỗi cập nhật: ${error.message}`, 'error');
     }
   };
 
@@ -302,7 +499,10 @@ export default function FolioModal({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+                <button 
+                  onClick={handlePrint}
+                  className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                >
                   <Printer size={18} />
                 </button>
               </div>
@@ -311,12 +511,15 @@ export default function FolioModal({
             {/* Body */}
             <main className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Quick Action Grid */}
-              <div className="grid grid-cols-5 gap-3 text-center">
+              <div className="grid grid-cols-5 gap-3 text-center print:hidden">
                 {[
-                  { label: 'Đổi phòng', icon: 'fa-exchange-alt', action: () => onChangeRoom(room.current_booking!.id) },
-                  { label: 'Sửa', icon: 'fa-pen', action: () => onEditBooking(room.current_booking) },
-                  { label: 'In', icon: 'fa-print', action: () => {} },
-                  { label: 'Cọc', icon: 'fa-wallet', action: () => {} },
+                  { label: 'Đổi phòng', icon: 'fa-exchange-alt', action: handleFetchAvailableRooms },
+                  { label: 'Sửa', icon: 'fa-pen', action: () => setShowEditBookingModal(true) },
+                  { label: 'In', icon: 'fa-print', action: handlePrint },
+                  { label: 'Cọc', icon: 'fa-wallet', action: () => {
+                    setDepositValue('');
+                    setShowDepositModal(true);
+                  }},
                   { label: 'Hủy', icon: 'fa-trash-alt', action: () => onCancel(room.current_booking!.id), color: 'text-rose-500' },
                 ].map(item => (
                   <div key={item.label} onClick={item.action} className="flex flex-col items-center gap-1 cursor-pointer">
@@ -641,29 +844,139 @@ export default function FolioModal({
       )}
 
       {room && room.current_booking && (
-        <CheckoutModal
-          key="checkout-modal"
-          isOpen={isCheckoutOpen}
-          onClose={() => setIsCheckoutOpen(false)}
-          room={room}
-          allRooms={allRooms}
-          pricingBreakdown={pricingBreakdown}
-          onConfirm={(data: CheckoutData) => {
-            const mergedTotal = room.current_booking?.merged_bookings?.reduce((sum, mb) => sum + mb.amount, 0) || 0;
-            const baseTotal = (pricingBreakdown?.total_amount || 0) + mergedTotal;
-            
-            const finalTotal = baseTotal + data.surcharge - (data.discountType === 'percent' ? baseTotal * data.discount / 100 : data.discount);
-            const taxAmount = data.isTaxEnabled ? finalTotal * data.taxPercent / 100 : 0;
-            const amountToPay = finalTotal + taxAmount - (room.current_booking?.deposit_amount || 0);
-            
-            onPayment(room.current_booking!.id, amountToPay, data.note);
-            setIsCheckoutOpen(false);
-          }}
-          onMerge={(targetRoomId, breakdown) => {
-            onMerge(room.current_booking!.id, targetRoomId, breakdown);
-            setIsCheckoutOpen(false);
-          }}
-        />
+        <div>
+          <EditBookingModal
+              isOpen={showEditBookingModal}
+              onClose={() => setShowEditBookingModal(false)}
+              booking={room.current_booking}
+              room={room}
+              customers={customers}
+              onSave={handleEditBookingSave}
+            />
+
+          <CheckoutModal
+            key="checkout-modal"
+            isOpen={isCheckoutOpen}
+            onClose={() => setIsCheckoutOpen(false)}
+            room={room}
+            pricingBreakdown={pricingBreakdown}
+            isAdmin={isAdmin}
+            onConfirm={(data: CheckoutData) => {
+              const auditParts = [
+                `Thanh toán: ${data.paymentMethod.toUpperCase()}`,
+                `Phụ thu: ${formatCurrency(data.surcharge)}`,
+                `Giảm giá: ${formatCurrency(data.discount)} ${data.discountReason ? `(${data.discountReason})` : ''}`,
+                `VAT: ${data.isTaxEnabled ? data.taxPercent + '%' : 'Không'}`,
+                data.note ? `Ghi chú: ${data.note}` : ''
+              ].filter(Boolean);
+              const auditNote = auditParts.join(' | ');
+              onPayment(room.current_booking!.id, data.totalToCollect, auditNote);
+              setIsCheckoutOpen(false);
+            }}
+          />
+
+          {/* Deposit Modal */}
+          {showDepositModal && (
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">Cập nhật tiền cọc</h3>
+                <div className="mb-6">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Số tiền cọc</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={depositValue ? formatCurrency(parseInt(depositValue.replace(/\D/g, '') || '0')) : ''}
+                      onChange={(e) => {
+                         const val = e.target.value.replace(/\D/g, '');
+                         setDepositValue(val);
+                      }}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDepositModal(false)}
+                    className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleDepositSubmit}
+                    className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    Lưu
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Change Room Modal */}
+          {showChangeRoomModal && (
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-200 max-h-[80vh] flex flex-col">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">Chọn phòng mới</h3>
+                
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-2 mb-6">
+                  {availableRooms.length === 0 ? (
+                    <p className="text-center text-slate-500 italic py-4">Không có phòng trống</p>
+                  ) : (
+                    availableRooms.map(r => (
+                      <div
+                        key={r.id}
+                        onClick={() => setSelectedTargetRoomId(r.id)}
+                        className={cn(
+                          "p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between",
+                          selectedTargetRoomId === r.id
+                            ? "border-indigo-600 bg-indigo-50"
+                            : "border-slate-100 hover:border-slate-300"
+                        )}
+                      >
+                        <span className="font-bold text-slate-700">Phòng {r.room_number}</span>
+                        {selectedTargetRoomId === r.id && <CircleCheck className="text-indigo-600" size={20} />}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="flex gap-3 mt-auto">
+                  <button
+                    onClick={() => {
+                      setShowChangeRoomModal(false);
+                      setSelectedTargetRoomId('');
+                    }}
+                    className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleChangeRoomSubmit}
+                    disabled={!selectedTargetRoomId}
+                    className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Xác nhận
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Hidden Printable Invoice */}
+          <div className="hidden print:block fixed inset-0 bg-white z-[99999]">
+             <PrintableInvoice 
+                room={room}
+                booking={room.current_booking}
+                services={room.current_booking.services_used}
+                pricing={pricingBreakdown}
+                totalServiceCost={serviceTotals.temp}
+                totalAmount={finalAmount}
+             />
+          </div>
+        </div>
       )}
     </AnimatePresence>
   );
