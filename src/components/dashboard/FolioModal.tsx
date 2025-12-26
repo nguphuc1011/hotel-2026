@@ -4,6 +4,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Edit, Printer, DollarSign, Trash2, ChevronDown, User, Clock, Plus, Minus, Search, Save, CircleCheck, Info, LogIn, LogOut, FileText, ShoppingCart, Star, Coffee, Utensils, Beer, Cigarette, Wine, Layers, DoorOpen } from 'lucide-react';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Room, Service, PricingBreakdown, Setting, Customer } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { calculateRoomPrice } from '@/lib/pricing';
@@ -318,7 +319,11 @@ export default function FolioModal({
       // 2. Update old room: dirty, no booking
       const { error: oldRoomError } = await supabase
         .from('rooms')
-        .update({ status: 'dirty', current_booking_id: null })
+        .update({ 
+          status: 'dirty', 
+          current_booking_id: null,
+          last_status_change: new Date().toISOString()
+        })
         .eq('id', room.id);
 
       if (oldRoomError) throw oldRoomError;
@@ -884,16 +889,12 @@ export default function FolioModal({
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Số tiền cọc</label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={depositValue ? formatCurrency(parseInt(depositValue.replace(/\D/g, '') || '0')) : ''}
-                      onChange={(e) => {
-                         const val = e.target.value.replace(/\D/g, '');
-                         setDepositValue(val);
-                      }}
+                    <NumericInput
+                      value={parseInt(depositValue.replace(/\D/g, '') || '0')}
+                      onChange={(val) => setDepositValue(String(val))}
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       placeholder="0"
+                      suffix="đ"
                     />
                   </div>
                 </div>

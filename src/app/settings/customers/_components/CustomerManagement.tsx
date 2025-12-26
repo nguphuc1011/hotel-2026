@@ -16,17 +16,33 @@ import {
   DollarSign, 
   Users,
   X,
-  Save
+  Save,
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency, cn } from '@/lib/utils';
 import Link from 'next/link';
+import { useNotification } from '@/context/NotificationContext';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function CustomerManagement() {
+  const { showNotification } = useNotification();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
   const [editForm, setEditForm] = useState({
     full_name: '',
     phone: '',
@@ -84,14 +100,146 @@ export default function CustomerManagement() {
     if (!error) {
       fetchCustomers();
       setEditingCustomer(null);
+      showNotification('Đã cập nhật thông tin khách hàng', 'success');
     } else {
       console.error('Lỗi khi cập nhật khách hàng:', error);
       if (error.message.includes('column') || error.code === '42703') {
-        alert('Lỗi: Cơ sở dữ liệu thiếu cột "plate_number" hoặc "notes". Vui lòng chạy câu lệnh SQL để cập nhật bảng customers.');
+        showNotification('Lỗi cơ sở dữ liệu. Vui lòng liên hệ hỗ trợ.', 'error');
       } else {
-        alert('Không thể lưu thay đổi: ' + error.message);
+        showNotification('Không thể lưu thay đổi: ' + error.message, 'error');
       }
     }
+  };
+
+  const handleDeleteCustomer = async (customer: Customer) => {
+    if (customer.full_name === 'Khách mới') {
+      showNotification('Không thể xóa khách hàng mặc định "Khách mới"', 'error');
+      return;
+    }
+
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xóa khách hàng?',
+      description: `Bạn có chắc chắn muốn xóa khách hàng "${customer.full_name}"? Mọi lịch sử đặt phòng của khách này sẽ được chuyển về "Khách mới" để lưu trữ hóa đơn.`,
+      onConfirm: async () => {
+        try {
+          // 1. Tìm ID của "Khách mới" mặc định
+          const { data: defaultCust } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('full_name', 'Khách mới')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .single();
+
+          const defaultId = defaultCust?.id;
+
+          if (!defaultId) {
+            throw new Error('Không tìm thấy khách hàng mặc định "Khách mới". Vui lòng tạo lại khách hàng này trước.');
+          }
+
+          // 2. Cập nhật các booking và invoice liên quan về Khách mới
+          const [bookingUpdate, invoiceUpdate] = await Promise.all([
+            supabase
+              .from('bookings')
+              .update({ customer_id: defaultId })
+              .eq('customer_id', customer.id),
+            supabase
+              .from('invoices')
+              .update({ customer_id: defaultId })
+              .eq('customer_id', customer.id)
+          ]);
+
+          if (bookingUpdate.error) throw bookingUpdate.error;
+          if (invoiceUpdate.error) throw invoiceUpdate.error;
+
+          // 3. Xóa khách hàng
+          const { error: deleteError } = await supabase
+            .from('customers')
+            .delete()
+            .eq('id', customer.id);
+
+          if (deleteError) throw deleteError;
+
+          showNotification('Đã xóa khách hàng và cập nhật lịch sử', 'success');
+          fetchCustomers();
+        } catch (error: any) {
+          showNotification('Lỗi khi xóa: ' + error.message, 'error');
+        } finally {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleCleanupDuplicates = async () => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Dọn dẹp khách trùng?',
+      description: 'Hệ thống sẽ gộp tất cả khách hàng có tên "Khách mới" hoặc không có thông tin vào một khách hàng duy nhất. Bạn có muốn tiếp tục?',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          // 1. Lấy tất cả khách hàng
+          const { data: allCustomers } = await supabase
+            .from('customers')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+          if (!allCustomers) return;
+
+          // 2. Tìm "Khách mới" chuẩn (cái đầu tiên được tạo)
+          const master = allCustomers.find(c => c.full_name === 'Khách mới') || allCustomers[0];
+          
+          if (!master) {
+            showNotification('Không tìm thấy khách hàng để làm chuẩn', 'error');
+            return;
+          }
+
+          // 3. Lọc ra những khách hàng cần gộp (tên là Khách mới nhưng khác ID master)
+          const duplicates = allCustomers.filter(c => 
+            c.id !== master.id && 
+            (c.full_name === 'Khách mới' || (!c.phone && !c.id_card && !c.plate_number))
+          );
+
+          if (duplicates.length === 0) {
+            showNotification('Không tìm thấy khách hàng trùng lặp nào', 'info');
+            return;
+          }
+
+          let count = 0;
+          for (const dupe of duplicates) {
+            // Cập nhật booking và invoice
+            await Promise.all([
+              supabase
+                .from('bookings')
+                .update({ customer_id: master.id })
+                .eq('customer_id', dupe.id),
+              supabase
+                .from('invoices')
+                .update({ customer_id: master.id })
+                .eq('customer_id', dupe.id)
+            ]);
+            
+            // Xóa khách trùng
+            await supabase
+              .from('customers')
+              .delete()
+              .eq('id', dupe.id);
+            
+            count++;
+          }
+
+          showNotification(`Đã dọn dẹp và gộp ${count} khách hàng thành công`, 'success');
+          fetchCustomers();
+        } catch (error: any) {
+          showNotification('Lỗi khi dọn dẹp: ' + error.message, 'error');
+        } finally {
+          setLoading(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const filteredCustomers = customers.filter(c =>
@@ -112,11 +260,22 @@ export default function CustomerManagement() {
   return (
     <div className="pb-32 pt-4 px-4 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-6">
-        <Link href="/settings" className="p-2 -ml-2 rounded-full active:bg-slate-200 transition-colors">
-          <ChevronLeft className="h-6 w-6 text-slate-600" />
-        </Link>
-        <h1 className="text-xl font-bold text-slate-800">Quản lý Khách hàng</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Link href="/settings" className="p-2 -ml-2 rounded-full active:bg-slate-200 transition-colors">
+            <ChevronLeft className="h-6 w-6 text-slate-600" />
+          </Link>
+          <h1 className="text-xl font-bold text-slate-800">Quản lý Khách hàng</h1>
+        </div>
+        
+        <button
+          onClick={handleCleanupDuplicates}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs hover:bg-emerald-200 transition-all shadow-sm active:scale-95"
+          title="Dọn dẹp các khách hàng trùng lặp"
+        >
+          <Sparkles size={14} />
+          Dọn khách trùng
+        </button>
       </div>
 
       {/* Search Bar */}
@@ -182,12 +341,24 @@ export default function CustomerManagement() {
                   </div>
                 </div>
               </div>
-              <button 
-                onClick={() => handleEditCustomer(customer)}
-                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
-              >
-                <Edit2 size={18} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => handleEditCustomer(customer)}
+                  className="p-2 rounded-full hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all"
+                  title="Sửa"
+                >
+                  <Edit2 size={18} />
+                </button>
+                {customer.full_name !== 'Khách mới' && (
+                  <button 
+                    onClick={() => handleDeleteCustomer(customer)}
+                    className="p-2 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all"
+                    title="Xóa"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-50">
@@ -328,6 +499,15 @@ export default function CustomerManagement() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        onConfirm={confirmConfig.onConfirm}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        variant="danger"
+      />
     </div>
   );
 }

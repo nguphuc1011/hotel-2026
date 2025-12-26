@@ -17,6 +17,7 @@ export interface Room {
   enable_overnight: boolean;
   voice_alias?: string;
   current_booking_id?: string;
+  last_status_change?: string;
   current_booking?: Booking & { customer?: Customer };
 }
 

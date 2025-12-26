@@ -18,6 +18,7 @@ import { TimeRules } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useNotification } from '../../../context/NotificationContext';
+import { NumericInput } from '@/components/ui/NumericInput';
 
 // Force dynamic to avoid prerender issues on some environments
 export const dynamic = 'force-dynamic';
@@ -307,20 +308,18 @@ const TimeSettingsTab = ({ timeRules, setTimeRules }: any) => (
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Ân hạn phòng giờ (phút)</label>
-          <input 
-            type="number" 
+          <NumericInput 
             value={timeRules.hourly_grace_period_minutes || 15} 
-            onChange={(e) => setTimeRules({...timeRules, hourly_grace_period_minutes: Number(e.target.value)})} 
+            onChange={(val) => setTimeRules({...timeRules, hourly_grace_period_minutes: val})} 
             className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-orange-200 outline-none transition-all" 
           />
            <p className="mt-1 text-[10px] text-slate-400 italic">Khách quá giờ trong khoảng này không bị tính thêm giờ.</p>
         </div>
         <div className="space-y-2">
           <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Ân hạn trả muộn (giờ)</label>
-          <input 
-            type="number" 
+          <NumericInput 
             value={timeRules.daily_grace_period_hours || 2} 
-            onChange={(e) => setTimeRules({...timeRules, daily_grace_period_hours: Number(e.target.value)})} 
+            onChange={(val) => setTimeRules({...timeRules, daily_grace_period_hours: val})} 
             className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-orange-200 outline-none transition-all" 
           />
           <p className="mt-1 text-[10px] text-slate-400 italic">Khách trả muộn trong khoảng này không bị tính phụ thu.</p>
@@ -399,10 +398,9 @@ const TaxSettingsTab = ({ taxConfig, setTaxConfig }: any) => (
         <div className="space-y-2">
           <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">% Thuế Lưu trú</label>
           <div className="relative">
-            <input 
-              type="number" 
+            <NumericInput 
               value={taxConfig.stay_tax} 
-              onChange={(e) => setTaxConfig({...taxConfig, stay_tax: Number(e.target.value)})} 
+              onChange={(val) => setTaxConfig({...taxConfig, stay_tax: val})} 
               className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all pr-10" 
             />
             <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">%</span>
@@ -411,10 +409,9 @@ const TaxSettingsTab = ({ taxConfig, setTaxConfig }: any) => (
         <div className="space-y-2">
           <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">% Thuế Dịch vụ</label>
           <div className="relative">
-            <input 
-              type="number" 
+            <NumericInput 
               value={taxConfig.service_tax} 
-              onChange={(e) => setTaxConfig({...taxConfig, service_tax: Number(e.target.value)})} 
+              onChange={(val) => setTaxConfig({...taxConfig, service_tax: val})} 
               className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all pr-10" 
             />
             <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">%</span>
@@ -482,8 +479,8 @@ const SurchargeSettingsTab = ({
             <div className="col-span-2 space-y-1">
               <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Phụ thu (%)</span>
               <div className="flex items-center gap-3">
-                <input type="number" value={rule.percent} onChange={(e) => updateLateRule(index, 'percent', Number(e.target.value))} className="flex-1 bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
-                <button onClick={() => removeLateRule(index)} className="rounded-xl bg-rose-50 p-3 text-rose-500 active:scale-90 transition-transform">
+                <NumericInput value={rule.percent} onChange={(val) => updateLateRule(index, 'percent', val)} className="flex-1 bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
+                <button onClick={() => removeLateRule(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                   <Trash2 className="h-5 w-5" />
                 </button>
               </div>
@@ -521,7 +518,7 @@ const SurchargeSettingsTab = ({
             <div className="col-span-2 space-y-1">
               <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Phụ thu (%)</span>
               <div className="flex items-center gap-3">
-                <input type="number" value={rule.percent} onChange={(e) => updateEarlyRule(index, 'percent', Number(e.target.value))} className="flex-1 bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
+                <NumericInput value={rule.percent} onChange={(val) => updateEarlyRule(index, 'percent', val)} className="flex-1 bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
                 <button onClick={() => removeEarlyRule(index)} className="rounded-xl bg-rose-50 p-3 text-rose-500 active:scale-90 transition-transform">
                   <Trash2 className="h-5 w-5" />
                 </button>

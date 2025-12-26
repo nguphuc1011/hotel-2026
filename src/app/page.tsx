@@ -100,7 +100,11 @@ export default function Dashboard() {
           try {
             const { error } = await supabase
               .from('rooms')
-              .update({ status: 'available', current_booking_id: null })
+              .update({ 
+                status: 'available', 
+                current_booking_id: null,
+                last_status_change: null 
+              })
               .eq('id', room.id);
             
             if (error) throw error;
@@ -188,6 +192,7 @@ export default function Dashboard() {
         .update({
           status: 'dirty',
           current_booking_id: null,
+          last_status_change: new Date().toISOString(),
         })
         .eq('id', folioRoom.id);
 
@@ -302,7 +307,8 @@ export default function Dashboard() {
             .from('rooms')
             .update({ 
               status: 'dirty', 
-              current_booking_id: null 
+              current_booking_id: null,
+              last_status_change: new Date().toISOString()
             })
             .eq('id', folioRoom.id);
 
@@ -328,18 +334,33 @@ export default function Dashboard() {
       let customerId = null;
       
       // 1. Create/Find Customer
-      const customerName = data.customer?.name?.trim() || 'KHÁCH VÃNG LAI';
+      let customerName = data.customer?.name?.trim();
       const customerPhone = data.customer?.phone?.trim() || '';
       const customerIdCard = data.customer?.idCard?.trim() || '';
       const customerPlate = data.customer?.plate_number?.trim() || '';
 
-      // Try to find existing first by phone or id_card (only if provided and not empty)
-      let existingCust = null;
-      const searchConditions = [];
-      if (customerPhone) searchConditions.push(`phone.eq.${customerPhone}`);
-      if (customerIdCard) searchConditions.push(`id_card.eq.${customerIdCard}`);
+      // Nếu không có tên khách, dùng "Khách mới"
+      if (!customerName) {
+        customerName = 'Khách mới';
+      }
 
-      if (searchConditions.length > 0) {
+      // Try to find existing first by name (if it's "Khách mới") or phone or id_card
+      let existingCust = null;
+      
+      if (customerName === 'Khách mới') {
+        const { data: foundDefault } = await supabase
+          .from('customers')
+          .select('id, plate_number')
+          .eq('full_name', 'Khách mới')
+          .maybeSingle();
+        existingCust = foundDefault;
+      }
+
+      if (!existingCust && (customerPhone || customerIdCard)) {
+        const searchConditions = [];
+        if (customerPhone) searchConditions.push(`phone.eq.${customerPhone}`);
+        if (customerIdCard) searchConditions.push(`id_card.eq.${customerIdCard}`);
+        
         const { data: found } = await supabase
           .from('customers')
           .select('id, plate_number')
@@ -368,7 +389,7 @@ export default function Dashboard() {
           .order('check_out_at', { ascending: false })
           .limit(1);
 
-        if (fullCustomer) {
+        if (fullCustomer && customerName !== 'Khách mới') {
           setCustomerInsightsData({ customer: fullCustomer, bookings: customerBookings || [] });
         }
       } else {

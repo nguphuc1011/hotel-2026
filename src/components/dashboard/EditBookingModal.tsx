@@ -5,7 +5,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Clock, DollarSign, User, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
-import { cn, formatCurrency, formatInputCurrency, parseCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Booking, Room, Customer } from '@/types';
 
 interface EditBookingModalProps {
@@ -32,7 +33,6 @@ export default function EditBookingModal({
 }: EditBookingModalProps) {
   const [checkInAt, setCheckInAt] = useState('');
   const [price, setPrice] = useState(0);
-  const [displayPrice, setDisplayPrice] = useState('0');
   const [priceChangeType, setPriceChangeType] = useState<'from_start' | 'from_today'>('from_start');
   const [customerName, setCustomerName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -47,7 +47,6 @@ export default function EditBookingModal({
         setCheckInAt(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
       }
       setPrice(booking.initial_price || 0);
-      setDisplayPrice(formatCurrency(booking.initial_price || 0));
       setCustomerName(booking.customer?.full_name || '');
       setPriceChangeType('from_start');
     }
@@ -199,15 +198,11 @@ export default function EditBookingModal({
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                   <DollarSign size={18} />
                 </div>
-                <input
-                  type="text"
-                  value={displayPrice}
-                  onChange={(e) => {
-                    const formatted = formatInputCurrency(e.target.value);
-                    setDisplayPrice(formatted);
-                    setPrice(parseCurrency(formatted));
-                  }}
+                <NumericInput
+                  value={price}
+                  onChange={setPrice}
                   className="w-full pl-12 pr-6 py-4 bg-slate-50 border-none rounded-2xl font-black text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all"
+                  suffix="đ"
                 />
               </div>
             </div>

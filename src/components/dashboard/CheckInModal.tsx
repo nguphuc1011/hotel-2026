@@ -2,11 +2,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Room, Service, Customer, TimeRules, CheckInData } from '@/types';
-import { cn, formatCurrency, formatInputCurrency, parseCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MoreHorizontal, User, Smartphone, CreditCard, Clock, Settings, FileText, Calendar } from 'lucide-react';
 import { suggestRentalType } from '@/lib/pricing';
 import { ServiceSelector } from './ServiceSelector';
+import { NumericInput } from '@/components/ui/NumericInput';
 
 interface CheckInModalProps {
   room: Room | null;
@@ -31,8 +32,6 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
   }, [isOpen, room, timeRules]);
   const [price, setPrice] = useState(0);
   const [deposit, setDeposit] = useState(0);
-  const [displayPrice, setDisplayPrice] = useState('0');
-  const [displayDeposit, setDisplayDeposit] = useState('0');
   const [servicesUsed, setServicesUsed] = useState<Array<{ service_id: string; quantity: number; price: number }>>([]);
   const [note, setNote] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -60,15 +59,6 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
       setNote('');
     }
   }, [isOpen]);
-
-  // Synchronize display strings when numeric values change
-  useEffect(() => {
-    setDisplayPrice(formatCurrency(price));
-  }, [price]);
-
-  useEffect(() => {
-    setDisplayDeposit(formatCurrency(deposit));
-  }, [deposit]);
 
   const filteredCustomers = useMemo(() => {
     const term = customer.name.toLowerCase();
@@ -237,37 +227,48 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
             </div>
 
             {/* Rental Type Segmented Control */}
-            <div className="p-1.5 bg-white/60 rounded-[2rem] shadow-inner flex relative">
-              <motion.div
-                layoutId="activeTab"
-                className={cn(
-                  "absolute h-[calc(100%-12px)] top-[6px] rounded-[1.7rem] shadow-md z-0",
-                  rentalType === 'hourly' ? "bg-indigo-600" : 
-                  rentalType === 'daily' ? "bg-blue-600" : "bg-purple-600"
-                )}
-                style={{
-                  width: room.enable_overnight ? '33.33%' : '50%',
-                  left: rentalType === 'hourly' ? '6px' : 
-                        rentalType === 'daily' ? (room.enable_overnight ? '33.33%' : '50%') : 
-                        '66.66%'
-                }}
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-              {['hourly', 'daily', ...(room.enable_overnight ? ['overnight'] : [])].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setRentalType(type)}
-                  className={cn(
-                    "flex-1 py-3.5 rounded-[1.7rem] text-[11px] font-black uppercase tracking-wider transition-all relative z-10 flex items-center justify-center gap-2",
-                    rentalType === type ? "text-white" : "text-zinc-400"
-                  )}
-                >
-                  {type === 'hourly' && <Clock size={14} />}
-                  {type === 'daily' && <Calendar size={14} />}
-                  {type === 'overnight' && <Smartphone size={14} />}
-                  {type === 'hourly' ? 'Theo Giờ' : type === 'daily' ? 'Theo Ngày' : 'Qua Đêm'}
-                </button>
-              ))}
+            <div className={cn(
+              "p-1.5 bg-white shadow-sm rounded-[2rem] grid relative overflow-hidden border border-slate-100",
+              room.enable_overnight ? "grid-cols-3" : "grid-cols-2"
+            )}>
+              {['hourly', 'daily', 'overnight'].map((type) => {
+                const isEnabled = type === 'overnight' ? room.enable_overnight : true;
+                if (type === 'overnight' && !room.enable_overnight) return null;
+                
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setRentalType(type)}
+                    className={cn(
+                      "py-4 rounded-[1.7rem] text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-all relative flex items-center justify-center gap-1.5 min-w-0",
+                      rentalType === type ? "text-white" : "text-zinc-400"
+                    )}
+                  >
+                    {rentalType === type && (
+                      <motion.div
+                        layoutId="activeTabBackground"
+                        className={cn(
+                          "absolute inset-0 rounded-[1.7rem] shadow-lg z-0",
+                          type === 'hourly' ? "bg-indigo-600" : 
+                          type === 'daily' ? "bg-blue-600" : "bg-purple-600"
+                        )}
+                        transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center justify-center gap-1.5">
+                      {type === 'hourly' && <Clock size={14} className="flex-shrink-0" />}
+                      {type === 'daily' && <Calendar size={14} className="flex-shrink-0" />}
+                      {type === 'overnight' && <Smartphone size={14} className="flex-shrink-0" />}
+                      <span className="hidden sm:inline">
+                        {type === 'hourly' ? 'Theo Giờ' : type === 'daily' ? 'Theo Ngày' : 'Qua Đêm'}
+                      </span>
+                      <span className="sm:hidden">
+                        {type === 'hourly' ? 'Giờ' : type === 'daily' ? 'Ngày' : 'Đêm'}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Price and Deposit */}
@@ -277,17 +278,12 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
                   <CreditCard size={10} /> Giá Phòng
                 </p>
                 <div className="flex items-baseline gap-1">
-                  <input
-                    type="text"
-                    value={displayPrice}
-                    onChange={(e) => {
-                      const formatted = formatInputCurrency(e.target.value);
-                      setDisplayPrice(formatted);
-                      setPrice(parseCurrency(formatted));
-                    }}
+                  <NumericInput
+                    value={price}
+                    onChange={setPrice}
                     className="w-full text-xl font-black text-zinc-900 border-none p-0 focus:ring-0 bg-transparent"
+                    suffix="đ"
                   />
-                  <span className="text-zinc-300 font-bold font-serif">đ</span>
                 </div>
               </div>
               
@@ -304,17 +300,12 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
                   </button>
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <input
-                    type="text"
-                    value={displayDeposit}
-                    onChange={(e) => {
-                      const formatted = formatInputCurrency(e.target.value);
-                      setDisplayDeposit(formatted);
-                      setDeposit(parseCurrency(formatted));
-                    }}
+                  <NumericInput
+                    value={deposit}
+                    onChange={setDeposit}
                     className="w-full text-xl font-black text-green-600 border-none p-0 focus:ring-0 bg-transparent"
+                    suffix="đ"
                   />
-                  <span className="text-green-200 font-bold font-serif">đ</span>
                 </div>
               </div>
             </div>

@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   Clock
 } from 'lucide-react';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Room, PricingBreakdown, RentalType } from '@/types';
 import { formatCurrency, formatDateTime, formatDuration } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -273,13 +274,12 @@ export default function CheckoutModal({
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                       <p className="text-slate-600 font-medium flex items-center gap-2 text-sm"><CircleMinus size={14} className="text-red-500"/> Giảm giá</p>
-                      <input 
-                          type="number"
-                          inputMode="decimal"
-                          value={discount || ''}
-                          onChange={(e) => setDiscount(Number(e.target.value))}
+                      <NumericInput
+                          value={discount}
+                          onChange={setDiscount}
                           placeholder="0"
                           className="w-28 bg-red-50 rounded-lg px-3 py-2 text-right font-black text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200"
+                          suffix="đ"
                       />
                   </div>
                   <AnimatePresence>
@@ -315,15 +315,12 @@ export default function CheckoutModal({
                       </button>
                     </div>
                     {isTaxEnabled && (
-                      <div className="flex items-center gap-1">
-                        <input 
-                          type="number"
-                          value={taxPercent}
-                          onChange={(e) => setTaxPercent(Number(e.target.value))}
-                          className="w-12 bg-blue-50 rounded-lg px-2 py-1 text-center font-black text-blue-600 text-sm"
-                        />
-                        <span className="text-xs font-bold text-slate-400">%</span>
-                      </div>
+                      <NumericInput 
+                        value={taxPercent}
+                        onChange={setTaxPercent}
+                        className="w-16 bg-blue-50 rounded-lg px-2 py-1 text-center font-black text-blue-600 text-sm"
+                        suffix="%"
+                      />
                     )}
                 </div>
 

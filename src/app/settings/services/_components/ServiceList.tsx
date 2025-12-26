@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, Edit, Package, Search, Tag, DollarSign, X, Save, AlertCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useNotification } from '@/context/NotificationContext';
 import { formatCurrency, cn } from '@/lib/utils';
+import { NumericInput } from '@/components/ui/NumericInput';
 
 type Service = {
   id: string;
@@ -340,12 +341,10 @@ export default function ServiceList() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-400 uppercase">Giá bán</label>
-                  <input 
-                    type="number"
-                    required
+                  <NumericInput 
                     value={formData.price}
-                    onChange={e => setFormData({...formData, price: Number(e.target.value)})}
-                    className="w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500"
+                    onChange={val => setFormData({...formData, price: val})}
+                    suffix="đ"
                   />
                 </div>
                 <div className="space-y-1">
@@ -425,13 +424,10 @@ export default function ServiceList() {
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-400 uppercase">Số lượng</label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
+                  <NumericInput
                     value={stockData.quantity}
-                    onChange={e => setStockData({ ...stockData, quantity: Number(e.target.value) })}
-                    className="w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500 text-lg font-bold"
+                    onChange={val => setStockData({ ...stockData, quantity: val })}
+                    placeholder="1"
                   />
                 </div>
 

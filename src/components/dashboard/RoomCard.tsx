@@ -76,10 +76,31 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
 
   // Calculate pricing and duration
   const updateInfo = useCallback(() => {
-    if (!isOccupied || !room.current_booking?.check_in_at) return;
+    const now = new Date();
+
+    // 1. Handle Dirty State Timer
+    if (room.status === 'dirty' && room.last_status_change) {
+      const start = new Date(room.last_status_change);
+      const totalMinutes = differenceInMinutes(now, start);
+      
+      if (totalMinutes === 0) {
+        setDuration('vừa xong');
+      } else if (totalMinutes < 60) {
+        setDuration(`${totalMinutes}p`);
+      } else {
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        setDuration(`${hours}h ${minutes}p`);
+      }
+      return;
+    }
+
+    if (!isOccupied || !room.current_booking?.check_in_at) {
+      setDuration('');
+      return;
+    }
 
     const start = new Date(room.current_booking.check_in_at);
-    const now = new Date();
 
     // 1. Calculate Duration
     if (room.status === 'hourly') {
@@ -111,23 +132,39 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
   useEffect(() => {
     updateInfo();
     
-    // Update interval: 3 mins for hourly, 1 hour for others
-    const intervalMs = room.status === 'hourly' ? 180000 : 3600000;
+    // Update interval: 1 min for dirty/hourly, 1 hour for others
+    const intervalMs = (room.status === 'hourly' || room.status === 'dirty') ? 60000 : 3600000;
     const interval = setInterval(updateInfo, intervalMs);
     
     return () => clearInterval(interval);
   }, [updateInfo, room.status]);
+
+  const dirtyStats = useMemo(() => {
+    if (room.status !== 'dirty' || !room.last_status_change) return null;
+    
+    // We use duration as a trigger to re-calculate, though we calculate from room.last_status_change
+    const minutes = differenceInMinutes(new Date(), new Date(room.last_status_change));
+    return {
+      minutes,
+      isWarning: minutes >= 30 && minutes < 60,
+      isCritical: minutes >= 60
+    };
+  }, [room.status, room.last_status_change, duration]);
 
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onClick?.(room)}
+      animate={dirtyStats?.isCritical ? {
+        backgroundColor: ['#f97316', '#ef4444', '#f97316'],
+        transition: { duration: 2, repeat: Infinity }
+      } : {}}
       className={cn(
         "group relative flex w-full flex-col justify-between overflow-hidden p-6 transition-all shadow-lg hover:shadow-2xl",
         "h-[200px] sm:h-[256px]", // Height: Mobile 200px, Desktop 256px
         "rounded-[2rem]", // Super large radius
-        config.color,
+        dirtyStats?.isWarning ? "bg-orange-600" : config.color,
         config.textColor
       )}
     >
@@ -180,6 +217,18 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
               </span>
               <span className={cn("text-[22px] font-black tracking-tighter", config.textColor)}>
                 {formatCurrency(amountToCollect)}đ
+              </span>
+            </div>
+          </div>
+        ) : room.status === 'dirty' ? (
+          <div className="flex items-center gap-3">
+            <div className="w-[3px] h-10 bg-current opacity-20 rounded-full" />
+            <div className="flex flex-col items-start leading-tight">
+              <span className="text-[13px] font-bold opacity-80 flex items-center gap-1">
+                <Clock size={12} /> {duration || 'vừa xong'}
+              </span>
+              <span className="text-[22px] font-black tracking-tighter uppercase">
+                {config.label}
               </span>
             </div>
           </div>
