@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
+import { useNotification } from '@/context/NotificationContext';
 import { supabase } from '@/lib/supabase';
 import { Room, Setting, Service } from '@/types';
 import { calculatePrice } from '@/lib/pricing';
@@ -29,6 +29,7 @@ export function CheckOutModal({ isOpen, onOpenChange, room, settings, services, 
   const [surcharge, setSurcharge] = useState(0);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showNotification } = useNotification();
 
   const timeRules = useMemo(() => settings.find(s => s.key === 'time_rules')?.value || {},
     [settings]
@@ -57,41 +58,37 @@ export function CheckOutModal({ isOpen, onOpenChange, room, settings, services, 
 
   const handleConfirmCheckout = async () => {
     if (!room.current_booking) {
-      toast.error('Không tìm thấy thông tin đặt phòng hiện tại.');
+      showNotification('Không tìm thấy thông tin đặt phòng hiện tại.', 'error');
       return;
     }
 
     setIsSubmitting(true);
-    const promise = supabase.rpc('handle_checkout', {
-      p_booking_id: room.current_booking.id,
-      p_room_id: room.id,
-      p_total_amount: totalAmount,
-      p_surcharge: surcharge,
-      p_services_total: servicesTotal,
-      p_room_total: roomTotal,
-      p_payment_method: paymentMethod,
-      p_notes: notes,
-      p_used_services: selectedServices.map(s => ({ service_id: s.id, quantity: s.quantity, price: s.price }))
-    });
+    showNotification('Đang xử lý thanh toán...', 'info');
 
-    toast.promise(promise, {
-      loading: 'Đang xử lý thanh toán...',
-      success: (data: any) => {
-        if (data.error) {
-          throw new Error(data.error.message);
-        }
-        mutateRooms();
-        onClose();
-        return `Thanh toán phòng ${room.room_number} thành công!`
-      },
-      error: (err: any) => {
-        console.error('Checkout RPC error:', err);
-        return `Lỗi: ${err.message}`;
-      },
-      finally: () => {
-        setIsSubmitting(false);
-      }
-    });
+    try {
+      const { data, error } = await supabase.rpc('handle_checkout', {
+        p_booking_id: room.current_booking.id,
+        p_room_id: room.id,
+        p_total_amount: totalAmount,
+        p_surcharge: surcharge,
+        p_services_total: servicesTotal,
+        p_room_total: roomTotal,
+        p_payment_method: paymentMethod,
+        p_notes: notes,
+        p_used_services: selectedServices.map(s => ({ service_id: s.id, quantity: s.quantity, price: s.price }))
+      });
+
+      if (error) throw error;
+      
+      mutateRooms();
+      onClose();
+      showNotification(`Thanh toán phòng ${room.room_number} thành công!`, 'success');
+    } catch (err: any) {
+      console.error('Checkout RPC error:', err);
+      showNotification(`Lỗi: ${err.message}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

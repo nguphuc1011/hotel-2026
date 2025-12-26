@@ -1,0 +1,51 @@
+'use client';
+
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+
+type NotificationType = 'success' | 'error' | 'info' | 'warning';
+
+interface Notification {
+  id: string;
+  message: string;
+  type: NotificationType;
+}
+
+interface NotificationContextType {
+  notification: Notification | null;
+  showNotification: (message: string, type?: NotificationType) => void;
+  hideNotification: () => void;
+}
+
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+
+export function NotificationProvider({ children }: { children: ReactNode }) {
+  const [notification, setNotification] = useState<Notification | null>(null);
+
+  const hideNotification = useCallback(() => {
+    setNotification(null);
+  }, []);
+
+  const showNotification = useCallback((message: string, type: NotificationType = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setNotification({ id, message, type });
+
+    // Tự động ẩn sau 4 giây
+    setTimeout(() => {
+      setNotification(current => current?.id === id ? null : current);
+    }, 4000);
+  }, []);
+
+  return (
+    <NotificationContext.Provider value={{ notification, showNotification, hideNotification }}>
+      {children}
+    </NotificationContext.Provider>
+  );
+}
+
+export function useNotification() {
+  const context = useContext(NotificationContext);
+  if (context === undefined) {
+    throw new Error('useNotification must be used within a NotificationProvider');
+  }
+  return context;
+}

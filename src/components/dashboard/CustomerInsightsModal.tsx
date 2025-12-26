@@ -26,22 +26,33 @@ export default function CustomerInsightsModal({ customer, bookings, onClose }: P
     : null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-900/20"
       />
+
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 32, stiffness: 300 }}
+        className="relative z-10 w-full sm:max-w-[500px] h-[100dvh] sm:h-[95vh] sm:max-h-[850px] bg-slate-50 shadow-2xl flex flex-col sm:rounded-[3rem] overflow-hidden"
       >
-        {/* Header with AI Gradient */}
-        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 p-8 text-white relative overflow-hidden">
+        {/* Header - Glassmorphism */}
+        <div className="relative h-48 w-full flex-shrink-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 flex items-end overflow-hidden">
+          <div className="absolute top-12 left-6 z-20">
+            <button 
+                onClick={onClose}
+                className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white/80 active:scale-90 transition-transform"
+            >
+                <X size={20} />
+            </button>
+          </div>
+          
           <div className="absolute top-0 right-0 p-8 opacity-10">
             <Sparkles size={120} />
           </div>
@@ -56,13 +67,6 @@ export default function CustomerInsightsModal({ customer, bookings, onClose }: P
             <h2 className="text-3xl font-black tracking-tight mb-1">Chào mừng trở lại!</h2>
             <p className="text-blue-100 font-medium opacity-90">Hệ thống đã nhận diện được khách hàng thân thiết</p>
           </div>
-
-          <button
-            onClick={onClose}
-            className="absolute right-6 top-6 rounded-full bg-white/10 p-2 text-white/80 hover:bg-white/20 transition-all"
-          >
-            <X size={20} />
-          </button>
         </div>
 
         <div className="p-8">

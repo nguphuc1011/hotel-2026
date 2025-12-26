@@ -4,20 +4,25 @@ import { useState, useMemo } from 'react';
 import { useHotel } from '@/hooks/useHotel';
 import { RoomCard } from '@/components/dashboard/RoomCard';
 import { CheckInModal } from '@/components/dashboard/CheckInModal';
-import { FolioModal } from '@/components/dashboard/FolioModal';
+import FolioModal from '@/components/dashboard/FolioModal';
 import CustomerInsightsModal from '@/components/dashboard/CustomerInsightsModal';
 import { Room, Customer, Booking } from '@/types';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
+import { useNotification } from '@/context/NotificationContext';
+import { NotificationBanner } from '@/components/layout/NotificationBanner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function Dashboard() {
   const { rooms, settings, customers, services, isLoading, mutateRooms } = useHotel();
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [folioRoom, setFolioRoom] = useState<Room | null>(null);
+  const { showNotification } = useNotification();
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [folioRoomId, setFolioRoomId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  
+  const selectedRoom = useMemo(() => rooms.find(r => r.id === selectedRoomId) || null, [rooms, selectedRoomId]);
+  const folioRoom = useMemo(() => rooms.find(r => r.id === folioRoomId) || null, [rooms, folioRoomId]);
   const [activeFilterIds, setActiveFilterIds] = useState<string[]>(['available', 'hourly', 'daily', 'dirty', 'repair']);
   const [customerInsightsData, setCustomerInsightsData] = useState<{ customer: Customer, bookings: Booking[] } | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -26,6 +31,8 @@ export default function Dashboard() {
     description: string;
     onConfirm: () => void;
     variant?: 'danger' | 'info';
+    confirmText?: string;
+    cancelText?: string;
   }>({
     isOpen: false,
     title: '',
@@ -34,12 +41,22 @@ export default function Dashboard() {
   });
 
   const systemSettings = settings?.find((s: Setting) => s.key === 'system_settings')?.value;
-  const timeRules = systemSettings || {
+  const timeRules = systemSettings ? {
+    check_in: systemSettings.check_in || '14:00',
+    check_out: systemSettings.check_out || '12:00',
+    overnight: systemSettings.overnight || { start: '22:00', end: '08:00' },
+    early_rules: systemSettings.early_rules || [],
+    late_rules: systemSettings.late_rules || [],
+    full_day_early_before: systemSettings.full_day_early_before || '05:00',
+    full_day_late_after: systemSettings.full_day_late_after || '18:00',
+  } : {
     check_in: '14:00',
     check_out: '12:00',
     overnight: { start: '22:00', end: '08:00' },
     early_rules: [],
     late_rules: [],
+    full_day_early_before: '05:00',
+    full_day_late_after: '18:00',
   };
 
   const roomCounts = useMemo(() => {
@@ -63,16 +80,23 @@ export default function Dashboard() {
     return activeFilterIds.includes(room.status);
   });
 
-  const handleRoomClick = async (room: Room) => {
-    if (room.status === 'available') {
-      setSelectedRoom(room);
-    } else if (['hourly', 'daily', 'overnight'].includes(room.status)) {
-      setFolioRoom(room);
-    } else if (['dirty', 'repair'].includes(room.status)) {
+  const handleRoomClick = (room: Room) => {
+    // 1. Nếu phòng đang có khách (có booking active) -> Mở Folio (Chi tiết thanh toán)
+    if (room.current_booking) {
+      setFolioRoomId(room.id);
+      setSelectedRoomId(null);
+      return;
+    }
+
+    // 2. Nếu phòng đang dơ (dirty) -> Hỏi xác nhận dọn xong
+    if (room.status === 'dirty') {
       setConfirmConfig({
         isOpen: true,
         title: 'Xác nhận dọn phòng',
-        description: `Xác nhận phòng ${room.room_number} đã sẵn sàng đón khách?`,
+        description: `Phòng ${room.room_number} đã dọn dẹp xong và sẵn sàng đón khách?`,
+        confirmText: 'ĐÃ DỌN XONG',
+        cancelText: 'QUAY LẠI',
+        variant: 'info',
         onConfirm: async () => {
           try {
             const { error } = await supabase
@@ -83,66 +107,177 @@ export default function Dashboard() {
             if (error) throw error;
             mutateRooms();
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            showNotification(`Phòng ${room.room_number} đã sẵn sàng!`, 'success');
           } catch (error) {
-            console.error('Error updating status:', error);
-            toast.error('Không thể cập nhật trạng thái phòng');
+            console.error('Lỗi cập nhật trạng thái:', error);
+            showNotification('Không thể cập nhật trạng thái phòng', 'error');
           }
         }
       });
+      return;
     }
+
+    // 3. Nếu phòng đang sửa chữa (repair)
+    if (room.status === 'repair') {
+      showNotification(`Phòng ${room.room_number} đang sửa chữa, không thể nhận khách.`, 'warning');
+      return;
+    }
+
+    // 4. Các trường hợp còn lại (mặc định là Available) -> Mở Check-in
+    setSelectedRoomId(room.id);
+    setFolioRoomId(null);
   };
 
-  const handlePayment = async (amount: number) => {
+  const handlePayment = async (bookingId: string, amount: number) => {
     if (!folioRoom) return;
-    
+
     try {
-      // 1. Update booking status to completed
-      if (folioRoom.current_booking_id) {
-        const { data: booking } = await supabase
-          .from('bookings')
-          .update({ 
-            status: 'completed', 
-            check_out_at: new Date().toISOString(),
-            final_amount: amount
-          })
-          .eq('id', folioRoom.current_booking_id)
-          .select('customer_id')
+      console.log('Bắt đầu thanh toán cho phòng:', folioRoom.room_number);
+
+      // 1. Update booking status and final amount
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'completed',
+          check_out_at: new Date().toISOString(),
+          final_amount: amount,
+        })
+        .eq('id', bookingId)
+        .select('customer_id')
+        .single();
+
+      if (bookingError) {
+        console.error('Lỗi cập nhật booking:', bookingError);
+        throw new Error(bookingError.message);
+      }
+
+      // 2. Update customer statistics if available
+      if (booking?.customer_id) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('visit_count, total_spent')
+          .eq('id', booking.customer_id)
           .single();
 
-        // 2. Update customer stats if linked
-        if (booking?.customer_id) {
-          // Lấy thông tin hiện tại của khách hàng
-          const { data: customer } = await supabase
+        if (customer) {
+          await supabase
             .from('customers')
-            .select('visit_count, total_spent')
-            .eq('id', booking.customer_id)
-            .single();
-
-          if (customer) {
-            await supabase
-              .from('customers')
-              .update({
-                visit_count: (customer.visit_count || 0) + 1,
-                total_spent: (customer.total_spent || 0) + amount
-              })
-              .eq('id', booking.customer_id);
-          }
+            .update({
+              visit_count: (customer.visit_count || 0) + 1,
+              total_spent: (customer.total_spent || 0) + amount,
+            })
+            .eq('id', booking.customer_id);
         }
       }
 
-      // 3. Set room to dirty
-      await supabase
+      // 3. Update room status to 'dirty'
+      const { error: roomError } = await supabase
         .from('rooms')
-        .update({ status: 'dirty', current_booking_id: null })
+        .update({
+          status: 'dirty',
+          current_booking_id: null,
+        })
         .eq('id', folioRoom.id);
 
-      mutateRooms();
-      setFolioRoom(null);
-      toast.success(`Thanh toán phòng ${folioRoom.room_number} thành công!`);
-    } catch (error) {
-      console.error(error);
-      toast.error('Lỗi thanh toán');
+      if (roomError) {
+        console.error('Lỗi cập nhật trạng thái phòng:', roomError);
+        throw new Error(roomError.message);
+      }
+      
+      console.log('Thanh toán hoàn tất, đang refresh dữ liệu...');
+
+      // 4. Reset state, refresh data, and show notification
+      setFolioRoomId(null);
+      await mutateRooms();
+      showNotification(`Thanh toán phòng ${folioRoom.room_number} thành công!`, 'success');
+    } catch (error: any) {
+      console.error('Lỗi trong quá trình thanh toán:', error);
+      showNotification(`Lỗi thanh toán: ${error.message}`, 'error');
     }
+  };
+
+  const handleCancel = async () => {
+    if (!folioRoom) return;
+    
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xác nhận hủy phòng',
+      description: `Bạn có chắc chắn muốn hủy đặt phòng ${folioRoom.room_number}? Mọi dữ liệu phiên này sẽ bị xóa và phòng sẽ chuyển sang trạng thái CHỜ DỌN.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const bookingId = folioRoom.current_booking_id || folioRoom.current_booking?.id;
+
+          // 1. Update booking to 'cancelled'
+          if (bookingId) {
+            const { error: bookingError } = await supabase
+              .from('bookings')
+              .update({ 
+                status: 'cancelled', 
+                check_out_at: new Date().toISOString()
+              })
+              .eq('id', bookingId);
+            
+            if (bookingError) throw bookingError;
+          }
+
+          // 2. Set room status to 'dirty'
+          const { error: roomError } = await supabase
+            .from('rooms')
+            .update({ 
+              status: 'dirty', 
+              current_booking_id: null 
+            })
+            .eq('id', folioRoom.id);
+
+          if (roomError) throw roomError;
+
+          // 3. Reset state and show notification
+          setFolioRoomId(null);
+          await mutateRooms();
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          showNotification(`Đã hủy phòng ${folioRoom.room_number} thành công!`, 'success');
+        } catch (error) {
+          console.error('Lỗi khi hủy phòng:', error);
+          showNotification('Lỗi khi hủy phòng', 'error');
+        }
+      }
+    });
+  };
+
+  const handleChangeRoom = (bookingId: string) => {
+    showNotification('Tính năng Đổi phòng đang được phát triển', 'info');
+  };
+
+  const handleEditBooking = () => {
+    if (!folioRoom?.current_booking) return;
+    
+    // LogNV sửa thông tin
+    const currentLogs = folioRoom.current_booking.notes || '';
+    const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const newLog = `\n[NV sửa bill lúc ${timeStr}]`;
+    
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xác nhận sửa Bill',
+      description: 'Hệ thống sẽ ghi lại nhật ký chỉnh sửa của nhân viên. Bạn có chắc chắn muốn tiếp tục?',
+      onConfirm: async () => {
+        try {
+          await supabase
+            .from('bookings')
+            .update({ 
+              notes: currentLogs + newLog 
+            })
+            .eq('id', folioRoom.current_booking_id);
+          
+          mutateRooms();
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          showNotification('Đã ghi nhận nhật ký sửa bill', 'success');
+        } catch (error) {
+          showNotification('Lỗi khi ghi nhật ký', 'error');
+        }
+      }
+    });
   };
 
   const handleCheckIn = async (data: CheckInData) => {
@@ -224,12 +359,28 @@ export default function Dashboard() {
           room_id: selectedRoom.id,
           customer_id: customerId,
           check_in_at: new Date().toISOString(),
+          system_created_at: new Date().toISOString(), // Giờ hệ thống thực tế
           rental_type: data.rentalType,
           initial_price: data.price,
           deposit_amount: data.deposit || 0,
           notes: data.notes,
           room_charge_locked: 0,
-          status: 'active'
+          status: 'active',
+          custom_surcharge: 0,
+          room_charge_suggested: 0,
+          room_charge_actual: 0,
+          services_used: data.services.map(s => {
+            const serviceId = s.service_id || s.id;
+            const serviceInfo = services.find(si => String(si.id) === String(serviceId));
+            return {
+              id: serviceId,
+              service_id: serviceId,
+              name: serviceInfo?.name || 'Dịch vụ',
+              price: s.price,
+              quantity: s.quantity,
+              total: s.price * s.quantity
+            };
+          })
         }])
         .select()
         .single();
@@ -248,9 +399,9 @@ export default function Dashboard() {
       if (roomError) throw roomError;
 
       // Success
-      setSelectedRoom(null);
-      mutateRooms(); // Refresh data immediately
-      
+      setSelectedRoomId(null);
+      await mutateRooms(); // Refresh data immediately
+      showNotification(`Nhận phòng ${selectedRoom.room_number} thành công!`, 'success');
     } catch (error: unknown) {
       const err = error as any;
       console.error('Chi tiết lỗi Check-in:', {
@@ -260,7 +411,7 @@ export default function Dashboard() {
         code: err.code,
         fullError: err
       });
-      toast.error(`Lỗi khi nhận phòng: ${err.message || 'Lỗi không xác định'}`);
+      showNotification(`Lỗi khi nhận phòng: ${err.message || 'Lỗi không xác định'}`, 'error');
     }
   };
 
@@ -308,11 +459,11 @@ export default function Dashboard() {
       if (error) throw error;
       
       mutateRooms();
-      toast.success('Đã khởi tạo 12 phòng mẫu thành công!');
+      showNotification('Đã khởi tạo 12 phòng mẫu thành công!', 'success');
     } catch (error: unknown) {
       const err = error as any;
       console.error('Seed error:', err);
-      toast.error(`Lỗi khởi tạo: ${err.message}`);
+      showNotification(`Lỗi khởi tạo: ${err.message}`, 'error');
     } finally {
       setIsSeeding(false);
     }
@@ -348,11 +499,12 @@ export default function Dashboard() {
   return (
     <div className="space-y-4 pb-20"> {/* Add padding bottom for mobile scroll */}
       <DashboardHeader 
+        roomCounts={roomCounts} 
         activeFilterIds={activeFilterIds}
         onToggleFilter={onToggleFilter}
-        roomCounts={roomCounts}
+        onSeed={seedRooms}
+        isSeeding={isSeeding}
       />
-
 
       <motion.div 
         layout
@@ -369,6 +521,7 @@ export default function Dashboard() {
             >
               <RoomCard 
                 room={room} 
+                settings={settings}
                 onClick={handleRoomClick}
               />
             </motion.div>
@@ -376,27 +529,28 @@ export default function Dashboard() {
         </AnimatePresence>
       </motion.div>
 
-      {selectedRoom && (
-        <CheckInModal 
-          room={selectedRoom} 
-          services={services}
-          customers={customers}
-          timeRules={timeRules}
-          onClose={() => setSelectedRoom(null)}
-          onConfirm={handleCheckIn}
-        />
-      )}
+      <CheckInModal 
+        room={selectedRoom} 
+        services={services}
+        customers={customers}
+        timeRules={timeRules}
+        isOpen={!!selectedRoomId}
+        onClose={() => setSelectedRoomId(null)}
+        onConfirm={handleCheckIn}
+      />
 
-      {folioRoom && (
-        <FolioModal
+      <FolioModal
           room={folioRoom}
           settings={settings}
           services={services}
-          isOpen={!!folioRoom}
-          onClose={() => setFolioRoom(null)}
+          isOpen={!!folioRoomId}
+          onClose={() => setFolioRoomId(null)}
           onPayment={handlePayment}
+          onUpdate={mutateRooms}
+          onCancel={handleCancel}
+          onChangeRoom={handleChangeRoom}
+          onEditBooking={handleEditBooking}
         />
-      )}
 
       {customerInsightsData && (
         <CustomerInsightsModal
@@ -411,6 +565,8 @@ export default function Dashboard() {
         title={confirmConfig.title}
         description={confirmConfig.description}
         variant={confirmConfig.variant}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
       />

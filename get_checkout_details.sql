@@ -24,34 +24,53 @@ BEGIN
     SELECT * INTO v_room FROM public.rooms WHERE id = v_booking.room_id;
 
     -- Get time rules from settings
-    SELECT value INTO v_time_rules FROM public.settings WHERE key = 'time_rules';
+    SELECT value INTO v_time_rules FROM public.settings WHERE key = 'system_settings';
 
     v_check_in_at := v_booking.check_in_at;
     v_duration_interval := v_now - v_check_in_at;
 
     -- 2. Calculate Room Charge based on rental_type
-    IF v_booking.rental_type = 'hourly' THEN
-        -- Hourly calculation
-        v_total_hours := ceil(extract(epoch from v_duration_interval) / 3600);
-        IF v_total_hours <= 1 THEN
-            v_room_charge := (v_room.prices->>'hourly')::numeric;
-        ELSE
-            v_room_charge := (v_room.prices->>'hourly')::numeric + ((v_total_hours - 1) * (v_room.prices->>'next_hour')::numeric);
+    -- Helper to parse price from jsonb (handles string or number)
+    -- SQL implementation of price parsing
+    DECLARE
+        v_hourly numeric;
+        v_next_hour numeric;
+        v_overnight numeric;
+        v_daily numeric;
+        
+        -- Helper function-like logic to clean price strings in SQL
+        v_clean_price_sql text;
+    BEGIN
+        v_clean_price_sql := 'regexp_replace(?, ''[^\d]'', '''', ''g'')';
+        
+        v_hourly := COALESCE(NULLIF(regexp_replace(v_room.prices->>'hourly', '[^\d]', '', 'g'), ''), '0')::numeric;
+        v_next_hour := COALESCE(NULLIF(regexp_replace(v_room.prices->>'next_hour', '[^\d]', '', 'g'), ''), '0')::numeric;
+        v_overnight := COALESCE(NULLIF(regexp_replace(v_room.prices->>'overnight', '[^\d]', '', 'g'), ''), '0')::numeric;
+        v_daily := COALESCE(NULLIF(regexp_replace(v_room.prices->>'daily', '[^\d]', '', 'g'), ''), '0')::numeric;
+
+        IF v_booking.rental_type = 'hourly' THEN
+            -- Hourly calculation
+            v_total_hours := ceil(extract(epoch from v_duration_interval) / 3600);
+            IF v_total_hours <= 1 THEN
+                v_room_charge := v_hourly;
+            ELSE
+                v_room_charge := v_hourly + ((v_total_hours - 1) * v_next_hour);
+            END IF;
+
+        ELSIF v_booking.rental_type = 'overnight' THEN
+            -- Overnight calculation
+            v_room_charge := v_overnight;
+
+        ELSIF v_booking.rental_type = 'daily' THEN
+            -- Daily calculation
+            DECLARE
+                v_total_days integer;
+            BEGIN
+                v_total_days := ceil(extract(epoch from v_duration_interval) / 86400);
+                v_room_charge := v_total_days * v_daily;
+            END;
         END IF;
-
-    ELSIF v_booking.rental_type = 'overnight' THEN
-        -- Overnight calculation
-        v_room_charge := (v_room.prices->>'overnight')::numeric;
-
-    ELSIF v_booking.rental_type = 'daily' THEN
-        -- Daily calculation
-        DECLARE
-            v_total_days integer;
-        BEGIN
-            v_total_days := ceil(extract(epoch from v_duration_interval) / 86400);
-            v_room_charge := v_total_days * (v_room.prices->>'daily')::numeric;
-        END;
-    END IF;
+    END;
 
     -- 3. Calculate Service Charges
     SELECT COALESCE(jsonb_agg(jsonb_build_object(

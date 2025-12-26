@@ -79,7 +79,13 @@ export interface Booking {
     detail: string;
   }>;
   room_charge_locked: number;
+  system_created_at: string;
+  room_charge_suggested: number;
+  room_charge_actual: number;
+  audit_note?: string;
+  custom_surcharge: number;
   status: BookingStatus;
+  notes?: string;
   rooms?: {
     room_number: string;
   };
@@ -134,7 +140,10 @@ export interface TimeRules {
   };
   early_rules: Array<{ from: string; to: string; percent: number }>;
   late_rules: Array<{ from: string; to: string; percent: number }>;
+  full_day_early_before?: string;
   full_day_late_after?: string;
+  hourly_grace_period_minutes?: number;
+  daily_grace_period_hours?: number;
 }
 
 export interface CheckInData {

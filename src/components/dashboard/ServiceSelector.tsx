@@ -80,7 +80,7 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
         )}
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-8 pt-2 -mx-6 px-6 scrollbar-hide snap-x snap-mandatory">
+      <div className="flex gap-4 overflow-x-auto pb-10 pt-4 -mx-6 px-6 scrollbar-hide snap-x snap-mandatory">
         {services.map((service) => {
           const selected = selectedServices.find(s => s.id === service.id);
           const quantity = selected?.quantity || 0;
@@ -99,7 +99,7 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
                   handleRemoveOne(service.id);
                 }}
                 className={cn(
-                  "w-full flex flex-col items-center text-center gap-4 p-6 rounded-[2.5rem] transition-all duration-500 border-2 relative overflow-hidden group",
+                  "w-full flex flex-col items-center text-center gap-4 p-6 rounded-[2.5rem] transition-all duration-500 border-2 relative group",
                   quantity > 0 
                     ? "bg-white border-blue-500 shadow-2xl shadow-blue-100/60" 
                     : "bg-white/40 border-transparent hover:border-zinc-200 hover:bg-white shadow-sm"
@@ -107,7 +107,7 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
               >
                 {/* Glossy Background for Selected */}
                 {quantity > 0 && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none rounded-[2.5rem] overflow-hidden" />
                 )}
 
                 <div className={cn(
@@ -141,7 +141,7 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
                       initial={{ scale: 0, opacity: 0, y: 10 }}
                       animate={{ scale: 1, opacity: 1, y: 0 }}
                       exit={{ scale: 0, opacity: 0, y: 10 }}
-                      className="absolute top-3 right-3"
+                      className="absolute top-3 right-3 z-20"
                     >
                       <div className="min-w-[28px] h-[28px] px-2 bg-zinc-900 text-white text-[11px] font-black rounded-full shadow-lg flex items-center justify-center gap-1 border border-white/20">
                         {quantity}

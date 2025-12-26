@@ -13,13 +13,22 @@ interface CheckInModalProps {
   services: Service[];
   customers: Customer[];
   timeRules: TimeRules;
+  isOpen: boolean;
   onClose: () => void;
   onConfirm: (data: CheckInData) => void;
 }
 
-export function CheckInModal({ room, services, customers, timeRules, onClose, onConfirm }: CheckInModalProps) {
+export function CheckInModal({ room, services, customers, timeRules, isOpen, onClose, onConfirm }: CheckInModalProps) {
   const [customer, setCustomer] = useState({ name: '', phone: '', idCard: '', plate_number: '' });
-  const [rentalType, setRentalType] = useState('daily');
+  const [rentalType, setRentalType] = useState('hourly');
+
+  // Suggest rental type on mount/room change
+  useEffect(() => {
+    if (isOpen && room) {
+      const suggestion = suggestRentalType(new Date(), timeRules);
+      setRentalType(suggestion);
+    }
+  }, [isOpen, room, timeRules]);
   const [price, setPrice] = useState(0);
   const [deposit, setDeposit] = useState(0);
   const [displayPrice, setDisplayPrice] = useState('0');
@@ -30,13 +39,27 @@ export function CheckInModal({ room, services, customers, timeRules, onClose, on
 
   // Synchronize numeric price when room or rentalType changes
   useEffect(() => {
-    if (room && room.prices) {
+    if (isOpen && room && room.prices) {
       const priceForType = room.prices[rentalType as keyof typeof room.prices];
-      if (typeof priceForType === 'number') {
+      if (typeof priceForType === 'number' && priceForType > 0) {
         setPrice(priceForType);
+      } else if (typeof priceForType === 'number' && priceForType === 0) {
+        // Fallback to room's default hourly if specific type is 0 (unlikely but possible)
+        setPrice(room.prices.hourly || 0);
       }
     }
-  }, [room, rentalType]);
+  }, [isOpen, room, rentalType]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setCustomer({ name: '', phone: '', idCard: '', plate_number: '' });
+      setPrice(0);
+      setDeposit(0);
+      setServicesUsed([]);
+      setNote('');
+    }
+  }, [isOpen]);
 
   // Synchronize display strings when numeric values change
   useEffect(() => {
@@ -98,47 +121,45 @@ export function CheckInModal({ room, services, customers, timeRules, onClose, on
   const serviceTotal = servicesUsed.reduce((sum, s) => sum + (s.price * s.quantity), 0);
   const totalAmount = price + serviceTotal;
 
-  if (!room) return null;
-
+  if (!isOpen || !room) return null;
 
   return (
     <AnimatePresence mode="wait">
-      <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-sm p-0">
-        {/* Background Overlay for click to close */}
-        <div className="absolute inset-0" onClick={onClose} />
+      <div className="fixed inset-0 z-[9999] flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-slate-900/20"
+        />
 
         <motion.div
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative w-full h-full sm:h-full bg-slate-100 shadow-2xl overflow-hidden flex flex-col rounded-none"
+          transition={{ type: 'spring', damping: 32, stiffness: 300 }}
+          className="relative z-10 w-full sm:max-w-[500px] h-[100dvh] sm:h-[95vh] sm:max-h-[850px] bg-slate-50 shadow-2xl flex flex-col sm:rounded-[3rem] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* iOS Style Drag Handle (Mobile only - hidden for full screen) */}
-          {/* <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-zinc-300 sm:hidden" /> */}
-
           {/* Header */}
-          <div className="px-6 pt-8 pb-4 flex items-center justify-between">
-            <button 
-              onClick={onClose} 
-              className="text-blue-600 font-bold text-lg active:scale-95 transition-all"
-            >
-              Hủy
-            </button>
-            <div className="text-center">
-              <h2 className="text-xl font-black text-zinc-900 uppercase">Phòng {room.room_number}</h2>
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+          <header className="flex-shrink-0 p-6 pt-12 sm:pt-8 bg-white border-b border-slate-100 relative">
+              <button 
+                onClick={onClose}
+                className="absolute left-6 top-12 sm:top-8 p-2 bg-slate-100 rounded-full text-slate-400 active:scale-90 transition-transform z-20"
+              >
+                <X size={20} />
+              </button>
+              <h2 className="text-2xl font-black text-slate-900 uppercase text-center tracking-tight">
+                Phòng {room.room_number}
+              </h2>
+              <p className="text-[10px] font-black text-slate-400 text-center tracking-[0.2em] mt-1 uppercase">
                 {room.room_type} • Tầng {room.area}
               </p>
-            </div>
-            <button className="p-2 bg-white/50 rounded-full text-zinc-400 active:scale-95 transition-all">
-              <MoreHorizontal size={20} />
-            </button>
-          </div>
+          </header>
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto px-6 space-y-5 pb-40 scrollbar-hide">
+          <main className="flex-1 overflow-y-auto space-y-8 p-6 pb-40 scrollbar-hide">
             
             {/* Customer Inputs */}
             <div className="space-y-3">
@@ -313,7 +334,7 @@ export function CheckInModal({ room, services, customers, timeRules, onClose, on
             <div className="pt-2">
               <ServiceSelector services={services} selectedServices={servicesUsed} onChange={setServicesUsed} />
             </div>
-          </div>
+          </main>
 
           {/* iOS Style Glassmorphism Footer */}
           <div className="absolute bottom-0 left-0 right-0 p-6 pt-4 bg-white/80 backdrop-blur-xl border-t border-white flex items-center justify-between z-10">

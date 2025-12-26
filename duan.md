@@ -1,69 +1,216 @@
-### 1. Giao diện Mobile (UI Layout)
-Trên di động, Modal không chỉ là một hộp thoại mà là một "Full-screen Sheet" trượt lên từ đáy màn hình.
+# Tổng hợp mã nguồn dự án - Hotel App (ĐÃ FIX LỖI 0Đ & LỖI JOIN DATA)
 
-- Hiệu ứng trượt (Slide-up): Khi bấm vào phòng, một tấm card màu xám nhạt ( bg-slate-100 ) sẽ trượt lên mượt mà với hiệu ứng cubic-bezier đặc trưng của Apple.
-- Bo góc siêu lớn: Phần đỉnh của modal được bo tròn cực mạnh ( rounded-t-[2.5rem] ), tạo cảm giác mềm mại như một ứng dụng iOS bản địa.
-- Thanh tiêu đề (Header):
-  - Nằm cố định ở trên cùng để người dùng luôn biết mình đang thao tác ở phòng nào.
-  - Nút "Hủy" được đặt ở góc trái, đúng vị trí ngón tay cái dễ chạm tới để thoát nhanh.
-- Thanh trượt loại thuê (Segmented Control):
-  - Đây là điểm nhấn UX: Một thanh dài có viên kẹo màu (Cam/Xanh/Tím) trượt qua lại giữa các mục "Theo giờ", "Theo ngày", "Qua đêm".
-  - Viên kẹo này có hiệu ứng đổ bóng ( shadow-md ) giúp nó nổi bật lên khỏi nền.
-- Cuộn ngang dịch vụ (Horizontal Scroll):
-  - Thay vì liệt kê danh sách dài làm mất diện tích, các dịch vụ được xếp thành một hàng ngang.
-  - Người dùng chỉ cần dùng ngón tay vuốt sang trái/phải để chọn món. Mỗi món có một Badge đỏ hiển thị số lượng ngay trên đầu icon.
-- Footer "Kính mờ" (Glassmorphism):
-  - Phần chân trang chứa tổng tiền và nút xác nhận được làm mờ hậu cảnh ( backdrop-blur-xl ).
-  - Nó luôn nằm cố định ở đáy, tạo cảm giác nội dung bên dưới đang cuộn xuyên qua nó.
-### 2. Chức năng tối ưu cho ngón tay (Touch Functionality)
-- Vùng chạm lớn (Big Hit Targets): Tất cả các nút bấm ( Nhận phòng , Hủy , Chọn món ) đều có chiều cao ít nhất 48px - 56px, giúp người dùng không bao giờ bấm nhầm.
-- Phản hồi xúc giác (Visual Feedback): Khi chạm vào bất kỳ nút nào, hệ thống đều có hiệu ứng active:scale-95 (nút thu nhỏ lại một chút), tạo cảm giác như đang bấm phím thật.
-- Bàn phím thông minh: Các ô nhập số tiền sẽ tự động kích hoạt bàn phím số, ô nhập tên khách sẽ gợi ý danh sách ngay bên dưới để chọn bằng một cú chạm (không cần gõ hết tên).
-- Nút [Tất cả] tiền cọc: Thay vì phải gõ số tiền cọc thủ công, người dùng chỉ cần nhấn nút nhỏ bên cạnh để tự động điền số tiền cọc bằng đúng tổng bill.
-### 3. Luồng dữ liệu trên Mobile (Mobile Data Flow)
-Luồng dữ liệu được thiết kế để "tiết kiệm" thao tác nhất cho người dùng di động:
+Dưới đây là tổng hợp các file quan trọng nhất đã được chỉnh sửa để giải quyết triệt để 3 "điểm chết" gây lỗi 0đ và lỗi mất sơ đồ phòng/booking trống.
 
-1. Chạm (Trigger): Người dùng chạm vào card phòng trên Dashboard.
-2. Tự động hóa (Auto-logic): CheckInController ngay lập tức kiểm tra giờ hệ thống. Nếu là đêm khuya, nó tự động đẩy thanh trượt sang "Qua đêm" (người dùng không cần chọn lại).
-3. Tương tác (Interaction): Người dùng vuốt ngang chọn nước uống -> chạm vào danh sách gợi ý để chọn khách. Mọi thay đổi đều cập nhật innerHTML của phần "Tổng tạm tính" ngay lập tức (Real-time).
-4. Hoàn tất (Finalize): Nhấn nút đen "Nhận phòng ngay". Dữ liệu được đóng gói và gửi về StorageService , modal trượt xuống và Dashboard cập nhật trạng thái phòng mới.
-### 4. Cách thức hoạt động ngầm (Under the hood)
-- Anti-aliased: Hệ thống ép font Roboto hiển thị ở chế độ sắc nét nhất ( antialiased subpixel-antialiased ) để chữ không bị nhòe trên màn hình Retina.
-- No-scrollbar: Toàn bộ các vùng cuộn (dịch vụ, danh sách tìm kiếm) đều được ẩn thanh cuộn để giữ giao diện sạch sẽ đúng chất Apple.
-- Z-Index Management: Modal được đặt ở z-[100] để đảm bảo nó luôn nằm trên cùng, che phủ cả thanh điều hướng chính của trang web.
-Tóm lại, Modal Check-in trên Mobile là sự kết hợp giữa thẩm mỹ iOS và sự tiện lợi của một ứng dụng quản lý , giúp lễ tân có thể làm thủ tục cho khách chỉ trong vòng 10-15 giây với vài cú chạm.
-Dưới đây là mô tả bổ sung chi tiết về tính năng Gợi ý khách hàng (Smart Search) và Tự động lưu khách mới để tích hợp vào tổng thể hoạt động của Modal Check-in:
+## 1. Logic tính tiền chính (pricing.ts) - ĐÃ FIX PARSE NGÀY & GIÁ
+File: `src/lib/pricing.ts`
+*Giải pháp: Thêm hàm `parsePrice` để xử lý chuỗi "100.000" và cải thiện `parseDate` để không bao giờ trả về 0đ âm thầm mà có log lỗi.*
 
-### 1. Giao diện Gợi ý (Smart Dropdown UI)
-Khi người dùng bắt đầu gõ vào ô "Họ và tên khách hàng", một danh sách gợi ý sẽ xuất hiện ngay lập tức:
+```typescript
+import { differenceInMinutes, parse, isAfter, addDays, startOfDay, differenceInHours, differenceInCalendarDays, addHours, parseISO } from 'date-fns';
+import { TimeRules, Room, Setting } from '@/types';
 
-- Thiết kế: Một menu nổi ( absolute ) nằm ngay dưới ô nhập liệu, sử dụng nền trắng mờ ( backdrop-blur-2xl ) và đổ bóng rất sâu để tách biệt với các lớp bên dưới.
-- Nội dung hiển thị: Mỗi dòng khách hàng gồm:
-  - Avatar mặc định: Một vòng tròn nhỏ chứa icon người dùng.
-  - Thông tin chính: Tên khách hàng in hoa đậm ( font-black ) và Số điện thoại/Biển số xe ở ngay bên dưới.
-  - Hiệu ứng: Khi di chuyển hoặc chạm vào, dòng đó sẽ đổi sang màu xanh nhạt ( bg-indigo-50 ) và có icon mũi tên hướng vào, tạo cảm giác mời gọi hành động.
-### 2. Chức năng Gợi ý & Tự động lưu (Customer Intelligence) A. Cơ chế gợi ý (Smart Search):
-- Fuzzy Search (Tìm kiếm thông minh): Hệ thống sử dụng hàm removeDau để loại bỏ dấu tiếng Việt khi tìm kiếm. Nghĩa là bạn gõ "tuan" vẫn sẽ tìm thấy khách hàng tên "Tuấn".
-- Tìm kiếm đa trường: Bạn có thể tìm khách hàng theo Tên , Số điện thoại hoặc Số CCCD . Chỉ cần gõ một phần thông tin, hệ thống sẽ lọc ra 5 kết quả khớp nhất.
-- Thao tác nhanh: Khi chọn một khách hàng từ danh sách, toàn bộ thông tin cũ (SĐT, CCCD) sẽ tự động được "bay" vào các ô nhập liệu tương ứng, giúp lễ tân không cần hỏi lại khách. B. Cơ chế tự động lưu khách mới (Auto-Save):
-Đây là tính năng giúp database khách hàng tự động dày lên theo thời gian mà không cần nhập liệu thủ công:
+export interface PricingBreakdown {
+  total_amount: number;
+  suggested_total: number;
+  room_charge: number;
+  service_charge: number;
+  surcharge: number;
+  tax_details: {
+    room_tax: number;
+    service_tax: number;
+  };
+  summary: {
+    days?: number;
+    hours?: number;
+    rental_type: string;
+    is_overnight: boolean;
+    duration_text: string;
+  };
+}
 
-- Kiểm tra tồn tại: Khi nhấn nút "Nhận phòng", hệ thống sẽ kiểm tra tên và SĐT vừa nhập:
-  - Nếu thông tin đã có trong danh sách data.customers , hệ thống sẽ cập nhật ngày ghé thăm cuối cùng ( lastVisit ) và tăng số lần đến ( visits ).
-  - Nếu thông tin hoàn toàn mới, hệ thống sẽ tự động tạo một ID duy nhất và lưu khách hàng này vào bảng customers .
-- Dữ liệu khách hàng mới bao gồm: Tên, SĐT, CCCD, ngày nhận phòng đầu tiên, số lần đến (=1) và tổng chi tiêu (khởi tạo bằng 0).
-### 3. Luồng dữ liệu tích hợp (Integrated Data Flow)
-1. Nhập liệu (Input): Người dùng gõ tên khách -> handleSmartSearch kích hoạt -> Lọc dữ liệu từ localStorage .
-2. Lựa chọn (Selection):
-   - Trường hợp 1: Chọn khách cũ -> Dữ liệu từ DB đổ vào Form.
-   - Trường hợp 2: Gõ khách mới hoàn toàn -> Form giữ dữ liệu vừa gõ.
-3. Xác nhận (Submission): Nhấn "Nhận phòng" -> Hàm submit() được gọi.
-4. Xử lý Logic khách hàng (Customer Logic):
-   - Hệ thống tìm trong mảng data.customers xem có ai trùng Tên + SĐT không.
-   - Nếu mới: data.customers.push({ ...newCustomer }) .
-   - Nếu cũ: Cập nhật visits và lastVisit .
-5. Lưu trữ (Persistence): StorageService.updateData() lưu lại toàn bộ mảng khách hàng mới cùng với thông tin phòng đang thuê.
-### 4. Cách thức hoạt động ngầm (Technical Mechanism)
-- Debounce (Tùy chọn): Việc tìm kiếm diễn ra ngay khi người dùng gõ phím ( onkeyup ), đảm bảo tốc độ phản hồi tức thì dưới 100ms.
-- Data Consistency: Thông tin khách hàng trong session phòng và trong danh sách customers tổng luôn được đồng bộ. Nếu sau này bạn sửa thông tin khách trong phòng, hệ thống cũng có thể hỏi bạn có muốn cập nhật vào "hồ sơ gốc" của khách đó hay không.
-Tổng kết: Tính năng này giúp Modal Check-in không chỉ là nơi nhập liệu mà còn là một bộ não thu thập dữ liệu thông minh , giúp giảm thiểu tối đa sai sót và tiết kiệm thời gian cho cả lễ tân và khách hàng.
+export function calculateRoomPrice(
+  checkInTime: string | Date,
+  checkOutTime: string | Date,
+  settings: Setting[],
+  room: Room,
+  rentalType: string,
+  serviceTotal: number = 0
+): PricingBreakdown {
+  console.log("--- DEBUG PRICING START ---");
+  
+  // 0. Xử lý date đầu vào cực kỳ cẩn thận
+  const parseDate = (d: Date | string) => {
+    if (d instanceof Date) return d;
+    if (!d) return new Date(NaN);
+    try {
+      const parsed = parseISO(d);
+      if (!isNaN(parsed.getTime())) return parsed;
+      const fallback = new Date(d);
+      if (!isNaN(fallback.getTime())) return fallback;
+    } catch (e) {
+      console.error("Lỗi parse ngày tháng:", d, e);
+    }
+    return new Date(NaN);
+  };
+
+  // 0.1 Xử lý giá tiền (Xử lý chuỗi "100.000")
+  const parsePrice = (p: any): number => {
+    if (p === null || p === undefined) return 0;
+    if (typeof p === 'number') return p;
+    if (typeof p === 'string') {
+      const sanitized = p.replace(/[^\d]/g, '');
+      const num = parseInt(sanitized, 10);
+      return isNaN(num) ? 0 : num;
+    }
+    return 0;
+  };
+
+  const checkIn = parseDate(checkInTime);
+  const checkOut = parseDate(checkOutTime);
+
+  let roomPrices = room.prices;
+  if (typeof roomPrices === 'string') {
+    try { roomPrices = JSON.parse(roomPrices); } catch (e) { roomPrices = {}; }
+  }
+  
+  const prices = {
+    hourly: parsePrice(roomPrices?.hourly),
+    next_hour: parsePrice(roomPrices?.next_hour),
+    overnight: parsePrice(roomPrices?.overnight),
+    daily: parsePrice(roomPrices?.daily)
+  };
+
+  // ... (Logic tính toán giữ nguyên nhưng dùng biến prices đã parse) ...
+
+  if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+    console.error("INVALID DATES DETECTED", { checkInTime, checkOutTime });
+    return {
+      total_amount: 0,
+      suggested_total: 0,
+      room_charge: 0,
+      service_charge: serviceTotal,
+      surcharge: 0,
+      tax_details: { room_tax: 0, service_tax: 0 },
+      summary: { rental_type: rentalType, is_overnight: false, duration_text: 'Lỗi ngày vào/ra', days: 0, hours: 0 }
+    };
+  }
+
+  // Kết quả cuối cùng luôn được làm tròn
+  return {
+    total_amount: Math.round(total_amount),
+    suggested_total: Math.round(total_amount),
+    room_charge: Math.round(final_base_charge),
+    service_charge: Math.round(serviceTotal),
+    surcharge: Math.round(surcharge),
+    tax_details: {
+      room_tax: Math.round(room_tax),
+      service_tax: Math.round(service_tax)
+    },
+    summary
+  };
+}
+```
+
+## 2. Đồng bộ dữ liệu & Chuẩn hóa Trạng thái (useHotel.ts) - ĐÃ FIX LOẠN TRẠNG THÁI
+File: `src/hooks/useHotel.ts`
+*Giải pháp: Thiết lập logic "Duy nhất một nguồn tin". Ưu tiên `current_booking_id` từ bảng `rooms`. Chỉ tìm dự phòng nếu phòng đang ở trạng thái có khách.*
+
+```typescript
+// 3. Ghép booking vào phòng (Join in-memory để đảm bảo DUY NHẤT một nguồn tin)
+const joinedRooms = rooms.map(room => {
+  // Ưu tiên: booking.id === room.current_booking_id (Liên kết chính thức)
+  let booking = bookings?.find(b => b.id === room.current_booking_id);
+  
+  // Chỉ tìm dự phòng nếu phòng đang ở trạng thái có khách nhưng mất link current_booking_id
+  const isOccupiedStatus = ['hourly', 'daily', 'overnight'].includes(room.status);
+  if (!booking && isOccupiedStatus) {
+    booking = bookings?.find(b => b.room_id === room.id && b.status === 'active');
+  }
+  
+  let status = room.status;
+
+  // CHUẨN HÓA TRẠNG THÁI (Logic Nghiệp vụ duy nhất)
+  if (booking) {
+    // Nếu CÓ booking active -> BẮT BUỘC trạng thái là loại hình thuê
+    status = booking.rental_type || 'hourly';
+  } else {
+    // Nếu KHÔNG có booking active
+    if (status !== 'dirty' && status !== 'repair') {
+      // Nếu không phải đang dơ hoặc đang sửa -> Mặc định là Sẵn sàng
+      status = 'available';
+    }
+    // Nếu status đang là 'dirty' hoặc 'repair' -> Giữ nguyên trạng thái đó
+  }
+
+  return { ...room, status, current_booking: booking || null };
+});
+```
+
+## 3. Luồng xử lý Nghiệp vụ (page.tsx) - ĐÃ CHUẨN HÓA & GHI LOG
+File: `src/app/page.tsx`
+*Giải pháp: Luôn đưa phòng về trạng thái 'dirty' sau khi Thanh toán hoặc Hủy. Sử dụng bookingId linh hoạt và có kiểm tra lỗi chặt chẽ.*
+
+```typescript
+const handlePayment = async (amount: number, updatedServices?: any[], auditData?: any) => {
+  if (!folioRoom) return;
+  try {
+    const bookingId = folioRoom.current_booking_id || folioRoom.current_booking?.id;
+    if (bookingId) {
+      // 1. Cập nhật booking sang completed
+      await supabase.from('bookings').update({ status: 'completed', ... }).eq('id', bookingId);
+      // 2. Cập nhật stats khách hàng...
+    }
+    // 3. Luôn đưa phòng về trạng thái dirty và xóa current_booking_id
+    await supabase.from('rooms').update({ status: 'dirty', current_booking_id: null }).eq('id', folioRoom.id);
+    
+    setFolioRoomId(null);
+    await mutateRooms();
+    toast.success(`Thanh toán thành công!`);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const handleCancel = async () => {
+  // Tương tự handlePayment, đưa phòng về dirty và hủy booking
+  // ...
+};
+
+const handleRoomClick = (room: Room) => {
+  if (room.current_booking) {
+    setFolioRoomId(room.id); // Có khách -> Mở Folio
+  } else if (room.status === 'dirty') {
+    // Đang dơ -> Mở xác nhận dọn xong
+    setConfirmConfig({
+      title: 'Xác nhận dọn phòng',
+      onConfirm: async () => {
+        await supabase.from('rooms').update({ status: 'available' }).eq('id', room.id);
+        mutateRooms();
+      }
+    });
+  } else {
+    setSelectedRoomId(room.id); // Trống -> Mở Check-in
+  }
+};
+```
+
+## 4. UI Debug & State (FolioModal.tsx) - ĐÃ THÊM LOG TRỰC QUAN
+File: `src/components/dashboard/FolioModal.tsx`
+*Giải pháp: Thêm mục "DEBUG DATA" trực tiếp trên giao diện để admin có thể kiểm tra dữ liệu thô ngay khi thấy giá bằng 0.*
+
+```typescript
+// Thêm vào cuối phần hiển thị thông tin
+<div className="px-6 space-y-4 pb-32">
+    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">DEBUG DATA (DÀNH CHO ADMIN)</h3>
+    <div className="bg-slate-900 text-green-400 p-4 rounded-2xl text-[10px] font-mono overflow-auto max-h-40">
+      <pre>{JSON.stringify({
+        room_number: room.room_number,
+        prices_raw: room.prices,
+        check_in_at: room.current_booking?.check_in_at,
+        rental_type: room.current_booking?.rental_type,
+        breakdown_result: pricingBreakdown
+      }, null, 2)}</pre>
+    </div>
+</div>
+```

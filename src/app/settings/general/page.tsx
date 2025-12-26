@@ -51,8 +51,9 @@ export default function GeneralSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState(tabs[0].id);
+  const { showNotification } = useNotification();
 
-  const [timeRules, setTimeRules] = useState<TimeRules & { full_day_late_after?: string }>({
+  const [timeRules, setTimeRules] = useState<TimeRules>({
     check_in: '14:00',
     check_out: '12:00',
     overnight: { start: '22:00', end: '08:00' },
@@ -61,8 +62,11 @@ export default function GeneralSettingsPage() {
       { from: '12:00', to: '15:00', percent: 30 },
       { from: '15:00', to: '18:00', percent: 50 },
     ],
+    full_day_early_before: '05:00',
     full_day_late_after: '18:00'
   });
+
+  const [enableAutoSurcharge, setEnableAutoSurcharge] = useState(true);
 
   const [taxConfig, setTaxConfig] = useState({
     tax_code: '',
@@ -88,6 +92,9 @@ export default function GeneralSettingsPage() {
       if (data) {
         if (data.value) {
           setTimeRules(prev => ({ ...prev, ...data.value }));
+          if (data.value.enableAutoSurcharge !== undefined) {
+            setEnableAutoSurcharge(data.value.enableAutoSurcharge);
+          }
         }
         setTaxConfig({
           tax_code: data.tax_code || '',
@@ -107,7 +114,10 @@ export default function GeneralSettingsPage() {
       setSaving(true);
       const payload = {
         key: 'system_settings',
-        value: timeRules,
+        value: {
+          ...timeRules,
+          enableAutoSurcharge
+        },
         tax_code: taxConfig.tax_code,
         tax_config: {
           stay_tax: taxConfig.stay_tax,
@@ -120,10 +130,10 @@ export default function GeneralSettingsPage() {
 
       if (error) throw error;
       
-      toast.success('Đã lưu cài đặt thành công!');
+      showNotification('Đã lưu cài đặt thành công!', 'success');
     } catch (err) {
       console.error('Error saving settings:', err);
-      toast.error('Có lỗi xảy ra khi lưu cài đặt!');
+      showNotification('Có lỗi xảy ra khi lưu cài đặt!', 'error');
     } finally {
       setSaving(false);
     }
@@ -149,6 +159,28 @@ export default function GeneralSettingsPage() {
     const newRules = [...timeRules.late_rules];
     newRules[index] = { ...newRules[index], [field]: value };
     setTimeRules({ ...timeRules, late_rules: newRules });
+  };
+
+  const addEarlyRule = () => {
+    setTimeRules({
+      ...timeRules,
+      early_rules: [
+        ...(timeRules.early_rules || []),
+        { from: '08:00', to: '12:00', percent: 10 }
+      ]
+    });
+  };
+
+  const removeEarlyRule = (index: number) => {
+    const newRules = [...(timeRules.early_rules || [])];
+    newRules.splice(index, 1);
+    setTimeRules({ ...timeRules, early_rules: newRules });
+  };
+
+  const updateEarlyRule = (index: number, field: string, value: any) => {
+    const newRules = [...(timeRules.early_rules || [])];
+    newRules[index] = { ...newRules[index], [field]: value };
+    setTimeRules({ ...timeRules, early_rules: newRules });
   };
 
   if (loading) {
@@ -194,7 +226,19 @@ export default function GeneralSettingsPage() {
         >
           {activeTab === 'time' && <TimeSettingsTab timeRules={timeRules} setTimeRules={setTimeRules} />}
           {activeTab === 'tax' && <TaxSettingsTab taxConfig={taxConfig} setTaxConfig={setTaxConfig} />}
-          {activeTab === 'surcharge' && <SurchargeSettingsTab timeRules={timeRules} updateLateRule={updateLateRule} addLateRule={addLateRule} removeLateRule={removeLateRule} />}
+          {activeTab === 'surcharge' && (
+            <SurchargeSettingsTab 
+              timeRules={timeRules} 
+              updateLateRule={updateLateRule} 
+              addLateRule={addLateRule} 
+              removeLateRule={removeLateRule} 
+              updateEarlyRule={updateEarlyRule}
+              addEarlyRule={addEarlyRule}
+              removeEarlyRule={removeEarlyRule}
+              enableAutoSurcharge={enableAutoSurcharge}
+              setEnableAutoSurcharge={setEnableAutoSurcharge}
+            />
+          )}
           {activeTab === 'ai' && <AISettingsTab />}
         </motion.div>
       </AnimatePresence>
@@ -253,6 +297,35 @@ const TimeSettingsTab = ({ timeRules, setTimeRules }: any) => (
     </div>
 
     <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+      <div className="flex items-center gap-2 mb-4 text-orange-600">
+        <Clock className="h-5 w-5" />
+        <h2 className="font-bold">Thời gian ân hạn (Grace Period)</h2>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Ân hạn phòng giờ (phút)</label>
+          <input 
+            type="number" 
+            value={timeRules.hourly_grace_period_minutes || 15} 
+            onChange={(e) => setTimeRules({...timeRules, hourly_grace_period_minutes: Number(e.target.value)})} 
+            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-orange-200 outline-none transition-all" 
+          />
+           <p className="mt-1 text-[10px] text-slate-400 italic">Khách quá giờ trong khoảng này không bị tính thêm giờ.</p>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Ân hạn trả muộn (giờ)</label>
+          <input 
+            type="number" 
+            value={timeRules.daily_grace_period_hours || 2} 
+            onChange={(e) => setTimeRules({...timeRules, daily_grace_period_hours: Number(e.target.value)})} 
+            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-orange-200 outline-none transition-all" 
+          />
+          <p className="mt-1 text-[10px] text-slate-400 italic">Khách trả muộn trong khoảng này không bị tính phụ thu.</p>
+        </div>
+      </div>
+    </div>
+
+    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
       <div className="flex items-center gap-2 mb-4 text-purple-600">
         <Clock className="h-5 w-5" />
         <h2 className="font-bold">Khung giờ đêm</h2>
@@ -280,15 +353,27 @@ const TimeSettingsTab = ({ timeRules, setTimeRules }: any) => (
     </div>
 
     <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Mốc tính 1 ngày</label>
-        <input 
-          type="time" 
-          value={timeRules.full_day_late_after} 
-          onChange={(e) => setTimeRules({...timeRules, full_day_late_after: e.target.value})} 
-          className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all" 
-        />
-        <p className="mt-2 text-xs text-slate-400 italic">Ví dụ: Trả phòng sau 18:00 sẽ tính thêm 1 ngày tiền phòng.</p>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Mốc check-in sớm</label>
+          <input 
+            type="time" 
+            value={timeRules.full_day_early_before} 
+            onChange={(e) => setTimeRules({...timeRules, full_day_early_before: e.target.value})} 
+            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all" 
+          />
+          <p className="mt-1 text-[10px] text-slate-400 italic">Nhận phòng trước giờ này tính thêm 1 ngày.</p>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Mốc trả muộn</label>
+          <input 
+            type="time" 
+            value={timeRules.full_day_late_after} 
+            onChange={(e) => setTimeRules({...timeRules, full_day_late_after: e.target.value})} 
+            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all" 
+          />
+          <p className="mt-1 text-[10px] text-slate-400 italic">Trả phòng sau giờ này tính thêm 1 ngày.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -337,15 +422,49 @@ const TaxSettingsTab = ({ taxConfig, setTaxConfig }: any) => (
   </section>
 );
 
-const SurchargeSettingsTab = ({ timeRules, updateLateRule, addLateRule, removeLateRule }: any) => (
+const SurchargeSettingsTab = ({ 
+  timeRules, 
+  updateLateRule, 
+  addLateRule, 
+  removeLateRule,
+  updateEarlyRule,
+  addEarlyRule,
+  removeEarlyRule,
+  enableAutoSurcharge,
+  setEnableAutoSurcharge
+}: any) => (
   <section className="space-y-4">
+    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 mb-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-slate-800">Phụ thu tự động</h3>
+          <p className="text-xs text-slate-500">Hệ thống tự tính % phụ thu khi check-out</p>
+        </div>
+        <button 
+          onClick={() => setEnableAutoSurcharge(!enableAutoSurcharge)}
+          className={cn(
+            "relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none",
+            enableAutoSurcharge ? "bg-blue-600" : "bg-slate-200"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-5 w-5 transform rounded-full bg-white transition-transform",
+              enableAutoSurcharge ? "translate-x-6" : "translate-x-1"
+            )}
+          />
+        </button>
+      </div>
+    </div>
+
+    {/* Late Check-out Section */}
     <div className="flex items-center justify-between px-2 mb-2">
-       <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Danh sách mốc phụ thu</span>
+       <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Phụ thu Trả muộn (Late)</span>
        <button onClick={addLateRule} className="flex items-center gap-1 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white active:scale-95 transition-transform shadow-lg shadow-blue-100">
         <Plus className="h-4 w-4" /> Thêm mới
       </button>
     </div>
-    <div className="space-y-3">
+    <div className="space-y-3 mb-8">
       {timeRules.late_rules.map((rule: any, index: number) => (
         <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={index} className="flex items-center gap-3 rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
           <div className="grid flex-1 grid-cols-2 gap-4">
@@ -372,7 +491,46 @@ const SurchargeSettingsTab = ({ timeRules, updateLateRule, addLateRule, removeLa
       {timeRules.late_rules.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-slate-200 py-12 text-slate-400 bg-white/50">
           <AlertCircle className="h-10 w-10 mb-3 opacity-20" />
-          <p className="font-medium">Chưa có quy định phụ thu</p>
+          <p className="font-medium text-xs">Chưa có quy định trả muộn</p>
+        </div>
+      )}
+    </div>
+
+    {/* Early Check-in Section */}
+    <div className="flex items-center justify-between px-2 mb-2">
+       <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Phụ thu Nhận sớm (Early)</span>
+       <button onClick={addEarlyRule} className="flex items-center gap-1 rounded-full bg-purple-600 px-4 py-2 text-xs font-bold text-white active:scale-95 transition-transform shadow-lg shadow-purple-100">
+        <Plus className="h-4 w-4" /> Thêm mới
+      </button>
+    </div>
+    <div className="space-y-3">
+      {(timeRules.early_rules || []).map((rule: any, index: number) => (
+        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={index} className="flex items-center gap-3 rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="grid flex-1 grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Từ</span>
+              <input type="time" value={rule.from} onChange={(e) => updateEarlyRule(index, 'from', e.target.value)} className="w-full bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Đến</span>
+              <input type="time" value={rule.to} onChange={(e) => updateEarlyRule(index, 'to', e.target.value)} className="w-full bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Phụ thu (%)</span>
+              <div className="flex items-center gap-3">
+                <input type="number" value={rule.percent} onChange={(e) => updateEarlyRule(index, 'percent', Number(e.target.value))} className="flex-1 bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
+                <button onClick={() => removeEarlyRule(index)} className="rounded-xl bg-rose-50 p-3 text-rose-500 active:scale-90 transition-transform">
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+      {(!timeRules.early_rules || timeRules.early_rules.length === 0) && (
+        <div className="flex flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-slate-200 py-12 text-slate-400 bg-white/50">
+          <AlertCircle className="h-10 w-10 mb-3 opacity-20" />
+          <p className="font-medium text-xs">Chưa có quy định nhận sớm</p>
         </div>
       )}
     </div>

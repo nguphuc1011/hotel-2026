@@ -1,121 +1,229 @@
-import { differenceInMinutes, parse, isAfter, addDays, startOfDay, differenceInHours } from 'date-fns';
+import { differenceInMinutes, parse, isAfter, addDays, startOfDay, differenceInHours, differenceInCalendarDays, addHours, parseISO } from 'date-fns';
 import { TimeRules, Room, Setting } from '@/types';
 
 export interface PricingBreakdown {
-  total_amount: number;      // Tổng phải thu
-  room_charge: number;       // Tiền phòng gốc (bao gồm cả phụ thu)
-  service_charge: number;    // Tiền dịch vụ (mặc định 0 trong hàm này)
-  surcharge: number;         // Tiền phụ thu trễ giờ/sớm
+  total_amount: number;
+  suggested_total: number;
+  room_charge: number;
+  service_charge: number;
+  surcharge: number;
   tax_details: {
-    room_tax: number;        // (Tiền phòng + phụ thu) * % Thuế Lưu trú
-    service_tax: number;     // Tiền dịch vụ * % Thuế Dịch vụ
+    room_tax: number;
+    service_tax: number;
   };
   summary: {
     days?: number;
     hours?: number;
     rental_type: string;
     is_overnight: boolean;
+    duration_text: string;
   };
 }
 
 /**
- * BỘ NÃO TÍNH GIÁ HOTEL 2026
- * Xử lý logic Hourly, Daily, Overnight và Thuế AI 2026
+ * BỘ NÃO TÍNH GIÁ HOTEL 2026 - PHIÊN BẢN LOGIC MỚI
+ * Xử lý logic Hourly, Daily, Overnight và Thuế theo nghiệp vụ chuẩn
  */
 export function calculateRoomPrice(
-  checkInTime: Date,
-  checkOutTime: Date,
+  checkInTime: Date | string,
+  checkOutTime: Date | string,
   settings: Setting[],
-  roomPrices: Room['prices'],
-  rentalType: 'hourly' | 'daily' | 'overnight'
+  room: Room,
+  rentalType: 'hourly' | 'daily' | 'overnight',
+  serviceTotal: number = 0
 ): PricingBreakdown {
-  
-  // 1. Lấy cấu hình hệ thống
-  const systemSetting = settings.find(s => s.key === 'system_settings');
-  const timeRules: TimeRules & { full_day_late_after?: string } = systemSetting?.value || {
-    check_in: '14:00',
-    check_out: '12:00',
-    overnight: { start: '22:00', end: '08:00' },
-    early_rules: [],
-    late_rules: [],
-    full_day_late_after: '18:00'
+  const parseDate = (d: Date | string) => {
+    if (d instanceof Date) return d;
+    if (!d) return new Date(NaN);
+    try {
+      const parsed = parseISO(d);
+      if (!isNaN(parsed.getTime())) return parsed;
+      const fallback = new Date(d);
+      if (!isNaN(fallback.getTime())) return fallback;
+    } catch (e) {}
+    return new Date(NaN);
   };
 
-  const taxConfig = systemSetting?.tax_config || { stay_tax: 5, service_tax: 1.5 };
+  const parsePrice = (p: any): number => {
+    if (p === null || p === undefined) return 0;
+    if (typeof p === 'number') return p;
+    if (typeof p === 'string') {
+      const sanitized = p.replace(/[^\d]/g, '');
+      const num = parseInt(sanitized, 10);
+      return isNaN(num) ? 0 : num;
+    }
+    return 0;
+  };
+
+  const checkIn = parseDate(checkInTime);
+  const checkOut = parseDate(checkOutTime);
+
+  let roomPrices = room.prices;
+  if (typeof roomPrices === 'string') {
+    try {
+      roomPrices = JSON.parse(roomPrices);
+    } catch (e) {
+      roomPrices = { hourly: 0, next_hour: 0, overnight: 0, daily: 0 };
+    }
+  }
   
-  let room_charge = 0;
+  const prices = {
+    hourly: parsePrice(roomPrices?.hourly),
+    next_hour: parsePrice(roomPrices?.next_hour),
+    overnight: parsePrice(roomPrices?.overnight),
+    daily: parsePrice(roomPrices?.daily)
+  };
+
+  const roomChargeLocked = room.current_booking?.room_charge_locked || 0;
+
+  const systemSetting = settings.find(s => s.key === 'system_settings');
+  const value = systemSetting?.value || {};
+
+  const timeRules: Required<TimeRules> = {
+    check_in: value.check_in || '14:00',
+    check_out: value.check_out || '12:00',
+    overnight: value.overnight || { start: '22:00', end: '08:00' },
+    early_rules: value.early_rules || [],
+    late_rules: value.late_rules || [],
+    full_day_early_before: value.full_day_early_before || '05:00',
+    full_day_late_after: value.full_day_late_after || '18:00',
+    hourly_grace_period_minutes: value.hourly_grace_period_minutes ?? 15,
+    daily_grace_period_hours: value.daily_grace_period_hours ?? 2,
+  };
+
+  const enableAutoSurcharge = value.enableAutoSurcharge ?? true;
+  const taxConfig = systemSetting?.tax_config || { stay_tax: 0, service_tax: 0 }; // Mặc định 0% thuế nếu chưa cài
+
+  if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+    console.error("INVALID DATES DETECTED");
+    return {
+      total_amount: 0,
+      suggested_total: 0,
+      room_charge: 0,
+      service_charge: serviceTotal,
+      surcharge: 0,
+      tax_details: { room_tax: 0, service_tax: 0 },
+      summary: { rental_type: rentalType, is_overnight: false, duration_text: 'Chưa có giờ vào', days: 0, hours: 0 }
+    };
+  }
+
+  const minutes = Math.max(0, differenceInMinutes(checkOut, checkIn));
+
+  // Debug log nếu vẫn ra 0đ
+  if (prices.hourly === 0 && prices.daily === 0) {
+    console.warn(`Cảnh báo: Phòng ${room.room_number} đang bị trống giá trong object room!`, room);
+  }
+
+  // --- LOGIC ÂN HẠN (GRACE PERIOD) ---
+  const isWithinGracePeriod = minutes > 0 && minutes <= timeRules.hourly_grace_period_minutes;
+
+  let base_charge = 0;
   let surcharge = 0;
+  let duration_text = '';
   let summary = {
     rental_type: rentalType,
     is_overnight: false,
     days: 0,
-    hours: 0
+    hours: 0,
+    duration_text: ''
   };
 
-  const diffMinutes = differenceInMinutes(checkOutTime, checkInTime);
-  const minutes = Math.max(0, diffMinutes);
+  const totalHours = differenceInHours(checkOut, checkIn);
+  const remainingMinutes = minutes % 60;
+
+  const getPercentageSurcharge = (time: Date, rules: Array<{ from: string; to: string; percent: number }>, basePrice: number) => {
+    if (!rules.length) return 0;
+    const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+    const applicableRule = [...rules]
+      .sort((a, b) => b.percent - a.percent)
+      .find(rule => timeStr >= rule.from && timeStr <= rule.to);
+    return applicableRule ? (basePrice * applicableRule.percent) / 100 : 0;
+  };
 
   // 2. Xử lý theo từng loại hình thuê
   if (rentalType === 'hourly') {
-    // Logic: Giá giờ đầu + (Tổng giờ - 1) * Giá giờ tiếp. Làm tròn lên (61p = 2h)
-    const totalHours = Math.max(1, Math.ceil(minutes / 60));
-    room_charge = roomPrices.hourly + (totalHours - 1) * roomPrices.next_hour;
-    summary.hours = totalHours;
+    const extraHours = Math.max(0, Math.ceil((minutes - 60) / 60));
+    base_charge = prices.hourly + (extraHours * prices.next_hour);
   } 
   else if (rentalType === 'overnight') {
-    // Logic: Giá phẳng cho khung giờ đêm
-    room_charge = roomPrices.overnight;
-    summary.is_overnight = true;
+    if (!room.enable_overnight) {
+      let effectiveHours = totalHours;
+      if (remainingMinutes > timeRules.hourly_grace_period_minutes) effectiveHours += 1;
+      effectiveHours = Math.max(1, effectiveHours);
+      base_charge = prices.hourly + (effectiveHours - 1) * prices.next_hour;
+      summary.hours = effectiveHours;
+      summary.rental_type = 'hourly';
+      duration_text = `${totalHours}h ${remainingMinutes}p`;
+    } else {
+      base_charge = prices.overnight;
+      summary.is_overnight = true;
+      duration_text = `Qua đêm (${totalHours}h ${remainingMinutes}p)`;
+      if (enableAutoSurcharge) {
+        surcharge += getPercentageSurcharge(checkIn, timeRules.early_rules, prices.overnight);
+        surcharge += getPercentageSurcharge(checkOut, timeRules.late_rules, prices.overnight);
+      }
+    }
   } 
   else if (rentalType === 'daily') {
-    // Logic Thuê Ngày (Phức tạp nhất)
-    const diffDays = Math.max(1, Math.ceil(minutes / (24 * 60)));
-    room_charge = diffDays * roomPrices.daily;
-    summary.days = diffDays;
+    const nightsStayed = differenceInCalendarDays(checkOut, checkIn);
+    const baseDays = Math.max(1, nightsStayed);
+    base_charge = baseDays * prices.daily;
+    summary.days = baseDays;
+    duration_text = `${baseDays} ngày`;
 
-    // Tính phụ thu trễ giờ (Late Surcharge) cho ngày cuối cùng
-    const [coH, coM] = timeRules.check_out.split(':').map(Number);
-    const [lateH, lateM] = (timeRules.full_day_late_after || '18:00').split(':').map(Number);
+    if (enableAutoSurcharge) {
+      let addedDayForEarly = false;
+      let addedDayForLate = false;
 
-    // Mốc trả phòng chuẩn của ngày cuối
-    const standardCheckOut = new Date(checkOutTime);
-    standardCheckOut.setHours(coH, coM, 0, 0);
+      const [checkInH, checkInM] = timeRules.check_in.split(':').map(Number);
+      const standardCheckIn = new Date(checkIn);
+      standardCheckIn.setHours(checkInH, checkInM, 0, 0);
 
-    // Mốc "Ăn gian" (Late Threshold)
-    const lateThreshold = new Date(checkOutTime);
-    lateThreshold.setHours(lateH, lateM, 0, 0);
+      if (isAfter(standardCheckIn, checkIn)) {
+        const [h, m] = timeRules.full_day_early_before.split(':').map(Number);
+        const threshold = new Date(checkIn);
+        threshold.setHours(h, m, 0, 0);
+        if (isAfter(threshold, checkIn)) {
+          surcharge += prices.daily;
+          addedDayForEarly = true;
+        }
+        if (!addedDayForEarly) {
+          surcharge += getPercentageSurcharge(checkIn, timeRules.early_rules, prices.daily);
+        }
+      }
 
-    if (isAfter(checkOutTime, lateThreshold)) {
-      // Trường hợp 1: Trả sau Late Threshold -> Tính thêm 1 ngày
-      surcharge = roomPrices.daily;
-      summary.days! += 1;
-    } 
-    else if (isAfter(checkOutTime, standardCheckOut)) {
-      // Trường hợp 2: Trả sau 12:00 nhưng trước Late Threshold -> Tính % theo late_rules
-      const checkOutStr = `${checkOutTime.getHours().toString().padStart(2, '0')}:${checkOutTime.getMinutes().toString().padStart(2, '0')}`;
-      
-      // Tìm rule phù hợp nhất (lấy mốc % cao nhất thỏa mãn)
-      const applicableRule = [...(timeRules.late_rules || [])]
-        .sort((a, b) => b.percent - a.percent)
-        .find(rule => checkOutStr >= rule.from && checkOutStr <= rule.to);
+      const [checkOutH, checkOutM] = timeRules.check_out.split(':').map(Number);
+      const standardCheckOut = new Date(checkOut);
+      standardCheckOut.setHours(checkOutH, checkOutM, 0, 0);
+      const gracePeriodEnd = addHours(standardCheckOut, timeRules.daily_grace_period_hours);
 
-      if (applicableRule) {
-        surcharge = (roomPrices.daily * applicableRule.percent) / 100;
+      if (isAfter(checkOut, gracePeriodEnd)) {
+        const [h, m] = timeRules.full_day_late_after.split(':').map(Number);
+        const threshold = new Date(checkOut);
+        threshold.setHours(h, m, 0, 0);
+        if (isAfter(checkOut, threshold)) {
+          surcharge += prices.daily;
+          addedDayForLate = true;
+        }
+        if (!addedDayForLate) {
+          surcharge += getPercentageSurcharge(checkOut, timeRules.late_rules, prices.daily);
+        }
       }
     }
   }
 
-  // 3. Logic Tách Thuế 2026
-  const room_tax = ((room_charge + surcharge) * taxConfig.stay_tax) / 100;
-  const service_charge = 0; // Sẽ tính thêm ở FolioModal nếu có
-  const service_tax = (service_charge * taxConfig.service_tax) / 100;
+  summary.duration_text = duration_text;
 
-  const total_amount = room_charge + surcharge + service_charge + room_tax + service_tax;
+  const final_base_charge = roomChargeLocked > 0 ? roomChargeLocked : base_charge;
+  const room_tax = ((final_base_charge + surcharge) * taxConfig.stay_tax) / 100;
+  const service_tax = (serviceTotal * taxConfig.service_tax) / 100;
+  const total_amount = final_base_charge + surcharge + serviceTotal + room_tax + service_tax;
 
   return {
     total_amount: Math.round(total_amount),
-    room_charge: room_charge,
-    service_charge: service_charge,
+    suggested_total: Math.round(total_amount),
+    room_charge: final_base_charge,
+    service_charge: serviceTotal,
     surcharge: Math.round(surcharge),
     tax_details: {
       room_tax: Math.round(room_tax),

@@ -10,7 +10,7 @@ import { cn, formatCurrency, formatInputCurrency, parseCurrency } from '@/lib/ut
 import { PlusCircle, Edit, Trash2, X, Save, ChevronLeft, Plus, Search, Building2, MapPin, DollarSign, Mic, Clock, Calendar, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Switch } from '@/components/ui/switch';
-import { toast } from 'sonner';
+import { useNotification } from '@/context/NotificationContext';
 import Link from 'next/link';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
@@ -33,6 +33,7 @@ type RoomFormData = z.infer<typeof roomSchema>;
 // --- MAIN COMPONENT --- //
 export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
+  const { showNotification } = useNotification();
   const [groupedRooms, setGroupedRooms] = useState<Record<string, Room[]>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
@@ -61,7 +62,7 @@ export default function RoomsPage() {
       setLoading(true);
       const { data, error } = await supabase.from('rooms').select('*').order('area').order('room_number');
       if (error) {
-        toast.error('Lỗi khi tải danh sách phòng.');
+        showNotification('Lỗi khi tải danh sách phòng.', 'error');
         console.error(error);
       } else {
         setRooms(data);
@@ -99,30 +100,28 @@ export default function RoomsPage() {
       .from('rooms')
       .update({ enable_overnight: newStatus })
       .eq('id', room.id);
-
     if (error) {
-      toast.error('Cập nhật thất bại!');
+      showNotification('Cập nhật thất bại!', 'error');
     } else {
-      toast.success(`Phòng ${room.room_number} đã ${newStatus ? 'cho phép' : 'chặn'} bán đêm.`);
-      fetchRooms(); 
+      showNotification(`Phòng ${room.room_number} đã ${newStatus ? 'cho phép' : 'chặn'} bán đêm.`, 'success');
+      fetchRooms();
     }
   };
 
-  const handleDeleteRoom = async (roomId: string) => {
+  const handleDeleteRoom = async (id: string) => {
     setConfirmConfig({
       isOpen: true,
-      title: 'Xóa phòng?',
+      title: 'Xóa phòng',
       description: 'Bạn có chắc chắn muốn xóa phòng này? Hành động này không thể hoàn tác.',
-      variant: 'danger',
       onConfirm: async () => {
-        const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+        const { error } = await supabase.from('rooms').delete().eq('id', id);
         if (error) {
-          toast.error('Xóa phòng thất bại.');
+          showNotification('Xóa phòng thất bại.', 'error');
         } else {
-          toast.success('Đã xóa phòng thành công.');
+          showNotification('Đã xóa phòng thành công.', 'success');
           fetchRooms();
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
         }
-        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
@@ -280,6 +279,7 @@ interface RoomModalProps {
 }
 
 function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
+  const { showNotification } = useNotification();
   const {
     register,
     handleSubmit,
@@ -333,9 +333,9 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
       : await supabase.from('rooms').insert(payload);
 
     if (error) {
-      toast.error(error.message);
+      showNotification(error.message, 'error');
     } else {
-      toast.success(room ? 'Cập nhật phòng thành công!' : 'Đã tạo phòng mới!');
+      showNotification(room ? 'Cập nhật phòng thành công!' : 'Đã tạo phòng mới!', 'success');
       onSave();
       onClose();
     }
@@ -344,14 +344,21 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <motion.div
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 100 }}
-            className="relative w-full h-full bg-slate-50 p-8 shadow-2xl flex flex-col overflow-y-auto rounded-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
           >
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-8 overflow-y-auto">
               <div className="flex items-center justify-between pt-4">
                 <h2 className="text-xl font-bold text-slate-800">{room ? 'Sửa thông tin phòng' : 'Tạo phòng mới'}</h2>
                 <button type="button" onClick={onClose} className="rounded-full bg-slate-200 p-3 text-slate-500 hover:bg-slate-300 transition-all">

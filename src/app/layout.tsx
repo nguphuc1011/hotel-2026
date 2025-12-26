@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Roboto } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
@@ -9,10 +9,14 @@ import Link from "next/link";
 import { Toaster } from 'sonner';
 import { BottomNav } from "@/components/layout/BottomNav";
 
-const inter = Inter({ subsets: ["latin", "vietnamese"] });
+import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationBanner } from "@/components/layout/NotificationBanner";
 
-
-
+const roboto = Roboto({ 
+  subsets: ["latin", "vietnamese"],
+  weight: ["300", "400", "500", "700", "900"],
+  variable: '--font-roboto',
+});
 
 export const metadata: Metadata = {
   title: "Hotel 2026",
@@ -48,20 +52,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" data-theme="light" className="light">
-      <body className={cn(inter.className, "min-h-screen bg-slate-50 selection:bg-blue-500/30 flex flex-col")}>
-        <Toaster position="top-center" richColors />
-        {/* <Header /> */}
+      <body className={cn(roboto.className, "min-h-screen bg-slate-50 selection:bg-blue-500/30 flex flex-col")}>
+        <NotificationProvider>
+          <NotificationBanner />
+          {/* <Header /> */}
 
-        {/* Main Content */}
-        <main className="flex-1 pb-24 px-4 max-w-md mx-auto w-full">
-          {children}
-        </main>
+          {/* Main Content */}
+          <main className="flex-1 pb-24 px-4 max-w-md mx-auto w-full">
+            {children}
+          </main>
 
-        <BottomNav />
+          <BottomNav />
+        </NotificationProvider>
       </body>
-
-
-
     </html>
   );
 }

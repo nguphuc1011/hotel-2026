@@ -7,24 +7,61 @@ import { useEffect } from 'react';
 
 const fetcher = async (key: string) => {
   if (key === 'rooms') {
-    const { data: rooms, error: roomsError } = await supabase
-      .from('rooms')
-      .select('*')
-      .order('room_number');
-      
-    if (roomsError) throw roomsError;
+    try {
+      // 1. Lấy danh sách phòng
+      const { data: rooms, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*')
+        .order('room_number');
 
-    const { data: bookings, error: bookingsError } = await supabase
-      .from('bookings')
-      .select('*, customer:customers(*)')
-      .eq('status', 'active');
+      if (roomsError) throw roomsError;
 
-    if (bookingsError) console.error('Error fetching bookings:', bookingsError);
+      // 2. Lấy danh sách booking đang active
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('*, customer:customers(*)')
+        .eq('status', 'active');
 
-    return rooms.map(room => ({
-      ...room,
-      current_booking: bookings?.find(b => b.room_id === room.id)
-    }));
+      if (bookingsError) throw bookingsError;
+
+      // 3. Ghép booking vào phòng (Join in-memory để đảm bảo DUY NHẤT một nguồn tin)
+      const joinedRooms = rooms.map(room => {
+        // Ưu tiên: booking.id === room.current_booking_id (Liên kết chính thức)
+        let booking = bookings?.find(b => b.id === room.current_booking_id);
+        
+        // Chỉ tìm dự phòng nếu phòng đang ở trạng thái có khách nhưng mất link current_booking_id
+        const isOccupiedStatus = ['hourly', 'daily', 'overnight'].includes(room.status);
+        if (!booking && isOccupiedStatus) {
+          booking = bookings?.find(b => b.room_id === room.id && b.status === 'active');
+        }
+        
+        let status = room.status;
+
+        // CHUẨN HÓA TRẠNG THÁI (Logic Nghiệp vụ duy nhất)
+        if (booking) {
+          // Nếu CÓ booking active -> BẮT BUỘC trạng thái là loại hình thuê
+          status = booking.rental_type || 'hourly';
+        } else {
+          // Nếu KHÔNG có booking active
+          if (status !== 'dirty' && status !== 'repair') {
+            // Nếu không phải đang dơ hoặc đang sửa -> Mặc định là Sẵn sàng
+            status = 'available';
+          }
+          // Nếu status đang là 'dirty' hoặc 'repair' -> Giữ nguyên trạng thái đó
+        }
+
+        return {
+          ...room,
+          status,
+          current_booking: booking || null
+        };
+      });
+
+      return joinedRooms;
+    } catch (error) {
+      console.error('Lỗi fetcher rooms:', error);
+      throw error;
+    }
   }
 
   // Default fetcher for other keys
@@ -69,21 +106,33 @@ export function useHotel() {
 
   // Subscribe to real-time changes
   useEffect(() => {
-    console.log('Subscribing to realtime changes...');
-    const channel = supabase
-      .channel('hotel-realtime')
+    // Listen to rooms changes
+    const roomChannel = supabase
+      .channel('rooms-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms' },
         (payload) => {
-          console.log('Realtime change detected:', payload);
-          mutate('rooms'); // Re-fetch immediately
+          mutate('rooms');
+        }
+      )
+      .subscribe();
+
+    // Listen to bookings changes
+    const bookingChannel = supabase
+      .channel('bookings-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings' },
+        (payload) => {
+          mutate('rooms');
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(roomChannel);
+      supabase.removeChannel(bookingChannel);
     };
   }, []);
 
