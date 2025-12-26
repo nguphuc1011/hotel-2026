@@ -56,6 +56,14 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface MergedBooking {
+  booking_id: string;
+  room_number: string;
+  amount: number;
+  details: PricingBreakdown;
+  merged_at: string;
+}
+
 export interface Booking {
   id: string;
   room_id: string;
@@ -72,6 +80,7 @@ export interface Booking {
     quantity: number;
     total: number;
   }>;
+  merged_bookings?: MergedBooking[];
   prepayments: number;
   logs: Array<{
     time: string;
@@ -159,9 +168,16 @@ export interface PricingBreakdown {
   summary: {
     days?: number;
     hours?: number;
+    minutes?: number;
     rental_type: string;
     is_overnight: boolean;
     duration_text: string;
+    base_price: number;
+    next_hour_price?: number;
+    extra_hours?: number;
+    extra_hours_charge?: number;
+    early_checkin_surcharge?: number;
+    late_checkout_surcharge?: number;
   };
 }
 

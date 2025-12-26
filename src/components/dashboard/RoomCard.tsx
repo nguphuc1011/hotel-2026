@@ -131,15 +131,6 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
         config.textColor
       )}
     >
-      {/* Background Icon */}
-      <div className="absolute -bottom-8 -right-8 transition-transform duration-500 group-hover:scale-110">
-        <BgIcon 
-          size={160} 
-          className="opacity-15" 
-          strokeWidth={2}
-        />
-      </div>
-
       {/* Header: Room Number & Badge */}
       <div className="z-10 flex w-full flex-col items-start gap-0">
         <div className="flex w-full items-start justify-between">
@@ -179,29 +170,25 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
       </div>
 
       {/* Footer: Data Display */}
-      <div className="z-10 mt-auto">
+      <div className="z-10 mt-auto w-full">
         {isOccupied ? (
-          <div className="flex items-center gap-2">
-            <div className="rounded-full bg-black/10 p-2 backdrop-blur-md">
-              <BgIcon size={20} className={cn(config.textColor === 'text-black' ? 'text-black' : 'text-white')} />
-            </div>
-            <div className="flex flex-col items-start leading-none">
-              <span className={cn("text-[13px] font-bold opacity-90 mb-0.5", config.textColor)}>
+          <div className="flex items-center gap-3">
+            <div className="w-[3px] h-10 bg-current opacity-20 rounded-full" />
+            <div className="flex flex-col items-start leading-tight">
+              <span className={cn("text-[13px] font-bold opacity-80", config.textColor)}>
                 Đã ở: {duration}
               </span>
-              <span className={cn("text-[20px] font-black tracking-tight", config.textColor)}>
+              <span className={cn("text-[22px] font-black tracking-tighter", config.textColor)}>
                 {formatCurrency(amountToCollect)}đ
               </span>
             </div>
           </div>
         ) : room.status === 'available' ? (
-          <div className="flex items-center gap-2">
-            <div className="rounded-full bg-black/10 p-2 backdrop-blur-md">
-              <Sun size={20} className="text-white" />
-            </div>
-            <div className="flex flex-col items-start leading-none">
-              <span className="text-[13px] font-bold opacity-90 mb-0.5 text-white">Giá ngày</span>
-              <span className="text-[20px] font-black tracking-tight text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-[3px] h-10 bg-current opacity-20 rounded-full" />
+            <div className="flex flex-col items-start leading-tight">
+              <span className="text-[13px] font-bold opacity-80 text-white">Giá ngày</span>
+              <span className="text-[22px] font-black tracking-tighter text-white">
                 {formatCurrency(room.prices?.daily || 0)}đ
               </span>
             </div>

@@ -101,16 +101,21 @@ export function calculateRoomPrice(
   let base_charge = 0;
   let surcharge = 0;
   let duration_text = '';
-  let summary = {
+  const remainingMinutes = minutes % 60;
+
+  let summary: PricingBreakdown['summary'] = {
     rental_type: rentalType,
     is_overnight: false,
     days: 0,
     hours: 0,
-    duration_text: ''
+    minutes: remainingMinutes,
+    duration_text: '',
+    base_price: 0,
+    early_checkin_surcharge: 0,
+    late_checkout_surcharge: 0
   };
 
   const totalHours = differenceInHours(checkOut, checkIn);
-  const remainingMinutes = minutes % 60;
 
   const getPercentageSurcharge = (time: Date, rules: Array<{ from: string; to: string; percent: number }>, basePrice: number) => {
     if (!rules.length) return 0;
@@ -125,6 +130,12 @@ export function calculateRoomPrice(
   if (rentalType === 'hourly') {
     const extraHours = Math.max(0, Math.ceil((minutes - 60) / 60));
     base_charge = prices.hourly + (extraHours * prices.next_hour);
+    summary.base_price = prices.hourly;
+    summary.next_hour_price = prices.next_hour;
+    summary.extra_hours = extraHours;
+    summary.extra_hours_charge = extraHours * prices.next_hour;
+    summary.hours = 1 + extraHours;
+    duration_text = `${summary.hours} giờ`;
   } 
   else if (rentalType === 'overnight') {
     if (!room.enable_overnight) {
@@ -134,14 +145,22 @@ export function calculateRoomPrice(
       base_charge = prices.hourly + (effectiveHours - 1) * prices.next_hour;
       summary.hours = effectiveHours;
       summary.rental_type = 'hourly';
+      summary.base_price = prices.hourly;
+      summary.next_hour_price = prices.next_hour;
+      summary.extra_hours = effectiveHours - 1;
+      summary.extra_hours_charge = (effectiveHours - 1) * prices.next_hour;
       duration_text = `${totalHours}h ${remainingMinutes}p`;
     } else {
       base_charge = prices.overnight;
       summary.is_overnight = true;
+      summary.base_price = prices.overnight;
       duration_text = `Qua đêm (${totalHours}h ${remainingMinutes}p)`;
       if (enableAutoSurcharge) {
-        surcharge += getPercentageSurcharge(checkIn, timeRules.early_rules, prices.overnight);
-        surcharge += getPercentageSurcharge(checkOut, timeRules.late_rules, prices.overnight);
+        const early = getPercentageSurcharge(checkIn, timeRules.early_rules, prices.overnight);
+        const late = getPercentageSurcharge(checkOut, timeRules.late_rules, prices.overnight);
+        summary.early_checkin_surcharge = early;
+        summary.late_checkout_surcharge = late;
+        surcharge += early + late;
       }
     }
   } 
@@ -150,6 +169,7 @@ export function calculateRoomPrice(
     const baseDays = Math.max(1, nightsStayed);
     base_charge = baseDays * prices.daily;
     summary.days = baseDays;
+    summary.base_price = prices.daily;
     duration_text = `${baseDays} ngày`;
 
     if (enableAutoSurcharge) {
@@ -165,11 +185,14 @@ export function calculateRoomPrice(
         const threshold = new Date(checkIn);
         threshold.setHours(h, m, 0, 0);
         if (isAfter(threshold, checkIn)) {
+          summary.early_checkin_surcharge = prices.daily;
           surcharge += prices.daily;
           addedDayForEarly = true;
         }
         if (!addedDayForEarly) {
-          surcharge += getPercentageSurcharge(checkIn, timeRules.early_rules, prices.daily);
+          const early = getPercentageSurcharge(checkIn, timeRules.early_rules, prices.daily);
+          summary.early_checkin_surcharge = early;
+          surcharge += early;
         }
       }
 
@@ -183,11 +206,14 @@ export function calculateRoomPrice(
         const threshold = new Date(checkOut);
         threshold.setHours(h, m, 0, 0);
         if (isAfter(checkOut, threshold)) {
+          summary.late_checkout_surcharge = prices.daily;
           surcharge += prices.daily;
           addedDayForLate = true;
         }
         if (!addedDayForLate) {
-          surcharge += getPercentageSurcharge(checkOut, timeRules.late_rules, prices.daily);
+          const late = getPercentageSurcharge(checkOut, timeRules.late_rules, prices.daily);
+          summary.late_checkout_surcharge = late;
+          surcharge += late;
         }
       }
     }

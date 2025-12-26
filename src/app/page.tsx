@@ -195,6 +195,70 @@ export default function Dashboard() {
     }
   };
 
+  const handleMerge = async (sourceBookingId: string, targetRoomId: string, breakdown: PricingBreakdown) => {
+    const sourceRoom = rooms.find(r => r.current_booking?.id === sourceBookingId);
+    const targetRoom = rooms.find(r => r.id === targetRoomId);
+    
+    if (!sourceRoom || !targetRoom || !targetRoom.current_booking) {
+      showNotification('Không tìm thấy thông tin phòng để gộp', 'error');
+      return;
+    }
+
+    try {
+      // 1. Chuẩn bị dữ liệu gộp
+      const mergeData = {
+        booking_id: sourceBookingId,
+        room_number: sourceRoom.room_number,
+        amount: breakdown.total_amount,
+        details: breakdown,
+        merged_at: new Date().toISOString()
+      };
+
+      // 2. Cập nhật phòng đích (thêm vào merged_bookings)
+      const currentMerged = targetRoom.current_booking.merged_bookings || [];
+      const { error: targetError } = await supabase
+        .from('bookings')
+        .update({
+          merged_bookings: [...currentMerged, mergeData]
+        })
+        .eq('id', targetRoom.current_booking.id);
+
+      if (targetError) throw targetError;
+
+      // 3. Hoàn tất booking nguồn (đã gộp)
+      const { error: sourceError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'completed',
+          check_out_at: new Date().toISOString(),
+          final_amount: 0, // Đã gộp vào phòng khác
+          notes: (sourceRoom.current_booking.notes || '') + `\n[Đã gộp vào phòng ${targetRoom.room_number}]`
+        })
+        .eq('id', sourceBookingId);
+
+      if (sourceError) throw sourceError;
+
+      // 4. Chuyển trạng thái phòng nguồn sang 'dirty'
+      const { error: roomError } = await supabase
+        .from('rooms')
+        .update({
+          status: 'dirty',
+          current_booking_id: null
+        })
+        .eq('id', sourceRoom.id);
+
+      if (roomError) throw roomError;
+
+      // 5. Kết thúc
+      setFolioRoomId(null);
+      await mutateRooms();
+      showNotification(`Đã gộp hóa đơn phòng ${sourceRoom.room_number} vào phòng ${targetRoom.room_number}`, 'success');
+    } catch (error: any) {
+      console.error('Lỗi khi gộp hóa đơn:', error);
+      showNotification(`Lỗi gộp hóa đơn: ${error.message}`, 'error');
+    }
+  };
+
   const handleCancel = async () => {
     if (!folioRoom) return;
     
@@ -540,6 +604,7 @@ export default function Dashboard() {
 
       <FolioModal
           room={folioRoom}
+          allRooms={rooms}
           settings={settings}
           services={services}
           isOpen={!!folioRoomId}
@@ -549,6 +614,7 @@ export default function Dashboard() {
           onCancel={handleCancel}
           onChangeRoom={handleChangeRoom}
           onEditBooking={handleEditBooking}
+          onMerge={handleMerge}
         />
 
       {customerInsightsData && (

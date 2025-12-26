@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
 import { format, parseISO, differenceInMinutes, differenceInCalendarDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import CheckoutModal, { CheckoutData } from './CheckoutModal';
 
 // Mock data for icons, will be replaced with actual icons
 const Icon = ({ name, className }: { name: string, className?: string }) => {
@@ -56,6 +57,7 @@ const ServiceIcon = ({ name }: { name: string }) => {
 
 interface FolioModalProps {
   room: Room | null;
+  allRooms: Room[];
   settings: Setting[];
   services: Service[];
   isOpen: boolean;
@@ -65,10 +67,12 @@ interface FolioModalProps {
   onCancel: (bookingId: string) => void;
   onChangeRoom: (bookingId: string) => void;
   onEditBooking: (booking: any) => void;
+  onMerge: (sourceBookingId: string, targetRoomId: string, breakdown: PricingBreakdown) => void;
 }
 
 export default function FolioModal({
   room,
+  allRooms,
   settings,
   services,
   isOpen,
@@ -77,7 +81,8 @@ export default function FolioModal({
   onUpdate,
   onCancel,
   onChangeRoom,
-  onEditBooking
+  onEditBooking,
+  onMerge
 }: FolioModalProps) {
 
   const [tempServices, setTempServices] = useState<Record<string, number>>({});
@@ -86,6 +91,7 @@ export default function FolioModal({
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isServicesExpanded, setIsServicesExpanded] = useState(true);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { showNotification } = useNotification();
 
   const duration = useMemo(() => {
@@ -146,7 +152,10 @@ export default function FolioModal({
   }, [tempServices, savedServices, services]);
 
   const isDirty = useMemo(() => {
-    return JSON.stringify(tempServices) !== JSON.stringify(savedServices);
+    // Chỉ so sánh các dịch vụ có số lượng > 0
+    const cleanTemp = Object.fromEntries(Object.entries(tempServices).filter(([_, q]) => q > 0));
+    const cleanSaved = Object.fromEntries(Object.entries(savedServices).filter(([_, q]) => q > 0));
+    return JSON.stringify(cleanTemp) !== JSON.stringify(cleanSaved);
   }, [tempServices, savedServices]);
 
   const updatePricing = useCallback(() => {
@@ -211,6 +220,13 @@ export default function FolioModal({
 
       if (error) throw error;
       
+      // Cập nhật tempServices để khớp với dữ liệu đã lưu (xóa các dịch vụ qty = 0)
+      const newTemp: Record<string, number> = {};
+      updatedServicesArray.forEach(s => {
+        newTemp[String(s.id)] = s.quantity;
+      });
+      setTempServices(newTemp);
+      
       showNotification('Đã lưu cập nhật dịch vụ', 'success');
       if (onUpdate) onUpdate();
     } catch (error: any) {
@@ -232,18 +248,19 @@ export default function FolioModal({
     if (!pricingBreakdown) return { base: 0, diff: serviceTotals.diff };
     
     // Base amount is everything EXCEPT the current temporary services
-    // This includes Room Charge, Surcharges, and Saved Services
+    // This includes Room Charge, Surcharges, Saved Services, and Merged Bookings
     const roomAndSurcharges = pricingBreakdown.total_amount 
       - pricingBreakdown.service_charge 
       - (pricingBreakdown.tax_details?.service_tax || 0);
       
-    const baseAmount = roomAndSurcharges + serviceTotals.saved - deposit;
+    const mergedTotal = room?.current_booking?.merged_bookings?.reduce((sum, mb) => sum + mb.amount, 0) || 0;
+    const baseAmount = roomAndSurcharges + serviceTotals.saved + mergedTotal - deposit;
     
     return {
       base: baseAmount,
       diff: serviceTotals.diff
     };
-  }, [pricingBreakdown, serviceTotals.saved, serviceTotals.diff, deposit]);
+  }, [pricingBreakdown, serviceTotals.saved, serviceTotals.diff, deposit, room?.current_booking?.merged_bookings]);
 
   const finalAmount = (pricingBreakdown?.total_amount || 0) - deposit;
 
@@ -252,7 +269,7 @@ export default function FolioModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+        <div key="folio-modal-main" className="fixed inset-0 z-[9999] flex items-center justify-center">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -363,6 +380,7 @@ export default function FolioModal({
                 <AnimatePresence>
                   {isHeroCardExpanded && (
                     <motion.div
+                      key="hero-expanded-content"
                       initial={{ opacity: 0, height: 0, marginTop: 0 }}
                       animate={{ opacity: 1, height: 'auto', marginTop: '24px' }}
                       exit={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -381,6 +399,23 @@ export default function FolioModal({
                           <span className="font-bold text-indigo-200">Tiền dịch vụ</span>
                           <span className="font-bold">{formatCurrency(serviceTotals.temp)}</span>
                         </div>
+
+                        {/* Merged Bookings */}
+                        {room.current_booking.merged_bookings && room.current_booking.merged_bookings.length > 0 && (
+                          <div className="pt-2 space-y-2 border-t border-white/10">
+                            <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Tiền gộp từ phòng khác</p>
+                            {room.current_booking.merged_bookings.map((mb, idx) => (
+                              <div key={idx} className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <Layers size={12} className="text-indigo-300" />
+                                  <span className="font-bold">Phòng {mb.room_number}</span>
+                                </div>
+                                <span className="font-bold">{formatCurrency(mb.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         {deposit > 0 && (
                           <div className="flex justify-between">
                             <span className="font-bold text-indigo-200">Tiền cọc</span>
@@ -470,6 +505,7 @@ export default function FolioModal({
                   <AnimatePresence initial={false}>
                     {isServicesExpanded && (
                       <motion.div
+                        key="services-expanded-content"
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
@@ -562,11 +598,11 @@ export default function FolioModal({
             </main>
 
             {/* Footer */}
-            <footer className="sticky bottom-0 bg-white/80 backdrop-blur-lg border-t border-slate-200 p-4 z-10">
-              <motion.button
-                layout
-                onClick={isDirty ? handleSaveUpdate : () => onPayment(room.current_booking!.id, finalAmount)}
-                disabled={isSaving}
+              <footer className="sticky bottom-0 bg-white border-t border-slate-200 p-4 z-10">
+                <motion.button
+                  layout
+                  onClick={isDirty ? handleSaveUpdate : () => setIsCheckoutOpen(true)}
+                  disabled={isSaving}
                 className={cn(
                   "w-full h-16 rounded-2xl font-black text-lg text-white flex items-center justify-center gap-2 transition-colors duration-300",
                   isDirty ? "bg-indigo-600 animate-pulse" : "bg-rose-600"
@@ -592,7 +628,7 @@ export default function FolioModal({
                       </>
                     ) : (
                       <>
-                        <Icon name="fa-check-circle" />
+                        <Icon name="fa-door-open" />
                         <span>THANH TOÁN {formatCurrency(finalAmount)}</span>
                       </>
                     )}
@@ -602,6 +638,32 @@ export default function FolioModal({
             </footer>
           </motion.div>
         </div>
+      )}
+
+      {room && room.current_booking && (
+        <CheckoutModal
+          key="checkout-modal"
+          isOpen={isCheckoutOpen}
+          onClose={() => setIsCheckoutOpen(false)}
+          room={room}
+          allRooms={allRooms}
+          pricingBreakdown={pricingBreakdown}
+          onConfirm={(data: CheckoutData) => {
+            const mergedTotal = room.current_booking?.merged_bookings?.reduce((sum, mb) => sum + mb.amount, 0) || 0;
+            const baseTotal = (pricingBreakdown?.total_amount || 0) + mergedTotal;
+            
+            const finalTotal = baseTotal + data.surcharge - (data.discountType === 'percent' ? baseTotal * data.discount / 100 : data.discount);
+            const taxAmount = data.isTaxEnabled ? finalTotal * data.taxPercent / 100 : 0;
+            const amountToPay = finalTotal + taxAmount - (room.current_booking?.deposit_amount || 0);
+            
+            onPayment(room.current_booking!.id, amountToPay, data.note);
+            setIsCheckoutOpen(false);
+          }}
+          onMerge={(targetRoomId, breakdown) => {
+            onMerge(room.current_booking!.id, targetRoomId, breakdown);
+            setIsCheckoutOpen(false);
+          }}
+        />
       )}
     </AnimatePresence>
   );
