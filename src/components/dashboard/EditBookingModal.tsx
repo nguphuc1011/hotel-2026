@@ -113,7 +113,7 @@ export default function EditBookingModal({
                 <Calendar size={20} />
               </div>
               <div>
-                <h2 className="text-xl font-black text-slate-900 uppercase">Sửa thông tin Bill</h2>
+                <h2 className="text-xl font-black text-slate-900 uppercase">Sửa thông tin</h2>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phòng {room?.room_number}</p>
               </div>
             </div>

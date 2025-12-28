@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,9 +11,12 @@ interface ConfirmDialogProps {
   description: string;
   confirmText?: string;
   cancelText?: string;
-  onConfirm: () => void;
+  onConfirm: (inputValue?: string) => void;
   onCancel: () => void;
   variant?: 'danger' | 'info';
+  showInput?: boolean;
+  inputPlaceholder?: string;
+  inputRequired?: boolean;
 }
 
 export function ConfirmDialog({
@@ -23,8 +27,28 @@ export function ConfirmDialog({
   cancelText = 'Hủy',
   onConfirm,
   onCancel,
-  variant = 'info'
+  variant = 'info',
+  showInput = false,
+  inputPlaceholder = 'Nhập lý do...',
+  inputRequired = false,
 }: ConfirmDialogProps) {
+  const [inputValue, setInputValue] = useState('');
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setInputValue('');
+      setError(false);
+    }
+  }, [isOpen]);
+
+  const handleConfirm = () => {
+    if (showInput && inputRequired && !inputValue.trim()) {
+      setError(true);
+      return;
+    }
+    onConfirm(inputValue);
+  };
   return (
     <AnimatePresence>
       {isOpen && (
@@ -51,11 +75,33 @@ export function ConfirmDialog({
               </div>
               
               <h3 className="mb-2 text-xl font-black text-slate-800">{title}</h3>
-              <p className="mb-8 text-sm font-medium text-slate-500">{description}</p>
+              <p className="mb-6 text-sm font-medium text-slate-500">{description}</p>
+              
+              {showInput && (
+                <div className="mb-6 w-full">
+                  <textarea
+                    value={inputValue}
+                    onChange={(e) => {
+                      setInputValue(e.target.value);
+                      if (error) setError(false);
+                    }}
+                    placeholder={inputPlaceholder}
+                    className={cn(
+                      "w-full min-h-[100px] rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-700 outline-none transition-all placeholder:text-slate-300",
+                      error ? "ring-2 ring-rose-500" : "focus:ring-2 focus:ring-blue-500"
+                    )}
+                  />
+                  {error && (
+                    <p className="mt-2 text-xs font-black text-rose-500 uppercase tracking-widest text-left px-2">
+                      Vui lòng nhập lý do
+                    </p>
+                  )}
+                </div>
+              )}
               
               <div className="flex w-full flex-col gap-2">
                 <button
-                  onClick={onConfirm}
+                  onClick={handleConfirm}
                   className={cn(
                     "h-14 w-full rounded-2xl text-base font-black text-white shadow-lg transition-all active:scale-[0.98]",
                     variant === 'danger' ? "bg-rose-500 shadow-rose-200" : "bg-blue-600 shadow-blue-200"

@@ -21,7 +21,7 @@ export default function ServicesSettingsPage() {
   return (
     <div className="min-h-screen bg-slate-50 pb-32">
       {/* Simple Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-50">
+      <div className="bg-white border-b border-slate-200 px-4 py-4">
         <div className="max-w-5xl mx-auto flex items-center gap-4">
           <Link href="/settings" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <ChevronLeft size={24} className="text-slate-600" />

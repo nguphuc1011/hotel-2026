@@ -28,10 +28,13 @@ export default function Dashboard() {
     isOpen: boolean;
     title: string;
     description: string;
-    onConfirm: () => void;
+    onConfirm: (inputValue?: string) => void;
     variant?: 'danger' | 'info';
     confirmText?: string;
     cancelText?: string;
+    showInput?: boolean;
+    inputPlaceholder?: string;
+    inputRequired?: boolean;
   }>({
     isOpen: false,
     title: '',
@@ -200,10 +203,50 @@ export default function Dashboard() {
         console.error('Lỗi cập nhật trạng thái phòng:', roomError);
         throw new Error(roomError.message);
       }
+
+      // 4. Ghi nhận giao dịch vào bảng Thu Chi (Cashflow)
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const userName = user?.user_metadata?.full_name || user?.email || 'Hệ thống';
+        
+        // Tìm ID của danh mục "Tiền phòng"
+        const { data: categoryData } = await supabase
+          .from('cashflow_categories')
+          .select('id')
+          .eq('name', 'Tiền phòng')
+          .eq('type', 'income')
+          .single();
+
+        const cashflowData = {
+          type: 'income',
+          category_name: 'Tiền phòng',
+          category_id: categoryData?.id || 'system-room-revenue',
+          content: `Thanh toán phòng ${folioRoom.room_number}`,
+          amount: Number(amount),
+          payment_method: 'cash',
+          created_by: userName,
+          created_at: new Date().toISOString(),
+          notes: `Booking ID: ${bookingId}`
+        };
+
+        const { error: cashflowError } = await supabase
+          .from('cashflow')
+          .insert([cashflowData]);
+
+        if (cashflowError) {
+          console.error('Lỗi ghi nhận thu chi:', cashflowError);
+          showNotification(`Thanh toán thành công nhưng lỗi ghi sổ thu chi: ${cashflowError.message}`, 'error');
+        } else {
+          console.log('Đã ghi nhận thu chi thành công');
+        }
+      } catch (cfErr: any) {
+        console.error('Lỗi hệ thống khi ghi thu chi:', cfErr);
+        showNotification(`Lỗi hệ thống khi ghi thu chi: ${cfErr.message}`, 'error');
+      }
       
       console.log('Thanh toán hoàn tất, đang refresh dữ liệu...');
 
-      // 4. Reset state, refresh data, and show notification
+      // 5. Reset state, refresh data, and show notification
       setFolioRoomId(null);
       await mutateRooms();
       showNotification(`Thanh toán phòng ${folioRoom.room_number} thành công!`, 'success');
@@ -285,17 +328,33 @@ export default function Dashboard() {
       title: 'Xác nhận hủy phòng',
       description: `Bạn có chắc chắn muốn hủy đặt phòng ${folioRoom.room_number}? Mọi dữ liệu phiên này sẽ bị xóa và phòng sẽ chuyển sang trạng thái CHỜ DỌN.`,
       variant: 'danger',
-      onConfirm: async () => {
+      showInput: true,
+      inputPlaceholder: 'Lý do hủy phòng...',
+      inputRequired: true,
+      onConfirm: async (reason) => {
         try {
           const bookingId = folioRoom.current_booking_id || folioRoom.current_booking?.id;
 
-          // 1. Update booking to 'cancelled'
+          // 1. Update booking to 'cancelled' with reason
           if (bookingId) {
+            // Get current notes
+            const { data: currentBooking } = await supabase
+              .from('bookings')
+              .select('notes')
+              .eq('id', bookingId)
+              .single();
+
+            const updatedNotes = [
+              currentBooking?.notes,
+              `[HỦY PHÒNG] Lý do: ${reason}`
+            ].filter(Boolean).join('\n');
+
             const { error: bookingError } = await supabase
               .from('bookings')
               .update({ 
                 status: 'cancelled', 
-                check_out_at: new Date().toISOString()
+                check_out_at: new Date().toISOString(),
+                notes: updatedNotes
               })
               .eq('id', bookingId);
             
@@ -337,7 +396,7 @@ export default function Dashboard() {
       let customerName = data.customer?.name?.trim();
       const customerPhone = data.customer?.phone?.trim() || '';
       const customerIdCard = data.customer?.idCard?.trim() || '';
-      const customerPlate = data.customer?.plate_number?.trim() || '';
+      const customerAddress = data.customer?.address?.trim() || '';
 
       // Nếu không có tên khách, dùng "Khách mới"
       if (!customerName) {
@@ -350,7 +409,7 @@ export default function Dashboard() {
       if (customerName === 'Khách mới') {
         const { data: foundDefault } = await supabase
           .from('customers')
-          .select('id, plate_number')
+          .select('id, address')
           .eq('full_name', 'Khách mới')
           .maybeSingle();
         existingCust = foundDefault;
@@ -363,7 +422,7 @@ export default function Dashboard() {
         
         const { data: found } = await supabase
           .from('customers')
-          .select('id, plate_number')
+          .select('id, address')
           .or(searchConditions.join(','))
           .maybeSingle();
         existingCust = found;
@@ -371,11 +430,11 @@ export default function Dashboard() {
 
       if (existingCust) {
         customerId = existingCust.id;
-        // Cập nhật biển số xe nếu chưa có hoặc khác
-        if (customerPlate && customerPlate !== existingCust.plate_number) {
+        // Cập nhật địa chỉ nếu chưa có hoặc khác
+        if (customerAddress && customerAddress !== existingCust.address) {
           await supabase
             .from('customers')
-            .update({ plate_number: customerPlate })
+            .update({ address: customerAddress })
             .eq('id', customerId);
         }
 
@@ -400,7 +459,7 @@ export default function Dashboard() {
             full_name: customerName,
             phone: customerPhone,
             id_card: customerIdCard,
-            plate_number: customerPlate,
+            address: customerAddress,
             visit_count: 1,
             total_spent: 0
           }])
@@ -626,9 +685,12 @@ export default function Dashboard() {
         isOpen={confirmConfig.isOpen}
         title={confirmConfig.title}
         description={confirmConfig.description}
-        variant={confirmConfig.variant}
         confirmText={confirmConfig.confirmText}
         cancelText={confirmConfig.cancelText}
+        variant={confirmConfig.variant}
+        showInput={confirmConfig.showInput}
+        inputPlaceholder={confirmConfig.inputPlaceholder}
+        inputRequired={confirmConfig.inputRequired}
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
       />

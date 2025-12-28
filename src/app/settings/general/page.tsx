@@ -206,7 +206,7 @@ export default function GeneralSettingsPage() {
       </div>
 
       {/* Tab Navigation - Apple Style Pill */}
-      <div className="mb-8 sticky top-16 z-30 py-2 bg-slate-50/80 backdrop-blur-sm -mx-4 px-4">
+      <div className="mb-8 py-2 bg-slate-50 -mx-4 px-4">
         <div className="flex items-center justify-between rounded-2xl bg-slate-200/50 p-1 shadow-inner overflow-x-auto scrollbar-hide gap-1">
           {tabs.map(tab => (
             <TabButton 

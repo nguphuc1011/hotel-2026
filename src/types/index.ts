@@ -26,7 +26,7 @@ export interface Customer {
   full_name: string;
   phone: string;
   id_card: string;
-  plate_number?: string;
+  address?: string;
   total_spent: number;
   visit_count: number;
   notes?: string;
@@ -63,6 +63,33 @@ export interface MergedBooking {
   amount: number;
   details: PricingBreakdown;
   merged_at: string;
+}
+
+export interface CashflowCategory {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  color: string;
+  is_system?: boolean;
+}
+
+export interface CashflowTransaction {
+  id: string;
+  type: 'income' | 'expense';
+  category_id: string;
+  category_name: string;
+  content: string;
+  amount: number;
+  payment_method: 'cash' | 'transfer';
+  created_by: string;
+  created_at: string;
+  notes?: string;
+}
+
+export interface CashflowSummary {
+  total_income: number;
+  total_expense: number;
+  net_profit: number;
 }
 
 export interface Booking {
@@ -188,7 +215,7 @@ export interface CheckInData {
     name: string;
     phone: string;
     idCard: string;
-    plate_number: string;
+    address: string;
   };
   rentalType: string;
   price: number;

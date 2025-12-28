@@ -231,7 +231,7 @@ export default function StaffPage() {
       {activeTab === 'list' ? (
         <>
           {/* Search Bar */}
-          <div className="mb-8 sticky top-16 z-30 py-2 bg-slate-50/80 backdrop-blur-sm -mx-4 px-4">
+          <div className="mb-8">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input

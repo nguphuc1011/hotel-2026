@@ -308,6 +308,20 @@ export default function FolioModal({
     if (!room?.current_booking || !selectedTargetRoomId) return;
 
     try {
+      // Check if target room is still available
+      const { data: targetRoom, error: targetRoomError } = await supabase
+        .from('rooms')
+        .select('status')
+        .eq('id', selectedTargetRoomId)
+        .single();
+
+      if (targetRoomError) throw targetRoomError;
+      if (targetRoom.status !== 'available') {
+        showNotification('Phòng đích không còn trống. Vui lòng chọn phòng khác.', 'error');
+        handleFetchAvailableRooms(); // Refresh the list
+        return;
+      }
+
       // 1. Update booking: room_id -> new room
       const { error: bookingError } = await supabase
         .from('bookings')
@@ -466,12 +480,11 @@ export default function FolioModal({
 
   const finalAmount = (pricingBreakdown?.total_amount || 0) - deposit;
 
-  if (!isOpen || !room || !room.current_booking) return null;
-
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div key="folio-modal-main" className="fixed inset-0 z-[9999] flex items-center justify-center">
+    <>
+      <AnimatePresence>
+        {isOpen && room && room.current_booking && (
+          <div key="folio-modal-main" className="fixed inset-0 z-[9999] flex items-center justify-center">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -487,23 +500,22 @@ export default function FolioModal({
             className="relative w-full h-full bg-slate-50 flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <header className="sticky top-0 bg-white border-b border-slate-200 p-4 z-10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={onClose} 
-                  className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
-                >
-                  <X size={20} className="text-slate-600" />
-                </button>
-                <div>
-                  <h2 className="font-black text-lg uppercase leading-tight">Phòng {room.room_number}</h2>
-                  <p className="text-blue-600 font-black text-[10px] tracking-[0.2em] uppercase">
-                    {room.current_booking.rental_type === 'hourly' ? 'KHÁCH GIỜ' : 
-                     room.current_booking.rental_type === 'overnight' ? 'KHÁCH QUA ĐÊM' : 'KHÁCH NGÀY'}
-                  </p>
-                </div>
+            <header className="sticky top-0 bg-white border-b border-slate-100 pt-4 pb-4 px-4 z-10 flex items-center justify-center relative min-h-[80px]">
+              <button 
+                onClick={onClose} 
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
+              >
+                <X size={20} className="text-slate-400" />
+              </button>
+              
+              <div className="text-center">
+                <h2 className="font-black text-2xl text-slate-800 uppercase tracking-tight">Chi tiết phòng</h2>
+                <p className="text-slate-400 font-bold text-[10px] tracking-[0.2em] uppercase mt-1">
+                  Phòng {room.room_number}
+                </p>
               </div>
-              <div className="flex items-center gap-2">
+
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <button 
                   onClick={handlePrint}
                   className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
@@ -661,21 +673,21 @@ export default function FolioModal({
               {/* Service Management */}
               <div className="space-y-4">
                 <div className="relative">
-                  <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Tìm dịch vụ..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-14 pl-12 pr-4 bg-white rounded-2xl border border-slate-200 shadow-sm"
+                    className="w-full h-14 pl-14 pr-6 bg-white rounded-full border border-slate-100 shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
                   />
                 </div>
 
                 {/* Catalog */}
                 <div className="flex overflow-x-auto gap-3 pb-8 pt-6 px-4 -mx-4 scrollbar-hide">
-                  {filteredServices.map(service => (
+                  {filteredServices.map((service, idx) => (
                     <div 
-                        key={service.id} 
+                        key={service.id || `service-${idx}`} 
                         onClick={() => handleQuantityChange(service.id, (tempServices[String(service.id)] || 0) + 1)} 
                         className="relative flex-shrink-0 w-28 text-center bg-white p-4 rounded-[2rem] shadow-sm cursor-pointer hover:bg-slate-50 transition-colors border border-slate-100"
                     >
@@ -721,7 +733,7 @@ export default function FolioModal({
                       >
                         {Object.entries(tempServices)
                           .filter(([_, qty]) => qty > 0)
-                          .map(([serviceId, quantity]) => {
+                          .map(([serviceId, quantity], idx) => {
                             // Chuẩn hóa so sánh ID để đảm bảo luôn tìm thấy service
                             const serviceInfo = services.find(s => String(s.id) === String(serviceId));
                             
@@ -734,7 +746,7 @@ export default function FolioModal({
                             const diff = quantity - savedQty;
 
                             return (
-                              <div key={serviceId} className="bg-white p-3 rounded-2xl flex items-center gap-3 shadow-sm border border-slate-100">
+                              <div key={serviceId || `sel-service-${idx}`} className="bg-white p-3 rounded-2xl flex items-center gap-3 shadow-sm border border-slate-100">
                                 <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center">
                                   <ServiceIcon name={name} />
                                 </div>
@@ -847,138 +859,141 @@ export default function FolioModal({
           </motion.div>
         </div>
       )}
+    </AnimatePresence>
 
-      {room && room.current_booking && (
-        <div>
-          <EditBookingModal
-              isOpen={showEditBookingModal}
-              onClose={() => setShowEditBookingModal(false)}
-              booking={room.current_booking}
-              room={room}
-              customers={customers}
-              onSave={handleEditBookingSave}
-            />
-
-          <CheckoutModal
-            key="checkout-modal"
-            isOpen={isCheckoutOpen}
-            onClose={() => setIsCheckoutOpen(false)}
+    {room && room.current_booking && (
+      <>
+        <EditBookingModal
+            isOpen={showEditBookingModal}
+            onClose={() => setShowEditBookingModal(false)}
+            booking={room.current_booking}
             room={room}
-            pricingBreakdown={pricingBreakdown}
-            isAdmin={isAdmin}
-            onConfirm={(data: CheckoutData) => {
-              const auditParts = [
-                `Thanh toán: ${data.paymentMethod.toUpperCase()}`,
-                `Phụ thu: ${formatCurrency(data.surcharge)}`,
-                `Giảm giá: ${formatCurrency(data.discount)} ${data.discountReason ? `(${data.discountReason})` : ''}`,
-                `VAT: ${data.isTaxEnabled ? data.taxPercent + '%' : 'Không'}`,
-                data.note ? `Ghi chú: ${data.note}` : ''
-              ].filter(Boolean);
-              const auditNote = auditParts.join(' | ');
-              onPayment(room.current_booking!.id, data.totalToCollect, auditNote);
-              setIsCheckoutOpen(false);
-            }}
+            customers={customers}
+            onSave={handleEditBookingSave}
           />
 
-          {/* Deposit Modal */}
-          {showDepositModal && (
-            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-200">
-                <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">Cập nhật tiền cọc</h3>
-                <div className="mb-6">
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Số tiền cọc</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <CheckoutModal
+          key="checkout-modal"
+          isOpen={isCheckoutOpen}
+          onClose={() => setIsCheckoutOpen(false)}
+          room={room}
+          pricingBreakdown={pricingBreakdown}
+          isAdmin={isAdmin}
+          onConfirm={(data: CheckoutData) => {
+            const auditParts = [
+              `Thanh toán: ${data.paymentMethod.toUpperCase()}`,
+              `Phụ thu: ${formatCurrency(data.surcharge)}`,
+              `Giảm giá: ${formatCurrency(data.discount)} ${data.discountReason ? `(${data.discountReason})` : ''}`,
+              `VAT: ${data.isTaxEnabled ? data.taxPercent + '%' : 'Không'}`,
+              data.note ? `Ghi chú: ${data.note}` : ''
+            ].filter(Boolean);
+            const auditNote = auditParts.join(' | ');
+            onPayment(room.current_booking!.id, data.totalToCollect, auditNote);
+            setIsCheckoutOpen(false);
+          }}
+        />
+
+        {/* Deposit Modal */}
+        {showDepositModal && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-black text-xl text-slate-800 uppercase tracking-tight">Cập nhật cọc</h3>
+                <button onClick={() => setShowDepositModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Số tiền cọc</p>
+                  <div className="flex items-baseline gap-1">
                     <NumericInput
                       value={parseInt(depositValue.replace(/\D/g, '') || '0')}
                       onChange={(val) => setDepositValue(String(val))}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="0"
+                      className="w-full text-3xl font-black text-emerald-600 border-none p-0 focus:ring-0 bg-transparent"
                       suffix="đ"
+                      autoFocus
                     />
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowDepositModal(false)}
-                    className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleDepositSubmit}
-                    className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    Lưu
-                  </button>
-                </div>
+
+                <button
+                  onClick={handleDepositSubmit}
+                  disabled={isSaving}
+                  className="w-full h-16 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                >
+                  {isSaving ? 'ĐANG LƯU...' : 'XÁC NHẬN'}
+                </button>
               </div>
             </div>
-          )}
-
-          {/* Change Room Modal */}
-          {showChangeRoomModal && (
-            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-200 max-h-[80vh] flex flex-col">
-                <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">Chọn phòng mới</h3>
-                
-                <div className="flex-1 overflow-y-auto min-h-0 space-y-2 mb-6">
-                  {availableRooms.length === 0 ? (
-                    <p className="text-center text-slate-500 italic py-4">Không có phòng trống</p>
-                  ) : (
-                    availableRooms.map(r => (
-                      <div
-                        key={r.id}
-                        onClick={() => setSelectedTargetRoomId(r.id)}
-                        className={cn(
-                          "p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between",
-                          selectedTargetRoomId === r.id
-                            ? "border-indigo-600 bg-indigo-50"
-                            : "border-slate-100 hover:border-slate-300"
-                        )}
-                      >
-                        <span className="font-bold text-slate-700">Phòng {r.room_number}</span>
-                        {selectedTargetRoomId === r.id && <CircleCheck className="text-indigo-600" size={20} />}
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="flex gap-3 mt-auto">
-                  <button
-                    onClick={() => {
-                      setShowChangeRoomModal(false);
-                      setSelectedTargetRoomId('');
-                    }}
-                    className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleChangeRoomSubmit}
-                    disabled={!selectedTargetRoomId}
-                    className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Xác nhận
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Hidden Printable Invoice */}
-          <div className="hidden print:block fixed inset-0 bg-white z-[99999]">
-             <PrintableInvoice 
-                room={room}
-                booking={room.current_booking}
-                services={room.current_booking.services_used}
-                pricing={pricingBreakdown}
-                totalServiceCost={serviceTotals.temp}
-                totalAmount={finalAmount}
-             />
           </div>
+        )}
+
+        {/* Change Room Modal */}
+        {showChangeRoomModal && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-200 max-h-[80vh] flex flex-col">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">Chọn phòng mới</h3>
+              
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-2 mb-6">
+                {availableRooms.length === 0 ? (
+                  <p className="text-center text-slate-500 italic py-4">Không có phòng trống</p>
+                ) : (
+                  availableRooms.map(r => (
+                    <div
+                      key={r.id}
+                      onClick={() => setSelectedTargetRoomId(r.id)}
+                      className={cn(
+                        "p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between",
+                        selectedTargetRoomId === r.id
+                          ? "border-indigo-600 bg-indigo-50"
+                          : "border-slate-100 hover:border-slate-300"
+                      )}
+                    >
+                      <span className="font-bold text-slate-700">Phòng {r.room_number}</span>
+                      {selectedTargetRoomId === r.id && <CircleCheck className="text-indigo-600" size={20} />}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-auto">
+                <button
+                  onClick={() => {
+                    setShowChangeRoomModal(false);
+                    setSelectedTargetRoomId('');
+                  }}
+                  className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleChangeRoomSubmit}
+                  disabled={!selectedTargetRoomId}
+                  className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Xác nhận
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Hidden Printable Invoice */}
+        <div className="hidden print:block fixed inset-0 bg-white z-[99999]">
+           <PrintableInvoice 
+              room={room}
+              booking={room.current_booking}
+              services={room.current_booking.services_used}
+              pricing={pricingBreakdown}
+              totalServiceCost={serviceTotals.temp}
+              totalAmount={finalAmount}
+           />
         </div>
-      )}
-    </AnimatePresence>
-  );
+      </>
+    )}
+  </>
+);
 }
+

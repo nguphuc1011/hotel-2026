@@ -7,6 +7,7 @@ import {
   UserCircle,
   BarChart3,
   Package,
+  Wallet,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -40,12 +41,21 @@ export default function SettingsPage() {
       href: '/settings/services'
     },
     { 
+      id: 'finance', 
+      title: 'Cấu hình Thu Chi', 
+      description: 'Quản lý danh mục & thiết lập tài chính',
+      icon: Wallet, 
+      color: 'text-emerald-500', 
+      bg: 'bg-emerald-50',
+      href: '/settings/finance'
+    },
+    { 
       id: 'staff', 
       title: 'Nhân viên', 
       description: 'Quản lý tài khoản & phân quyền',
       icon: Users, 
-      color: 'text-emerald-500', 
-      bg: 'bg-emerald-50',
+      color: 'text-blue-500', 
+      bg: 'bg-blue-50',
       href: '/settings/staff'
     },
     { 

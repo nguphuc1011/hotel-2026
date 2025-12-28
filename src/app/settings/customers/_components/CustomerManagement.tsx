@@ -18,7 +18,8 @@ import {
   X,
   Save,
   Trash2,
-  Sparkles
+  Sparkles,
+  MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -47,7 +48,7 @@ export default function CustomerManagement() {
     full_name: '',
     phone: '',
     id_card: '',
-    plate_number: '',
+    address: '',
     notes: ''
   });
 
@@ -78,7 +79,7 @@ export default function CustomerManagement() {
       full_name: customer.full_name || '',
       phone: customer.phone || '',
       id_card: customer.id_card || '',
-      plate_number: customer.plate_number || '',
+      address: customer.address || '',
       notes: customer.notes || ''
     });
   };
@@ -92,7 +93,7 @@ export default function CustomerManagement() {
         full_name: editForm.full_name,
         phone: editForm.phone,
         id_card: editForm.id_card,
-        plate_number: editForm.plate_number,
+        address: editForm.address,
         notes: editForm.notes
       })
       .eq('id', editingCustomer.id);
@@ -199,7 +200,7 @@ export default function CustomerManagement() {
           // 3. Lọc ra những khách hàng cần gộp (tên là Khách mới nhưng khác ID master)
           const duplicates = allCustomers.filter(c => 
             c.id !== master.id && 
-            (c.full_name === 'Khách mới' || (!c.phone && !c.id_card && !c.plate_number))
+            (c.full_name === 'Khách mới' || (!c.phone && !c.id_card && !c.address))
           );
 
           if (duplicates.length === 0) {
@@ -246,7 +247,7 @@ export default function CustomerManagement() {
     c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.id_card?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.plate_number?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -279,7 +280,7 @@ export default function CustomerManagement() {
       </div>
 
       {/* Search Bar */}
-      <div className="mb-8 sticky top-16 z-30 py-2 bg-slate-50/80 backdrop-blur-sm">
+      <div className="mb-8">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
           <input
@@ -458,13 +459,13 @@ export default function CustomerManagement() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Biển số xe</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Địa chỉ</label>
                     <input
                       type="text"
-                      value={editForm.plate_number}
-                      onChange={(e) => setEditForm({ ...editForm, plate_number: e.target.value })}
+                      value={editForm.address}
+                      onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                       className="w-full h-12 rounded-2xl bg-slate-50 px-4 text-base font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all border-transparent"
-                      placeholder="29A-xxxxx..."
+                      placeholder="Nhập địa chỉ khách hàng..."
                     />
                   </div>
 

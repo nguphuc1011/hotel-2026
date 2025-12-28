@@ -81,13 +81,13 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-10 pt-4 -mx-6 px-6 scrollbar-hide snap-x snap-mandatory">
-        {services.map((service) => {
+        {services.map((service, idx) => {
           const selected = selectedServices.find(s => s.id === service.id);
           const quantity = selected?.quantity || 0;
 
           return (
             <motion.div 
-              key={service.id} 
+              key={service.id || `service-${idx}`} 
               className="relative flex-shrink-0 w-[160px] snap-start"
               whileHover={{ y: -8 }}
               whileTap={{ scale: 0.95 }}

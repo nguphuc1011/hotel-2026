@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Cog, Bed, ShoppingBasket, Users, BookUser, BarChart3, ArrowLeft } from 'lucide-react';
+import { Cog, Bed, ShoppingBasket, Users, BookUser, BarChart3, ArrowLeft, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
@@ -13,6 +13,7 @@ const navigation = [
   { name: 'Nhân viên', href: '/settings/staff', icon: Users },
   { name: 'Khách hàng', href: '/settings/customers', icon: BookUser },
   { name: 'Báo cáo', href: '/settings/reports', icon: BarChart3 },
+  { name: 'Thu Chi', href: '/settings/finance', icon: Wallet },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
