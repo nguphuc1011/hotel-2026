@@ -21,21 +21,27 @@ const getFirebaseConfig = () => {
   const configRaw = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
   if (configRaw) {
     try {
-      // Làm sạch chuỗi trước khi parse
-      const cleaned = configRaw.trim();
+      // Làm sạch chuỗi: xóa các phần dư thừa như "const firebaseConfig =" hoặc dấu chấm phẩy
+      let cleaned = configRaw.trim();
 
-      // Nếu là JSON chuẩn (bắt đầu bằng { và kết thúc bằng })
-      if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
-        // Thử parse JSON chuẩn trước
-        try {
-          return JSON.parse(cleaned);
-        } catch {
-          // Nếu parse JSON thất bại (có thể do thiếu ngoặc kép ở key), dùng Function để eval an toàn
-
-          return new Function(`return ${cleaned}`)();
-        }
+      // Nếu có dạng "const config = { ... }" hoặc "var config = { ... }"
+      if (cleaned.includes('{')) {
+        cleaned = cleaned.substring(cleaned.indexOf('{'));
       }
-    } catch {
+      if (cleaned.includes('}')) {
+        cleaned = cleaned.substring(0, cleaned.lastIndexOf('}') + 1);
+      }
+
+      // Thử parse JSON chuẩn trước
+      try {
+        return JSON.parse(cleaned);
+      } catch {
+        // Nếu parse JSON thất bại (có thể do thiếu ngoặc kép ở key), dùng Function để eval an toàn
+        return new Function(`return ${cleaned}`)();
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Lỗi khi phân giải Firebase Config:', e);
       return {};
     }
   }

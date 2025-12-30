@@ -148,25 +148,37 @@ export default function ThaoInsight() {
   }, []);
 
   const sendDemoReport = async () => {
+    const toastId = toast.loading('Đang kết nối với "Mắt Thần"...');
     try {
+      // eslint-disable-next-line no-console
+      console.log('Bắt đầu yêu cầu Token cho Mắt Thần...');
+
       const token = await requestForToken();
+
       if (!token) {
+        // eslint-disable-next-line no-console
+        console.warn('Không lấy được Token. Có thể do Bệ Hạ từ chối hoặc cấu hình sai.');
         toast.error('Bệ Hạ chưa cho phép "Mắt Thần" hoặc thiếu cấu hình!', {
+          id: toastId,
           description:
-            'Vui lòng kiểm tra quyền thông báo hoặc biến NEXT_PUBLIC_FIREBASE_VAPID_KEY trên Vercel.',
+            'Vui lòng kiểm tra quyền thông báo (nút ổ khóa trên trình duyệt) hoặc biến NEXT_PUBLIC_FIREBASE_VAPID_KEY trên Vercel.',
         });
         return;
       }
 
+      // eslint-disable-next-line no-console
+      console.log('Đã lấy được Token:', token);
       toast.success('Kết nối "Mắt Thần" thành công!', {
-        description: `Token: ${token.substring(0, 10)}... (Đã sẵn sàng nhận tin)`,
+        id: toastId,
+        description: `Token: ${token.substring(0, 10)}... (Bệ Hạ đã sẵn sàng nhận tin)`,
         duration: 5000,
       });
     } catch (error: any) {
       // eslint-disable-next-line no-console
-      console.error('Lỗi Demo Report:', error);
+      console.error('Lỗi cực nghiêm trọng khi kích hoạt Mắt Thần:', error);
       toast.error('Lỗi khi kích hoạt Mắt Thần', {
-        description: error.message || 'Lỗi không xác định',
+        id: toastId,
+        description: error.message || 'Lỗi không xác định trong quá trình khởi tạo.',
       });
     }
   };
