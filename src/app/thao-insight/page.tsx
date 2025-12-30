@@ -47,6 +47,13 @@ export default function ThaoInsight() {
   const fetchInsights = async () => {
     setLoading(true);
     try {
+      // Kiểm tra cấu hình Supabase
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        // eslint-disable-next-line no-console
+        console.error('Thiếu biến môi trường Supabase!');
+        // Nếu đang ở client, chúng ta có thể kiểm tra xem client có thực sự có key không
+      }
+
       const now = new Date();
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
@@ -98,7 +105,9 @@ export default function ThaoInsight() {
         },
         inventoryWarnings: lowStock || [],
       });
-    } catch {
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.error('Lỗi khi fetch insights:', error);
       toast.error('Không thể kết nối với Mật Sổ!');
     } finally {
       setLoading(false);
