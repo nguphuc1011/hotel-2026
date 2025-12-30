@@ -22,13 +22,17 @@ if (firebaseConfig.apiKey) {
 
   messaging.onBackgroundMessage((payload) => {
     console.log('[firebase-messaging-sw.js] Nhận thông báo trong nền:', payload);
-    const notificationTitle = payload.notification.title;
+    
+    const notificationTitle = payload.notification?.title || 'MẮT THẦN HÀNH QUÂN';
     const notificationOptions = {
-      body: payload.notification.body,
-      icon: '/favicon.ico'
+      body: payload.notification?.body || 'Báo cáo Bệ Hạ, hỏa tiễn đã nổ!',
+      icon: '/favicon.ico',
+      tag: 'eye-of-god-alert',
+      renotify: true,
+      data: payload.data
     };
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
+    return self.registration.showNotification(notificationTitle, notificationOptions);
   });
 } else {
   console.warn('[firebase-messaging-sw.js] Không tìm thấy cấu hình Firebase. Thông báo nền có thể không hoạt động.');
