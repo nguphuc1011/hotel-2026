@@ -5,35 +5,54 @@ import { JWT } from "https://esm.sh/google-auth-library@8.7.0"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
-  // Xử lý CORS cho preflight requests
+  // 1. Xử lý CORS cho preflight requests (OPTIONS)
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { 
+      status: 200, 
+      headers: corsHeaders 
+    })
   }
 
   try {
+    console.log('--- NHẬN YÊU CẦU BẮN HỎA TIỄN ---')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { user_id, title, body, data } = await req.json()
-
-    if (!user_id) {
-      throw new Error('Thiếu user_id để gửi thông báo')
+    // Kiểm tra body
+    let bodyData;
+    try {
+      bodyData = await req.json()
+      console.log('Payload nhận được:', JSON.stringify(bodyData))
+    } catch (e) {
+      console.error('Lỗi parse JSON body:', e)
+      return new Response(JSON.stringify({ success: false, message: 'Invalid JSON body' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
     }
 
-    // 1. Lấy tất cả Token của Bệ Hạ từ bảng user_push_tokens
-    const { data: tokens, error: tokenError } = await supabaseClient
+    const { user_id, title, body, data } = bodyData
+
+    // 1. Lấy Token từ bảng user_push_tokens
+    let query = supabaseClient
       .from('user_push_tokens')
       .select('token')
-      .eq('user_id', user_id)
+
+    if (user_id) {
+      query = query.eq('user_id', user_id)
+    }
+    
+    const { data: tokens, error: tokenError } = await query
 
     if (tokenError || !tokens || tokens.length === 0) {
-      console.log('Không tìm thấy Token cho user:', user_id)
-      return new Response(JSON.stringify({ success: false, message: 'Không có Token nào được lưu' }), {
+      console.log('Không tìm thấy Token nào để gửi thông báo')
+      return new Response(JSON.stringify({ success: false, message: 'Không có Token nào trong hệ thống' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })

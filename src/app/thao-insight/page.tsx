@@ -203,6 +203,9 @@ export default function ThaoInsight() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error('Bệ Hạ cần đăng nhập để bắn Hỏa tiễn!');
 
+      // eslint-disable-next-line no-console
+      console.log('Đang gọi Edge Function tại:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+
       const { data, error } = await supabase.functions.invoke('send-push-notification', {
         body: {
           user_id: user.id,
@@ -212,7 +215,11 @@ export default function ThaoInsight() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('Chi tiết lỗi Edge Function:', error);
+        throw error;
+      }
 
       if (data?.success) {
         toast.success('Hỏa tiễn đã rời bệ phóng!', {

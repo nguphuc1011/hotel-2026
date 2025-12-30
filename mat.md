@@ -23,8 +23,9 @@
 | :--- | :--- | :--- |
 | **Bước 1** | Tạo bảng `user_push_tokens` và logic lưu Token tự động. | ✅ Hoàn thành |
 | **Bước 2** | Thiết lập Supabase Edge Function (Trung tâm điều phối). | ✅ Đã đúc xong |
-| **Bước 3** | Cài đặt Database Webhook trên bảng `bookings`. | 🟡 Đang thực thi |
-| **Bước 4** | Kiểm thử thực tế trên đa thiết bị (PC & Mobile). | ⚪ Chờ duyệt |
+- [x] Sửa lỗi CORS cho Edge Function (Thêm Access-Control-Allow-Methods và fix OPTIONS response)
+- [x] Triển khai Edge Function lên Supabase Cloud (`npx supabase functions deploy`)
+- [ ] Kiểm thử gửi thông báo thực tế khi có Check-in
 
 ---
 *Cập nhật ngày: 2025-12-30*
