@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { HotelService } from '@/services/hotel';
 
 export default function Dashboard() {
   const { rooms, settings, customers, services, isLoading, mutateRooms } = useHotel();
@@ -20,11 +21,26 @@ export default function Dashboard() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [folioRoomId, setFolioRoomId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
-  
-  const selectedRoom = useMemo(() => rooms.find(r => r.id === selectedRoomId) || null, [rooms, selectedRoomId]);
-  const folioRoom = useMemo(() => rooms.find(r => r.id === folioRoomId) || null, [rooms, folioRoomId]);
-  const [activeFilterIds, setActiveFilterIds] = useState<string[]>(['available', 'hourly', 'daily', 'dirty', 'repair']);
-  const [customerInsightsData, setCustomerInsightsData] = useState<{ customer: Customer, bookings: Booking[] } | null>(null);
+
+  const selectedRoom = useMemo(
+    () => rooms.find((r) => r.id === selectedRoomId) || null,
+    [rooms, selectedRoomId]
+  );
+  const folioRoom = useMemo(
+    () => rooms.find((r) => r.id === folioRoomId) || null,
+    [rooms, folioRoomId]
+  );
+  const [activeFilterIds, setActiveFilterIds] = useState<string[]>([
+    'available',
+    'hourly',
+    'daily',
+    'dirty',
+    'repair',
+  ]);
+  const [customerInsightsData, setCustomerInsightsData] = useState<{
+    customer: Customer;
+    bookings: Booking[];
+  } | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -44,41 +60,41 @@ export default function Dashboard() {
   });
 
   const systemSettings = settings?.find((s: Setting) => s.key === 'system_settings')?.value;
-  const timeRules = systemSettings ? {
-    check_in: systemSettings.check_in || '14:00',
-    check_out: systemSettings.check_out || '12:00',
-    overnight: systemSettings.overnight || { start: '22:00', end: '08:00' },
-    early_rules: systemSettings.early_rules || [],
-    late_rules: systemSettings.late_rules || [],
-    full_day_early_before: systemSettings.full_day_early_before || '05:00',
-    full_day_late_after: systemSettings.full_day_late_after || '18:00',
-  } : {
-    check_in: '14:00',
-    check_out: '12:00',
-    overnight: { start: '22:00', end: '08:00' },
-    early_rules: [],
-    late_rules: [],
-    full_day_early_before: '05:00',
-    full_day_late_after: '18:00',
-  };
+  const timeRules = systemSettings
+    ? {
+        check_in: systemSettings.check_in || '14:00',
+        check_out: systemSettings.check_out || '12:00',
+        overnight: systemSettings.overnight || { start: '22:00', end: '08:00' },
+        early_rules: systemSettings.early_rules || [],
+        late_rules: systemSettings.late_rules || [],
+        full_day_early_before: systemSettings.full_day_early_before || '05:00',
+        full_day_late_after: systemSettings.full_day_late_after || '18:00',
+      }
+    : {
+        check_in: '14:00',
+        check_out: '12:00',
+        overnight: { start: '22:00', end: '08:00' },
+        early_rules: [],
+        late_rules: [],
+        full_day_early_before: '05:00',
+        full_day_late_after: '18:00',
+      };
 
   const roomCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    rooms.forEach(room => {
+    rooms.forEach((room) => {
       counts[room.status] = (counts[room.status] || 0) + 1;
     });
     return counts;
   }, [rooms]);
 
   const onToggleFilter = (id: string) => {
-    setActiveFilterIds(prev => 
-      prev.includes(id) 
-        ? prev.filter(i => i !== id) 
-        : [...prev, id]
+    setActiveFilterIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   };
 
-  const filteredRooms = rooms.filter(room => {
+  const filteredRooms = rooms.filter((room) => {
     if (room.status === 'overnight') return activeFilterIds.includes('daily');
     return activeFilterIds.includes(room.status);
   });
@@ -104,22 +120,23 @@ export default function Dashboard() {
           try {
             const { error } = await supabase
               .from('rooms')
-              .update({ 
-                status: 'available', 
+              .update({
+                status: 'available',
                 current_booking_id: null,
-                last_status_change: null 
+                last_status_change: null,
               })
               .eq('id', room.id);
-            
+
             if (error) throw error;
             mutateRooms();
-            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
             showNotification(`Phòng ${room.room_number} đã sẵn sàng!`, 'success');
           } catch (error) {
+            // eslint-disable-next-line no-console
             console.error('Lỗi cập nhật trạng thái:', error);
             showNotification('Không thể cập nhật trạng thái phòng', 'error');
           }
-        }
+        },
       });
       return;
     }
@@ -139,6 +156,7 @@ export default function Dashboard() {
     if (!folioRoom) return;
 
     try {
+      // eslint-disable-next-line no-console
       console.log('Bắt đầu thanh toán cho phòng:', folioRoom.room_number);
 
       // 1. Get current notes to append audit info
@@ -148,10 +166,9 @@ export default function Dashboard() {
         .eq('id', bookingId)
         .single();
 
-      const updatedNotes = [
-        currentBooking?.notes,
-        auditNote ? `[THANH TOÁN] ${auditNote}` : ''
-      ].filter(Boolean).join('\n');
+      const updatedNotes = [currentBooking?.notes, auditNote ? `[THANH TOÁN] ${auditNote}` : '']
+        .filter(Boolean)
+        .join('\n');
 
       // 2. Update booking status, final amount and notes
       const { data: booking, error: bookingError } = await supabase
@@ -167,6 +184,7 @@ export default function Dashboard() {
         .single();
 
       if (bookingError) {
+        // eslint-disable-next-line no-console
         console.error('Lỗi cập nhật booking:', bookingError);
         throw new Error(bookingError.message);
       }
@@ -201,15 +219,18 @@ export default function Dashboard() {
         .eq('id', folioRoom.id);
 
       if (roomError) {
+        // eslint-disable-next-line no-console
         console.error('Lỗi cập nhật trạng thái phòng:', roomError);
         throw new Error(roomError.message);
       }
 
       // 4. Ghi nhận giao dịch vào bảng Thu Chi (Cashflow)
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         const userName = user?.user_metadata?.full_name || user?.email || 'Hệ thống';
-        
+
         // Tìm ID của danh mục "Tiền phòng"
         const { data: categoryData } = await supabase
           .from('cashflow_categories')
@@ -227,7 +248,7 @@ export default function Dashboard() {
           payment_method: 'cash',
           created_by: userName,
           created_at: new Date().toISOString(),
-          notes: `Booking ID: ${bookingId}`
+          notes: `Booking ID: ${bookingId}`,
         };
 
         // Chỉ thêm category_id nếu tìm thấy UUID hợp lệ
@@ -235,37 +256,51 @@ export default function Dashboard() {
           cashflowData.category_id = categoryData.id;
         }
 
-        const { error: cashflowError } = await supabase
-          .from('cashflow')
-          .insert([cashflowData]);
+        const { error: cashflowError } = await supabase.from('cashflow').insert([cashflowData]);
 
         if (cashflowError) {
+          // eslint-disable-next-line no-console
           console.error('Lỗi ghi nhận thu chi:', cashflowError);
-          showNotification(`Thanh toán thành công nhưng lỗi ghi sổ thu chi: ${cashflowError.message}`, 'error');
+          showNotification(
+            `Thanh toán thành công nhưng lỗi ghi sổ thu chi: ${cashflowError.message}`,
+            'error'
+          );
         } else {
+          // eslint-disable-next-line no-console
           console.log('Đã ghi nhận thu chi thành công');
         }
       } catch (cfErr: any) {
+        // eslint-disable-next-line no-console
         console.error('Lỗi hệ thống khi ghi thu chi:', cfErr);
         showNotification(`Lỗi hệ thống khi ghi thu chi: ${cfErr.message}`, 'error');
       }
-      
+
+      // eslint-disable-next-line no-console
       console.log('Thanh toán hoàn tất, đang refresh dữ liệu...');
 
       // 5. Reset state, refresh data, and show notification
       setFolioRoomId(null);
       await mutateRooms();
       showNotification(`Thanh toán phòng ${folioRoom.room_number} thành công!`, 'success');
+
+      // Gửi thông báo hệ thống (Mắt Thần)
+      // eslint-disable-next-line no-console
+      HotelService.notifySystemChange('check_out', folioRoom.id).catch(console.error);
     } catch (error: any) {
+      // eslint-disable-next-line no-console
       console.error('Lỗi trong quá trình thanh toán:', error);
       showNotification(`Lỗi thanh toán: ${error.message}`, 'error');
     }
   };
 
-  const handleMerge = async (sourceBookingId: string, targetRoomId: string, breakdown: PricingBreakdown) => {
-    const sourceRoom = rooms.find(r => r.current_booking?.id === sourceBookingId);
-    const targetRoom = rooms.find(r => r.id === targetRoomId);
-    
+  const _handleMerge = async (
+    sourceBookingId: string,
+    targetRoomId: string,
+    breakdown: PricingBreakdown
+  ) => {
+    const sourceRoom = rooms.find((r) => r.current_booking?.id === sourceBookingId);
+    const targetRoom = rooms.find((r) => r.id === targetRoomId);
+
     if (!sourceRoom || !targetRoom || !targetRoom.current_booking) {
       showNotification('Không tìm thấy thông tin phòng để gộp', 'error');
       return;
@@ -278,7 +313,7 @@ export default function Dashboard() {
         room_number: sourceRoom.room_number,
         amount: breakdown.total_amount,
         details: breakdown,
-        merged_at: new Date().toISOString()
+        merged_at: new Date().toISOString(),
       };
 
       // 2. Cập nhật phòng đích (thêm vào merged_bookings)
@@ -286,7 +321,7 @@ export default function Dashboard() {
       const { error: targetError } = await supabase
         .from('bookings')
         .update({
-          merged_bookings: [...currentMerged, mergeData]
+          merged_bookings: [...currentMerged, mergeData],
         })
         .eq('id', targetRoom.current_booking.id);
 
@@ -299,7 +334,9 @@ export default function Dashboard() {
           status: 'completed',
           check_out_at: new Date().toISOString(),
           final_amount: 0, // Đã gộp vào phòng khác
-          notes: (sourceRoom.current_booking.notes || '') + `\n[Đã gộp vào phòng ${targetRoom.room_number}]`
+          notes:
+            (sourceRoom.current_booking.notes || '') +
+            `\n[Đã gộp vào phòng ${targetRoom.room_number}]`,
         })
         .eq('id', sourceBookingId);
 
@@ -310,7 +347,7 @@ export default function Dashboard() {
         .from('rooms')
         .update({
           status: 'dirty',
-          current_booking_id: null
+          current_booking_id: null,
         })
         .eq('id', sourceRoom.id);
 
@@ -319,8 +356,12 @@ export default function Dashboard() {
       // 5. Kết thúc
       setFolioRoomId(null);
       await mutateRooms();
-      showNotification(`Đã gộp hóa đơn phòng ${sourceRoom.room_number} vào phòng ${targetRoom.room_number}`, 'success');
+      showNotification(
+        `Đã gộp hóa đơn phòng ${sourceRoom.room_number} vào phòng ${targetRoom.room_number}`,
+        'success'
+      );
     } catch (error: any) {
+      // eslint-disable-next-line no-console
       console.error('Lỗi khi gộp hóa đơn:', error);
       showNotification(`Lỗi gộp hóa đơn: ${error.message}`, 'error');
     }
@@ -328,7 +369,7 @@ export default function Dashboard() {
 
   const handleCancel = async () => {
     if (!folioRoom) return;
-    
+
     setConfirmConfig({
       isOpen: true,
       title: 'Xác nhận hủy phòng',
@@ -350,20 +391,19 @@ export default function Dashboard() {
               .eq('id', bookingId)
               .single();
 
-            const updatedNotes = [
-              currentBooking?.notes,
-              `[HỦY PHÒNG] Lý do: ${reason}`
-            ].filter(Boolean).join('\n');
+            const updatedNotes = [currentBooking?.notes, `[HỦY PHÒNG] Lý do: ${reason}`]
+              .filter(Boolean)
+              .join('\n');
 
             const { error: bookingError } = await supabase
               .from('bookings')
-              .update({ 
-                status: 'cancelled', 
+              .update({
+                status: 'cancelled',
                 check_out_at: new Date().toISOString(),
-                notes: updatedNotes
+                notes: updatedNotes,
               })
               .eq('id', bookingId);
-            
+
             if (bookingError) throw bookingError;
 
             // 1b. Ghi log sự kiện (Móng ngầm)
@@ -373,17 +413,17 @@ export default function Dashboard() {
               entity_id: bookingId,
               action: 'Hủy đặt phòng',
               reason: reason,
-              severity: 'danger'
+              severity: 'danger',
             });
           }
 
           // 2. Set room status to 'dirty'
           const { error: roomError } = await supabase
             .from('rooms')
-            .update({ 
-              status: 'dirty', 
+            .update({
+              status: 'dirty',
               current_booking_id: null,
-              last_status_change: new Date().toISOString()
+              last_status_change: new Date().toISOString(),
             })
             .eq('id', folioRoom.id);
 
@@ -392,13 +432,14 @@ export default function Dashboard() {
           // 3. Reset state and show notification
           setFolioRoomId(null);
           await mutateRooms();
-          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
           showNotification(`Đã hủy phòng ${folioRoom.room_number} thành công!`, 'success');
         } catch (error) {
+          // eslint-disable-next-line no-console
           console.error('Lỗi khi hủy phòng:', error);
           showNotification('Lỗi khi hủy phòng', 'error');
         }
-      }
+      },
     });
   };
 
@@ -407,7 +448,7 @@ export default function Dashboard() {
       if (!selectedRoom) return;
 
       let customerId = null;
-      
+
       // 1. Create/Find Customer
       let customerName = data.customer?.name?.trim();
       const customerPhone = data.customer?.phone?.trim() || '';
@@ -421,7 +462,7 @@ export default function Dashboard() {
 
       // Try to find existing first by name (if it's "Khách mới") or phone or id_card
       let existingCust = null;
-      
+
       if (customerName === 'Khách mới') {
         const { data: foundDefault } = await supabase
           .from('customers')
@@ -435,7 +476,7 @@ export default function Dashboard() {
         const searchConditions = [];
         if (customerPhone) searchConditions.push(`phone.eq.${customerPhone}`);
         if (customerIdCard) searchConditions.push(`id_card.eq.${customerIdCard}`);
-        
+
         const { data: found } = await supabase
           .from('customers')
           .select('id, address')
@@ -455,7 +496,11 @@ export default function Dashboard() {
         }
 
         // Fetch full customer data and their bookings for the insights modal
-        const { data: fullCustomer } = await supabase.from('customers').select('*').eq('id', customerId).single();
+        const { data: fullCustomer } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', customerId)
+          .single();
         const { data: customerBookings } = await supabase
           .from('bookings')
           .select('*, rooms(room_number)')
@@ -471,18 +516,21 @@ export default function Dashboard() {
         // Create new customer (including KHÁCH VÃNG LAI)
         const { data: newCust, error: custError } = await supabase
           .from('customers')
-          .insert([{
-            full_name: customerName,
-            phone: customerPhone,
-            id_card: customerIdCard,
-            address: customerAddress,
-            visit_count: 1,
-            total_spent: 0
-          }])
+          .insert([
+            {
+              full_name: customerName,
+              phone: customerPhone,
+              id_card: customerIdCard,
+              address: customerAddress,
+              visit_count: 1,
+              total_spent: 0,
+            },
+          ])
           .select()
           .single();
 
         if (custError) {
+          // eslint-disable-next-line no-console
           console.error('Error creating customer:', custError);
         } else {
           customerId = newCust.id;
@@ -492,33 +540,35 @@ export default function Dashboard() {
       // 2. Create booking
       const { data: booking, error: bookingError } = await supabase
         .from('bookings')
-        .insert([{
-          room_id: selectedRoom.id,
-          customer_id: customerId,
-          check_in_at: new Date().toISOString(),
-          system_created_at: new Date().toISOString(), // Giờ hệ thống thực tế
-          rental_type: data.rentalType,
-          initial_price: data.price,
-          deposit_amount: data.deposit || 0,
-          notes: data.notes,
-          room_charge_locked: 0,
-          status: 'active',
-          custom_surcharge: 0,
-          room_charge_suggested: 0,
-          room_charge_actual: 0,
-          services_used: data.services.map(s => {
-            const serviceId = s.service_id || s.id;
-            const serviceInfo = services.find(si => String(si.id) === String(serviceId));
-            return {
-              id: serviceId,
-              service_id: serviceId,
-              name: serviceInfo?.name || 'Dịch vụ',
-              price: s.price,
-              quantity: s.quantity,
-              total: s.price * s.quantity
-            };
-          })
-        }])
+        .insert([
+          {
+            room_id: selectedRoom.id,
+            customer_id: customerId,
+            check_in_at: new Date().toISOString(),
+            system_created_at: new Date().toISOString(), // Giờ hệ thống thực tế
+            rental_type: data.rentalType,
+            initial_price: data.price,
+            deposit_amount: data.deposit || 0,
+            notes: data.notes,
+            room_charge_locked: 0,
+            status: 'active',
+            custom_surcharge: 0,
+            room_charge_suggested: 0,
+            room_charge_actual: 0,
+            services_used: data.services.map((s) => {
+              const serviceId = s.service_id || s.id;
+              const serviceInfo = services.find((si) => String(si.id) === String(serviceId));
+              return {
+                id: serviceId,
+                service_id: serviceId,
+                name: serviceInfo?.name || 'Dịch vụ',
+                price: s.price,
+                quantity: s.quantity,
+                total: s.price * s.quantity,
+              };
+            }),
+          },
+        ])
         .select()
         .single();
 
@@ -527,9 +577,9 @@ export default function Dashboard() {
       // 3. Update room status
       const { error: roomError } = await supabase
         .from('rooms')
-        .update({ 
+        .update({
           status: data.rentalType, // 'hourly', 'daily', 'overnight'
-          current_booking_id: booking.id
+          current_booking_id: booking.id,
         })
         .eq('id', selectedRoom.id);
 
@@ -539,14 +589,19 @@ export default function Dashboard() {
       setSelectedRoomId(null);
       await mutateRooms(); // Refresh data immediately
       showNotification(`Nhận phòng ${selectedRoom.room_number} thành công!`, 'success');
+
+      // Gửi thông báo hệ thống (Mắt Thần)
+      // eslint-disable-next-line no-console
+      HotelService.notifySystemChange('check_in', selectedRoom.id).catch(console.error);
     } catch (error: unknown) {
       const err = error as any;
+      // eslint-disable-next-line no-console
       console.error('Chi tiết lỗi Check-in:', {
         message: err.message,
         details: err.details,
         hint: err.hint,
         code: err.code,
-        fullError: err
+        fullError: err,
       });
       showNotification(`Lỗi khi nhận phòng: ${err.message || 'Lỗi không xác định'}`, 'error');
     }
@@ -557,12 +612,13 @@ export default function Dashboard() {
       setConfirmConfig({
         isOpen: true,
         title: 'Nạp lại dữ liệu?',
-        description: 'Bạn có chắc chắn muốn nạp lại dữ liệu mẫu? Hành động này sẽ cập nhật lại giá và thông tin cho các phòng hiện có.',
+        description:
+          'Bạn có chắc chắn muốn nạp lại dữ liệu mẫu? Hành động này sẽ cập nhật lại giá và thông tin cho các phòng hiện có.',
         variant: 'danger',
         onConfirm: () => {
-          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
           executeSeed();
-        }
+        },
       });
       return;
     }
@@ -580,13 +636,13 @@ export default function Dashboard() {
           area: `Tầng ${floor}`,
           room_type: num === 4 ? 'VIP' : 'Standard',
           status: 'available',
-          prices: { 
-            hourly: 60000, 
-            next_hour: 20000, 
-            overnight: 150000, 
-            daily: 250000 
+          prices: {
+            hourly: 60000,
+            next_hour: 20000,
+            overnight: 150000,
+            daily: 250000,
           },
-          enable_overnight: true
+          enable_overnight: true,
         };
       });
 
@@ -594,11 +650,12 @@ export default function Dashboard() {
         .from('rooms')
         .upsert(sampleRooms, { onConflict: 'room_number' });
       if (error) throw error;
-      
+
       mutateRooms();
       showNotification('Đã khởi tạo 12 phòng mẫu thành công!', 'success');
     } catch (error: unknown) {
       const err = error as any;
+      // eslint-disable-next-line no-console
       console.error('Seed error:', err);
       showNotification(`Lỗi khởi tạo: ${err.message}`, 'error');
     } finally {
@@ -634,20 +691,21 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-4 pb-20"> {/* Add padding bottom for mobile scroll */}
-      <DashboardHeader 
-        roomCounts={roomCounts} 
+    <div className="space-y-4 pb-20">
+      {' '}
+      {/* Add padding bottom for mobile scroll */}
+      <DashboardHeader
+        roomCounts={roomCounts}
         activeFilterIds={activeFilterIds}
         onToggleFilter={onToggleFilter}
         onSeed={seedRooms}
         isSeeding={isSeeding}
       />
-
-      <motion.div 
+      <motion.div
         layout
         className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4 pt-0"
       >
-        <AnimatePresence mode='popLayout'>
+        <AnimatePresence mode="popLayout">
           {filteredRooms.map((room) => (
             <motion.div
               layout
@@ -656,18 +714,13 @@ export default function Dashboard() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
             >
-              <RoomCard 
-                room={room} 
-                settings={settings}
-                onClick={handleRoomClick}
-              />
+              <RoomCard room={room} settings={settings} onClick={handleRoomClick} />
             </motion.div>
           ))}
         </AnimatePresence>
       </motion.div>
-
-      <CheckInModal 
-        room={selectedRoom} 
+      <CheckInModal
+        room={selectedRoom}
         services={services}
         customers={customers}
         timeRules={timeRules}
@@ -675,20 +728,18 @@ export default function Dashboard() {
         onClose={() => setSelectedRoomId(null)}
         onConfirm={handleCheckIn}
       />
-
-      <FolioModal 
-         isOpen={!!folioRoomId}
-         onClose={() => setFolioRoomId(null)}
-         room={folioRoom}
-         settings={settings}
-         services={services}
-         customers={customers}
-         onPayment={handlePayment}
-         onUpdate={mutateRooms}
-         onCancel={handleCancel}
-         isAdmin={true}
-       />
-
+      <FolioModal
+        isOpen={!!folioRoomId}
+        onClose={() => setFolioRoomId(null)}
+        room={folioRoom}
+        settings={settings}
+        services={services}
+        customers={customers}
+        onPayment={handlePayment}
+        onUpdate={mutateRooms}
+        onCancel={handleCancel}
+        isAdmin={true}
+      />
       {customerInsightsData && (
         <CustomerInsightsModal
           customer={customerInsightsData.customer}
@@ -696,7 +747,6 @@ export default function Dashboard() {
           onClose={() => setCustomerInsightsData(null)}
         />
       )}
-
       <ConfirmDialog
         isOpen={confirmConfig.isOpen}
         title={confirmConfig.title}
@@ -708,11 +758,15 @@ export default function Dashboard() {
         inputPlaceholder={confirmConfig.inputPlaceholder}
         inputRequired={confirmConfig.inputRequired}
         onConfirm={confirmConfig.onConfirm}
-        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );
 }
 
-{/* Force Update 19:15 */}
-{/* Trigger Build Again */}
+{
+  /* Force Update 19:15 */
+}
+{
+  /* Trigger Build Again */
+}
