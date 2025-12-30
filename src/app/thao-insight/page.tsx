@@ -123,16 +123,35 @@ export default function ThaoInsight() {
     };
     setupNotifications();
 
-    // Lắng nghe thông báo khi đang mở ứng dụng
-    onMessageListener()
-      .then((payload: any) => {
-        toast.info(payload.notification?.title || 'Thông báo mới', {
-          description: payload.notification?.body,
-        });
-      })
-      .catch(() => {
-        // Error handling
-      });
+    // Lắng nghe thông báo khi đang mở ứng dụng (Foreground)
+    let isSubscribed = true;
+    const listenForMessages = async () => {
+      try {
+        const payload = await onMessageListener();
+        if (isSubscribed && payload) {
+          // eslint-disable-next-line no-console
+          console.log('🚀 Hỏa tiễn đã nổ ngay trong trang:', payload);
+          toast.info(payload.notification?.title || 'HỎA TIỄN ĐÃ NỔ!', {
+            description: payload.notification?.body,
+            duration: 10000, // Hiện lâu hơn để Bệ Hạ kịp xem
+            action: {
+              label: 'Đã rõ',
+              onClick: () => {},
+            },
+          });
+          // Sau khi nổ xong, tiếp tục lắng nghe phát tiếp theo
+          listenForMessages();
+        }
+      } catch (err) {
+        if (isSubscribed) {
+          // eslint-disable-next-line no-console
+          console.error('Lỗi lắng nghe hỏa tiễn:', err);
+          // Thử lại sau 2 giây nếu lỗi
+          setTimeout(listenForMessages, 2000);
+        }
+      }
+    };
+    listenForMessages();
 
     // Real-time updates from Supabase
     const channel = supabase
@@ -143,6 +162,7 @@ export default function ThaoInsight() {
       .subscribe();
 
     return () => {
+      isSubscribed = false;
       supabase.removeChannel(channel);
     };
   }, []);

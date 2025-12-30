@@ -44,7 +44,13 @@ async function getAccessToken(serviceAccount: any) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
+  // Xử lý Preflight request (OPTIONS) ngay lập tức
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { 
+      status: 200, 
+      headers: corsHeaders 
+    })
+  }
 
   try {
     const firebaseKeyRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY')
