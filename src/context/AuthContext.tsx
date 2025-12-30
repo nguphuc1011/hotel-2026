@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { Profile } from '@/types';
 import { useRouter, usePathname } from 'next/navigation';
+import { requestForToken } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -50,6 +51,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (currentUser) {
         await fetchProfile(currentUser.id);
+        // TỰ ĐỘNG LẤY VÀ LƯU PUSH TOKEN KHI ĐĂNG NHẬP
+        requestForToken();
       } else {
         setProfile(null);
         if (pathname !== '/login') {

@@ -101,6 +101,27 @@ export const requestForToken = async () => {
       const currentToken = await getToken(messaging, {
         vapidKey: vapidKey,
       });
+
+      if (currentToken) {
+        // TỰ ĐỘNG GỬI TOKEN LÊN SUPABASE
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from('user_push_tokens').upsert({
+              user_id: user.id,
+              token: currentToken,
+              device_type: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+              last_seen: new Date().toISOString()
+            }, { onConflict: 'token' });
+            // eslint-disable-next-line no-console
+            console.log('Đã cập nhật Token lên Mật Sổ (Supabase)');
+          }
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('Lỗi khi lưu Token lên Supabase:', e);
+        }
+      }
+
       return currentToken || null;
     }
     return null;
