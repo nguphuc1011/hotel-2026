@@ -65,8 +65,22 @@ if (typeof window !== 'undefined') {
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         messaging = getMessaging(app);
 
-        // KHÔNG đăng ký Service Worker thủ công nữa để tránh nhân đôi trạm phát
-        // Firebase Messaging sẽ tự động tìm thấy firebase-messaging-sw.js ở thư mục public
+        // ĐĂNG KÝ SERVICE WORKER THỦ CÔNG ĐỂ TRUYỀN CONFIG
+        const configString = encodeURIComponent(JSON.stringify(config));
+        navigator.serviceWorker
+          .register(`/firebase-messaging-sw.js?config=${configString}`, {
+            scope: '/firebase-cloud-messaging-push-scope', // Đè lên scope mặc định của Firebase
+            updateViaCache: 'none',
+          })
+          .then((registration) => {
+            // eslint-disable-next-line no-console
+            console.log('Mắt Thần đã gác cửa thành công với cấu hình chuẩn!');
+            registration.update(); // Ép cập nhật ngay lập tức
+          })
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error('Lỗi khi triển khai Mắt Thần:', err);
+          });
       }
     } catch {
       // Trình duyệt không hỗ trợ hoặc lỗi khởi tạo
