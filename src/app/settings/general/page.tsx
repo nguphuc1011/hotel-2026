@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import useSWR, { mutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clock, 
@@ -50,8 +51,19 @@ const tabs = [
   { id: 'ai', label: 'Cấu hình AI', icon: Wrench },
 ];
 
+const fetchSettings = async () => {
+  const { data, error } = await supabase
+    .from('settings')
+    .select('*')
+    .eq('key', 'system_settings')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || {};
+};
+
 export default function GeneralSettingsPage() {
-  const [loading, setLoading] = useState(true);
+  const { data: remoteData, error: fetchError, isLoading: loading } = useSWR('system_settings', fetchSettings);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState(tabs[0].id);
   const context = useNotification();
@@ -78,40 +90,27 @@ export default function GeneralSettingsPage() {
     service_tax: 1.5
   });
 
+  // Sync state with SWR data
   useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('key', 'system_settings')
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        if (data.value) {
-          setTimeRules(prev => ({ ...prev, ...data.value }));
-          if (data.value.enableAutoSurcharge !== undefined) {
-            setEnableAutoSurcharge(data.value.enableAutoSurcharge);
-          }
+    if (remoteData) {
+      if (remoteData.value) {
+        setTimeRules(prev => ({ ...prev, ...remoteData.value }));
+        if (remoteData.value.enableAutoSurcharge !== undefined) {
+          setEnableAutoSurcharge(remoteData.value.enableAutoSurcharge);
         }
-        setTaxConfig({
-          tax_code: data.tax_code || '',
-          stay_tax: data.tax_config?.stay_tax || 5,
-          service_tax: data.tax_config?.service_tax || 1.5
-        });
       }
-    } catch (err) {
-      console.error('Error fetching settings:', err);
-    } finally {
-      setLoading(false);
+      
+      // Support both structure: top-level (legacy) or inside value (new)
+      const tax_code = remoteData.value?.tax_code || remoteData.tax_code || '';
+      const tax_config = remoteData.value?.tax_config || remoteData.tax_config;
+      
+      setTaxConfig({
+        tax_code,
+        stay_tax: tax_config?.vat || tax_config?.stay_tax || 5,
+        service_tax: tax_config?.service_fee || tax_config?.service_tax || 1.5
+      });
     }
-  };
+  }, [remoteData]);
 
   const handleSave = async () => {
     try {
@@ -120,24 +119,29 @@ export default function GeneralSettingsPage() {
         key: 'system_settings',
         value: {
           ...timeRules,
-          enableAutoSurcharge
-        },
-        tax_code: taxConfig.tax_code,
-        tax_config: {
-          stay_tax: taxConfig.stay_tax,
-          service_tax: taxConfig.service_tax
+          enableAutoSurcharge,
+          tax_code: taxConfig.tax_code,
+          tax_config: {
+            vat: taxConfig.stay_tax,
+            service_fee: taxConfig.service_tax
+          }
         }
       };
+
+      // Optimistic update
+      mutate('system_settings', { ...remoteData, value: payload.value }, false);
+
       const { error } = await supabase
         .from('settings')
         .upsert([payload], { onConflict: 'key', ignoreDuplicates: false });
 
       if (error) throw error;
-      
-      showNotification('Đã lưu cài đặt thành công!', 'success');
+      showNotification('Lưu cấu hình thành công!', 'success');
+      mutate('system_settings');
     } catch (err) {
-      console.error('Error saving settings:', err);
-      showNotification('Có lỗi xảy ra khi lưu cài đặt!', 'error');
+      console.error(err);
+      showNotification('Lỗi khi lưu cấu hình.', 'error');
+      mutate('system_settings');
     } finally {
       setSaving(false);
     }

@@ -41,6 +41,8 @@ export interface Service {
   stock: number;
   icon?: string;
   tax_type: 'service' | 'accommodation' | 'goods';
+  is_active?: boolean;
+  deleted_at?: string;
   keywords?: string[];
 }
 
@@ -126,6 +128,7 @@ export interface Booking {
   rooms?: {
     room_number: string;
   };
+  is_printed?: boolean;
 }
 
 export interface Invoice {
@@ -144,6 +147,7 @@ export interface Profile {
   full_name: string;
   role: 'admin' | 'staff' | 'manager';
   phone?: string;
+  avatar_url?: string;
   permissions?: string[];
   created_at?: string;
 }

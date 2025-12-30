@@ -21,6 +21,7 @@ import {
   Sparkles,
   MapPin
 } from 'lucide-react';
+import { EventService } from '@/services/events';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency, cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -118,10 +119,13 @@ export default function CustomerManagement() {
       return;
     }
 
+    const reason = window.prompt(`Bạn có chắc chắn muốn xóa khách hàng "${customer.full_name}"? Mọi lịch sử đặt phòng sẽ được gộp vào khách hàng mặc định. Vui lòng nhập lý do:`);
+    if (!reason) return;
+
     setConfirmConfig({
       isOpen: true,
-      title: 'Xóa khách hàng?',
-      description: `Bạn có chắc chắn muốn xóa khách hàng "${customer.full_name}"? Mọi lịch sử đặt phòng của khách này sẽ được chuyển về "Khách mới" để lưu trữ hóa đơn.`,
+      title: 'Đang xử lý...',
+      description: 'Đang gộp dữ liệu và xóa khách hàng...',
       onConfirm: async () => {
         try {
           // 1. Tìm ID của "Khách mới" mặc định
@@ -161,6 +165,17 @@ export default function CustomerManagement() {
             .eq('id', customer.id);
 
           if (deleteError) throw deleteError;
+
+          // 4. Ghi log sự kiện
+          await EventService.emit({
+            type: 'CUSTOMER_DELETE',
+            entity_type: 'customers',
+            entity_id: customer.id,
+            action: 'Xóa khách hàng',
+            reason: reason,
+            old_value: customer,
+            severity: 'warning'
+          });
 
           showNotification('Đã xóa khách hàng và cập nhật lịch sử', 'success');
           fetchCustomers();

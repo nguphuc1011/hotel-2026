@@ -8,7 +8,9 @@ import {
   User, 
   CreditCard, 
   Banknote,
-  MoreHorizontal
+  MoreHorizontal,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -17,9 +19,11 @@ import { CashflowTransaction } from '@/types';
 
 interface CashflowTableProps {
   transactions: CashflowTransaction[];
+  onEdit?: (t: CashflowTransaction) => void;
+  onDelete?: (t: CashflowTransaction) => void;
 }
 
-export const CashflowTable: React.FC<CashflowTableProps> = ({ transactions }) => {
+export const CashflowTable: React.FC<CashflowTableProps> = ({ transactions, onEdit, onDelete }) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -53,6 +57,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({ transactions }) =>
               <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Số tiền</th>
               <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Thanh toán</th>
               <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Người tạo</th>
+              <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -128,6 +133,24 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({ transactions }) =>
                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-black text-xs">
                       {t.created_by?.charAt(0).toUpperCase()}
                     </div>
+                  </div>
+                </td>
+                <td className="px-8 py-6 text-right">
+                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => onEdit?.(t)}
+                      className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-colors"
+                      title="Sửa giao dịch"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => onDelete?.(t)}
+                      className="p-2 hover:bg-rose-50 text-rose-600 rounded-xl transition-colors"
+                      title="Xóa giao dịch"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </td>
               </tr>

@@ -8,6 +8,7 @@ import {
   BarChart3,
   Package,
   Wallet,
+  ShieldAlert
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -75,6 +76,15 @@ export default function SettingsPage() {
       color: 'text-rose-500', 
       bg: 'bg-rose-50',
       href: '/settings/reports'
+    },
+    { 
+      id: 'thao-insight', 
+      title: 'Tháo Insight', 
+      description: 'Mắt thần giám sát & đối soát thất thoát',
+      icon: ShieldAlert, 
+      color: 'text-red-500', 
+      bg: 'bg-red-50',
+      href: '/thao-insight'
     },
   ];
 

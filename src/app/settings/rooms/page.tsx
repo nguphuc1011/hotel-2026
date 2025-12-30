@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import useSWR, { mutate } from 'swr';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -30,15 +31,20 @@ const roomSchema = z.object({
 
 type RoomFormData = z.infer<typeof roomSchema>;
 
+const fetchRooms = async () => {
+  const { data, error } = await supabase.from('rooms').select('*').order('area').order('room_number');
+  if (error) throw error;
+  return data || [];
+};
+
 // --- MAIN COMPONENT --- //
 export default function RoomsPage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const { data: rooms = [], error, isLoading: loading } = useSWR('rooms', fetchRooms);
   const { showNotification } = useNotification();
   const [groupedRooms, setGroupedRooms] = useState<Record<string, Room[]>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -52,36 +58,18 @@ export default function RoomsPage() {
     onConfirm: () => {},
   });
 
-  // --- DATA FETCHING --- //
+  // --- DATA SYNC --- //
   useEffect(() => {
-    fetchRooms();
-  }, []);
-
-  const fetchRooms = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.from('rooms').select('*').order('area').order('room_number');
-      if (error) {
-        showNotification('Lỗi khi tải danh sách phòng.', 'error');
-        console.error(error);
-      } else {
-        setRooms(data);
-        groupRoomsByArea(data);
-      }
-    } finally {
-      setLoading(false);
+    if (rooms) {
+      const groups = rooms.reduce((acc, room) => {
+        const area = room.area || 'Chưa phân loại';
+        if (!acc[area]) acc[area] = [];
+        acc[area].push(room);
+        return acc;
+      }, {} as Record<string, Room[]>);
+      setGroupedRooms(groups);
     }
-  };
-
-  const groupRoomsByArea = (data: Room[]) => {
-    const groups = data.reduce((acc, room) => {
-      const area = room.area || 'Chưa phân loại';
-      if (!acc[area]) acc[area] = [];
-      acc[area].push(room);
-      return acc;
-    }, {} as Record<string, Room[]>);
-    setGroupedRooms(groups);
-  };
+  }, [rooms]);
 
   // --- ACTIONS --- //
   const handleOpenModal = (room: Room | null = null) => {
@@ -96,15 +84,22 @@ export default function RoomsPage() {
 
   const handleToggleOvernight = async (room: Room) => {
     const newStatus = !room.enable_overnight;
+    
+    // Optimistic update
+    const newRooms = rooms.map(r => r.id === room.id ? { ...r, enable_overnight: newStatus } : r);
+    mutate('rooms', newRooms, false);
+
     const { error } = await supabase
       .from('rooms')
       .update({ enable_overnight: newStatus })
       .eq('id', room.id);
+    
     if (error) {
       showNotification('Cập nhật thất bại!', 'error');
+      mutate('rooms'); // Rollback
     } else {
       showNotification(`Phòng ${room.room_number} đã ${newStatus ? 'cho phép' : 'chặn'} bán đêm.`, 'success');
-      fetchRooms();
+      mutate('rooms'); // Revalidate
     }
   };
 
@@ -114,12 +109,17 @@ export default function RoomsPage() {
       title: 'Xóa phòng',
       description: 'Bạn có chắc chắn muốn xóa phòng này? Hành động này không thể hoàn tác.',
       onConfirm: async () => {
+        // Optimistic update
+        const newRooms = rooms.filter(r => r.id !== id);
+        mutate('rooms', newRooms, false);
+
         const { error } = await supabase.from('rooms').delete().eq('id', id);
         if (error) {
           showNotification('Xóa phòng thất bại.', 'error');
+          mutate('rooms'); // Rollback
         } else {
           showNotification('Đã xóa phòng thành công.', 'success');
-          fetchRooms();
+          mutate('rooms'); // Revalidate
           setConfirmConfig(prev => ({ ...prev, isOpen: false }));
         }
       }
@@ -255,7 +255,7 @@ export default function RoomsPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         room={editingRoom}
-        onSave={fetchRooms}
+        onSave={() => mutate('rooms')}
       />
 
       <ConfirmDialog
@@ -318,26 +318,25 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
   }, [isOpen, room, reset]);
 
   const onSubmit = async (data: RoomFormData) => {
-    const payload = {
-      ...data,
-      prices: {
-        hourly: Number(data.prices.hourly),
-        next_hour: Number(data.prices.next_hour),
-        daily: Number(data.prices.daily),
-        overnight: Number(data.prices.overnight),
+    try {
+      if (room) {
+        const { error } = await supabase
+          .from('rooms')
+          .update(data)
+          .eq('id', room.id);
+        
+        if (error) throw error;
+        showNotification('Cập nhật phòng thành công.', 'success');
+      } else {
+        const { error } = await supabase.from('rooms').insert([data]);
+        if (error) throw error;
+        showNotification('Thêm phòng mới thành công.', 'success');
       }
-    };
-
-    const { error } = room
-      ? await supabase.from('rooms').update(payload).eq('id', room.id)
-      : await supabase.from('rooms').insert(payload);
-
-    if (error) {
-      showNotification(error.message, 'error');
-    } else {
-      showNotification(room ? 'Cập nhật phòng thành công!' : 'Đã tạo phòng mới!', 'success');
       onSave();
       onClose();
+    } catch (error) {
+      showNotification('Có lỗi xảy ra.', 'error');
+      console.error(error);
     }
   };
 

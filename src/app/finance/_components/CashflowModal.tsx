@@ -28,13 +28,15 @@ interface CashflowModalProps {
   onClose: () => void;
   onSave: (data: any) => Promise<void>;
   categories: CashflowCategory[];
+  initialData?: any;
 }
 
 export const CashflowModal: React.FC<CashflowModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  categories
+  categories,
+  initialData
 }) => {
   const [type, setType] = useState<'income' | 'expense'>('income');
   const [categoryId, setCategoryId] = useState<string>('');
@@ -46,16 +48,27 @@ export const CashflowModal: React.FC<CashflowModalProps> = ({
 
   const filteredCategories = categories.filter(c => c.type === type);
 
+  const isExpense = type === 'expense';
+
   useEffect(() => {
     if (isOpen) {
-      setType('income');
-      setCategoryId('');
-      setAmount(0);
-      setContent('');
-      setPaymentMethod('cash');
-      setNotes('');
+      if (initialData) {
+        setType(initialData.type);
+        setCategoryId(initialData.category_id);
+        setAmount(initialData.amount);
+        setContent(initialData.content);
+        setPaymentMethod(initialData.payment_method);
+        setNotes(initialData.notes || '');
+      } else {
+        setType('income');
+        setCategoryId('');
+        setAmount(0);
+        setContent('');
+        setPaymentMethod('cash');
+        setNotes('');
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,14 +81,15 @@ export const CashflowModal: React.FC<CashflowModalProps> = ({
       const selectedCategory = categories.find(c => c.id === categoryId);
       await onSave({
         type,
+        category: selectedCategory?.name || 'Khác', 
         category_id: categoryId,
-        category_name: selectedCategory?.name || '',
+        category_name: selectedCategory?.name || 'Khác',
         amount,
         content: content.trim(),
         payment_method: paymentMethod,
         notes: notes.trim()
       });
-      onClose();
+      // Logic onClose được xử lý bởi cha hoặc sau khi save thành công
     } catch (error) {
       console.error(error);
     } finally {
@@ -85,45 +99,50 @@ export const CashflowModal: React.FC<CashflowModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl p-0 overflow-hidden bg-white border-none rounded-[3rem] shadow-2xl">
-        <DialogHeader className="p-8 pb-0">
-          <DialogTitle className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-            Lập phiếu {type === 'income' ? 'Thu' : 'Chi'} mới
-          </DialogTitle>
+      <DialogContent className="max-w-none w-screen h-screen m-0 p-0 overflow-hidden bg-white border-none rounded-none shadow-none z-[9999] flex flex-col">
+        <DialogHeader className="p-8 pb-4 flex-shrink-0 border-b border-slate-100">
+          <div className="max-w-3xl mx-auto w-full flex items-center justify-between">
+            <DialogTitle className="text-3xl font-black text-slate-900 uppercase tracking-tight">
+              {initialData ? 'Sửa phiếu' : 'Lập phiếu'} {type === 'income' ? 'Thu' : 'Chi'} {initialData ? '' : 'mới'}
+            </DialogTitle>
+            <Button 
+              variant="ghost" 
+              onClick={onClose}
+              className="rounded-full w-12 h-12 p-0 hover:bg-slate-100 text-slate-400"
+            >
+              <ArrowUpCircle className="rotate-45" size={24} />
+            </Button>
+          </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
-          {/* Type Selector */}
-          <div className="grid grid-cols-2 gap-4">
+        <div className="flex-1 overflow-y-auto bg-slate-50/30">
+          <form onSubmit={handleSubmit} className="max-w-3xl mx-auto w-full p-8 space-y-10">
+            <div className="grid grid-cols-2 gap-6">
             <button
               type="button"
-              onClick={() => {
-                setType('income');
-                setCategoryId('');
-              }}
+              onClick={() => setType('income')}
               className={cn(
-                "flex items-center justify-center gap-3 h-16 rounded-2xl font-black uppercase text-xs tracking-widest transition-all",
+                "h-16 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 transition-all border-2",
                 type === 'income' 
-                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-100 scale-[1.02]" 
-                  : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                  ? "bg-emerald-50 border-emerald-500 text-emerald-600 shadow-lg shadow-emerald-100" 
+                  : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
               )}
             >
-              <ArrowUpCircle size={18} /> Khoản Thu
+              <ArrowUpCircle size={20} />
+              Khoản Thu
             </button>
             <button
               type="button"
-              onClick={() => {
-                setType('expense');
-                setCategoryId('');
-              }}
+              onClick={() => setType('expense')}
               className={cn(
-                "flex items-center justify-center gap-3 h-16 rounded-2xl font-black uppercase text-xs tracking-widest transition-all",
+                "h-16 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 transition-all border-2",
                 type === 'expense' 
-                  ? "bg-rose-600 text-white shadow-lg shadow-rose-100 scale-[1.02]" 
-                  : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                  ? "bg-rose-50 border-rose-500 text-rose-600 shadow-lg shadow-rose-100" 
+                  : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
               )}
             >
-              <ArrowDownCircle size={18} /> Khoản Chi
+              <ArrowDownCircle size={20} />
+              Khoản Chi
             </button>
           </div>
 
@@ -133,9 +152,9 @@ export const CashflowModal: React.FC<CashflowModalProps> = ({
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Danh mục</Label>
               <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger className="h-14 rounded-2xl border-slate-100 bg-slate-50 font-bold text-slate-700 focus:ring-blue-600">
-                  <SelectValue placeholder="Chọn danh mục" />
+                  <SelectValue placeholder={isExpense ? "Chọn hạng mục chi..." : "Chọn hạng mục thu..."} />
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-slate-100">
+                <SelectContent className="rounded-2xl border-slate-100 shadow-xl">
                   {filteredCategories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id} className="font-bold py-3">
                       <div className="flex items-center gap-2">
@@ -144,6 +163,11 @@ export const CashflowModal: React.FC<CashflowModalProps> = ({
                       </div>
                     </SelectItem>
                   ))}
+                  {filteredCategories.length === 0 && (
+                    <div className="p-4 text-center text-xs font-bold text-slate-400 italic">
+                      Chưa có hạng mục cho loại này
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -194,12 +218,12 @@ export const CashflowModal: React.FC<CashflowModalProps> = ({
 
           {/* Content & Notes */}
           <div className="space-y-6">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nội dung</Label>
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nội dung {isExpense ? 'chi' : 'thu'}</Label>
               <Input
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Ví dụ: Tiền phòng 101, Thanh toán tiền điện..."
+                placeholder={isExpense ? "VD: Tiền điện tháng 12, Sửa vòi hoa sen phòng 102..." : "VD: Thu tiền bán thanh lý..."}
                 className="h-14 rounded-2xl border-slate-100 bg-slate-50 font-bold placeholder:text-slate-300 focus:ring-blue-600"
               />
             </div>
@@ -215,29 +239,18 @@ export const CashflowModal: React.FC<CashflowModalProps> = ({
             </div>
           </div>
 
-          <div className="flex gap-4 pt-4">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onClose}
-              className="flex-1 h-16 rounded-2xl font-black uppercase text-xs tracking-widest text-slate-400 hover:text-slate-600"
-            >
-              Hủy bỏ
-            </Button>
+          {/* Submit Button */}
+          <div className="pt-6 border-t border-slate-100">
             <Button
               type="submit"
               disabled={isSubmitting || amount <= 0 || !categoryId || !content.trim()}
-              className={cn(
-                "flex-[2] h-16 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg transition-all",
-                type === 'income' 
-                  ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" 
-                  : "bg-rose-600 hover:bg-rose-700 shadow-rose-100"
-              )}
+              className="w-full h-16 rounded-2xl font-black uppercase text-sm tracking-[0.2em] bg-slate-900 hover:bg-black text-white shadow-xl shadow-slate-200 transition-all disabled:opacity-50"
             >
-              {isSubmitting ? "Đang xử lý..." : "Lưu giao dịch"}
+              {isSubmitting ? 'Đang lưu...' : (initialData ? 'Cập nhật phiếu' : 'Xác nhận lập phiếu')}
             </Button>
           </div>
         </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

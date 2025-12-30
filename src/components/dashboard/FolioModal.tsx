@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
 import { format, parseISO, differenceInMinutes, differenceInCalendarDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { EventService } from '@/services/events';
+import { useAuth } from '@/context/AuthContext';
 import CheckoutModal, { CheckoutData } from './CheckOutModal';
 import EditBookingModal from './EditBookingModal';
 
@@ -101,6 +103,7 @@ export default function FolioModal({
   const [tick, setTick] = useState(0);
   
   const { showNotification } = useNotification();
+  const { profile, isAdmin: isGlobalAdmin } = useAuth();
 
   // Tự động làm mới tính toán mỗi phút
   useEffect(() => {
@@ -210,13 +213,38 @@ export default function FolioModal({
     const bookingId = room?.current_booking?.id;
     if (!bookingId || isSaving) return;
 
+    // 1. Xác định xem có sự thay đổi giảm (xóa/giảm số lượng) không
+    const isReducing = Object.entries(tempServices).some(([sid, qty]) => {
+      const savedQty = savedServices[sid] || 0;
+      return qty < savedQty;
+    });
+
+    // CHỐT CHẶN: Cấm xóa dịch vụ sau khi đã in nháp (Chỉ Admin/Manager mới được quyền)
+    if (isReducing && room.current_booking.is_printed) {
+      const canBypass = profile?.role === 'admin' || profile?.role === 'manager';
+      if (!canBypass) {
+        showNotification('CẤM XÓA: Folio đã được in nháp. Chỉ Quản lý/Admin mới có quyền xóa/giảm dịch vụ lúc này!', 'error');
+        // Reset tempServices về trạng thái đã lưu
+        setTempServices(savedServices);
+        return;
+      }
+    }
+
+    let reason = '';
+    if (isReducing) {
+      reason = window.prompt('Phát hiện hành động GIẢM số lượng dịch vụ. Vui lòng nhập lý do (bắt buộc):') || '';
+      if (!reason.trim()) {
+        showNotification('Bắt buộc phải có lý do khi giảm số lượng dịch vụ!', 'error');
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const updatedServicesArray = Object.entries(tempServices)
         .filter(([_, qty]) => qty > 0)
         .map(([sid, qty]) => {
           const s = services.find(srv => String(srv.id) === String(sid));
-          // Tìm giá từ dữ liệu đã lưu nếu không có trong danh sách dịch vụ hiện tại
           const savedS = room.current_booking?.services_used?.find((ss: any) => String(ss.service_id || ss.id) === String(sid));
           
           const price = s?.price || savedS?.price || 0;
@@ -239,7 +267,18 @@ export default function FolioModal({
 
       if (error) throw error;
       
-      // Cập nhật tempServices để khớp với dữ liệu đã lưu (xóa các dịch vụ qty = 0)
+      // 2. Ghi log sự kiện (Móng ngầm)
+      await EventService.emit({
+        type: 'SERVICE_UPDATE',
+        entity_type: 'booking',
+        entity_id: bookingId,
+        action: isReducing ? 'Giảm/Xóa dịch vụ' : 'Cập nhật dịch vụ',
+        old_value: savedServices,
+        new_value: tempServices,
+        reason: reason,
+        severity: isReducing ? 'warning' : 'info'
+      });
+
       const newTemp: Record<string, number> = {};
       updatedServicesArray.forEach(s => {
         newTemp[String(s.id)] = s.quantity;
@@ -255,8 +294,25 @@ export default function FolioModal({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!room?.current_booking?.id) return;
+    
+    // Đánh dấu đã in nháp để kích hoạt chốt chặn gian lận
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ is_printed: true })
+        .eq('id', room.current_booking.id);
+        
+      if (error) throw error;
+      
+      // Cập nhật local state để UI phản ứng ngay lập tức nếu cần
+      if (onUpdate) onUpdate();
+      
+      window.print();
+    } catch (error: any) {
+      showNotification(`Lỗi khi đánh dấu in: ${error.message}`, 'error');
+    }
   };
 
   const handleDepositSubmit = async () => {
@@ -307,6 +363,13 @@ export default function FolioModal({
   const handleChangeRoomSubmit = async () => {
     if (!room?.current_booking || !selectedTargetRoomId) return;
 
+    const targetRoomObj = availableRooms.find(r => r.id === selectedTargetRoomId);
+    const reason = window.prompt(`Xác nhận đổi phòng từ ${room.room_number} sang ${targetRoomObj?.room_number}. Vui lòng nhập lý do:`) || '';
+    if (!reason.trim()) {
+      showNotification('Bắt buộc phải có lý do khi đổi phòng!', 'error');
+      return;
+    }
+
     try {
       // Check if target room is still available
       const { data: targetRoom, error: targetRoomError } = await supabase
@@ -346,12 +409,24 @@ export default function FolioModal({
       const { error: newRoomError } = await supabase
         .from('rooms')
         .update({ 
-          status: 'occupied', // Assuming simple status mapping, or keep existing logic
+          status: 'occupied', 
           current_booking_id: room.current_booking.id 
         })
         .eq('id', selectedTargetRoomId);
 
       if (newRoomError) throw newRoomError;
+
+      // 4. Ghi log sự kiện (Móng ngầm)
+      await EventService.emit({
+        type: 'ROOM_CHANGE',
+        entity_type: 'booking',
+        entity_id: room.current_booking.id,
+        action: 'Đổi phòng',
+        reason: reason,
+        old_value: { room_id: room.id, room_number: room.room_number },
+        new_value: { room_id: selectedTargetRoomId, room_number: targetRoomObj?.room_number },
+        severity: 'info'
+      });
 
       showNotification('Đã đổi phòng thành công', 'success');
       setShowChangeRoomModal(false);
@@ -370,60 +445,45 @@ export default function FolioModal({
   }) => {
     if (!room?.current_booking) return;
 
+    // Kiểm tra xem có thay đổi quan trọng không
+    const isPriceChanged = data.initial_price !== (room.current_booking.initial_price || 0);
+    const isTimeChanged = data.check_in_at !== room.current_booking.check_in_at;
+
+    let reason = '';
+    if (isPriceChanged || isTimeChanged) {
+      reason = window.prompt(`Phát hiện thay đổi ${isPriceChanged ? 'GIÁ' : ''}${isPriceChanged && isTimeChanged ? ' và ' : ''}${isTimeChanged ? 'THỜI GIAN' : ''}. Vui lòng nhập lý do (bắt buộc):`) || '';
+      if (!reason.trim()) {
+        showNotification('Bắt buộc phải có lý do khi sửa đổi thông tin quan trọng!', 'error');
+        return;
+      }
+    }
+
     try {
       const updates: any = {
         check_in_at: data.check_in_at,
         initial_price: data.initial_price,
       };
+      
+      const oldValues = {
+        check_in_at: room.current_booking.check_in_at,
+        initial_price: room.current_booking.initial_price,
+        customer_name: room.current_booking.customer?.full_name
+      };
 
       // Handle "from today" logic
       if (data.price_change_type === 'from_today') {
-        // Use the NEW check_in_at for calculation to ensure consistency
+        // ... (existing logic)
         const targetCheckIn = data.check_in_at;
         const now = new Date();
-
-        // 1. Calculate current charge at OLD price for the period [newCheckIn -> now]
-        // We use pricesOverride to force the OLD price for this calculation
         const oldPricesOverride = { ...room.prices };
         oldPricesOverride[room.current_booking.rental_type as keyof typeof oldPricesOverride] = room.current_booking.initial_price || 0;
 
-        const currentPricing = calculateRoomPrice(
-          targetCheckIn,
-          now,
-          settings,
-          room,
-          room.current_booking.rental_type,
-          0,
-          0,
-          oldPricesOverride
-        );
-
-        // 2. Calculate what the charge would be at NEW price for the same period [newCheckIn -> now]
+        const currentPricing = calculateRoomPrice(targetCheckIn, now, settings, room, room.current_booking.rental_type, 0, 0, oldPricesOverride);
         const newPricesOverride = { ...room.prices };
         newPricesOverride[room.current_booking.rental_type as keyof typeof newPricesOverride] = data.initial_price;
-        
-        const newPricing = calculateRoomPrice(
-          targetCheckIn,
-          now,
-          settings,
-          room,
-          room.current_booking.rental_type,
-          0,
-          0,
-          newPricesOverride
-        );
-
-        // 3. Difference to be added to custom_surcharge
-        // If currentPricing.room_charge (old) > newPricing.room_charge (new), diff is positive (surcharge)
-        // If currentPricing.room_charge (old) < newPricing.room_charge (new), diff is negative (discount)
+        const newPricing = calculateRoomPrice(targetCheckIn, now, settings, room, room.current_booking.rental_type, 0, 0, newPricesOverride);
         const diff = currentPricing.room_charge - newPricing.room_charge;
-        
-        // We add this diff to the EXISTING custom_surcharge
         updates.custom_surcharge = (room.current_booking.custom_surcharge || 0) + diff;
-      } else {
-        // If "from_start", we might want to keep or reset custom_surcharge? 
-        // Usually, if they change the price "from start", they might want to clear previous "from today" adjustments.
-        // Let's keep it for now as it might contain other manual surcharges.
       }
 
       // 4. Update booking
@@ -436,12 +496,24 @@ export default function FolioModal({
 
       // 5. Update customer name if changed
       if (room.current_booking.customer_id) {
-        const { error: customerError } = await supabase
+        await supabase
           .from('customers')
           .update({ full_name: data.customer_name })
           .eq('id', room.current_booking.customer_id);
-        
-        if (customerError) throw customerError;
+      }
+
+      // 6. Ghi log sự kiện (Móng ngầm)
+      if (isPriceChanged || isTimeChanged) {
+        await EventService.emit({
+          type: 'PRICE_UPDATE',
+          entity_type: 'booking',
+          entity_id: room.current_booking.id,
+          action: 'Sửa giá/thời gian phòng',
+          old_value: oldValues,
+          new_value: { ...updates, customer_name: data.customer_name },
+          reason: reason,
+          severity: 'warning'
+        });
       }
 
       showNotification('Đã cập nhật thông tin và tính toán lại tiền', 'success');

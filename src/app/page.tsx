@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useHotel } from '@/hooks/useHotel';
+import { EventService } from '@/services/events';
 import { RoomCard } from '@/components/dashboard/RoomCard';
 import { CheckInModal } from '@/components/dashboard/CheckInModal';
 import FolioModal from '@/components/dashboard/FolioModal';
@@ -217,10 +218,10 @@ export default function Dashboard() {
           .eq('type', 'income')
           .single();
 
-        const cashflowData = {
+        const cashflowData: any = {
           type: 'income',
+          category: 'Tiền phòng',
           category_name: 'Tiền phòng',
-          category_id: categoryData?.id || 'system-room-revenue',
           content: `Thanh toán phòng ${folioRoom.room_number}`,
           amount: Number(amount),
           payment_method: 'cash',
@@ -228,6 +229,11 @@ export default function Dashboard() {
           created_at: new Date().toISOString(),
           notes: `Booking ID: ${bookingId}`
         };
+
+        // Chỉ thêm category_id nếu tìm thấy UUID hợp lệ
+        if (categoryData?.id) {
+          cashflowData.category_id = categoryData.id;
+        }
 
         const { error: cashflowError } = await supabase
           .from('cashflow')
@@ -359,6 +365,16 @@ export default function Dashboard() {
               .eq('id', bookingId);
             
             if (bookingError) throw bookingError;
+
+            // 1b. Ghi log sự kiện (Móng ngầm)
+            await EventService.emit({
+              type: 'BOOKING_CANCEL',
+              entity_type: 'booking',
+              entity_id: bookingId,
+              action: 'Hủy đặt phòng',
+              reason: reason,
+              severity: 'danger'
+            });
           }
 
           // 2. Set room status to 'dirty'

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Edit, Package, Search, Tag, DollarSign, X, Save, AlertCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, Package, Search, Tag, DollarSign, X, Save, AlertCircle, ArrowUpCircle, ArrowDownCircle, MoreVertical, Edit2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { EventService } from '@/services/events';
 import { useNotification } from '@/context/NotificationContext';
 import { formatCurrency, cn } from '@/lib/utils';
 import { NumericInput } from '@/components/ui/NumericInput';
@@ -111,8 +112,33 @@ export default function ServiceList() {
 
     try {
       let result;
+      let reason = '';
+
       if (selectedService) {
+        // Kiểm tra gian lận giá: Giảm giá niêm yết
+        if (formData.price < selectedService.price) {
+          reason = window.prompt(`Cảnh báo: Bạn đang GIẢM GIÁ niêm yết của dịch vụ "${selectedService.name}" từ ${formatCurrency(selectedService.price)} xuống ${formatCurrency(formData.price)}. Vui lòng nhập lý do (bắt buộc):`) || '';
+          if (!reason.trim()) {
+            showNotification('Bắt buộc phải có lý do khi giảm giá dịch vụ!', 'error');
+            setSubmitting(false);
+            return;
+          }
+        }
+
         result = await supabase.from('services').update(payload).eq('id', selectedService.id);
+
+        if (!result.error && reason) {
+          await EventService.emit({
+            type: 'SERVICE_PRICE_REDUCTION',
+            entity_type: 'services',
+            entity_id: selectedService.id,
+            action: 'Giảm giá dịch vụ',
+            reason: reason,
+            old_value: selectedService,
+            new_value: payload,
+            severity: 'warning'
+          });
+        }
       } else {
         result = await supabase.from('services').insert([payload]);
       }
@@ -180,12 +206,24 @@ export default function ServiceList() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa dịch vụ này?')) return;
+  const handleDelete = async (service: any) => {
+    const reason = window.prompt(`Bạn có chắc chắn muốn xóa dịch vụ "${service.name}"? Vui lòng nhập lý do:`);
+    if (!reason) return;
 
     try {
-      const { error } = await supabase.from('services').delete().eq('id', id);
+      const { error } = await supabase.from('services').delete().eq('id', service.id);
       if (error) throw error;
+
+      await EventService.emit({
+        type: 'SERVICE_DELETE',
+        entity_type: 'services',
+        entity_id: service.id,
+        action: 'Xóa dịch vụ',
+        reason: reason,
+        old_value: service,
+        severity: 'warning'
+      });
+
       showNotification('Đã xóa thành công', 'success');
       fetchData();
     } catch (err: any) {
@@ -282,7 +320,7 @@ export default function ServiceList() {
                   >
                     <Edit size={18} />
                   </button>
-                  <button onClick={() => handleDelete(service.id)} className="p-2 text-slate-400 hover:text-rose-600">
+                  <button onClick={() => handleDelete(service)} className="p-2 text-slate-400 hover:text-rose-600">
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -296,7 +334,12 @@ export default function ServiceList() {
                 <div className="flex items-center gap-2">
                   <div className="text-right">
                     <p className="text-[10px] font-bold text-slate-400 uppercase">Tồn kho</p>
-                    <p className="font-bold text-slate-800">{service.stock ?? 0}</p>
+                    <p className={cn(
+                      "font-bold",
+                      (service.stock ?? 0) < 5 ? "text-rose-600 animate-pulse" : "text-slate-800"
+                    )}>
+                      {service.stock ?? 0}
+                    </p>
                   </div>
                   
                   <button 
