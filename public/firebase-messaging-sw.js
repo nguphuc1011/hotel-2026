@@ -5,10 +5,23 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-comp
 const urlParams = new URLSearchParams(location.search);
 const configParam = urlParams.get('config');
 
-let firebaseConfig = {};
+// CẤU HÌNH DỰ PHÒNG (Hardcoded cho Vercel)
+const hardcodedConfig = {
+  apiKey: "AIzaSyAKzIBtkOuAFUCTw2GR1KxX8rzVNcJzT1g",
+  authDomain: "thaoai.firebaseapp.com",
+  projectId: "thaoai",
+  storageBucket: "thaoai.firebasestorage.app",
+  messagingSenderId: "401527129236",
+  appId: "1:401527129236:web:395efdd0a4c8291d5fa081"
+};
+
+let firebaseConfig = hardcodedConfig; 
 if (configParam) {
   try {
-    firebaseConfig = JSON.parse(decodeURIComponent(configParam));
+    const dynamicConfig = JSON.parse(decodeURIComponent(configParam));
+    if (dynamicConfig && dynamicConfig.apiKey) {
+      firebaseConfig = dynamicConfig;
+    }
   } catch (e) {
     console.error('Lỗi khi giải mã Firebase config trong Service Worker:', e);
   }
