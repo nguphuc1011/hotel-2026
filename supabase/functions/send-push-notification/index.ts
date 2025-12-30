@@ -3,7 +3,7 @@ import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': '*', // Cho phép tất cả các loại header để tránh lỗi Preflight
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
@@ -79,43 +79,47 @@ Deno.serve(async (req) => {
     
     const invalidTokens: string[] = []
     const results = await Promise.all(tokens.map(async (t) => {
-      const fcmRes = await fetch(fcmUrl, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${accessToken}`, 
-          'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify({
-            message: {
-              token: t.token,
-              notification: { 
-                title: body.title || 'MẮT THẦN HÀNH QUÂN', 
-                body: body.body || `Báo cáo Bệ Hạ, hỏa tiễn đã nổ lúc ${new Date().toLocaleTimeString('vi-VN')}!` 
-              },
-              webpush: {
-                fcm_options: {
-                  link: 'https://hotel-2026.vercel.app/thao-insight'
+      try {
+        const fcmRes = await fetch(fcmUrl, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${accessToken}`, 
+            'Content-Type': 'application/json' 
+          },
+          body: JSON.stringify({
+              message: {
+                token: t.token,
+                notification: { 
+                  title: body.title || 'MẮT THẦN HÀNH QUÂN', 
+                  body: body.body || `Báo cáo Bệ Hạ, hỏa tiễn đã nổ lúc ${new Date().toLocaleTimeString('vi-VN')}!` 
                 },
-                notification: {
-                  icon: 'https://oyrupgbavjpyyobbnrth.supabase.co/storage/v1/object/public/icons/favicon.ico',
-                  badge: 'https://oyrupgbavjpyyobbnrth.supabase.co/storage/v1/object/public/icons/favicon.ico',
-                  tag: 'eye-of-god-alert',
-                  renotify: true
+                webpush: {
+                  fcm_options: {
+                    link: 'https://hotel-2026.vercel.app/thao-insight'
+                  },
+                  notification: {
+                    icon: 'https://oyrupgbavjpyyobbnrth.supabase.co/storage/v1/object/public/icons/favicon.ico',
+                    tag: `eye-of-god-${Date.now()}`, // Tạo tag duy nhất để không bị gộp thông báo
+                    renotify: true // Ép báo rung/chuông kể cả khi cùng tag
+                  }
                 }
               }
-            }
           })
-      })
-      
-      const fcmData = await fcmRes.json()
-      if (!fcmRes.ok) {
-        // Nếu lỗi là NotRegistered hoặc Unregistered, đánh dấu để xóa
-        if (fcmData.error?.details?.[0]?.errorCode === "UNREGISTERED" || fcmData.error?.message?.includes("NotRegistered")) {
-          invalidTokens.push(t.token)
+        })
+
+        const fcmData = await fcmRes.json()
+        if (!fcmRes.ok) {
+          console.error(`[MẮT THẦN] Lỗi FCM cho token ${t.token.substring(0, 10)}:`, fcmData)
+          if (fcmData.error?.status === 'NOT_FOUND' || fcmData.error?.details?.[0]?.errorCode === 'UNREGISTERED' || fcmData.error?.message?.includes("NotRegistered")) {
+            invalidTokens.push(t.token)
+          }
+          return { success: false, token: t.token, error: fcmData }
         }
-        return false;
+        return { success: true, token: t.token }
+      } catch (e) {
+        console.error(`[MẮT THẦN] Lỗi kết nối FCM:`, e)
+        return { success: false, token: t.token, error: e }
       }
-      return true;
     }))
 
     // Tự động dọn dẹp các Token rác
@@ -124,7 +128,7 @@ Deno.serve(async (req) => {
       await supabase.from('user_push_tokens').delete().in('token', invalidTokens)
     }
 
-    const sentCount = results.filter(Boolean).length
+    const sentCount = results.filter(r => r.success).length
     return new Response(JSON.stringify({ 
       success: sentCount > 0, 
       sent_count: sentCount, 

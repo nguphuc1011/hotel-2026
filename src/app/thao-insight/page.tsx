@@ -213,10 +213,9 @@ export default function ThaoInsight() {
         'https://oyrupgbavjpyyobbnrth.supabase.co/functions/v1/send-push-notification',
         {
           method: 'POST',
-          // Bỏ mode: 'cors' để dùng mặc định của trình duyệt, đôi khi ép cors lại gây lỗi preflight
+          mode: 'cors', // Bật lại mode cors sau khi đã fix Header ở Server
           headers: {
             'Content-Type': 'application/json',
-            // Dùng Bearer token là anon key (nếu Function tắt Verify JWT thì cái này chỉ để vượt cổng Supabase)
             Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
             apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
           },
