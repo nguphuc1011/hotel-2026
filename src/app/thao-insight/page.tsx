@@ -195,6 +195,46 @@ export default function ThaoInsight() {
     }
   };
 
+  const sendRocketTest = async () => {
+    const toastId = toast.loading('🚀 Đang chuẩn bị Hỏa tiễn từ Server...');
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error('Bệ Hạ cần đăng nhập để bắn Hỏa tiễn!');
+
+      const { data, error } = await supabase.functions.invoke('send-push-notification', {
+        body: {
+          user_id: user.id,
+          title: '🚀 HỎA TIỄN TỪ SERVER',
+          body: 'Báo cáo Bệ Hạ! Trạm phát tín hiệu Edge Function đã khai hỏa thành công!',
+          data: { type: 'test_rocket' },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success('Hỏa tiễn đã rời bệ phóng!', {
+          id: toastId,
+          description: `Đã truyền tin tới ${data.sent_count}/${data.total_tokens} thiết bị của Bệ Hạ.`,
+        });
+      } else {
+        toast.error('Hỏa tiễn xịt!', {
+          id: toastId,
+          description: data?.message || 'Không tìm thấy Token nào để gửi.',
+        });
+      }
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.error('Lỗi bắn Hỏa tiễn:', error);
+      toast.error('Lỗi khi bắn Hỏa tiễn', {
+        id: toastId,
+        description: error.message || 'Vui lòng kiểm tra Edge Function config.',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-900">
@@ -229,12 +269,20 @@ export default function ThaoInsight() {
               "Tháo đã nhìn thấu vạn vật - Kẻ gian khó thoát mắt thần"
             </p>
           </div>
-          <Button
-            onClick={sendDemoReport}
-            className="h-16 px-10 rounded-2xl font-black uppercase text-xs tracking-widest bg-blue-600 hover:bg-blue-700 text-white shadow-2xl shadow-blue-900/20 gap-3 transition-all active:scale-95"
-          >
-            <Bell size={20} /> Gửi báo cáo Demo
-          </Button>
+          <div className="flex flex-col md:flex-row gap-3">
+            <Button
+              onClick={sendDemoReport}
+              className="h-16 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 shadow-2xl gap-3 transition-all active:scale-95"
+            >
+              <Bell size={18} /> Demo Local
+            </Button>
+            <Button
+              onClick={sendRocketTest}
+              className="h-16 px-10 rounded-2xl font-black uppercase text-xs tracking-widest bg-blue-600 hover:bg-blue-700 text-white shadow-2xl shadow-blue-900/20 gap-3 transition-all active:scale-95"
+            >
+              <Activity size={20} /> Bắn thử Hỏa tiễn
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

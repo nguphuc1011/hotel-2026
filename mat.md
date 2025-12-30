@@ -21,9 +21,9 @@
 
 | Giai đoạn | Hành động | Trạng thái |
 | :--- | :--- | :--- |
-| **Bước 1** | Tạo bảng `user_push_tokens` và logic lưu Token tự động. | 🟡 Đang thực thi |
-| **Bước 2** | Thiết lập Supabase Edge Function (Trung tâm điều phối). | ⚪ Chờ duyệt |
-| **Bước 3** | Cài đặt Database Webhook trên bảng `bookings`. | ⚪ Chờ duyệt |
+| **Bước 1** | Tạo bảng `user_push_tokens` và logic lưu Token tự động. | ✅ Hoàn thành |
+| **Bước 2** | Thiết lập Supabase Edge Function (Trung tâm điều phối). | ✅ Đã đúc xong |
+| **Bước 3** | Cài đặt Database Webhook trên bảng `bookings`. | 🟡 Đang thực thi |
 | **Bước 4** | Kiểm thử thực tế trên đa thiết bị (PC & Mobile). | ⚪ Chờ duyệt |
 
 ---
