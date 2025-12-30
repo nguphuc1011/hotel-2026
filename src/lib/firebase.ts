@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
+import { supabase } from './supabase';
 
 // PHIÊN BẢN BẤT BIẾN: Hỗ trợ linh hoạt mọi phương thức cấu hình
 const getFirebaseConfig = () => {
@@ -105,14 +106,23 @@ export const requestForToken = async () => {
       if (currentToken) {
         // TỰ ĐỘNG GỬI TOKEN LÊN SUPABASE
         try {
-          const { data: { user } } = await supabase.auth.getUser();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
           if (user) {
-            await supabase.from('user_push_tokens').upsert({
-              user_id: user.id,
-              token: currentToken,
-              device_type: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
-              last_seen: new Date().toISOString()
-            }, { onConflict: 'token' });
+            await supabase.from('user_push_tokens').upsert(
+              {
+                user_id: user.id,
+                token: currentToken,
+                device_type: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                  navigator.userAgent
+                )
+                  ? 'mobile'
+                  : 'desktop',
+                last_seen: new Date().toISOString(),
+              },
+              { onConflict: 'token' }
+            );
             // eslint-disable-next-line no-console
             console.log('Đã cập nhật Token lên Mật Sổ (Supabase)');
           }
