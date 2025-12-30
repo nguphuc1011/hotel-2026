@@ -1,47 +1,61 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
 
-let firebaseConfig = {};
-try {
+// Hàm hỗ trợ parse config an toàn
+const getSafeConfig = () => {
   const configRaw = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
-  if (configRaw) {
-    // Nếu chuỗi không bắt đầu bằng '{', có thể Bệ Hạ đã dán thiếu dấu ngoặc
-    const formattedConfig = configRaw.trim().startsWith('{') ? configRaw : `{${configRaw}}`;
-    // Thử parse JSON, nếu thất bại (do thiếu dấu ngoặc kép ở key), chúng ta sẽ báo lỗi êm dịu hơn
-    firebaseConfig = JSON.parse(formattedConfig);
-  }
-} catch {
-  // Trong quá trình build, nếu config chưa có hoặc sai định dạng, ta bỏ qua để không làm gãy build
-  if (process.env.NODE_ENV === 'production') {
-    // Chỉ log cảnh báo, không làm crash ứng dụng
-  }
-}
+  if (!configRaw) return {};
 
-const app =
-  getApps().length > 0
-    ? getApp()
-    : Object.keys(firebaseConfig).length > 0
-      ? initializeApp(firebaseConfig)
-      : null;
-const messaging = typeof window !== 'undefined' && app ? getMessaging(app) : undefined;
+  try {
+    // Thử parse JSON chuẩn
+    return JSON.parse(configRaw);
+  } catch {
+    try {
+      // Nếu dán kiểu JS object (thiếu ngoặc kép ở key), thử bọc lại và parse
+      // Lưu ý: Đây là giải pháp tình thế, tốt nhất vẫn là JSON chuẩn
+      const formatted = configRaw.trim().startsWith('{') ? configRaw : `{${configRaw}}`;
+      // Sử dụng Function thay vì eval để an toàn hơn một chút và tránh lỗi linter
 
-if (typeof window !== 'undefined' && app) {
-  // Đăng ký Service Worker với config được truyền qua query parameter
-  if ('serviceWorker' in navigator && Object.keys(firebaseConfig).length > 0) {
-    const configString = encodeURIComponent(JSON.stringify(firebaseConfig));
-    navigator.serviceWorker
-      .register(`/firebase-messaging-sw.js?config=${configString}`)
-      .then(() => {
-        // SW registered
-      })
-      .catch(() => {
-        // SW registration failed
-      });
+      return new Function(`return ${formatted}`)();
+    } catch {
+      return {};
+    }
+  }
+};
+
+let app: FirebaseApp | null = null;
+let messaging: Messaging | undefined = undefined;
+
+// Chỉ khởi tạo trên trình duyệt để tránh lỗi Prerender/SSR
+if (typeof window !== 'undefined') {
+  const firebaseConfig = getSafeConfig();
+
+  if (Object.keys(firebaseConfig).length > 0) {
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+    try {
+      messaging = getMessaging(app);
+
+      // Đăng ký Service Worker
+      if ('serviceWorker' in navigator) {
+        const configString = encodeURIComponent(JSON.stringify(firebaseConfig));
+        navigator.serviceWorker
+          .register(`/firebase-messaging-sw.js?config=${configString}`)
+          .then(() => {
+            // SW registered
+          })
+          .catch(() => {
+            // SW registration failed
+          });
+      }
+    } catch {
+      // Messaging có thể không hỗ trợ trên một số trình duyệt
+    }
   }
 }
 
 export const requestForToken = async () => {
-  if (!messaging) return null;
+  if (typeof window === 'undefined' || !messaging) return null;
 
   try {
     const permission = await Notification.requestPermission();
@@ -49,12 +63,9 @@ export const requestForToken = async () => {
       const currentToken = await getToken(messaging, {
         vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
       });
-      if (currentToken) {
-        return currentToken;
-      } else {
-        return null;
-      }
+      return currentToken || null;
     }
+    return null;
   } catch {
     return null;
   }
@@ -62,7 +73,7 @@ export const requestForToken = async () => {
 
 export const onMessageListener = () =>
   new Promise((resolve) => {
-    if (!messaging) return;
+    if (typeof window === 'undefined' || !messaging) return;
     onMessage(messaging, (payload) => {
       resolve(payload);
     });
