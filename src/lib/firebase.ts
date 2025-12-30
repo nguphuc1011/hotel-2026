@@ -21,15 +21,22 @@ const getFirebaseConfig = () => {
   const configRaw = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
   if (configRaw) {
     try {
-      return JSON.parse(configRaw);
-    } catch {
-      try {
-        const formatted = configRaw.trim().startsWith('{') ? configRaw : `{${configRaw}}`;
+      // Làm sạch chuỗi trước khi parse
+      const cleaned = configRaw.trim();
 
-        return new Function(`return ${formatted}`)();
-      } catch {
-        return {};
+      // Nếu là JSON chuẩn (bắt đầu bằng { và kết thúc bằng })
+      if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+        // Thử parse JSON chuẩn trước
+        try {
+          return JSON.parse(cleaned);
+        } catch {
+          // Nếu parse JSON thất bại (có thể do thiếu ngoặc kép ở key), dùng Function để eval an toàn
+
+          return new Function(`return ${cleaned}`)();
+        }
       }
+    } catch {
+      return {};
     }
   }
 
