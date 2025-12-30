@@ -1,27 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-const getEnv = (key: string) => {
-  if (typeof window !== 'undefined') {
-    return window.process?.env?.[key] || process.env[key];
-  }
-  return process.env[key];
-};
+// Trong Next.js, biến NEXT_PUBLIC_ sẽ được nhúng vào client-side bundle lúc build.
+// Nếu Bệ Hạ chưa dán biến môi trường lên Vercel trước khi build, chúng sẽ là undefined.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || getEnv('NEXT_PUBLIC_SUPABASE_URL');
-const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  // Trong môi trường build/prerender của Next.js, biến môi trường có thể chưa có
-  // Chúng ta sẽ log cảnh báo thay vì throw error ngay lập tức để tránh làm hỏng bản build
-  // nếu trang đó không thực sự sử dụng supabase lúc build.
-  if (process.env.NODE_ENV === 'development') {
+// Kiểm tra và thông báo lỗi rõ ràng
+if (typeof window !== 'undefined') {
+  if (!supabaseUrl || !supabaseAnonKey) {
     // eslint-disable-next-line no-console
-    console.warn('Supabase environment variables are missing!');
+    console.warn(
+      'CẢNH BÁO: Thiếu biến môi trường Supabase. Hãy kiểm tra lại Vercel Environment Variables và đảm bảo đã Redeploy.'
+    );
   }
 }
 
-// Khởi tạo client với fallback để tránh crash module load
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-key'

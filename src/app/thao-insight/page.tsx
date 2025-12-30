@@ -83,7 +83,7 @@ export default function ThaoInsight() {
         .from('bookings')
         .select('total_amount, status')
         .eq('status', 'completed')
-        .gte('updated_at', startOfToday);
+        .gte('check_out_at', startOfToday);
 
       const expectedIncome = bookingsToday?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
 
