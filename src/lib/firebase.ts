@@ -1,55 +1,69 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
 
-// Hàm hỗ trợ parse config an toàn
-const getSafeConfig = () => {
+// PHIÊN BẢN BẤT BIẾN: Hỗ trợ linh hoạt mọi phương thức cấu hình
+const getFirebaseConfig = () => {
+  // Ưu tiên 1: Các biến môi trường rời rạc (Chuẩn nhất, tránh lỗi JSON)
+  const individualConfig = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  };
+
+  if (individualConfig.apiKey && individualConfig.appId) {
+    return individualConfig;
+  }
+
+  // Ưu tiên 2: Biến JSON tổng hợp (Nếu Bệ Hạ đã dán cả cục)
   const configRaw = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
-  if (!configRaw) return {};
-
-  try {
-    // Thử parse JSON chuẩn
-    return JSON.parse(configRaw);
-  } catch {
+  if (configRaw) {
     try {
-      // Nếu dán kiểu JS object (thiếu ngoặc kép ở key), thử bọc lại và parse
-      // Lưu ý: Đây là giải pháp tình thế, tốt nhất vẫn là JSON chuẩn
-      const formatted = configRaw.trim().startsWith('{') ? configRaw : `{${configRaw}}`;
-      // Sử dụng Function thay vì eval để an toàn hơn một chút và tránh lỗi linter
-
-      return new Function(`return ${formatted}`)();
+      return JSON.parse(configRaw);
     } catch {
-      return {};
+      try {
+        const formatted = configRaw.trim().startsWith('{') ? configRaw : `{${configRaw}}`;
+
+        return new Function(`return ${formatted}`)();
+      } catch {
+        return {};
+      }
     }
   }
+
+  return {};
 };
 
 let app: FirebaseApp | null = null;
 let messaging: Messaging | undefined = undefined;
 
-// Chỉ khởi tạo trên trình duyệt để tránh lỗi Prerender/SSR
+// Chỉ khởi tạo trên Client
 if (typeof window !== 'undefined') {
-  const firebaseConfig = getSafeConfig();
+  const config = getFirebaseConfig();
 
-  if (Object.keys(firebaseConfig).length > 0) {
-    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  if (config && (config as any).apiKey) {
+    app = getApps().length > 0 ? getApp() : initializeApp(config);
 
     try {
-      messaging = getMessaging(app);
+      // Kiểm tra trình duyệt có hỗ trợ Messaging không
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        messaging = getMessaging(app);
 
-      // Đăng ký Service Worker
-      if ('serviceWorker' in navigator) {
-        const configString = encodeURIComponent(JSON.stringify(firebaseConfig));
+        // Đăng ký Service Worker
+        const configString = encodeURIComponent(JSON.stringify(config));
         navigator.serviceWorker
           .register(`/firebase-messaging-sw.js?config=${configString}`)
           .then(() => {
-            // SW registered
+            /* Mắt Thần đã gác cửa */
           })
           .catch(() => {
-            // SW registration failed
+            /* Lỗi tuần tra */
           });
       }
     } catch {
-      // Messaging có thể không hỗ trợ trên một số trình duyệt
+      // Trình duyệt không hỗ trợ hoặc lỗi khởi tạo
     }
   }
 }
