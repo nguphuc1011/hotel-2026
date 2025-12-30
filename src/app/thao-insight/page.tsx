@@ -148,18 +148,27 @@ export default function ThaoInsight() {
   }, []);
 
   const sendDemoReport = async () => {
-    const token = await requestForToken();
-    if (!token) {
-      toast.error('Bệ Hạ chưa cho phép "Mắt Thần" gửi thông báo!', {
-        description: 'Vui lòng kiểm tra cài đặt trình duyệt và cấp quyền.',
-      });
-      return;
-    }
+    try {
+      const token = await requestForToken();
+      if (!token) {
+        toast.error('Bệ Hạ chưa cho phép "Mắt Thần" hoặc thiếu cấu hình!', {
+          description:
+            'Vui lòng kiểm tra quyền thông báo hoặc biến NEXT_PUBLIC_FIREBASE_VAPID_KEY trên Vercel.',
+        });
+        return;
+      }
 
-    toast.success('Đang gửi báo cáo "Tháo Insight" tới thiết bị của Bệ Hạ...', {
-      description: 'Báo cáo đã được nén và mã hóa theo chuẩn mật mã quân sự.',
-      duration: 5000,
-    });
+      toast.success('Kết nối "Mắt Thần" thành công!', {
+        description: `Token: ${token.substring(0, 10)}... (Đã sẵn sàng nhận tin)`,
+        duration: 5000,
+      });
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.error('Lỗi Demo Report:', error);
+      toast.error('Lỗi khi kích hoạt Mắt Thần', {
+        description: error.message || 'Lỗi không xác định',
+      });
+    }
   };
 
   if (loading) {

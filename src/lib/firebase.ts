@@ -69,18 +69,31 @@ if (typeof window !== 'undefined') {
 }
 
 export const requestForToken = async () => {
-  if (typeof window === 'undefined' || !messaging) return null;
+  if (typeof window === 'undefined') return null;
+
+  if (!messaging) {
+    // eslint-disable-next-line no-console
+    console.warn('Firebase Messaging chưa được khởi tạo. Kiểm tra Firebase Config.');
+    return null;
+  }
 
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      if (!vapidKey) {
+        // eslint-disable-next-line no-console
+        console.error('Thiếu NEXT_PUBLIC_FIREBASE_VAPID_KEY!');
+      }
       const currentToken = await getToken(messaging, {
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        vapidKey: vapidKey,
       });
       return currentToken || null;
     }
     return null;
-  } catch {
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Lỗi lấy Token:', error);
     return null;
   }
 };
