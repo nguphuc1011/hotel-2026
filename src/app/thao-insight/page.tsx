@@ -168,11 +168,23 @@ export default function ThaoInsight() {
 
       // eslint-disable-next-line no-console
       console.log('Đã lấy được Token:', token);
+
+      // Giả lập một báo cáo quân sự
       toast.success('Kết nối "Mắt Thần" thành công!', {
         id: toastId,
-        description: `Token: ${token.substring(0, 10)}... (Bệ Hạ đã sẵn sàng nhận tin)`,
-        duration: 5000,
+        description: 'Đang gửi bản tin thử nghiệm tới thiết bị của Bệ Hạ...',
+        duration: 3000,
       });
+
+      // Kích hoạt thông báo trình duyệt (Local Notification) để Demo
+      if ('Notification' in window && Notification.permission === 'granted') {
+        setTimeout(() => {
+          new Notification('MẮT THẦN: BÁO CÁO QUÂN SỰ', {
+            body: 'Bệ Hạ vạn tuế! Hệ thống truyền tin đã thông suốt. Tháo Insight đã sẵn sàng canh giữ vương quốc.',
+            icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983803.png',
+          });
+        }, 1500);
+      }
     } catch (error: any) {
       // eslint-disable-next-line no-console
       console.error('Lỗi cực nghiêm trọng khi kích hoạt Mắt Thần:', error);
