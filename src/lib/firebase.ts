@@ -65,15 +65,21 @@ if (typeof window !== 'undefined') {
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         messaging = getMessaging(app);
 
-        // Đăng ký Service Worker
+        // Đăng ký Service Worker với cơ chế ép buộc cập nhật
         const configString = encodeURIComponent(JSON.stringify(config));
         navigator.serviceWorker
-          .register(`/firebase-messaging-sw.js?config=${configString}`)
-          .then(() => {
-            /* Mắt Thần đã gác cửa */
+          .register(`/firebase-messaging-sw.js?config=${configString}`, {
+            updateViaCache: 'none',
           })
-          .catch(() => {
-            /* Lỗi tuần tra */
+          .then((registration) => {
+            // eslint-disable-next-line no-console
+            console.log('Mắt Thần đã gác cửa thành công!');
+            // Ép cập nhật ngay lập tức nếu có bản mới
+            registration.update();
+          })
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error('Lỗi tuần tra:', err);
           });
       }
     } catch {

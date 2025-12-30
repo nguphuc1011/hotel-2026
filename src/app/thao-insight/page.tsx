@@ -204,22 +204,38 @@ export default function ThaoInsight() {
       if (!user) throw new Error('Bệ Hạ cần đăng nhập để bắn Hỏa tiễn!');
 
       // eslint-disable-next-line no-console
-      console.log('Đang gọi Edge Function tại:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+      console.log(
+        'Đang gọi Edge Function tại:',
+        'https://oyrupgbavjpyyobbnrth.supabase.co/functions/v1/send-push-notification'
+      );
 
-      const { data, error } = await supabase.functions.invoke('send-push-notification', {
-        body: {
-          user_id: user.id,
-          title: '🚀 HỎA TIỄN TỪ SERVER',
-          body: 'Báo cáo Bệ Hạ! Trạm phát tín hiệu Edge Function đã khai hỏa thành công!',
-          data: { type: 'test_rocket' },
-        },
-      });
+      const response = await fetch(
+        'https://oyrupgbavjpyyobbnrth.supabase.co/functions/v1/send-push-notification',
+        {
+          method: 'POST',
+          mode: 'cors', // Vượt rào CORS theo mật lệnh
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          },
+          body: JSON.stringify({
+            user_id: user.id,
+            title: '🚀 HỎA TIỄN TỪ SERVER',
+            body: 'Báo cáo Bệ Hạ! Trạm phát tín hiệu Edge Function đã khai hỏa thành công!',
+            data: { type: 'test_rocket' },
+          }),
+        }
+      );
 
-      if (error) {
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
         // eslint-disable-next-line no-console
-        console.error('Chi tiết lỗi Edge Function:', error);
-        throw error;
+        console.error('Chi tiết lỗi Edge Function:', errorData);
+        throw new Error(errorData.error || `Lỗi Server: ${response.status}`);
       }
+
+      const data = await response.json();
 
       if (data?.success) {
         toast.success('Hỏa tiễn đã rời bệ phóng!', {
