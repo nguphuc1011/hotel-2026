@@ -65,22 +65,8 @@ if (typeof window !== 'undefined') {
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         messaging = getMessaging(app);
 
-        // Đăng ký Service Worker với cơ chế ép buộc cập nhật
-        const configString = encodeURIComponent(JSON.stringify(config));
-        navigator.serviceWorker
-          .register(`/firebase-messaging-sw.js?config=${configString}`, {
-            updateViaCache: 'none',
-          })
-          .then((registration) => {
-            // eslint-disable-next-line no-console
-            console.log('Mắt Thần đã gác cửa thành công!');
-            // Ép cập nhật ngay lập tức nếu có bản mới
-            registration.update();
-          })
-          .catch((err) => {
-            // eslint-disable-next-line no-console
-            console.error('Lỗi tuần tra:', err);
-          });
+        // KHÔNG đăng ký Service Worker thủ công nữa để tránh nhân đôi trạm phát
+        // Firebase Messaging sẽ tự động tìm thấy firebase-messaging-sw.js ở thư mục public
       }
     } catch {
       // Trình duyệt không hỗ trợ hoặc lỗi khởi tạo
