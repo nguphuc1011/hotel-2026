@@ -235,9 +235,16 @@ export default function ThaoInsight() {
     } catch (error: any) {
       // eslint-disable-next-line no-console
       console.error('Lỗi bắn Hỏa tiễn:', error);
+
+      let errorDetail = error.message || 'Vui lòng kiểm tra Edge Function config.';
+      if (error.message?.includes('Failed to fetch')) {
+        errorDetail =
+          'Không thể kết nối tới Server. Có thể do CORS hoặc Edge Function chưa được deploy.';
+      }
+
       toast.error('Lỗi khi bắn Hỏa tiễn', {
         id: toastId,
-        description: error.message || 'Vui lòng kiểm tra Edge Function config.',
+        description: errorDetail,
       });
     }
   };
@@ -275,6 +282,15 @@ export default function ThaoInsight() {
             <p className="text-slate-400 font-bold text-sm tracking-wide uppercase italic">
               "Tháo đã nhìn thấu vạn vật - Kẻ gian khó thoát mắt thần"
             </p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Trạm phát:</span>
+              <code className="text-[10px] text-blue-400 font-mono bg-blue-500/5 px-2 py-0.5 rounded border border-blue-500/10">
+                {process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '').replace(
+                  '.supabase.co',
+                  ''
+                )}
+              </code>
+            </div>
           </div>
           <div className="flex flex-col md:flex-row gap-3">
             <Button
