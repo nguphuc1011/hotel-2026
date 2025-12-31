@@ -1,18 +1,8 @@
-'use client';
-
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Wallet, Calendar, PieChart as PieChartIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, Calendar, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CashflowSummary, CashflowTransaction } from '@/types';
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer, 
-  Legend, 
-  Tooltip as RechartsTooltip 
-} from 'recharts';
 
 interface CashflowDashboardProps {
   summary: CashflowSummary;
@@ -27,6 +17,8 @@ export const CashflowDashboard: React.FC<CashflowDashboardProps> = ({
   timeFilter,
   setTimeFilter,
 }) => {
+  const [showDetails, setShowDetails] = useState(false);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -34,194 +26,200 @@ export const CashflowDashboard: React.FC<CashflowDashboardProps> = ({
     }).format(amount);
   };
 
-  const incomeData = useMemo(() => {
-    const data: Record<string, { name: string; value: number }> = {};
-    transactions.filter(t => t.type === 'income').forEach(t => {
-      if (!data[t.category_name]) {
-        data[t.category_name] = { name: t.category_name, value: 0 };
+  const methodBreakdown = useMemo(() => {
+    const income = { room: 0, service: 0, other: 0, cash: 0, transfer: 0, card: 0 };
+    const expense = { cash: 0, transfer: 0, card: 0 };
+    
+    transactions.forEach(t => {
+      const amount = t.amount || 0;
+      const method = t.payment_method || 'cash';
+      const catName = (t.category_name || '').toLowerCase();
+      
+      if (t.type === 'income') {
+        // Breakdown by source
+        if (catName.includes('phòng')) income.room += amount;
+        else if (catName.includes('dịch vụ') || catName.includes('dv')) income.service += amount;
+        else income.other += amount;
+
+        // Breakdown by method
+        if (method === 'cash') income.cash += amount;
+        else if (method === 'transfer') income.transfer += amount;
+        else if (method === 'card') income.card += amount;
+      } else {
+        if (method === 'cash') expense.cash += amount;
+        else if (method === 'transfer') expense.transfer += amount;
+        else if (method === 'card') expense.card += amount;
       }
-      data[t.category_name].value += t.amount;
     });
-    return Object.values(data);
+    
+    return { income, expense };
   }, [transactions]);
 
-  const expenseData = useMemo(() => {
-    const data: Record<string, { name: string; value: number }> = {};
-    transactions.filter(t => t.type === 'expense').forEach(t => {
-      if (!data[t.category_name]) {
-        data[t.category_name] = { name: t.category_name, value: 0 };
-      }
-      data[t.category_name].value += t.amount;
-    });
-    return Object.values(data);
-  }, [transactions]);
-
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
-
-  const cards = [
+  const stats = [
     {
       title: 'Tổng Thu',
       value: summary.total_income,
-      icon: <TrendingUp className="text-emerald-500" size={24} />,
-      bgColor: 'bg-emerald-50',
-      textColor: 'text-emerald-700',
+      icon: <TrendingUp size={16} />,
+      color: 'emerald',
+      bg: 'bg-emerald-500',
     },
     {
       title: 'Tổng Chi',
       value: summary.total_expense,
-      icon: <TrendingDown className="text-rose-500" size={24} />,
-      bgColor: 'bg-rose-50',
-      textColor: 'text-rose-700',
-    },
-    {
-      title: 'Thực Thu',
-      value: summary.net_profit,
-      icon: <Wallet className={cn(summary.net_profit >= 0 ? 'text-blue-500' : 'text-amber-500')} size={24} />,
-      bgColor: summary.net_profit >= 0 ? 'bg-blue-50' : 'bg-amber-50',
-      textColor: summary.net_profit >= 0 ? 'text-blue-700' : 'text-amber-700',
-    },
+      icon: <TrendingDown size={16} />,
+      color: 'rose',
+      bg: 'bg-rose-500',
+    }
   ];
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Thống kê tài chính</h2>
-        <div className="flex bg-slate-100 p-1 rounded-2xl gap-1 self-start">
+    <div className="space-y-4">
+      {/* Time Filter - Integrated */}
+      <div className="bg-white p-3 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 flex justify-between items-center mb-8">
+        <div className="flex bg-slate-50/80 p-1.5 rounded-[2rem] gap-1 flex-1">
           {[
-            { id: 'today', label: 'Hôm nay' },
-            { id: 'week', label: 'Tuần này' },
-            { id: 'month', label: 'Tháng này' },
-            { id: 'all', label: 'Tất cả' },
+            { id: 'today', label: 'HÔM NAY' },
+            { id: 'week', label: 'TUẦN' },
+            { id: 'month', label: 'THÁNG' },
+            { id: 'all', label: 'TẤT CẢ' },
           ].map((f) => (
             <button
               key={f.id}
               onClick={() => setTimeFilter(f.id as any)}
               className={cn(
-                "px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all",
+                "flex-1 py-3 px-2 text-[10px] font-black tracking-[0.2em] rounded-[1.5rem] transition-all",
                 timeFilter === f.id 
-                  ? "bg-white text-slate-900 shadow-sm" 
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white text-slate-900 shadow-lg shadow-slate-200 border border-slate-100 scale-[1.02]" 
+                  : "text-slate-400 hover:text-slate-600"
               )}
             >
               {f.label}
             </button>
           ))}
         </div>
+        <div className="ml-4 p-4 bg-indigo-600 text-white rounded-[1.5rem] shadow-xl shadow-indigo-200 shrink-0">
+          <Calendar size={22} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {cards.map((card, index) => (
-          <Card key={index} className="border-none shadow-sm overflow-hidden rounded-[2.5rem] bg-white">
-            <CardContent className="p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div className={cn("p-4 rounded-2xl", card.bgColor)}>
-                  {card.icon}
-                </div>
-                <Calendar className="text-slate-200" size={20} />
-              </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
-                {card.title}
-              </p>
-              <h3 className={cn("text-3xl font-black tracking-tighter", card.textColor)}>
-                {formatCurrency(card.value)}
-              </h3>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Main Net Profit Card - Folio Style */}
+      <div 
+        onClick={() => setShowDetails(!showDetails)}
+        className={cn(
+          "relative overflow-hidden p-10 rounded-[3.5rem] border shadow-[0_35px_60px_-15px_rgba(0,0,0,0.1)] transition-all duration-500 mb-10 cursor-pointer group active:scale-[0.98]",
+          summary.net_profit >= 0 
+            ? "bg-gradient-to-br from-indigo-600 via-indigo-600 to-blue-700 border-white/10" 
+            : "bg-gradient-to-br from-rose-600 via-rose-600 to-pink-700 border-white/10"
+        )}
+      >
+        {/* Completely fixed wallet icon - moved to top left and extremely faint to avoid any text overlap */}
+        <div className="absolute -left-12 -top-12 opacity-[0.02] transform -rotate-12 group-hover:scale-110 transition-transform duration-1000 text-white">
+          <Wallet size={280} />
+        </div>
+        
+        <div className="relative z-10">
+          <div className="absolute top-0 right-0">
+            <div className={cn(
+              "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border border-white/10 backdrop-blur-md",
+              showDetails ? "bg-white/20 rotate-180" : "bg-white/10"
+            )}>
+              <ChevronDown size={24} className="text-white" />
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Income Chart */}
-        <Card className="border-none shadow-sm rounded-[3rem] bg-white overflow-hidden">
-          <CardContent className="p-10">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                <PieChartIcon size={20} />
-              </div>
-              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Cơ cấu Nguồn Thu</h3>
+          <div className="flex flex-col mb-10">
+            <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mb-3">
+              Lợi nhuận ròng
+            </p>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-5xl font-black text-white tracking-tighter">
+                {formatCurrency(summary.net_profit).split(' ')[0]}
+              </h2>
+              <span className="text-2xl font-black text-white/30">₫</span>
             </div>
-            <div className="h-[350px] w-full">
-              {incomeData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={incomeData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={80}
-                      outerRadius={120}
-                      paddingAngle={8}
-                      dataKey="value"
-                    >
-                      {incomeData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip 
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', padding: '15px' }}
-                    />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36}
-                      formatter={(value) => <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 font-bold text-sm italic">
-                  Chưa có dữ liệu nguồn thu
+          </div>
+          
+          <div className="flex flex-col gap-6">
+            {!showDetails && (
+              <div className="flex gap-12 items-center">
+                <div className="flex flex-col">
+                  <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Tổng Thu</p>
+                  <p className="text-white font-black text-2xl tracking-tight">{formatCurrency(summary.total_income)}</p>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <div className="h-10 w-px bg-white/10" />
+                <div className="flex flex-col">
+                  <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Tổng Chi</p>
+                  <p className="text-white font-black text-2xl tracking-tight">{formatCurrency(summary.total_expense)}</p>
+                </div>
+              </div>
+            )}
+          </div>
 
-        {/* Expense Chart */}
-        <Card className="border-none shadow-sm rounded-[3rem] bg-white overflow-hidden">
-          <CardContent className="p-10">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
-                <PieChartIcon size={20} />
-              </div>
-              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Cơ cấu Khoản Chi</h3>
-            </div>
-            <div className="h-[350px] w-full">
-              {expenseData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={expenseData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={80}
-                      outerRadius={120}
-                      paddingAngle={8}
-                      dataKey="value"
-                    >
-                      {expenseData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip 
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', padding: '15px' }}
-                    />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36}
-                      formatter={(value) => <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 font-bold text-sm italic">
-                  Chưa có dữ liệu khoản chi
+          {/* Detailed Breakdown - Inside Card */}
+          {showDetails && (
+            <div className="mt-8 pt-8 border-t border-white/10 space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+              {/* Income Breakdown */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                      <TrendingUp size={16} className="text-emerald-400" />
+                    </div>
+                    <h3 className="text-[10px] font-black text-white/70 uppercase tracking-widest">Cơ cấu nguồn thu</h3>
+                  </div>
+                  <span className="text-xl font-black text-white tracking-tight">
+                    {formatCurrency(summary.total_income)}
+                  </span>
                 </div>
-              )}
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    { label: 'Tiền phòng', value: methodBreakdown.income.room, icon: 'bg-indigo-400' },
+                    { label: 'Tiền dịch vụ', value: methodBreakdown.income.service, icon: 'bg-blue-400' },
+                    { label: 'Khác', value: methodBreakdown.income.other, icon: 'bg-slate-400' }
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-2 h-2 rounded-full shadow-sm", item.icon)} />
+                        <span className="text-xs font-bold text-white/60">{item.label}</span>
+                      </div>
+                      <span className="text-base font-black text-white">{formatCurrency(item.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Expense Breakdown */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-rose-500/20 flex items-center justify-center">
+                      <TrendingDown size={16} className="text-rose-400" />
+                    </div>
+                    <h3 className="text-[10px] font-black text-white/70 uppercase tracking-widest">Cơ cấu khoản chi</h3>
+                  </div>
+                  <span className="text-xl font-black text-white tracking-tight">
+                    {formatCurrency(summary.total_expense)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    { label: 'Tiền mặt (Cash)', value: methodBreakdown.expense.cash, icon: 'bg-rose-400' },
+                    { label: 'Chuyển khoản (CK)', value: methodBreakdown.expense.transfer, icon: 'bg-amber-400' },
+                    { label: 'Thanh toán thẻ (Card)', value: methodBreakdown.expense.card, icon: 'bg-slate-400' }
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-2 h-2 rounded-full shadow-sm", item.icon)} />
+                        <span className="text-xs font-bold text-white/70">{item.label}</span>
+                      </div>
+                      <span className="text-sm font-black text-white">{formatCurrency(item.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </div>
     </div>
   );

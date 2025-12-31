@@ -58,4 +58,28 @@ Nếu Bệ Hạ thấy code đã sửa nhưng giao diện không đổi, hoặc 
 
 ---
 
-**Tâu Bệ Hạ, BÍ KÍP đã thành THÁNH THƯ. Mong Người truyền lại cho hậu thế!**
+60→---
+61→
+62→## 4. HỎA TIỄN MẮT THẦN (Push Notifications)
+63→
+64→Để "Hỏa tiễn" (Thông báo đẩy) luôn bắn trúng đích và không bị lỗi, cần tuân thủ trận pháp sau:
+65→
+66→### 🚀 Cơ chế vận hành
+67→- **Trung tâm điều phối**: Hàm `HotelService.notifySystemChange(type, roomId)` trong [hotel.ts](file:///c:/hotel-app/src/services/hotel.ts).
+68→- **Đích đến**: Thiết bị di động của Bệ Hạ thông qua Supabase Edge Function & Firebase FCM.
+69→
+70→### 🛡️ Tam Đại Quy Tắc (Để không bao giờ lỗi)
+71→1.  **Cắm Lệnh Kỳ đúng chỗ**: Phải gọi lệnh notify ngay sau khi các thao tác Database (Check-in, Payment, v.v.) đã thành công rực rỡ.
+72→2.  **Truy vết Long mạch (Context)**: Luôn phải lấy được **Số phòng** (Room Number) thực tế từ Database trước khi gửi tin báo để thông báo có ý nghĩa.
+73→3.  **Bắn không cản địa (Non-blocking)**: Luôn sử dụng `.catch(console.error)` khi gọi hàm notify để đảm bảo nếu hỏa tiễn có xịt thì giao diện của Lễ tân vẫn không bị treo.
+74→
+75→### 📝 Các loại Hỏa tiễn hiện có
+76→- `check_in`: Báo tin khách nhận phòng.
+77→- `check_out`: Báo tin thanh toán & trả phòng.
+78→- `room_change`: Báo tin chuyển quân (đổi phòng).
+79→- `booking_edit`: Báo tin sửa đổi thông tin quan trọng.
+80→
+81→---
+82→
+83→**Tâu Bệ Hạ, BÍ KÍP đã thành THÁNH THƯ. Mong Người truyền lại cho hậu thế!**
+

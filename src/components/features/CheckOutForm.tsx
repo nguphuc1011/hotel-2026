@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useNotification } from "@/context/NotificationContext";
 import { Button } from "@/components/ui/button";
-import { Clock, List, DollarSign, ShoppingCart } from "lucide-react";
+import { Clock, List, DollarSign, ShoppingCart, CreditCard, Banknote } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface CheckOutFormProps {
   room: Room;
@@ -31,6 +32,7 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
   const [details, setDetails] = useState<CheckoutDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
 
   useEffect(() => {
     if (!room.current_booking_id) {
@@ -63,8 +65,18 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
     }
     setIsCheckingOut(true);
     try {
-      const { error } = await supabase.rpc('handle_checkout', { p_booking_id: room.current_booking_id });
+      const { data, error } = await supabase.rpc('handle_checkout', { 
+        p_booking_id: room.current_booking_id,
+        p_notes: `[THANH TOÁN NHANH] Phương thức: ${paymentMethod}`,
+        p_payment_method: paymentMethod || 'cash',
+        p_surcharge: 0,
+        p_total_amount: Number(details?.total_amount) || 0
+      });
       if (error) throw error;
+      
+      if (data?.success === false) {
+        throw new Error(data.message || 'Thanh toán thất bại');
+      }
       
       showNotification(`Phòng ${room.room_number} đã được thanh toán thành công!`, "success")
       onCheckoutSuccess();
@@ -119,6 +131,39 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
               ))}
             </>
           )}
+        </div>
+      </div>
+      
+      {/* Payment Method */}
+      <div className="space-y-3">
+        <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+          <CreditCard className="h-5 w-5"/> Phương thức thanh toán
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setPaymentMethod('cash')}
+            className={cn(
+              "flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
+              paymentMethod === 'cash' 
+                ? "border-blue-600 bg-blue-50 text-blue-600 shadow-sm" 
+                : "border-slate-100 bg-white text-slate-500 hover:border-slate-200"
+            )}
+          >
+            <Banknote className="h-5 w-5" />
+            <span className="font-bold text-sm">Tiền mặt</span>
+          </button>
+          <button
+            onClick={() => setPaymentMethod('transfer')}
+            className={cn(
+              "flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
+              paymentMethod === 'transfer' 
+                ? "border-blue-600 bg-blue-50 text-blue-600 shadow-sm" 
+                : "border-slate-100 bg-white text-slate-500 hover:border-slate-200"
+            )}
+          >
+            <CreditCard className="h-5 w-5" />
+            <span className="font-bold text-sm">Chuyển khoản</span>
+          </button>
         </div>
       </div>
 

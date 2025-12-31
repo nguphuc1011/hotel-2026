@@ -19,13 +19,17 @@ const fetcher = async (key: string) => {
       // 2. Lấy danh sách booking đang active
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('*, customer:customers(*)')
-        .eq('status', 'active');
+        .select('*')
+        .eq('status', 'active')
+        .is('deleted_at', null);
 
-      if (bookingsError) throw bookingsError;
+      if (bookingsError) {
+        console.error('Lỗi fetcher bookings:', bookingsError);
+        // Không throw để vẫn hiện được danh sách phòng trống
+      }
 
       // 3. Ghép booking vào phòng (Join in-memory để đảm bảo DUY NHẤT một nguồn tin)
-      const joinedRooms = rooms.map(room => {
+      const joinedRooms = (rooms || []).map(room => {
         // Ưu tiên: booking.id === room.current_booking_id (Liên kết chính thức)
         let booking = bookings?.find(b => b.id === room.current_booking_id);
         
@@ -130,9 +134,35 @@ export function useHotel() {
       )
       .subscribe();
 
+    // Listen to customers changes
+    const customerChannel = supabase
+      .channel('customers-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'customers' },
+        () => {
+          mutate('customers');
+        }
+      )
+      .subscribe();
+
+    // Listen to services changes
+    const serviceChannel = supabase
+      .channel('services-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'services' },
+        () => {
+          mutate('services');
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(roomChannel);
       supabase.removeChannel(bookingChannel);
+      supabase.removeChannel(customerChannel);
+      supabase.removeChannel(serviceChannel);
     };
   }, []);
 

@@ -52,10 +52,14 @@ export const EventService = {
         // Tâu Bệ Hạ: Nếu vẫn lỗi RLS hoặc thiếu cột, thần sẽ thử ghi bản rút gọn nhất
         if (error.code === '42501' || error.code === 'PGRST204') {
           console.warn('[EventService] Đang thử ghi log rút gọn do lỗi DB...');
-          await supabase.from('audit_logs').insert({
-            action: `[REDUCED] ${event.action}`,
-            reason: `Lỗi DB: ${error.message} | Lý do gốc: ${event.reason}`
-          }).catch(() => {});
+          try {
+            await supabase.from('audit_logs').insert({
+              action: `[REDUCED] ${event.action}`,
+              reason: `Lỗi DB: ${error.message} | Lý do gốc: ${event.reason}`
+            });
+          } catch (e) {
+            // Im lặng nếu vẫn lỗi
+          }
         }
       }
 

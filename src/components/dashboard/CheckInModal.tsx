@@ -17,11 +17,12 @@ interface CheckInModalProps {
   customers: Customer[];
   timeRules: TimeRules;
   isOpen: boolean;
+  isProcessing?: boolean;
   onClose: () => void;
   onConfirm: (data: CheckInData) => void;
 }
 
-export function CheckInModal({ room, services, customers, timeRules, isOpen, onClose, onConfirm }: CheckInModalProps) {
+export function CheckInModal({ room, services, customers, timeRules, isOpen, isProcessing = false, onClose, onConfirm }: CheckInModalProps) {
   const [customer, setCustomer] = useState({ name: '', phone: '', idCard: '', address: '' });
   const [rentalType, setRentalType] = useState('hourly');
 
@@ -125,21 +126,32 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
   };
 
   const handleConfirm = () => {
-    const checkInData = {
-      room_id: room?.id,
-      customer: {
-        name: customer.name,
-        phone: customer.phone,
-        idCard: customer.idCard,
-        address: customer.address,
-      },
-      rentalType: rentalType,
-      price: price,
-      deposit: deposit,
-      services: servicesUsed,
-      notes: note,
-    };
-    onConfirm(checkInData);
+    try {
+      console.log('CheckInModal: handleConfirm triggered');
+      if (isProcessing) {
+        console.warn('CheckInModal: handleConfirm aborted because isProcessing is true');
+        return;
+      }
+      
+      const checkInData = {
+        room_id: room?.id,
+        customer: {
+          name: customer.name,
+          phone: customer.phone,
+          idCard: customer.idCard,
+          address: customer.address,
+        },
+        rentalType: rentalType,
+        price: price,
+        deposit: deposit,
+        services: servicesUsed,
+        notes: note,
+      };
+      console.log('CheckInModal: sending data to onConfirm:', checkInData);
+      onConfirm(checkInData);
+    } catch (err) {
+      console.error('CheckInModal: Error in handleConfirm:', err);
+    }
   };
 
   const rentalTypes = useMemo(() => {
@@ -163,12 +175,12 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
     <>
       <AnimatePresence mode="wait">
         {isOpen && room && (
-          <div key="checkin-modal-root" className="fixed inset-0 z-[9999] flex items-center justify-center">
+          <div key="checkin-modal-root" className="fixed inset-0 z-[10010] flex items-center justify-center pointer-events-auto">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-md"
+            className="absolute inset-0 bg-black/60 backdrop-blur-md z-0"
             onClick={onClose}
           />
           <motion.div
@@ -176,7 +188,7 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 40, stiffness: 400 }}
-            className="relative w-full h-full bg-slate-50 flex flex-col overflow-hidden"
+            className="relative w-full h-[100dvh] bg-slate-50 flex flex-col overflow-hidden z-[10020]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -196,224 +208,216 @@ export function CheckInModal({ room, services, customers, timeRules, isOpen, onC
             </header>
 
             {/* Scrollable Content */}
-            <main className="flex-1 overflow-y-auto space-y-8 p-6 pb-40 scrollbar-hide">
-            
-            {/* Customer Inputs */}
-            <div className="space-y-4">
-              <button
-                type="button"
-                onClick={() => setIsScannerOpen(true)}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center gap-3 text-white font-black uppercase tracking-wider shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:scale-[1.02] active:scale-[0.98] transition-all group overflow-hidden relative"
-              >
-                <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                <Scan size={22} className="group-hover:rotate-12 transition-transform" />
-                QUÉT THẺ CCCD (THÁO AI)
-              </button>
-
-              <div className="space-y-3">
-                <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Họ và tên khách hàng"
-                  value={customer.name || ''}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-                  onChange={(e) => setCustomer({...customer, name: e.target.value})}
-                  className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-                
-                {/* Smart Suggestion Dropdown */}
-                <AnimatePresence>
-                  {filteredCustomers.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-20 w-full bg-white/80 backdrop-blur-2xl border border-white rounded-3xl mt-2 shadow-2xl overflow-hidden divide-y divide-zinc-50"
-                    >
-                      {filteredCustomers.map((c: Customer, index: number) => (
-                        <button
-                          key={c.id || `customer-${index}`}
-                          type="button"
-                          onClick={() => handleSelectCustomer(c)}
-                          className="w-full px-5 py-4 text-left hover:bg-blue-50/50 flex items-center gap-4 transition-all group"
-                        >
-                          <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                            <User size={20} />
-                          </div>
-                          <div>
-                            <p className="font-black text-zinc-900 uppercase text-sm">{c.full_name}</p>
-                            <p className="text-xs font-bold text-zinc-400">{c.phone} {c.address ? `• ${c.address}` : ''}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Số điện thoại"
-                    value={customer.phone || ''}
-                    onChange={(e) => setCustomer({...customer, phone: e.target.value})}
-                    className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
-                  />
-                </div>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Số CCCD"
-                    value={customer.idCard || ''}
-                    onChange={(e) => setCustomer({...customer, idCard: e.target.value})}
-                    className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Địa chỉ khách hàng"
-                  value={customer.address || ''}
-                  onChange={(e) => setCustomer({...customer, address: e.target.value})}
-                  className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-              </div>
-            </div>
-          </div>
-
-            {/* Rental Type Selection - Modern Card Style */}
-            <div className="relative flex bg-white/50 p-2 rounded-[2.5rem] shadow-inner border border-slate-100 gap-2 mb-6">
-              <div className="absolute inset-0 p-2 pointer-events-none">
-                <div className="relative w-full h-full">
-                  <motion.div
-                    layoutId="activeRentalType"
-                    className={cn(
-                      "absolute h-full rounded-[2rem] shadow-lg transition-colors duration-500",
-                      rentalType === 'hourly' && "bg-blue-600 shadow-blue-200",
-                      rentalType === 'daily' && "bg-emerald-600 shadow-emerald-200",
-                      rentalType === 'overnight' && "bg-indigo-600 shadow-indigo-200"
-                    )}
-                    initial={false}
-                    animate={{
-                      width: `${100 / rentalTypes.length}%`,
-                      x: `${activeIndex * 100}%`,
-                    }}
-                    transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                  />
-                </div>
-              </div>
-
-              {rentalTypes.map((type) => (
+            <main className="flex-1 overflow-y-auto space-y-8 p-6 scrollbar-hide">
+              {/* Customer Inputs */}
+              <div className="space-y-4">
                 <button
-                  key={type.id}
-                  onClick={() => setRentalType(type.id)}
-                  className={cn(
-                    "relative flex-1 flex flex-col items-center justify-center gap-2 py-5 rounded-[2rem] transition-colors duration-300 z-10",
-                    rentalType === type.id ? "text-white" : "text-slate-400 hover:text-slate-600"
-                  )}
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center gap-3 text-white font-black uppercase tracking-wider shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:scale-[1.02] active:scale-[0.98] transition-all group overflow-hidden relative"
                 >
-                  <div className={cn(
-                    "p-2 rounded-xl transition-all duration-500",
-                    rentalType === type.id ? "scale-110 bg-white/20 rotate-[10deg]" : "bg-slate-50"
-                  )}>
-                    {type.icon}
-                  </div>
-                  <span className="text-[10px] font-black tracking-[0.1em] uppercase">
-                    {type.label}
-                  </span>
+                  <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                  <Scan size={22} className="group-hover:rotate-12 transition-transform" />
+                  QUÉT THẺ CCCD (THÁO AI)
                 </button>
-              ))}
-            </div>
 
-            {/* Price and Deposit */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-slate-100 relative group transition-all hover:shadow-md">
-                <div className="absolute top-4 right-5 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <CreditCard size={40} />
-                </div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                  <CreditCard size={10} /> Giá Phòng
-                </p>
-                <div className="flex items-baseline gap-1">
-                  <NumericInput
-                    value={price}
-                    onChange={setPrice}
-                    className="w-full text-2xl font-black text-slate-900 border-none p-0 focus:ring-0 bg-transparent"
-                    suffix="đ"
-                  />
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Họ và tên khách hàng"
+                      value={customer.name || ''}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                      onChange={(e) => setCustomer({...customer, name: e.target.value})}
+                      className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                    
+                    {/* Smart Suggestion Dropdown */}
+                    <AnimatePresence>
+                      {filteredCustomers.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute z-20 w-full bg-white/80 backdrop-blur-2xl border border-white rounded-3xl mt-2 shadow-2xl overflow-hidden divide-y divide-zinc-50"
+                        >
+                          {filteredCustomers.map((c: Customer, index: number) => (
+                            <button
+                              key={c.id || `customer-${index}`}
+                              type="button"
+                              onClick={() => handleSelectCustomer(c)}
+                              className="w-full px-5 py-4 text-left hover:bg-blue-50/50 flex items-center gap-4 transition-all group"
+                            >
+                              <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                <User size={20} />
+                              </div>
+                              <div>
+                                <p className="font-black text-zinc-900 uppercase text-sm">{c.full_name}</p>
+                                <p className="text-xs font-bold text-zinc-400">{c.phone} {c.address ? `• ${c.address}` : ''}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Số điện thoại"
+                        value={customer.phone || ''}
+                        onChange={(e) => setCustomer({...customer, phone: e.target.value})}
+                        className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
+                      />
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Số CCCD"
+                        value={customer.idCard || ''}
+                        onChange={(e) => setCustomer({...customer, idCard: e.target.value})}
+                        className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Địa chỉ khách hàng"
+                      value={customer.address || ''}
+                      onChange={(e) => setCustomer({...customer, address: e.target.value})}
+                      className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
                 </div>
               </div>
-              
-              <div className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-slate-100 relative group transition-all hover:shadow-md">
-                <div className="absolute top-4 right-5 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <FileText size={40} />
+
+              {/* Rental Type Selection - Modern Card Style */}
+              <div className="relative flex bg-white/50 p-2 rounded-[2.5rem] shadow-inner border border-slate-100 gap-2">
+                <div className="absolute inset-0 p-2 pointer-events-none">
+                  <div className="relative w-full h-full">
+                    <motion.div
+                      layoutId="activeRentalType"
+                      className={cn(
+                        "absolute h-full rounded-[2rem] shadow-lg transition-colors duration-500",
+                        rentalType === 'hourly' && "bg-blue-600 shadow-blue-200",
+                        rentalType === 'daily' && "bg-emerald-600 shadow-emerald-200",
+                        rentalType === 'overnight' && "bg-indigo-600 shadow-indigo-200"
+                      )}
+                      initial={false}
+                      animate={{
+                        x: `${activeIndex * 100}%`,
+                        width: `${100 / rentalTypes.length}%`
+                      }}
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                  </div>
                 </div>
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <FileText size={10} /> Tiền Cọc
-                  </p>
-                  <button 
-                    onClick={() => setDeposit(price + serviceTotal)}
-                    className="text-[9px] font-black text-blue-500 hover:text-blue-700 transition-colors uppercase px-2 py-0.5 bg-blue-50 rounded-full"
+
+                {rentalTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => setRentalType(type.id as any)}
+                    className={cn(
+                      "relative flex-1 py-4 flex flex-col items-center justify-center gap-1.5 rounded-[1.5rem] transition-all duration-500 z-10",
+                      rentalType === type.id ? "text-white" : "text-slate-400 hover:text-slate-600"
+                    )}
                   >
-                    Tất cả
+                    <span className={cn(
+                      "transition-transform duration-500",
+                      rentalType === type.id && "scale-110"
+                    )}>
+                      {type.icon}
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em]">{type.label}</span>
                   </button>
+                ))}
+              </div>
+
+              {/* Price & Deposit Inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Tiền phòng</label>
+                  <div className="relative group">
+                    <NumericInput
+                      value={price}
+                      onChange={setPrice}
+                      className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-black focus:ring-2 focus:ring-blue-500 transition-all"
+                      suffix="đ"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-baseline gap-1">
-                  <NumericInput
-                    value={deposit}
-                    onChange={setDeposit}
-                    className="w-full text-2xl font-black text-emerald-600 border-none p-0 focus:ring-0 bg-transparent"
-                    suffix="đ"
-                  />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Trả trước</label>
+                  <div className="relative group">
+                    <NumericInput
+                      value={deposit}
+                      onChange={setDeposit}
+                      className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-black focus:ring-2 focus:ring-blue-500 transition-all"
+                      suffix="đ"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Note Textarea */}
-            <div className="bg-white p-5 rounded-[2.5rem] shadow-sm">
-              <textarea
-                placeholder="Ghi chú thêm..."
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                className="w-full text-sm font-bold text-zinc-600 border-none p-0 focus:ring-0 bg-transparent resize-none placeholder:text-zinc-200"
-              />
-            </div>
-
-            {/* Service Selection */}
-            <div className="pt-2">
-              <ServiceSelector services={services} selectedServices={servicesUsed} onChange={setServicesUsed} />
-            </div>
-          </main>
-
-          {/* iOS Style Glassmorphism Footer */}
-          <div className="absolute bottom-0 left-0 right-0 p-6 pt-4 bg-white/80 backdrop-blur-xl border-t border-white flex items-center justify-between z-10">
-            <div className="space-y-0.5">
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Tổng tạm tính</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-black text-zinc-900 tracking-tight">
-                  {formatCurrency(totalAmount)}
-                </span>
-                <span className="text-zinc-400 font-bold font-serif">đ</span>
+              {/* Notes Section */}
+              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                <textarea
+                  placeholder="Ghi chú thêm..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={2}
+                  className="w-full text-sm font-bold text-zinc-600 border-none p-0 focus:ring-0 bg-transparent resize-none placeholder:text-zinc-200"
+                />
               </div>
-            </div>
-            
-            <button
-              onClick={handleConfirm}
-              className="px-8 py-5 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-wider shadow-xl shadow-slate-200 active:scale-95 transition-all flex items-center gap-3 group relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <span className="relative z-10">Nhận phòng ngay</span>
-              <div className="relative z-10 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-12 transition-transform">
-                <MoreHorizontal size={20} />
+
+              {/* Service Selection */}
+              <div className="pt-2">
+                <ServiceSelector services={services} selectedServices={servicesUsed} onChange={setServicesUsed} />
               </div>
-            </button>
-          </div>
+            </main>
+
+            {/* iOS Style Glassmorphism Footer - Fixed height */}
+             <footer className="relative shrink-0 p-6 pt-4 pb-safe bg-white border-t border-slate-100 flex items-center justify-between z-[10030] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+               <div className="space-y-0.5 pointer-events-none">
+                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Tổng tạm tính</p>
+                 <div className="flex items-baseline gap-1">
+                   <span className="text-2xl font-black text-zinc-900 tracking-tight">
+                     {formatCurrency(totalAmount)}
+                   </span>
+                   <span className="text-zinc-400 font-bold font-serif">đ</span>
+                 </div>
+               </div>
+               
+               <button
+                 type="button"
+                 onClick={handleConfirm}
+                 disabled={isProcessing}
+                 className={cn(
+                   "px-10 py-6 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-wider shadow-xl shadow-slate-200 active:scale-95 transition-all flex items-center gap-3 group relative touch-manipulation z-[10040]",
+                   isProcessing && "opacity-70 cursor-not-allowed shadow-none"
+                 )}
+               >
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-[2rem]" />
+                <span className="relative z-10">{isProcessing ? 'Đang xử lý...' : 'Nhận phòng ngay'}</span>
+                <div className="relative z-10 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  {isProcessing ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    >
+                      <MoreHorizontal size={20} />
+                    </motion.div>
+                  ) : (
+                    <MoreHorizontal size={20} />
+                  )}
+                </div>
+              </button>
+            </footer>
           </motion.div>
         </div>
       )}

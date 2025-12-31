@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HotelService } from '@/services/hotel';
+import { ShoppingCart, Plus } from 'lucide-react';
+import { QuickSaleModal } from '@/components/dashboard/QuickSaleModal';
 
 export default function Dashboard() {
   const { rooms, settings, customers, services, isLoading, mutateRooms } = useHotel();
@@ -21,6 +23,8 @@ export default function Dashboard() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [folioRoomId, setFolioRoomId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isQuickSaleOpen, setIsQuickSaleOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const selectedRoom = useMemo(
     () => rooms.find((r) => r.id === selectedRoomId) || null,
@@ -152,14 +156,25 @@ export default function Dashboard() {
     setFolioRoomId(null);
   };
 
-  const handlePayment = async (bookingId: string, amount: number, auditNote?: string) => {
+  const handlePayment = async (
+    bookingId: string,
+    amount: number,
+    paymentMethod: string = 'cash',
+    surcharge: number = 0,
+    auditNote?: string
+  ) => {
     if (!folioRoom) return;
 
     try {
       // eslint-disable-next-line no-console
-      console.log('Bắt đầu thanh toán cho phòng:', folioRoom.room_number);
+      console.log('Bắt đầu thanh toán cho phòng:', folioRoom.room_number, {
+        bookingId,
+        amount,
+        paymentMethod,
+        surcharge,
+      });
 
-      // 1. Get current notes to append audit info
+      // 1. Lấy ghi chú hiện tại để nối thêm audit info
       const { data: currentBooking } = await supabase
         .from('bookings')
         .select('notes')
@@ -170,121 +185,34 @@ export default function Dashboard() {
         .filter(Boolean)
         .join('\n');
 
-      // 2. Update booking status, final amount and notes
-      const { data: booking, error: bookingError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'completed',
-          check_out_at: new Date().toISOString(),
-          final_amount: amount,
-          notes: updatedNotes,
-        })
-        .eq('id', bookingId)
-        .select('customer_id')
-        .single();
+      // 3. Gọi RPC xử lý thanh toán (Bản cực kỳ ổn định - Alphabetical parameters)
+      const { data, error: rpcError } = await supabase.rpc('handle_checkout', {
+        p_booking_id: bookingId,
+        p_notes: updatedNotes || '',
+        p_payment_method: paymentMethod || 'cash',
+        p_surcharge: Number(surcharge) || 0,
+        p_total_amount: Number(amount) || 0
+      });
 
-      if (bookingError) {
+      if (rpcError) {
         // eslint-disable-next-line no-console
-        console.error('Lỗi cập nhật booking:', bookingError);
-        throw new Error(bookingError.message);
+        console.error('Lỗi RPC handle_checkout:', rpcError);
+        throw new Error(rpcError.message);
       }
 
-      // 2. Update customer statistics if available
-      if (booking?.customer_id) {
-        const { data: customer } = await supabase
-          .from('customers')
-          .select('visit_count, total_spent')
-          .eq('id', booking.customer_id)
-          .single();
-
-        if (customer) {
-          await supabase
-            .from('customers')
-            .update({
-              visit_count: (customer.visit_count || 0) + 1,
-              total_spent: (customer.total_spent || 0) + amount,
-            })
-            .eq('id', booking.customer_id);
-        }
-      }
-
-      // 3. Update room status to 'dirty'
-      const { error: roomError } = await supabase
-        .from('rooms')
-        .update({
-          status: 'dirty',
-          current_booking_id: null,
-          last_status_change: new Date().toISOString(),
-        })
-        .eq('id', folioRoom.id);
-
-      if (roomError) {
-        // eslint-disable-next-line no-console
-        console.error('Lỗi cập nhật trạng thái phòng:', roomError);
-        throw new Error(roomError.message);
-      }
-
-      // 4. Ghi nhận giao dịch vào bảng Thu Chi (Cashflow)
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        const userName = user?.user_metadata?.full_name || user?.email || 'Hệ thống';
-
-        // Tìm ID của danh mục "Tiền phòng"
-        const { data: categoryData } = await supabase
-          .from('cashflow_categories')
-          .select('id')
-          .eq('name', 'Tiền phòng')
-          .eq('type', 'income')
-          .single();
-
-        const cashflowData: any = {
-          type: 'income',
-          category: 'Tiền phòng',
-          category_name: 'Tiền phòng',
-          content: `Thanh toán phòng ${folioRoom.room_number}`,
-          amount: Number(amount),
-          payment_method: 'cash',
-          created_by: userName,
-          created_at: new Date().toISOString(),
-          notes: `Booking ID: ${bookingId}`,
-        };
-
-        // Chỉ thêm category_id nếu tìm thấy UUID hợp lệ
-        if (categoryData?.id) {
-          cashflowData.category_id = categoryData.id;
-        }
-
-        const { error: cashflowError } = await supabase.from('cashflow').insert([cashflowData]);
-
-        if (cashflowError) {
-          // eslint-disable-next-line no-console
-          console.error('Lỗi ghi nhận thu chi:', cashflowError);
-          showNotification(
-            `Thanh toán thành công nhưng lỗi ghi sổ thu chi: ${cashflowError.message}`,
-            'error'
-          );
-        } else {
-          // eslint-disable-next-line no-console
-          console.log('Đã ghi nhận thu chi thành công');
-        }
-      } catch (cfErr: any) {
-        // eslint-disable-next-line no-console
-        console.error('Lỗi hệ thống khi ghi thu chi:', cfErr);
-        showNotification(`Lỗi hệ thống khi ghi thu chi: ${cfErr.message}`, 'error');
+      if (data?.success === false) {
+        throw new Error(data.message || 'Giao dịch không thành công');
       }
 
       // eslint-disable-next-line no-console
-      console.log('Thanh toán hoàn tất, đang refresh dữ liệu...');
+      console.log('Thanh toán hoàn tất qua RPC, đang refresh dữ liệu...');
 
-      // 5. Reset state, refresh data, and show notification
+      // 4. Reset state, refresh data, and show notification
       setFolioRoomId(null);
       await mutateRooms();
       showNotification(`Thanh toán phòng ${folioRoom.room_number} thành công!`, 'success');
 
-      // Gửi thông báo hệ thống (Mắt Thần)
-      // eslint-disable-next-line no-console
+      // 5. Gửi thông báo hệ thống (Mắt Thần)
       HotelService.notifySystemChange('check_out', folioRoom.id).catch(console.error);
     } catch (error: any) {
       // eslint-disable-next-line no-console
@@ -444,8 +372,16 @@ export default function Dashboard() {
   };
 
   const handleCheckIn = async (data: CheckInData) => {
+    console.log('page.tsx: handleCheckIn called with data:', data);
+    if (isProcessing) return;
+    setIsProcessing(true);
     try {
-      if (!selectedRoom) return;
+      if (!selectedRoom) {
+        console.warn('page.tsx: handleCheckIn aborted because selectedRoom is null');
+        setIsProcessing(false);
+        return;
+      }
+      console.log('page.tsx: handling check-in for room:', selectedRoom.room_number);
 
       let customerId = null;
 
@@ -604,6 +540,8 @@ export default function Dashboard() {
         fullError: err,
       });
       showNotification(`Lỗi khi nhận phòng: ${err.message || 'Lỗi không xác định'}`, 'error');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -665,8 +603,13 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+      <div className="flex h-screen w-full items-center justify-center bg-white/80 backdrop-blur-sm fixed inset-0 z-[200]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent shadow-lg" />
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">
+            Đang tải dữ liệu...
+          </p>
+        </div>
       </div>
     );
   }
@@ -698,8 +641,7 @@ export default function Dashboard() {
         roomCounts={roomCounts}
         activeFilterIds={activeFilterIds}
         onToggleFilter={onToggleFilter}
-        onSeed={seedRooms}
-        isSeeding={isSeeding}
+        hotelName="Hotel 2026"
       />
       <motion.div
         layout
@@ -709,7 +651,7 @@ export default function Dashboard() {
           {filteredRooms.map((room) => (
             <motion.div
               layout
-              key={room.id}
+              key={`${room.id}-${room.status}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
@@ -725,6 +667,7 @@ export default function Dashboard() {
         customers={customers}
         timeRules={timeRules}
         isOpen={!!selectedRoomId}
+        isProcessing={isProcessing}
         onClose={() => setSelectedRoomId(null)}
         onConfirm={handleCheckIn}
       />
@@ -759,6 +702,25 @@ export default function Dashboard() {
         inputRequired={confirmConfig.inputRequired}
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Floating Action Button for Quick Sale */}
+      <div className="fixed bottom-32 right-8 z-[90]">
+        <button
+          onClick={() => setIsQuickSaleOpen(true)}
+          className="w-16 h-16 rounded-full bg-blue-600 text-white shadow-2xl flex items-center justify-center hover:bg-blue-700 hover:scale-110 active:scale-95 transition-all group"
+        >
+          <ShoppingCart size={28} />
+          <span className="absolute right-full mr-4 px-3 py-1 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+            Bán lẻ tại quầy
+          </span>
+        </button>
+      </div>
+
+      <QuickSaleModal
+        isOpen={isQuickSaleOpen}
+        onClose={() => setIsQuickSaleOpen(false)}
+        services={services}
       />
     </div>
   );

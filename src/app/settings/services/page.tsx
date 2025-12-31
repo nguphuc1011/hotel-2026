@@ -12,7 +12,6 @@ import StockHistory from './_components/StockHistory';
 const tabs = [
   { id: 'list', label: 'Dịch vụ', icon: List },
   { id: 'categories', label: 'Phân loại', icon: Package },
-  { id: 'history', label: 'Kho hàng', icon: History },
 ];
 
 export default function ServicesSettingsPage() {
@@ -26,7 +25,7 @@ export default function ServicesSettingsPage() {
           <Link href="/settings" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <ChevronLeft size={24} className="text-slate-600" />
           </Link>
-          <h1 className="text-xl font-bold text-slate-800">Quản lý Dịch vụ & Kho</h1>
+          <h1 className="text-xl font-bold text-slate-800">Cấu hình Dịch vụ</h1>
         </div>
       </div>
 
@@ -54,7 +53,6 @@ export default function ServicesSettingsPage() {
         <div className="min-h-[400px]">
           {activeTab === 'list' && <ServiceList />}
           {activeTab === 'categories' && <ServiceCategories />}
-          {activeTab === 'history' && <StockHistory />}
         </div>
       </div>
     </div>

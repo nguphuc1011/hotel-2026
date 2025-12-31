@@ -1,5 +1,5 @@
--- TRỪ KHO TỨC THÌ (AUTO-DEDUCT)
--- Khi thêm dịch vụ vào Folio, tự động trừ kho của service tương ứng.
+-- TRỪ KHO TỨC THÌ (AUTO-DEDUCT) & NHẬT KÝ KHO (STOCK HISTORY)
+-- Khi thêm dịch vụ vào Folio, tự động trừ kho của service tương ứng và ghi log.
 
 -- 1. Hàm xử lý trừ kho khi cập nhật services_used trong bookings
 CREATE OR REPLACE FUNCTION public.fn_auto_deduct_inventory()
@@ -11,50 +11,82 @@ DECLARE
     v_diff_qty INTEGER;
     v_stock_current INTEGER;
     v_service_name TEXT;
+    v_audit_id UUID;
+    v_staff_name TEXT;
 BEGIN
-    -- Chỉ xử lý nếu services_used thay đổi
-    IF (OLD.services_used IS DISTINCT FROM NEW.services_used) THEN
-        
-        -- Duyệt qua mảng dịch vụ mới để trừ kho (hoặc cộng lại nếu giảm số lượng)
-        -- Tâu Bệ Hạ: Ta so sánh từng món trong mảng JSONB
-        
-        -- 1. Xử lý các món mới hoặc tăng số lượng
+    -- Lấy tên nhân viên thực hiện (nếu có)
+    SELECT full_name INTO v_staff_name FROM public.profiles WHERE id = auth.uid();
+    v_staff_name := COALESCE(v_staff_name, 'Hệ thống (Auto)');
+
+    -- 1. Xử lý INSERT (Khi check-in có sẵn dịch vụ)
+    IF (TG_OP = 'INSERT' AND NEW.services_used IS NOT NULL AND jsonb_array_length(NEW.services_used) > 0) THEN
+        -- Tạo một bản ghi audit tổng cho lần check-in này
+        INSERT INTO public.inventory_audits (staff_id, staff_name, notes)
+        VALUES (auth.uid(), v_staff_name, 'Tự động trừ kho khi Check-in - Booking ID: ' || NEW.id)
+        RETURNING id INTO v_audit_id;
+
+        FOR v_new_service IN SELECT * FROM jsonb_array_elements(NEW.services_used) LOOP
+            v_service_id := (v_new_service->>'service_id')::UUID;
+            v_diff_qty := (v_new_service->>'quantity')::INTEGER;
+            
+            IF v_diff_qty > 0 THEN
+                SELECT stock, name INTO v_stock_current, v_service_name FROM public.services WHERE id = v_service_id;
+                
+                -- Cập nhật kho
+                UPDATE public.services SET stock = stock - v_diff_qty WHERE id = v_service_id;
+                
+                -- Ghi chi tiết log
+                INSERT INTO public.inventory_audit_details (audit_id, service_id, service_name, system_stock, actual_stock, discrepancy)
+                VALUES (v_audit_id, v_service_id, v_service_name, v_stock_current, v_stock_current - v_diff_qty, -v_diff_qty);
+            END IF;
+        END LOOP;
+
+    -- 2. Xử lý UPDATE (Khi thêm/bớt dịch vụ trong Folio)
+    ELSIF (TG_OP = 'UPDATE' AND (OLD.services_used IS DISTINCT FROM NEW.services_used)) THEN
+        -- Tạo một bản ghi audit tổng
+        INSERT INTO public.inventory_audits (staff_id, staff_name, notes)
+        VALUES (auth.uid(), v_staff_name, 'Tự động cập nhật kho từ Folio - Booking ID: ' || NEW.id)
+        RETURNING id INTO v_audit_id;
+
+        -- Xử lý các món mới hoặc thay đổi số lượng
         FOR v_new_service IN SELECT * FROM jsonb_array_elements(NEW.services_used) LOOP
             v_service_id := (v_new_service->>'service_id')::UUID;
             
-            -- Lấy số lượng cũ (nếu có)
+            -- Lấy số lượng cũ
             SELECT (val->>'quantity')::INTEGER INTO v_diff_qty 
             FROM jsonb_array_elements(COALESCE(OLD.services_used, '[]'::jsonb)) val 
             WHERE (val->>'service_id')::UUID = v_service_id;
             
             v_diff_qty := (v_new_service->>'quantity')::INTEGER - COALESCE(v_diff_qty, 0);
             
-            IF v_diff_qty > 0 THEN
-                -- Kiểm tra kho
+            IF v_diff_qty != 0 THEN
                 SELECT stock, name INTO v_stock_current, v_service_name FROM public.services WHERE id = v_service_id;
                 
-                IF v_stock_current < v_diff_qty THEN
-                    RAISE EXCEPTION 'KHO KHÔNG ĐỦ: Món [%] chỉ còn %, không thể xuất %!', v_service_name, v_stock_current, v_diff_qty;
-                END IF;
-                
-                -- Trừ kho
+                -- Cập nhật kho
                 UPDATE public.services SET stock = stock - v_diff_qty WHERE id = v_service_id;
-            ELSIF v_diff_qty < 0 THEN
-                -- Cộng lại kho nếu giảm số lượng
-                UPDATE public.services SET stock = stock + ABS(v_diff_qty) WHERE id = v_service_id;
+                
+                -- Ghi chi tiết log
+                INSERT INTO public.inventory_audit_details (audit_id, service_id, service_name, system_stock, actual_stock, discrepancy)
+                VALUES (v_audit_id, v_service_id, v_service_name, v_stock_current, v_stock_current - v_diff_qty, -v_diff_qty);
             END IF;
         END LOOP;
         
-        -- 2. Xử lý các món bị xóa hoàn toàn khỏi mảng
+        -- Xử lý các món bị xóa hoàn toàn khỏi mảng
         FOR v_old_service IN SELECT * FROM jsonb_array_elements(OLD.services_used) LOOP
             v_service_id := (v_old_service->>'service_id')::UUID;
             
             IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(NEW.services_used) val WHERE (val->>'service_id')::UUID = v_service_id) THEN
-                -- Cộng lại kho toàn bộ số lượng đã dùng
-                UPDATE public.services SET stock = stock + (v_old_service->>'quantity')::INTEGER WHERE id = v_service_id;
+                v_diff_qty := (v_old_service->>'quantity')::INTEGER;
+                SELECT stock, name INTO v_stock_current, v_service_name FROM public.services WHERE id = v_service_id;
+                
+                -- Cộng lại kho
+                UPDATE public.services SET stock = stock + v_diff_qty WHERE id = v_service_id;
+                
+                -- Ghi chi tiết log
+                INSERT INTO public.inventory_audit_details (audit_id, service_id, service_name, system_stock, actual_stock, discrepancy)
+                VALUES (v_audit_id, v_service_id, v_service_name, v_stock_current, v_stock_current + v_diff_qty, v_diff_qty);
             END IF;
         END LOOP;
-
     END IF;
     
     RETURN NEW;
@@ -64,7 +96,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 2. Áp dụng trigger vào bảng bookings
 DROP TRIGGER IF EXISTS trg_auto_deduct_inventory ON public.bookings;
 CREATE TRIGGER trg_auto_deduct_inventory
-    BEFORE UPDATE OF services_used ON public.bookings
+    AFTER INSERT OR UPDATE OF services_used ON public.bookings
     FOR EACH ROW EXECUTE FUNCTION public.fn_auto_deduct_inventory();
 
 -- ==========================================
@@ -82,7 +114,7 @@ SELECT
 FROM public.bookings b
 JOIN public.rooms r ON b.room_id = r.id
 CROSS JOIN LATERAL jsonb_array_elements(b.services_used) s_used(val)
-WHERE b.status = 'occupied' AND b.deleted_at IS NULL;
+WHERE b.status = 'active' AND b.deleted_at IS NULL;
 
 -- ==========================================
 -- ĐỒNG BỘ REAL-TIME (HỒ NƯỚC CHUNG)

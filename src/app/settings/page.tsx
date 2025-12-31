@@ -16,6 +16,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/context/NotificationContext';
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -64,8 +66,8 @@ export default function SettingsPage() {
     },
     {
       id: 'services',
-      title: 'Quản lý dịch vụ',
-      description: 'Danh mục dịch vụ & kho hàng',
+      title: 'Danh mục Dịch vụ',
+      description: 'Thiết lập danh sách mặt hàng & đơn giá',
       icon: Package,
       color: 'text-orange-500',
       bg: 'bg-orange-50',
@@ -89,96 +91,52 @@ export default function SettingsPage() {
       bg: 'bg-blue-50',
       href: '/settings/staff',
     },
-    {
-      id: 'customers',
-      title: 'Khách hàng',
-      description: 'Danh sách & lịch sử khách hàng',
-      icon: UserCircle,
-      color: 'text-sky-500',
-      bg: 'bg-sky-50',
-      href: '/settings/customers',
-    },
-    {
-      id: 'reports',
-      title: 'Báo Cáo',
-      description: 'Cấu hình & xem báo cáo doanh thu',
-      icon: BarChart3,
-      color: 'text-rose-500',
-      bg: 'bg-rose-50',
-      href: '/settings/reports',
-    },
-    {
-      id: 'thao-insight',
-      title: 'Tháo Insight',
-      description: 'Mắt thần giám sát & đối soát thất thoát',
-      icon: ShieldAlert,
-      color: 'text-red-500',
-      bg: 'bg-red-50',
-      href: '/thao-insight',
-    },
   ];
 
   return (
-    <div className="pt-4">
-      <header className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Cài đặt</h1>
-          <p className="text-slate-500 text-sm">Quản lý cấu hình hệ thống của bạn</p>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="p-3 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-100 transition-all active:scale-95 flex items-center gap-2 font-bold text-sm shadow-sm"
-        >
-          <LogOut className="w-5 h-5" />
-          Đăng xuất
-        </button>
-      </header>
+    <RoleGuard allowedRoles={['admin', 'manager']}>
+      <div className="min-h-screen bg-slate-50/50 p-6 lg:p-10 pb-32">
+        <div className="max-w-4xl mx-auto space-y-10">
+          {/* Header */}
+          <div className="space-y-2">
+            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Cài đặt hệ thống</h1>
+            <p className="text-slate-500 font-bold text-sm">Quản lý toàn bộ thông số vận hành</p>
+          </div>
 
-      <div className="grid grid-cols-2 gap-4 pb-24">
-        {menuItems.map((item) => {
-          const Content = (
-            <div className="flex flex-col items-center justify-center p-6 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 transition-all active:scale-95 hover:shadow-md group h-full relative overflow-hidden">
-              <div
-                className={`p-4 rounded-[1.5rem] ${item.bg} mb-3 group-active:scale-110 transition-transform`}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {menuItems.map((item) => (
+              <Link
+                key={item.id}
+                href={item.href}
+                className="group flex items-start gap-5 p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
               >
-                <item.icon className={`h-8 w-8 ${item.color}`} />
-              </div>
-              <span className="text-sm font-bold text-slate-800 text-center leading-tight">
-                {item.title}
-              </span>
-              <span className="text-[10px] text-slate-400 text-center mt-2 leading-tight px-2 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">
-                {item.description}
-              </span>
-
-              {item.href ? (
-                <div className="absolute top-4 right-4">
-                  <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                <div className={cn("p-4 rounded-2xl shrink-0 transition-colors", item.bg, item.color)}>
+                  <item.icon size={24} />
                 </div>
-              ) : (
-                <div className="absolute top-4 right-4">
-                  <div className="text-[8px] font-black text-slate-300 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-wider">
-                    Sắp có
-                  </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight">
+                    {item.title}
+                  </h3>
+                  <p className="text-slate-400 text-xs font-bold leading-relaxed">
+                    {item.description}
+                  </p>
                 </div>
-              )}
-            </div>
-          );
-
-          if (item.href) {
-            return (
-              <Link key={item.id} href={item.href} className="aspect-square">
-                {Content}
               </Link>
-            );
-          }
+            ))}
+          </div>
 
-          return (
-            <div key={item.id} className="w-full aspect-square cursor-not-allowed opacity-80">
-              {Content}
-            </div>
-          );
-        })}
+          {/* Logout Section */}
+          <div className="pt-10 border-t border-slate-200">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-3 p-6 bg-rose-50 text-rose-600 rounded-[2rem] font-black uppercase tracking-widest hover:bg-rose-100 transition-all"
+            >
+              <LogOut size={20} />
+              Đăng xuất ngay
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </RoleGuard>
   );
 }

@@ -3,21 +3,40 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutGrid, Settings, BarChart3, WalletCards } from 'lucide-react';
-
-const navLinks = [
-  { href: '/settings/reports', label: 'BÁO CÁO', icon: BarChart3 },
-  { href: '/finance', label: 'THU CHI', icon: WalletCards },
-  { href: '/', label: 'SƠ ĐỒ', icon: LayoutGrid },
-  { href: '/settings', label: 'CÀI ĐẶT', icon: Settings },
-];
+import { LayoutGrid, Settings, BarChart3, WalletCards, Users, Package, BrainCircuit } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { profile, loading, isAdmin } = useAuth();
+  
+  if (loading) return null;
+
+  const isManager = profile?.role === 'manager';
+
+  const getNavLinks = () => {
+    const common = { href: '/', label: 'SƠ ĐỒ', icon: LayoutGrid };
+    const finance = { href: '/finance', label: 'THU CHI', icon: WalletCards };
+    const reports = { href: '/reports', label: 'BÁO CÁO', icon: BarChart3 };
+    const inventory = { href: '/inventory', label: 'KHO', icon: Package };
+    const settings = { href: '/settings', label: 'CÀI ĐẶT', icon: Settings };
+
+    if (isAdmin || isManager) {
+      // 5 items for admin/manager: Reports, Finance, SƠ ĐỒ (Center), Inventory, Settings
+      return [reports, finance, common, inventory, settings];
+    }
+    
+    // Default staff: 3 items: Finance, SƠ ĐỒ (Center), Customers
+    const customers = { href: '/customers', label: 'KHÁCH', icon: Users };
+    return [finance, common, customers];
+  };
+
+  const navLinks = getNavLinks();
+  const centerIndex = Math.floor(navLinks.length / 2);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-[100] h-24 flex items-end justify-center pointer-events-none pb-safe">
-      <div className="relative w-full max-w-md h-20 pointer-events-auto">
+      <div className="relative h-20 w-full max-w-md pointer-events-auto transition-all duration-500">
         {/* Solid White Background with Notch - Subtle Top Shadow */}
         <div className="absolute inset-0 overflow-hidden">
           <svg
@@ -42,7 +61,7 @@ export function BottomNav() {
             const Icon = link.icon;
 
             // Center Item (Floating Button with Glassmorphism)
-            if (index === 2) {
+            if (index === centerIndex) {
               return (
                 <div key={link.href} className="flex-1 flex justify-center -mt-12">
                   <Link
@@ -79,7 +98,7 @@ export function BottomNav() {
                 </div>
                 <span
                   className={cn(
-                    'text-[11px] font-bold tracking-tight transition-colors',
+                    'text-[10px] font-black uppercase tracking-widest transition-colors',
                     isActive ? 'text-slate-900' : 'text-zinc-500'
                   )}
                 >

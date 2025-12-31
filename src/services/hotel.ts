@@ -163,7 +163,7 @@ export const HotelService = {
   },
 
   /**
-   * THANH TOÁN & CHECK-OUT: Sử dụng RPC resolve_checkout
+   * THANH TOÁN & CHECK-OUT: Sử dụng RPC handle_checkout (Hệ thống mới thống nhất)
    */
   async checkOut(params: {
     bookingId: string;
@@ -178,31 +178,25 @@ export const HotelService = {
     user?: any; // User object for logging
   }) {
     // eslint-disable-next-line no-console
-    console.log('[HotelService] Bắt đầu quy trình checkOut (RPC)...', params.bookingId);
+    console.log('[HotelService] Bắt đầu quy trình checkOut (handle_checkout)...', params.bookingId);
 
     // Chuẩn bị notes tổng hợp
     const fullNotes = [params.auditNote ? `[THANH TOÁN] ${params.auditNote}` : '', params.notes]
       .filter(Boolean)
       .join('\n');
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    // Gọi RPC resolve_checkout
-    const { data, error } = await supabase.rpc('resolve_checkout', {
+    // Gọi RPC handle_checkout (Unified - Alphabetical parameters)
+    const { data, error } = await supabase.rpc('handle_checkout', {
       p_booking_id: params.bookingId,
-      p_payment_method: params.paymentMethod,
-      p_total_amount: params.totalAmount,
-      p_final_amount: params.finalAmount,
-      p_surcharge: params.surcharge || 0,
-      p_notes: fullNotes,
-      p_user_id: user?.id || params.user?.id,
+      p_notes: fullNotes || '',
+      p_payment_method: params.paymentMethod || 'cash',
+      p_surcharge: Number(params.surcharge) || 0,
+      p_total_amount: Number(params.finalAmount) || 0
     });
 
     if (error) {
       // eslint-disable-next-line no-console
-      console.error('[HotelService] Lỗi RPC resolve_checkout:', error);
+      console.error('[HotelService] Lỗi RPC handle_checkout:', error);
       throw new Error(`Lỗi thanh toán: ${error.message}`);
     }
 
@@ -211,7 +205,7 @@ export const HotelService = {
     }
 
     // eslint-disable-next-line no-console
-    console.log('[HotelService] Check-out thành công qua RPC');
+    console.log('[HotelService] Check-out thành công qua RPC handle_checkout');
 
     // Gửi thông báo hệ thống
     await this.notifySystemChange('check_out', params.roomId);

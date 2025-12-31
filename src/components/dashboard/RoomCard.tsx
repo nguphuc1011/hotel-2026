@@ -31,36 +31,42 @@ const statusConfig = {
   available: {
     label: 'Sẵn sàng',
     color: 'bg-[#155e75]', // Cyan 800
+    hex: '#155e75',
     icon: Sun,
     textColor: 'text-white'
   },
   hourly: {
     label: 'Khách giờ',
     color: 'bg-[#f59e0b]', // Amber 500
+    hex: '#f59e0b',
     icon: Clock,
     textColor: 'text-black'
   },
   daily: {
     label: 'Khách ngày',
     color: 'bg-[#1e40af]', // Blue 800
+    hex: '#1e40af',
     icon: Sun,
     textColor: 'text-white'
   },
   overnight: {
     label: 'Qua đêm',
     color: 'bg-[#1e40af]', // Blue 800 (Shared with daily)
+    hex: '#1e40af',
     icon: Moon,
     textColor: 'text-white'
   },
   dirty: {
     label: 'Chờ dọn',
     color: 'bg-[#f97316]', // Orange 500
+    hex: '#f97316',
     icon: Brush,
     textColor: 'text-white'
   },
   repair: {
     label: 'Đang sửa',
     color: 'bg-[#1e293b]', // Slate 800
+    hex: '#1e293b',
     icon: Wrench,
     textColor: 'text-white'
   },
@@ -159,12 +165,15 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
       animate={dirtyStats?.isCritical ? {
         backgroundColor: ['#f97316', '#ef4444', '#f97316'],
         transition: { duration: 2, repeat: Infinity }
-      } : {}}
+      } : {
+        backgroundColor: dirtyStats?.isWarning ? '#ea580c' : config.hex,
+        transition: { duration: 0.3 }
+      }}
       className={cn(
-        "group relative flex w-full flex-col justify-between overflow-hidden p-6 transition-all shadow-lg hover:shadow-2xl",
-        "h-[200px] sm:h-[256px]", // Height: Mobile 200px, Desktop 256px
-        "rounded-[2rem]", // Super large radius
-        dirtyStats?.isWarning ? "bg-orange-600" : config.color,
+        "group relative flex w-full flex-col justify-between overflow-hidden p-6 shadow-lg hover:shadow-2xl",
+        "h-[200px] sm:h-[256px]",
+        "rounded-[2rem]",
+        config.color, // Fallback background color from config
         config.textColor
       )}
     >
@@ -190,7 +199,7 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
                 "rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-wider backdrop-blur-md",
                 "bg-black/10"
               )}>
-                Sẵn sàng
+                {config.label}
               </span>
             )}
           </div>

@@ -24,7 +24,8 @@ import {
   CreditCard,
   Wallet,
   AlertTriangle,
-  Clock
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Room, PricingBreakdown, RentalType } from '@/types';
@@ -155,250 +156,212 @@ export default function CheckoutModal({
             className="relative w-full h-full bg-slate-50 flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <header className="sticky top-0 bg-white border-b border-slate-100 pt-4 pb-4 px-4 z-10 flex items-center justify-center relative min-h-[80px]">
-              <button 
-                onClick={onClose} 
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
-              >
-                <X size={20} className="text-slate-400" />
-              </button>
-              <div className="text-center">
-                <h2 className="font-black text-2xl text-slate-800 uppercase tracking-tight">Trả phòng</h2>
-                <p className="text-slate-400 font-bold text-[10px] tracking-[0.2em] uppercase mt-1">
-                  Phòng {room.room_number}
-                </p>
+            <header className="sticky top-0 bg-white border-b border-slate-100 py-3 px-4 z-10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={onClose} 
+                  className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
+                >
+                  <X size={18} className="text-slate-400" />
+                </button>
+                <div>
+                  <h2 className="font-black text-lg text-slate-800 uppercase tracking-tight">Trả phòng</h2>
+                  <p className="text-indigo-600 font-bold text-[10px] tracking-[0.1em] uppercase">
+                    Phòng {room.room_number} • {pricingBreakdown?.summary?.duration_text || '...'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Tổng thu thực tế</p>
+                <p className="text-xl font-black text-indigo-600 leading-none">{formatCurrency(totalCalculations.totalToCollect)}</p>
               </div>
             </header>
 
             {/* Body */}
-            <main className="flex-1 overflow-y-auto p-4 space-y-4 pb-32 scrollbar-hide">
-              {/* Card 1: Stay Info */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-50">
-                  <Calendar size={16} className="text-indigo-500" />
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Thông tin lưu trú</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Giờ vào</p>
-                    <p className="font-black text-slate-700 text-sm">{formatDateTime(booking?.check_in_at, 'HH:mm')}</p>
-                    <p className="text-[10px] text-slate-400">{formatDateTime(booking?.check_in_at, 'dd/MM')}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Giờ ra</p>
-                    <p className="font-black text-slate-700 text-sm">{formatDateTime(new Date().toISOString(), 'HH:mm')}</p>
-                    <p className="text-[10px] text-slate-400">{formatDateTime(new Date().toISOString(), 'dd/MM')}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Thời gian</p>
-                    <p className="font-black text-indigo-600 text-sm">{pricingBreakdown?.summary?.duration_text || '...'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: Room Charge */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
-                  <BedDouble size={16} className="text-blue-500" />
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tiền phòng</span>
-                </div>
-                <div className="flex justify-between items-center">
-                    <p className="text-slate-600 font-medium">Tiền phòng gốc</p>
-                    <p className="font-bold text-slate-800">{formatCurrency(totalCalculations.roomCharge)}</p>
-                </div>
-                {pricingBreakdown?.summary && (
-                  <div className="space-y-2">
-                    {pricingBreakdown.summary.early_checkin_surcharge ? (
-                      <div className="flex justify-between items-center text-xs bg-amber-50 p-2 rounded-lg">
-                        <p className="text-amber-700 flex items-center gap-1 font-medium"><CirclePlus size={12}/> Phụ phí nhận sớm</p>
-                        <p className="font-bold text-amber-700">+{formatCurrency(pricingBreakdown.summary.early_checkin_surcharge)}</p>
+            <main className="flex-1 overflow-hidden flex flex-col md:flex-row p-3 gap-3 bg-slate-50/50">
+              {/* Left Column: Summary & Services */}
+              <div className="flex-1 flex flex-col gap-3 min-h-0">
+                {/* Stay Summary Card */}
+                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 shrink-0">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                        <Clock size={10}/> Thời gian lưu trú
+                      </p>
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                        <span>{formatDateTime(booking?.check_in_at, 'HH:mm dd/MM')}</span>
+                        <ArrowRight size={12} className="text-slate-300"/>
+                        <span>{formatDateTime(new Date().toISOString(), 'HH:mm dd/MM')}</span>
                       </div>
-                    ) : null}
-                    {pricingBreakdown.summary.late_checkout_surcharge ? (
-                      <div className="flex justify-between items-center text-xs bg-amber-50 p-2 rounded-lg">
-                        <p className="text-amber-700 flex items-center gap-1 font-medium"><CirclePlus size={12}/> Phụ phí trả muộn</p>
-                        <p className="font-bold text-amber-700">+{formatCurrency(pricingBreakdown.summary.late_checkout_surcharge)}</p>
-                      </div>
-                    ) : null}
+                    </div>
+                    <div className="text-right space-y-1 border-l border-slate-50 pl-4">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Tiền phòng</p>
+                      <p className="font-black text-slate-800">{formatCurrency(totalCalculations.roomCharge)}</p>
+                    </div>
                   </div>
-                )}
-              </div>
+                  
+                  {/* Quick Surcharge Badges */}
+                  {(pricingBreakdown?.summary?.early_checkin_surcharge || pricingBreakdown?.summary?.late_checkout_surcharge) && (
+                    <div className="mt-2 pt-2 border-t border-slate-50 flex flex-wrap gap-2">
+                      {pricingBreakdown?.summary?.early_checkin_surcharge ? (
+                        <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100">
+                          Sớm: +{formatCurrency(pricingBreakdown.summary.early_checkin_surcharge)}
+                        </span>
+                      ) : null}
+                      {pricingBreakdown?.summary?.late_checkout_surcharge ? (
+                        <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100">
+                          Muộn: +{formatCurrency(pricingBreakdown.summary.late_checkout_surcharge)}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
 
-              {/* Card 3: Services */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => setShowServices(!showServices)}>
+                {/* Services List - Scrollable */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden min-h-[150px]">
+                  <div className="p-2 px-3 border-b border-slate-50 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-2">
-                      <Sparkles size={16} className="text-emerald-500" />
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Dịch vụ</span>
+                      <Sparkles size={14} className="text-emerald-500" />
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dịch vụ & Phụ thu</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <p className="font-bold text-slate-800">{formatCurrency(totalCalculations.serviceCharge)}</p>
-                        <ChevronDown size={18} className={cn("transition-transform text-slate-400", showServices && "rotate-180")} />
-                    </div>
-                </div>
-                <AnimatePresence>
-                  {showServices && services.length > 0 && (
-                      <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="px-4 pb-4 border-t border-slate-50 space-y-2 max-h-48 overflow-y-auto pt-3"
-                      >
-                          {services.map((s, idx) => (
-                              <div key={s.id || `service-${idx}`} className="flex justify-between items-center text-sm">
-                                  <p className="text-slate-500 font-medium">{s.name} <span className="text-xs text-slate-400">(x{s.quantity})</span></p>
-                                  <p className="font-bold text-slate-600">{formatCurrency(s.total)}</p>
-                              </div>
-                          ))}
-                      </motion.div>
-                  )}
-                  {showServices && services.length === 0 && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="px-4 pb-4 border-t border-slate-50 pt-3"
-                    >
-                      <p className="text-xs text-slate-400 italic text-center">Không có dịch vụ nào</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Card 4: Payment & Method */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
-                  <Receipt size={16} className="text-indigo-500" />
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Thanh toán & Phương thức</span>
-                </div>
-                
-                {/* Discount Section */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                      <p className="text-slate-600 font-medium flex items-center gap-2 text-sm"><CircleMinus size={14} className="text-red-500"/> Giảm giá</p>
-                      <NumericInput
-                          value={discount}
-                          onChange={setDiscount}
-                          placeholder="0"
-                          className="w-28 bg-red-50 rounded-lg px-3 py-2 text-right font-black text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200"
-                          suffix="đ"
-                      />
+                    <p className="text-xs font-black text-slate-800">{formatCurrency(totalCalculations.serviceCharge + totalCalculations.surcharges)}</p>
                   </div>
-                  <AnimatePresence>
-                    {discount > 0 && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                        <input 
-                            type="text"
-                            value={discountReason}
-                            onChange={(e) => setDiscountReason(e.target.value)}
-                            placeholder="Lý do giảm giá..."
-                            className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs italic focus:outline-none focus:ring-1 focus:ring-slate-200"
-                        />
-                      </motion.div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {services.length > 0 ? (
+                      services.map((s, idx) => (
+                        <div key={s.id || `service-${idx}`} className="flex justify-between items-center py-1.5 px-2 hover:bg-slate-50 rounded-lg transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                              {s.quantity}
+                            </div>
+                            <p className="text-xs text-slate-600 font-medium">{s.name}</p>
+                          </div>
+                          <p className="text-xs font-bold text-slate-600">{formatCurrency(s.total)}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex items-center justify-center italic text-[10px] text-slate-300">
+                        Chưa có dịch vụ nào
+                      </div>
                     )}
-                  </AnimatePresence>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Payment Controls */}
+              <div className="w-full md:w-[320px] flex flex-col gap-3 shrink-0">
+                {/* Adjustments Card */}
+                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
+                    <Receipt size={14} className="text-indigo-500" />
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Điều chỉnh & Thuế</span>
+                  </div>
+                  
+                  {/* Discount */}
+                  <div className="flex justify-between items-center gap-2">
+                    <div className="shrink-0">
+                      <p className="text-[11px] text-slate-600 font-bold flex items-center gap-1.5">
+                        <CircleMinus size={12} className="text-red-500"/> Giảm giá
+                      </p>
+                    </div>
+                    <NumericInput
+                      value={discount}
+                      onChange={setDiscount}
+                      className="w-24 bg-red-50/50 rounded-lg px-2 py-1.5 text-right font-black text-red-600 text-xs focus:ring-1 focus:ring-red-200"
+                      suffix="đ"
+                    />
+                  </div>
+                  {discount > 0 && (
+                    <input 
+                      type="text"
+                      value={discountReason}
+                      onChange={(e) => setDiscountReason(e.target.value)}
+                      placeholder="Lý do giảm..."
+                      className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[10px] focus:ring-1 focus:ring-slate-200"
+                    />
+                  )}
+
+                  {/* VAT & Deposit Row */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className={cn(
+                      "p-2 rounded-lg border transition-all cursor-pointer flex flex-col gap-1",
+                      isTaxEnabled ? "bg-blue-50 border-blue-100" : "bg-slate-50 border-slate-100"
+                    )} onClick={() => setIsTaxEnabled(!isTaxEnabled)}>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">VAT</p>
+                      <div className="flex items-center justify-between">
+                        <span className={cn("text-xs font-black", isTaxEnabled ? "text-blue-600" : "text-slate-400")}>
+                          {isTaxEnabled ? `${taxPercent}%` : 'Tắt'}
+                        </span>
+                        <div className={cn("w-3 h-3 rounded-full", isTaxEnabled ? "bg-blue-500" : "bg-slate-300")} />
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-100 flex flex-col gap-1">
+                      <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Đã cọc</p>
+                      <p className="text-xs font-black text-emerald-600">{formatCurrency(deposit)}</p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* VAT Section */}
-                <div className="flex justify-between items-center py-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-slate-600 font-medium text-sm flex items-center gap-2"><Database size={14} className="text-blue-500"/> Thuế VAT</p>
+                {/* Payment Method Selector */}
+                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 space-y-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thanh toán bằng</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      {id: 'cash', label: 'Tiền mặt', icon: Wallet},
+                      {id: 'transfer', label: 'C.Khoản', icon: Landmark},
+                      {id: 'card', label: 'Thẻ/POS', icon: CreditCard},
+                    ].map(method => (
                       <button 
-                        onClick={() => setIsTaxEnabled(!isTaxEnabled)}
+                        key={method.id} 
+                        onClick={() => setPaymentMethod(method.id as any)} 
                         className={cn(
-                          "w-10 h-5 rounded-full relative transition-colors duration-200",
-                          isTaxEnabled ? "bg-blue-500" : "bg-slate-200"
+                          "flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border-2 transition-all",
+                          paymentMethod === method.id 
+                            ? "border-indigo-500 bg-indigo-50 text-indigo-600" 
+                            : "border-slate-50 bg-slate-50 text-slate-400"
                         )}
                       >
-                        <div className={cn(
-                          "absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-200 shadow-sm",
-                          isTaxEnabled ? "left-6" : "left-1"
-                        )} />
+                        <method.icon size={16}/>
+                        <span className="text-[9px] font-black uppercase whitespace-nowrap">{method.label}</span>
                       </button>
-                    </div>
-                    {isTaxEnabled && (
-                      <NumericInput 
-                        value={taxPercent}
-                        onChange={setTaxPercent}
-                        className="w-16 bg-blue-50 rounded-lg px-2 py-1 text-center font-black text-blue-600 text-sm"
-                        suffix="%"
-                      />
-                    )}
-                </div>
-
-                {/* Deposit Section */}
-                <div className="flex justify-between items-center py-1">
-                    <p className="text-slate-600 font-medium text-sm flex items-center gap-2"><Coins size={14} className="text-emerald-500"/> Đã đặt cọc</p>
-                    <p className="font-black text-emerald-600">-{formatCurrency(deposit)}</p>
-                </div>
-
-                {/* Payment Methods */}
-                <div className="pt-2 space-y-3">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Phương thức thanh toán</p>
-                  <div className="grid grid-cols-3 gap-2">
-                      {[
-                          {id: 'cash', label: 'Tiền mặt', icon: Wallet},
-                          {id: 'transfer', label: 'Chuyển khoản', icon: Landmark},
-                          {id: 'card', label: 'Thẻ / POS', icon: CreditCard},
-                      ].map(method => (
-                          <button key={method.id} onClick={() => setPaymentMethod(method.id as any)} className={cn(
-                              "flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
-                              paymentMethod === method.id 
-                                ? "border-indigo-500 bg-indigo-50 text-indigo-600 shadow-sm" 
-                                : "border-slate-50 bg-slate-50 text-slate-400 grayscale opacity-70"
-                          )}>
-                              <method.icon size={20}/>
-                              <span className="text-[10px] font-black uppercase">{method.label}</span>
-                          </button>
-                      ))}
+                    ))}
                   </div>
                 </div>
 
-                {/* Notes Section */}
-                <div className="pt-2">
-                    <p className="text-slate-600 font-medium text-sm flex items-center gap-2 mb-2"><MessageSquare size={14} className="text-slate-400"/> Ghi chú</p>
-                    <textarea 
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="Thêm ghi chú thanh toán..."
-                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-200 min-h-[60px] resize-none"
-                    />
+                {/* Quick Note */}
+                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2">
+                  <MessageSquare size={14} className="text-slate-400 shrink-0"/>
+                  <input 
+                    type="text"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Ghi chú nhanh..."
+                    className="flex-1 bg-transparent text-xs focus:outline-none"
+                  />
                 </div>
+
+                {/* Confirm Button */}
+                <button 
+                  onClick={handleConfirm}
+                  className="w-full h-12 bg-indigo-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-lg shadow-indigo-200"
+                >
+                  <CheckCircle2 size={18} />
+                  XÁC NHẬN TRẢ PHÒNG
+                </button>
               </div>
-              
-              {/* Admin Insight */}
-              {isAdmin && pricingBreakdown && (
-                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-amber-200/50 flex items-center justify-center text-amber-700">
-                        <AlertTriangle size={16}/>
-                      </div>
-                      <div>
-                        <p className="font-black text-amber-900 uppercase tracking-tighter">Đối soát AI</p>
-                        <p className="text-amber-700 opacity-70">Dựa trên quy định khách sạn</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-amber-700 font-medium">Gợi ý: <span className="font-black text-amber-900">{formatCurrency(pricingBreakdown.total_amount)}</span></p>
-                        <p className="text-amber-700 font-medium">Thực thu: <span className="font-black text-amber-900">{formatCurrency(totalCalculations.totalToCollect)}</span></p>
-                    </div>
-                </div>
-              )}
             </main>
 
-            {/* Sticky Footer */}
-            <footer className="flex-shrink-0 p-4 bg-white border-t-2 border-slate-200 sticky bottom-0">
-                <div className="flex items-center justify-between mb-3">
-                    <p className="text-slate-600 font-semibold">Tổng thu thực tế</p>
-                    <p className="text-2xl font-extrabold text-indigo-600">{formatCurrency(totalCalculations.totalToCollect)}</p>
+            {/* Admin Bar - Optional overlay at bottom */}
+            {isAdmin && pricingBreakdown && (
+              <div className="bg-amber-900 text-amber-100 px-4 py-1.5 flex justify-between items-center text-[10px] font-bold tracking-tight">
+                <span className="flex items-center gap-1.5"><AlertTriangle size={10}/> ĐỐI SOÁT AI:</span>
+                <div className="flex gap-4">
+                  <span>Gợi ý: {formatCurrency(pricingBreakdown.total_amount)}</span>
+                  <span>Chênh lệch: {formatCurrency(totalCalculations.totalToCollect - pricingBreakdown.total_amount)}</span>
                 </div>
-                <button 
-                    onClick={handleConfirm}
-                    className="w-full h-14 bg-indigo-600 text-white rounded-xl font-bold text-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-                >
-                    XÁC NHẬN THANH TOÁN
-                </button>
-            </footer>
+              </div>
+            )}
           </motion.div>
         </div>
       )}

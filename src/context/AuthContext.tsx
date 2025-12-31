@@ -82,6 +82,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (existingProfile) {
+        // ĐẢM BẢO TÀI KHOẢN 'admin' HOẶC EMAIL CÓ CHỮ 'admin' LUÔN CÓ QUYỀN ADMIN
+        const isActuallyAdmin = 
+          existingProfile.username === 'admin' || 
+          existingProfile.username?.startsWith('admin@') ||
+          user.email === 'admin@gmail.com' || // Hardcoded fallback for safety
+          user.email?.startsWith('admin@');
+
+        if (isActuallyAdmin && existingProfile.role !== 'admin') {
+          const { data: updatedProfile } = await supabase
+            .from('profiles')
+            .update({ role: 'admin' })
+            .eq('id', userId)
+            .select()
+            .single();
+          if (updatedProfile) {
+            setProfile(updatedProfile);
+            return;
+          }
+        }
         setProfile(existingProfile);
         return;
       }

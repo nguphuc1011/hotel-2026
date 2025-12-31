@@ -102,7 +102,13 @@ interface FolioModalProps {
   customers: Customer[];
   isOpen: boolean;
   onClose: () => void;
-  onPayment: (bookingId: string, finalAmount: number, auditNote?: string) => void;
+  onPayment: (
+    bookingId: string,
+    finalAmount: number,
+    paymentMethod: string,
+    surcharge: number,
+    auditNote?: string
+  ) => void;
   onUpdate: () => void;
   onCancel: (bookingId: string) => void;
   isAdmin?: boolean;
@@ -242,9 +248,9 @@ export default function FolioModal({
     if (!bookingId || isSaving) return;
 
     // 1. Xác định xem có sự thay đổi giảm (xóa/giảm số lượng) không
-    const isReducing = Object.entries(tempServices).some(([sid, qty]) => {
-      const savedQty = savedServices[sid] || 0;
-      return qty < savedQty;
+    const isReducing = Object.entries(savedServices).some(([sid, savedQty]) => {
+      const tempQty = tempServices[sid] || 0;
+      return tempQty < savedQty;
     });
 
     // CHỐT CHẶN: Cấm xóa dịch vụ sau khi đã in nháp (Chỉ Admin/Manager mới được quyền)
@@ -1121,7 +1127,13 @@ export default function FolioModal({
                 data.note ? `Ghi chú: ${data.note}` : '',
               ].filter(Boolean);
               const auditNote = auditParts.join(' | ');
-              onPayment(room.current_booking!.id, data.totalToCollect, auditNote);
+              onPayment(
+                room.current_booking!.id,
+                data.totalToCollect,
+                data.paymentMethod,
+                data.surcharge,
+                auditNote
+              );
               setIsCheckoutOpen(false);
             }}
           />

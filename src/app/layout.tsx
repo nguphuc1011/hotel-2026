@@ -7,7 +7,7 @@ import Link from "next/link";
 
 
 import { BottomNav } from "@/components/layout/BottomNav";
-
+import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationBanner } from "@/components/layout/NotificationBanner";
 
@@ -52,17 +52,19 @@ export default function RootLayout({
   return (
     <html lang="vi" data-theme="light" className="light">
       <body className={cn(roboto.className, "min-h-screen bg-slate-50 selection:bg-blue-500/30 flex flex-col")}>
-        <NotificationProvider>
-          <NotificationBanner />
-          {/* <Header /> */}
+        <AuthProvider>
+          <NotificationProvider>
+            <NotificationBanner />
+            {/* <Header /> */}
 
-          {/* Main Content */}
-          <main className="flex-1 pb-24 px-4 max-w-md mx-auto w-full">
-            {children}
-          </main>
+            {/* Main Content */}
+            <main className="flex-1 pb-24 px-4 max-w-md mx-auto w-full">
+              {children}
+            </main>
 
-          <BottomNav />
-        </NotificationProvider>
+            <BottomNav />
+          </NotificationProvider>
+        </AuthProvider>
       </body>
     </html>
   );
