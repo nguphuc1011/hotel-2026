@@ -217,6 +217,7 @@ export interface PricingBreakdown {
 export interface CheckInData {
   room_id: string;
   customer: {
+    id?: string;
     name: string;
     phone: string;
     idCard: string;

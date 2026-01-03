@@ -18,7 +18,7 @@ import { ShoppingCart, Plus } from 'lucide-react';
 import { QuickSaleModal } from '@/components/dashboard/QuickSaleModal';
 
 export default function Dashboard() {
-  const { rooms, settings, customers, services, isLoading, mutateRooms } = useHotel();
+  const { rooms, settings, services, isLoading, mutateRooms } = useHotel();
   const { showNotification } = useNotification();
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [folioRoomId, setFolioRoomId] = useState<string | null>(null);
@@ -381,164 +381,60 @@ export default function Dashboard() {
         setIsProcessing(false);
         return;
       }
-      console.log('page.tsx: handling check-in for room:', selectedRoom.room_number);
 
-      let customerId = null;
+      // 1. Thực hiện Check-in Atomic qua RPC
+      const booking = await HotelService.checkIn({
+              roomId: selectedRoom.id,
+              customer: {
+                id: data.customer?.id,
+                name: data.customer?.name || 'Khách vãng lai',
+                phone: data.customer?.phone,
+                idCard: data.customer?.idCard,
+                address: data.customer?.address,
+              },
+        rentalType: data.rentalType,
+        price: data.price,
+        deposit: data.deposit,
+        notes: data.notes,
+        services: data.services.map(s => ({
+          service_id: s.service_id || s.id,
+          quantity: s.quantity,
+          price: s.price
+        })),
+        allServices: services
+      });
 
-      // 1. Create/Find Customer
-      let customerName = data.customer?.name?.trim();
-      const customerPhone = data.customer?.phone?.trim() || '';
-      const customerIdCard = data.customer?.idCard?.trim() || '';
-      const customerAddress = data.customer?.address?.trim() || '';
-
-      // Nếu không có tên khách, dùng "Khách mới"
-      if (!customerName) {
-        customerName = 'Khách mới';
-      }
-
-      // Try to find existing first by name (if it's "Khách mới") or phone or id_card
-      let existingCust = null;
-
-      if (customerName === 'Khách mới') {
-        const { data: foundDefault } = await supabase
-          .from('customers')
-          .select('id, address')
-          .eq('full_name', 'Khách mới')
-          .maybeSingle();
-        existingCust = foundDefault;
-      }
-
-      if (!existingCust && (customerPhone || customerIdCard)) {
-        const searchConditions = [];
-        if (customerPhone) searchConditions.push(`phone.eq.${customerPhone}`);
-        if (customerIdCard) searchConditions.push(`id_card.eq.${customerIdCard}`);
-
-        const { data: found } = await supabase
-          .from('customers')
-          .select('id, address')
-          .or(searchConditions.join(','))
-          .maybeSingle();
-        existingCust = found;
-      }
-
-      if (existingCust) {
-        customerId = existingCust.id;
-        // Cập nhật địa chỉ nếu chưa có hoặc khác
-        if (customerAddress && customerAddress !== existingCust.address) {
-          await supabase
-            .from('customers')
-            .update({ address: customerAddress })
-            .eq('id', customerId);
-        }
-
-        // Fetch full customer data and their bookings for the insights modal
+      // 2. Fetch Customer Insights (Optional UI feature)
+      if (booking && booking.customer_id) {
         const { data: fullCustomer } = await supabase
           .from('customers')
           .select('*')
-          .eq('id', customerId)
+          .eq('id', booking.customer_id)
           .single();
+        
         const { data: customerBookings } = await supabase
           .from('bookings')
           .select('*, rooms(room_number)')
-          .eq('customer_id', customerId)
+          .eq('customer_id', booking.customer_id)
           .eq('status', 'completed')
           .order('check_out_at', { ascending: false })
           .limit(1);
 
-        if (fullCustomer && customerName !== 'Khách mới') {
+        if (fullCustomer && fullCustomer.full_name !== 'Khách vãng lai') {
           setCustomerInsightsData({ customer: fullCustomer, bookings: customerBookings || [] });
-        }
-      } else {
-        // Create new customer (including KHÁCH VÃNG LAI)
-        const { data: newCust, error: custError } = await supabase
-          .from('customers')
-          .insert([
-            {
-              full_name: customerName,
-              phone: customerPhone,
-              id_card: customerIdCard,
-              address: customerAddress,
-              visit_count: 1,
-              total_spent: 0,
-            },
-          ])
-          .select()
-          .single();
-
-        if (custError) {
-          // eslint-disable-next-line no-console
-          console.error('Error creating customer:', custError);
-        } else {
-          customerId = newCust.id;
         }
       }
 
-      // 2. Create booking
-      const { data: booking, error: bookingError } = await supabase
-        .from('bookings')
-        .insert([
-          {
-            room_id: selectedRoom.id,
-            customer_id: customerId,
-            check_in_at: new Date().toISOString(),
-            system_created_at: new Date().toISOString(), // Giờ hệ thống thực tế
-            rental_type: data.rentalType,
-            initial_price: data.price,
-            deposit_amount: data.deposit || 0,
-            notes: data.notes,
-            room_charge_locked: 0,
-            status: 'active',
-            custom_surcharge: 0,
-            room_charge_suggested: 0,
-            room_charge_actual: 0,
-            services_used: data.services.map((s) => {
-              const serviceId = s.service_id || s.id;
-              const serviceInfo = services.find((si) => String(si.id) === String(serviceId));
-              return {
-                id: serviceId,
-                service_id: serviceId,
-                name: serviceInfo?.name || 'Dịch vụ',
-                price: s.price,
-                quantity: s.quantity,
-                total: s.price * s.quantity,
-              };
-            }),
-          },
-        ])
-        .select()
-        .single();
-
-      if (bookingError) throw bookingError;
-
-      // 3. Update room status
-      const { error: roomError } = await supabase
-        .from('rooms')
-        .update({
-          status: data.rentalType, // 'hourly', 'daily', 'overnight'
-          current_booking_id: booking.id,
-        })
-        .eq('id', selectedRoom.id);
-
-      if (roomError) throw roomError;
-
-      // Success
+      // 3. Kết thúc quy trình
       setSelectedRoomId(null);
-      await mutateRooms(); // Refresh data immediately
+      await mutateRooms();
       showNotification(`Nhận phòng ${selectedRoom.room_number} thành công!`, 'success');
 
-      // 5. Gửi thông báo hệ thống (Mắt Thần)
+      // 4. Thông báo hệ thống
       HotelService.notifySystemChange('check_in', selectedRoom.id).catch(console.error);
-    } catch (error: unknown) {
-      const err = error as any;
-      // eslint-disable-next-line no-console
-      console.error('Chi tiết lỗi Check-in:', {
-        message: err.message,
-        details: err.details,
-        hint: err.hint,
-        code: err.code,
-        fullError: err,
-      });
-      showNotification(`Lỗi khi nhận phòng: ${err.message || 'Lỗi không xác định'}`, 'error');
+    } catch (error: any) {
+      console.error('Lỗi Check-in:', error);
+      showNotification(`Lỗi khi nhận phòng: ${error.message || 'Lỗi không xác định'}`, 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -663,7 +559,6 @@ export default function Dashboard() {
       <CheckInModal
         room={selectedRoom}
         services={services}
-        customers={customers}
         timeRules={timeRules}
         isOpen={!!selectedRoomId}
         isProcessing={isProcessing}
@@ -676,7 +571,6 @@ export default function Dashboard() {
         room={folioRoom}
         settings={settings}
         services={services}
-        customers={customers}
         onPayment={handlePayment}
         onUpdate={mutateRooms}
         onCancel={handleCancel}

@@ -114,8 +114,8 @@ export default function CustomerManagement() {
   };
 
   const handleDeleteCustomer = async (customer: Customer) => {
-    if (customer.full_name === 'Khách mới') {
-      showNotification('Không thể xóa khách hàng mặc định "Khách mới"', 'error');
+    if (customer.full_name === 'Khách vãng lai') {
+      showNotification('Không thể xóa khách hàng mặc định "Khách vãng lai"', 'error');
       return;
     }
 
@@ -128,11 +128,11 @@ export default function CustomerManagement() {
       description: 'Đang gộp dữ liệu và xóa khách hàng...',
       onConfirm: async () => {
         try {
-          // 1. Tìm ID của "Khách mới" mặc định
+          // 1. Tìm ID của "Khách vãng lai" mặc định
           const { data: defaultCust } = await supabase
             .from('customers')
             .select('id')
-            .eq('full_name', 'Khách mới')
+            .eq('full_name', 'Khách vãng lai')
             .order('created_at', { ascending: true })
             .limit(1)
             .single();
@@ -192,7 +192,7 @@ export default function CustomerManagement() {
     setConfirmConfig({
       isOpen: true,
       title: 'Dọn dẹp khách trùng?',
-      description: 'Hệ thống sẽ gộp tất cả khách hàng có tên "Khách mới" hoặc không có thông tin vào một khách hàng duy nhất. Bạn có muốn tiếp tục?',
+      description: 'Hệ thống sẽ gộp tất cả khách hàng có tên "Khách vãng lai" hoặc không có thông tin vào một khách hàng duy nhất. Bạn có muốn tiếp tục?',
       onConfirm: async () => {
         setLoading(true);
         try {

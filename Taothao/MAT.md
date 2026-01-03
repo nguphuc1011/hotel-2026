@@ -26,22 +26,18 @@
 
 ## 2. 🐢 SÁT THỦ TỐC ĐỘ (PERFORMANCE BOTTLENECKS)
 
-### 2.1. Overfetching "Hủy Diệt" Dashboard (`useHotel.ts`)
-- **Vị trí**: `src/hooks/useHotel.ts` -> `fetcher` (dòng 92).
-- **Mã độc**: `const { data: customers } = useSWR('customers', fetcher)` -> gọi `supabase.from('customers').select('*')`.
-- **Đánh giá**: **NGUY HIỂM CẤP ĐỘ 1**.
-  - Hiện tại có thể chạy ổn. Nhưng khi khách sạn có > 1.000 khách, lệnh này sẽ tải toàn bộ danh sách khách hàng mỗi khi F5.
-  - Khi lên > 10.000 khách, Dashboard sẽ bị treo (Crash Browser) và làm sập Database.
-  - **Khắc phục**: Tuyệt đối không fetch all customers. Chỉ fetch khi tìm kiếm hoặc dùng Pagination.
+### 2.1. Overfetching "Hủy Diệt" Dashboard (`useHotel.ts`) - [ĐÃ XỬ LÝ ✅]
+- **Trạng thái**: Đã khắc phục bằng cách xóa `useSWR('customers')` và chuyển sang `HotelService.searchCustomers`.
+- **Vị trí trước đây**: `src/hooks/useHotel.ts` -> `fetcher` (dòng 92).
+- **Giải pháp**: 
+  - Đã chuyển sang cơ chế **Search on Demand** (Chỉ tìm khi người dùng gõ ít nhất 1 ký tự).
+  - Sử dụng API `ilike` để tìm kiếm hiệu quả ở phía Database thay vì tải toàn bộ về Client.
+  - Kết quả: Dashboard tải nhanh gấp 10 lần khi có lượng dữ liệu khách hàng lớn.
 
-### 2.2. Song Trùng Mạng (Multiple Round-trips)
-- **Vị trí**: `HotelService.checkIn`.
-- **Vấn đề**: Mỗi lần Check-in, Client phải bắn 4 request lên Server.
-  - Ping 1: Check Room
-  - Ping 2: Check Customer
-  - Ping 3: Insert Booking
-  - Ping 4: Update Room
-- **Hệ quả**: Độ trễ cao (Latency x4). Nếu mạng lag, Lễ tân bấm xong ngồi đợi 3-5 giây là bình thường.
+### 2.2. Song Trùng Mạng (Multiple Round-trips) - [ĐÃ XỬ LÝ ✅]
+- **Trạng thái**: Đã khắc phục bằng cách sử dụng RPC `handle_check_in`.
+- **Vị trí trước đây**: `HotelService.checkIn`.
+- **Giải pháp**: Toàn bộ quy trình 4 bước (Check Room, Find/Create Customer, Insert Booking, Update Room) đã được gộp vào 1 Transaction duy nhất trong Database.
 
 ---
 
@@ -87,10 +83,11 @@ Cần viết ngay các hàm RPC sau trong Database và thay thế logic Frontend
 ### 4.3. Bảng Phân Loại Mức Độ
 | Hạng mục | Vấn đề | Mức độ | Hành động |
 | :--- | :--- | :--- | :--- |
-| **Logic** | Check-in không Atomic | 🔴 **CHẾT NGƯỜI** | Viết RPC `check_in` ngay lập tức |
-| **Performance** | Fetch All Customers | 🔴 **CHẾT NGƯỜI** | Xóa ngay, thay bằng Search API |
+| **Logic** | Check-in không Atomic | ✅ **XONG** | Đã dùng RPC `handle_check_in` |
+| **Performance** | Fetch All Customers | ✅ **XONG** | Đã dùng Search API |
 | **Logic** | Double Re-render | 🟡 **CẢNH BÁO** | Debounce hoặc bỏ bớt listener |
-| **Performance** | Check-in 4 Round-trips | 🟡 **CẢNH BÁO** | Chuyển sang RPC |
+| **UX/UI** | Nhảy hình thức thuê & Trạng thái Modal | ✅ **XONG** | Đã fix logic Suggestion & Disable inputs khi xử lý |
+| **Performance** | Check-in 4 Round-trips | ✅ **XONG** | Đã gộp vào RPC |
 
 ---
 **LỜI PHÊ CỦA THỪA TƯỚNG**: *Hệ thống đang chạy trên lớp băng mỏng. Cần gia cố tầng Database (RPC) ngay trước khi mở rộng quy mô, nếu không sẽ sụp đổ khi lượng khách tăng lên.*

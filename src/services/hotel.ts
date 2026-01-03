@@ -4,11 +4,12 @@ import { Service } from '@/types';
 export const HotelService = {
   /**
    * CHECK-IN: Đảm bảo tính nguyên tử (Atomic)
-   * Tạo booking và cập nhật trạng thái phòng trong một luồng duy nhất
+   * Sử dụng RPC handle_check_in để xử lý toàn bộ quy trình trong một transaction
    */
   async checkIn(params: {
     roomId: string;
     customer: {
+      id?: string;
       name: string;
       phone?: string;
       idCard?: string;
@@ -22,26 +23,7 @@ export const HotelService = {
     services?: Array<{ service_id: string; quantity: number; price: number }>;
     allServices?: Service[]; // Để lấy tên dịch vụ
   }) {
-    // 1. Kiểm tra trạng thái phòng
-    const { data: room, error: roomErr } = await supabase
-      .from('rooms')
-      .select('status, room_number')
-      .eq('id', params.roomId)
-      .single();
-
-    if (roomErr || !['available', 'reserved'].includes(room?.status)) {
-      // Cho phép check-in nếu reserved (đặt trước) hoặc available
-      if (room?.status !== 'available' && room?.status !== 'reserved') {
-        throw new Error(
-          `Phòng ${room?.room_number || ''} không khả dụng để check-in (Status: ${room?.status})`
-        );
-      }
-    }
-
-    // 2. Tìm hoặc Tạo khách hàng
-    const customerId = await this.findOrCreateCustomer(params.customer);
-
-    // 3. Chuẩn bị dữ liệu services_used
+    // 1. Chuẩn bị dữ liệu services_used
     const servicesUsed =
       params.services?.map((s) => {
         const serviceInfo = params.allServices?.find(
@@ -57,42 +39,51 @@ export const HotelService = {
         };
       }) || [];
 
-    // 4. Tạo Booking
-    const { data: booking, error: bookingErr } = await supabase
-      .from('bookings')
-      .insert({
-        room_id: params.roomId,
-        customer_id: customerId,
-        check_in_at: params.checkInAt || new Date().toISOString(),
-        rental_type: params.rentalType,
-        initial_price: params.price,
-        deposit_amount: params.deposit || 0,
-        notes: params.notes,
-        status: 'active',
-        services_used: servicesUsed,
-      })
-      .select()
-      .single();
+    // 2. Gọi RPC handle_check_in
+    const { data, error } = await supabase.rpc('handle_check_in', {
+      p_room_id: params.roomId,
+      p_rental_type: params.rentalType,
+      p_customer_id: params.customer.id || null,
+      p_customer_name: params.customer.name,
+      p_customer_phone: params.customer.phone || null,
+      p_customer_id_card: params.customer.idCard || null,
+      p_customer_address: params.customer.address || null,
+      p_check_in_at: params.checkInAt || new Date().toISOString(),
+      p_initial_price: params.price,
+      p_deposit_amount: params.deposit || 0,
+      p_notes: params.notes || null,
+      p_services_used: servicesUsed,
+    });
 
-    if (bookingErr) throw bookingErr;
-
-    // 5. Cập nhật trạng thái phòng
-    const { error: updateRoomErr } = await supabase
-      .from('rooms')
-      .update({
-        status: params.rentalType, // Set status to rental type (hourly/daily/overnight)
-        current_booking_id: booking.id,
-        last_status_change: new Date().toISOString(),
-      })
-      .eq('id', params.roomId);
-
-    if (updateRoomErr) {
-      // Rollback booking (Manual)
-      await supabase.from('bookings').delete().eq('id', booking.id);
-      throw updateRoomErr;
+    if (error) {
+      throw new Error(`Lỗi check-in: ${error.message}`);
     }
 
-    return booking;
+    if (data && !data.success) {
+      throw new Error(data.message || 'Lỗi xử lý check-in');
+    }
+
+    return data.booking;
+  },
+
+  /**
+   * TÌM KIẾM KHÁCH HÀNG (Tối ưu performance)
+   */
+  async searchCustomers(term: string) {
+    if (!term || term.trim().length < 1) return [];
+
+    const cleanTerm = term.trim();
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .or(`full_name.ilike.%${cleanTerm}%,phone.ilike.%${cleanTerm}%,id_card.ilike.%${cleanTerm}%`)
+      .order('full_name')
+      .limit(5);
+
+    if (error) {
+      return [];
+    }
+    return data || [];
   },
 
   /**

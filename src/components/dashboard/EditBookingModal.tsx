@@ -8,13 +8,13 @@ import { format, parseISO } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Booking, Room, Customer } from '@/types';
+import { HotelService } from '@/services/hotel';
 
 interface EditBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   booking: (Booking & { customer?: { full_name: string } }) | null;
   room: Room | null;
-  customers: Customer[];
   onSave: (data: {
     check_in_at: string;
     initial_price: number;
@@ -28,7 +28,6 @@ export default function EditBookingModal({
   onClose,
   booking,
   room,
-  customers,
   onSave
 }: EditBookingModalProps) {
   const [checkInAt, setCheckInAt] = useState('');
@@ -37,13 +36,28 @@ export default function EditBookingModal({
   const [customerName, setCustomerName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [searchResults, setSearchResults] = useState<Customer[]>([]);
+
+  // Search khách hàng khi gõ tên
+  useEffect(() => {
+    const searchTimer = setTimeout(async () => {
+      if (customerName && customerName.length >= 1 && isFocused) {
+        const results = await HotelService.searchCustomers(customerName);
+        setSearchResults(results);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(searchTimer);
+  }, [customerName, isFocused]);
 
   useEffect(() => {
     if (isOpen && booking) {
       try {
         const date = booking.check_in_at ? parseISO(booking.check_in_at) : new Date();
         setCheckInAt(format(date, "yyyy-MM-dd'T'HH:mm"));
-      } catch (e) {
+      } catch (error) {
         setCheckInAt(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
       }
       setPrice(booking.initial_price || 0);
@@ -51,26 +65,6 @@ export default function EditBookingModal({
       setPriceChangeType('from_start');
     }
   }, [isOpen, booking]);
-
-  const filteredCustomers = useMemo(() => {
-    const term = customerName.toLowerCase();
-    if (!term || !isFocused) return [];
-    
-    const removeDau = (str: string) => {
-      return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    };
-    
-    const searchStr = removeDau(term);
-    return customers.filter((c: Customer) => {
-      const fullName = c.full_name || '';
-      const phone = c.phone || '';
-      const idCard = c.id_card || '';
-      
-      return removeDau(fullName).includes(searchStr) ||
-             phone.includes(term) ||
-             idCard.includes(term);
-    }).slice(0, 5);
-  }, [customerName, customers, isFocused]);
 
   const handleSelectCustomer = (selected: Customer) => {
     setCustomerName(selected.full_name);
@@ -89,7 +83,7 @@ export default function EditBookingModal({
       });
       onClose();
     } catch (error) {
-      console.error('Error saving booking:', error);
+      // Error handled by parent
     } finally {
       setIsSaving(false);
     }
@@ -146,14 +140,14 @@ export default function EditBookingModal({
                 
                 {/* Customer Suggestions */}
                 <AnimatePresence>
-                  {filteredCustomers.length > 0 && (
+                  {searchResults.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       className="absolute z-20 w-full bg-white/90 backdrop-blur-xl border border-slate-100 rounded-2xl mt-2 shadow-xl overflow-hidden divide-y divide-slate-50"
                     >
-                      {filteredCustomers.map((c: Customer) => (
+                      {searchResults.map((c: Customer) => (
                         <button
                           key={c.id}
                           type="button"

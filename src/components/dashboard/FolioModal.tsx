@@ -99,7 +99,6 @@ interface FolioModalProps {
   room: Room | null;
   settings: Setting[];
   services: Service[];
-  customers: Customer[];
   isOpen: boolean;
   onClose: () => void;
   onPayment: (
@@ -118,7 +117,6 @@ export default function FolioModal({
   room,
   settings,
   services,
-  customers,
   isOpen,
   onClose,
   onPayment,
@@ -329,6 +327,7 @@ export default function FolioModal({
 
       showNotification('Đã lưu cập nhật dịch vụ', 'success');
       if (onUpdate) onUpdate();
+      onClose(); // Đóng tất cả modal về sơ đồ phòng
     } catch (error: any) {
       showNotification(`Lỗi khi lưu: ${error.message}`, 'error');
     } finally {
@@ -1107,7 +1106,6 @@ export default function FolioModal({
             onClose={() => setShowEditBookingModal(false)}
             booking={room.current_booking}
             room={room}
-            customers={customers}
             onSave={handleEditBookingSave}
           />
 

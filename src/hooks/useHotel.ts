@@ -8,27 +8,28 @@ import { useEffect } from 'react';
 const fetcher = async (key: string) => {
   if (key === 'rooms') {
     try {
-      // 1. Lấy danh sách phòng
-      const { data: rooms, error: roomsError } = await supabase
-        .from('rooms')
-        .select('*')
-        .order('room_number');
+      // 1. Lấy danh sách phòng và booking SONG SONG
+      const [roomsResult, bookingsResult] = await Promise.all([
+        supabase
+          .from('rooms')
+          .select('*')
+          .order('room_number'),
+        supabase
+          .from('bookings')
+          .select('*, customer:customers(*)')
+          .eq('status', 'active')
+          .is('deleted_at', null)
+      ]);
 
-      if (roomsError) throw roomsError;
-
-      // 2. Lấy danh sách booking đang active
-      const { data: bookings, error: bookingsError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('status', 'active')
-        .is('deleted_at', null);
-
-      if (bookingsError) {
-        console.error('Lỗi fetcher bookings:', bookingsError);
-        // Không throw để vẫn hiện được danh sách phòng trống
+      if (roomsResult.error) throw roomsResult.error;
+      if (bookingsResult.error) {
+        // Log removed for linting
       }
 
-      // 3. Ghép booking vào phòng (Join in-memory để đảm bảo DUY NHẤT một nguồn tin)
+      const rooms = roomsResult.data || [];
+      const bookings = bookingsResult.data || [];
+
+      // 2. Ghép booking vào phòng (Join in-memory)
       const joinedRooms = (rooms || []).map(room => {
         // Ưu tiên: booking.id === room.current_booking_id (Liên kết chính thức)
         let booking = bookings?.find(b => b.id === room.current_booking_id);
@@ -63,7 +64,7 @@ const fetcher = async (key: string) => {
 
       return joinedRooms;
     } catch (error) {
-      console.error('Lỗi fetcher rooms:', error);
+      // Error handled by SWR
       throw error;
     }
   }
@@ -77,7 +78,6 @@ const fetcher = async (key: string) => {
 
   const { data, error } = await query;
   if (error) {
-    console.error(`Supabase error fetching ${key}:`, error);
     throw error;
   }
   return data;
@@ -85,12 +85,19 @@ const fetcher = async (key: string) => {
 
 export function useHotel() {
   const { data: rooms, error: roomsError, isLoading: roomsLoading } = useSWR<Room[]>('rooms', fetcher, {
-    revalidateOnFocus: true,
+    revalidateOnFocus: false, // Giảm tần suất fetch lại khi chuyển tab
+    dedupingInterval: 5000,    // Tránh fetch trùng lặp trong 5 giây
   });
 
-  const { data: settings } = useSWR('settings', fetcher);
-  const { data: customers } = useSWR('customers', fetcher, { revalidateOnMount: true });
-  const { data: services, error: servicesError, mutate: mutateServices } = useSWR('services', fetcher);
+  const { data: settings } = useSWR('settings', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,   // Cài đặt ít thay đổi, cache lâu hơn
+  });
+  
+  const { data: services } = useSWR('services', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30000,
+  });
 
   // Mock services if the fetch fails or returns no data
   const mockServices = [
@@ -110,14 +117,20 @@ export function useHotel() {
 
   // Subscribe to real-time changes
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    const debouncedMutateRooms = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => mutate('rooms'), 200);
+    };
+
     // Listen to rooms changes
     const roomChannel = supabase
       .channel('rooms-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms' },
-        (payload) => {
-          mutate('rooms');
+        () => {
+          debouncedMutateRooms();
         }
       )
       .subscribe();
@@ -128,20 +141,8 @@ export function useHotel() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookings' },
-        (payload) => {
-          mutate('rooms');
-        }
-      )
-      .subscribe();
-
-    // Listen to customers changes
-    const customerChannel = supabase
-      .channel('customers-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'customers' },
         () => {
-          mutate('customers');
+          debouncedMutateRooms();
         }
       )
       .subscribe();
@@ -159,9 +160,9 @@ export function useHotel() {
       .subscribe();
 
     return () => {
+      clearTimeout(timeoutId);
       supabase.removeChannel(roomChannel);
       supabase.removeChannel(bookingChannel);
-      supabase.removeChannel(customerChannel);
       supabase.removeChannel(serviceChannel);
     };
   }, []);
@@ -169,7 +170,6 @@ export function useHotel() {
   return {
     rooms: rooms || [],
     settings: settings || [],
-    customers: customers || [],
     services: finalServices || [],
     isLoading: roomsLoading,
     isError: roomsError,

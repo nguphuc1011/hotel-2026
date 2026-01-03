@@ -91,6 +91,15 @@ export default function SettingsPage() {
       bg: 'bg-blue-50',
       href: '/settings/staff',
     },
+    {
+      id: 'customers',
+      title: 'Khách hàng',
+      description: 'Quản lý danh sách & lịch sử khách',
+      icon: UserCircle,
+      color: 'text-rose-500',
+      bg: 'bg-rose-50',
+      href: '/settings/customers',
+    },
   ];
 
   return (
