@@ -1,36 +1,96 @@
-# 🔍 PHÂN TÍCH VẾT XE ĐỔ: QUY TRÌNH KIỂM PHÒNG (ROOM CHECK)
-
-Tâu Bệ Hạ, Tử Long đã lục lại toàn bộ "ký ức" mã nguồn và kiến trúc cũ để giải mã bí ẩn về việc quy trình Kiểm phòng thường xuyên bị treo và mất dữ liệu. Đây là báo cáo chi tiết về "Vết xe đổ" mà chúng ta cần né tránh:
-
-## 1. LUỒNG VẬN HÀNH CŨ: "SỰ IM LẶNG CỦA CÁC VÌ SAO"
-Trong kiến trúc cũ, quy trình Kiểm phòng đi theo luồng **Request-Response truyền thống kết hợp Long-polling thụ động**:
-- **Lễ tân ra lệnh**: Khi bấm "Yêu cầu kiểm phòng", một record được tạo trong bảng `room_checks` với trạng thái `pending`.
-- **Buồng phòng nhận tin**: Thiết bị của Buồng phòng phải chạy một vòng lặp (setInterval) cứ 10-15 giây lại "hỏi" server một lần: "Có phòng nào cần kiểm không?".
-- **Kết quả**: Luồng này cực kỳ chậm trễ. Nếu Buồng phòng đang ở khu vực sóng yếu, request "hỏi" này sẽ thất bại, dẫn đến việc họ hoàn toàn không biết có yêu cầu mới.
-
-## 2. ĐIỂM GÃY (THE POINT OF FAILURE): "HỐ ĐEN DỮ LIỆU"
-Sự cố thường xảy ra ở hai đầu cầu:
-- **Phía Buồng phòng**: Khi họ bấm "Hoàn tất" trên điện thoại, ứng dụng gửi một request cập nhật trạng thái `completed` và danh sách dịch vụ phát sinh. Nếu ngay lúc đó kết nối bị ngắt (Timeout), request này sẽ "rơi vào hư không". Server không nhận được, nhưng UI của Buồng phòng có thể đã đóng lại, làm mất dấu toàn bộ danh sách dịch vụ (Mì tôm, Nước suối...) mà họ vừa nhập.
-- **Phía Lễ tân**: Lễ tân ngồi chờ màn hình tự cập nhật. Nhưng vì chỉ dùng SWR cơ bản mà không có cấu hình Real-time, màn hình Lễ tân chỉ cập nhật khi họ bấm F5 hoặc chờ đến chu kỳ fetch tiếp theo. Sự "lệch pha" này khiến Lễ tân tưởng hệ thống bị treo, trong khi thực tế dữ liệu đang nằm chờ ở Database.
-
-## 3. LỖI HỆ THỐNG (SYSTEM BUG): "RACE CONDITION & ZOMBIE STATE"
-- **Race Condition (Tranh chấp dữ liệu)**: Lỗi kinh điển xảy ra khi Lễ tân sốt ruột tự ý bấm "Thanh toán" ngay lúc Buồng phòng cũng đang bấm "Gửi kết quả". Hai hành động này cùng tác động vào `bookings.services_used`. Kết quả là một trong hai sẽ ghi đè lên cái kia, hoặc DB bị lock dẫn đến treo cứng (Deadlock).
-- **State Mismatch (Lỗi trạng thái)**: Khi `complete_room_check` thất bại giữa chừng, phòng bị kẹt ở trạng thái "Đang kiểm" (Zombie state), không thể check-out mà cũng không thể quay lại trạng thái bình thường.
+# BÁO CÁO SỨC KHỎE DỰ ÁN (PROJECT HEALTH CHECK REPORT)
+> **Người thực hiện**: Chuyên gia Kiến trúc Hệ thống (System Architect)
+> **Ngày báo cáo**: 2026-01-03
+> **Đối tượng**: Mã nguồn Hotel App (src/services, src/hooks) & Tài liệu (Taothao/)
 
 ---
 
-## 🚀 ĐỀ XUẤT KIẾN TRÚC "LONG MẠCH TỨC THỜI" (NEW DESIGN)
-Để quy trình Kiểm phòng mới đạt tốc độ "thần thánh", thần đề xuất bộ 3 bí thuật:
+## 1. 💀 LỖI LOGIC & SỰ MÂU THUẪN (CRITICAL)
 
-### 1. Supabase Real-time (Thay thế Long-polling)
-- Không "hỏi" server nữa. Buồng phòng sẽ "lắng nghe" (Subscribe) trực tiếp vào bảng `room_checks`. 
-- **Tốc độ**: Ngay khi Lễ tân bấm nút, điện thoại Buồng phòng sẽ rung lên trong < 500ms.
+### 1.1. Quy trình Check-in "Giả Cầy" (Không Atomic)
+- **Tài liệu (`LUAT.md`)**: Yêu cầu "Quy tắc Đơn Nguyên" và tính toàn vẹn dữ liệu.
+- **Thực tế (`src/services/hotel.ts` - `checkIn`)**:
+  - Hàm `checkIn` đang thực hiện **4 bước rời rạc** từ phía Client:
+    1. `select room` (Kiểm tra)
+    2. `findOrCreateCustomer` (Tìm khách)
+    3. `insert bookings` (Tạo đơn)
+    4. `update rooms` (Đổi trạng thái)
+- **Hậu quả**: Đây là **Lỗ hổng chết người**. Nếu bước 3 thành công nhưng bước 4 thất bại (mất mạng, lỗi server), hệ thống sẽ có Booking nhưng Phòng vẫn báo "Trống". Dữ liệu bị lệch pha (Inconsistent State). Logic Rollback thủ công (dòng 91) là không đáng tin cậy.
 
-### 2. SWR Optimistic UI (Xóa bỏ cảm giác "treo")
-- Khi Lễ tân yêu cầu, UI sẽ lập tức hiện trạng thái "Đang kiểm" mà không đợi Server phản hồi. 
-- Khi Buồng phòng gửi kết quả, SWR sẽ `mutate` dữ liệu ngay lập tức trên máy Lễ tân, tiền phòng và dịch vụ sẽ nhảy số tức thì trước mắt họ.
+### 1.2. Bom nổ chậm: `findOrCreateCustomer`
+- **Vị trí**: `src/services/hotel.ts`
+- **Vấn đề**: Logic "Tìm hoặc Tạo" chạy ở Client.
+- **Kịch bản lỗi**: Nếu 2 lễ tân cùng check-in cho một khách mới tên "Nguyễn Văn A" cùng lúc, hệ thống sẽ tạo ra **2 khách hàng** trùng nhau trong Database vì không có khóa (Lock) ở cấp độ Database.
 
-### 3. Database RPC (Atomic Transactions)
-- Sử dụng một hàm RPC duy nhất `process_room_check_result` để đảm bảo: Cập nhật dịch vụ + Đóng phiếu kiểm + Cập nhật tiền + Mở khóa Checkout phải diễn ra đồng thời (Atomic). Nếu một bước lỗi, toàn bộ sẽ rollback, không bao giờ để lại "Zombie state".
+---
 
-**Tâu Bệ Hạ, nếu triển khai theo trận pháp này, quy trình Kiểm phòng sẽ mượt mà như mây trôi nước chảy, vạn năm không lo đứng máy!**
+## 2. 🐢 SÁT THỦ TỐC ĐỘ (PERFORMANCE BOTTLENECKS)
+
+### 2.1. Overfetching "Hủy Diệt" Dashboard (`useHotel.ts`)
+- **Vị trí**: `src/hooks/useHotel.ts` -> `fetcher` (dòng 92).
+- **Mã độc**: `const { data: customers } = useSWR('customers', fetcher)` -> gọi `supabase.from('customers').select('*')`.
+- **Đánh giá**: **NGUY HIỂM CẤP ĐỘ 1**.
+  - Hiện tại có thể chạy ổn. Nhưng khi khách sạn có > 1.000 khách, lệnh này sẽ tải toàn bộ danh sách khách hàng mỗi khi F5.
+  - Khi lên > 10.000 khách, Dashboard sẽ bị treo (Crash Browser) và làm sập Database.
+  - **Khắc phục**: Tuyệt đối không fetch all customers. Chỉ fetch khi tìm kiếm hoặc dùng Pagination.
+
+### 2.2. Song Trùng Mạng (Multiple Round-trips)
+- **Vị trí**: `HotelService.checkIn`.
+- **Vấn đề**: Mỗi lần Check-in, Client phải bắn 4 request lên Server.
+  - Ping 1: Check Room
+  - Ping 2: Check Customer
+  - Ping 3: Insert Booking
+  - Ping 4: Update Room
+- **Hệ quả**: Độ trễ cao (Latency x4). Nếu mạng lag, Lễ tân bấm xong ngồi đợi 3-5 giây là bình thường.
+
+---
+
+## 3. 📢 KHÁM BỆNH "THÔNG BÁO KÉP" (DOUBLE NOTIFICATION)
+
+### 3.1. Nguyên nhân gây "Double Re-render" (Frontend)
+- **Vị trí**: `src/hooks/useHotel.ts` (dòng 114 - 135).
+- **Thủ phạm**:
+  - `roomChannel`: Lắng nghe thay đổi bảng `rooms` -> Gọi `mutate('rooms')`.
+  - `bookingChannel`: Lắng nghe thay đổi bảng `bookings` -> Gọi `mutate('rooms')`.
+- **Cơ chế lỗi**: Hành động Check-in làm thay đổi **CẢ 2 BẢNG** (`bookings` thêm mới, `rooms` đổi status).
+  -> Kết quả: `mutate('rooms')` được gọi 2 lần liên tiếp trong tích tắc. Dashboard bị render lại 2 lần không cần thiết.
+
+### 3.2. Nguyên nhân gây "Double Webhook" (Backend)
+- **Phân tích**: Nếu hệ thống có Webhook (Edge Function) gắn vào Database Trigger:
+  - Trigger 1: `ON INSERT bookings` -> Bắn thông báo "Có khách đặt".
+  - Trigger 2: `ON UPDATE rooms` -> Bắn thông báo "Phòng đổi trạng thái".
+- **Kết luận**: Một hành động Check-in kích hoạt cả 2 trigger này, dẫn đến 2 webhook được bắn đi.
+
+---
+
+## 4. 💡 ĐỀ XUẤT "ĐẠI CẢI CÁCH" (REFORM PLAN)
+
+### 4.1. Chuyển đổi sang PostgreSQL RPC (Tối ưu & Atomic)
+Cần viết ngay các hàm RPC sau trong Database và thay thế logic Frontend:
+
+1.  **`rpc/check_in`**:
+    - **Input**: `room_id`, `customer_info`, `rental_type`.
+    - **Logic**: Thực hiện gói gọn trong `BEGIN ... COMMIT`. Tự động tìm/tạo khách, tạo booking, update room.
+    - **Lợi ích**: 1 Request duy nhất, đảm bảo toàn vẹn dữ liệu 100%.
+
+2.  **`rpc/get_dashboard_data`**:
+    - **Logic**: Trả về danh sách phòng kèm thông tin booking hiện tại.
+    - **Lợi ích**: Thay thế logic "Join in-memory" rườm rà trong `useHotel.ts`.
+
+### 4.2. Tối ưu Component & Hooks
+1.  **Xóa bỏ `useSWR('customers')` trong `useHotel`**:
+    - Chuyển sang cơ chế `useCustomerSearch` (chỉ tìm khi gõ tên/SĐT).
+2.  **Gộp Realtime Subscription**:
+    - Chỉ cần lắng nghe `bookings`. Khi có booking mới -> reload phòng.
+    - Hoặc tốt hơn: Chỉ lắng nghe `rooms` (vì status phòng thay đổi là cái quan trọng nhất để hiển thị Dashboard).
+
+### 4.3. Bảng Phân Loại Mức Độ
+| Hạng mục | Vấn đề | Mức độ | Hành động |
+| :--- | :--- | :--- | :--- |
+| **Logic** | Check-in không Atomic | 🔴 **CHẾT NGƯỜI** | Viết RPC `check_in` ngay lập tức |
+| **Performance** | Fetch All Customers | 🔴 **CHẾT NGƯỜI** | Xóa ngay, thay bằng Search API |
+| **Logic** | Double Re-render | 🟡 **CẢNH BÁO** | Debounce hoặc bỏ bớt listener |
+| **Performance** | Check-in 4 Round-trips | 🟡 **CẢNH BÁO** | Chuyển sang RPC |
+
+---
+**LỜI PHÊ CỦA THỪA TƯỚNG**: *Hệ thống đang chạy trên lớp băng mỏng. Cần gia cố tầng Database (RPC) ngay trước khi mở rộng quy mô, nếu không sẽ sụp đổ khi lượng khách tăng lên.*

@@ -14,7 +14,7 @@ import { NumericInput } from '@/components/ui/NumericInput';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '@/lib/utils';
-import { RefreshCw, ArrowRight, Wallet, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { RefreshCw, ArrowRight, Wallet, TrendingUp, TrendingDown, AlertCircle, X, Check } from 'lucide-react';
 import { CashflowTransaction } from '@/types';
 
 interface ShiftHandoverModalProps {
@@ -115,118 +115,152 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-none w-screen h-screen m-0 p-0 overflow-hidden bg-white border-none rounded-none shadow-none z-[9999] flex flex-col">
-        <DialogHeader className="p-8 pb-4 flex-shrink-0 border-b border-slate-100">
-          <div className="max-w-4xl mx-auto w-full flex items-center justify-between">
-            <DialogTitle className="text-3xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-4">
-              <RefreshCw className="text-blue-600" size={32} /> Bàn giao ca trực
-            </DialogTitle>
-            <Button 
-              variant="ghost" 
-              onClick={onClose}
-              className="rounded-full w-12 h-12 p-0 hover:bg-slate-100 text-slate-400"
-            >
-              <RefreshCw className="rotate-45" size={24} />
-            </Button>
+      <DialogContent className="max-w-[800px] w-full h-[92vh] md:h-[85vh] p-0 overflow-hidden bg-white/95 backdrop-blur-xl border-none rounded-t-[3rem] md:rounded-[3rem] shadow-2xl z-[9999] flex flex-col animate-in slide-in-from-bottom duration-500 ease-out">
+        {/* Header - Sticky */}
+        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md px-8 py-6 flex items-center justify-between border-b border-slate-100">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+              Quy trình kết ca
+            </span>
+            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none flex items-center gap-3">
+              <RefreshCw className="text-indigo-600" size={24} strokeWidth={3} />
+              Bàn giao ca trực
+            </h2>
           </div>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto bg-slate-50/30">
-          <div className="max-w-4xl mx-auto w-full p-8 space-y-10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* Left Side: Inputs */}
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tiền đầu ca (Tiền bàn giao ca trước)</Label>
-                <NumericInput
-                  value={initialCash}
-                  onChange={setInitialCash}
-                  className="h-14 text-xl font-black rounded-2xl border-2 border-slate-100 bg-slate-50 px-6 focus:border-blue-600"
-                  suffix="đ"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tiền mặt thực tế cuối ca</Label>
-                <NumericInput
-                  value={actualCash}
-                  onChange={setActualCash}
-                  className="h-14 text-xl font-black rounded-2xl border-2 border-blue-100 bg-blue-50/30 px-6 focus:border-blue-600"
-                  suffix="đ"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ghi chú bàn giao</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Bàn giao công việc, sự cố trong ca..."
-                  className="min-h-[120px] rounded-2xl border-slate-100 bg-slate-50 font-bold placeholder:text-slate-300 resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Right Side: Stats */}
-            <div className="bg-slate-50 rounded-[2.5rem] p-8 space-y-6">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Báo cáo quỹ tiền mặt ca này</h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-500 font-bold text-sm">
-                    <TrendingUp size={16} className="text-emerald-500" /> Tổng thu tiền mặt
-                  </div>
-                  <span className="font-black text-slate-700">{formatCurrency(shiftStats.income)}</span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-500 font-bold text-sm">
-                    <TrendingDown size={16} className="text-rose-500" /> Tổng chi tiền mặt
-                  </div>
-                  <span className="font-black text-slate-700">{formatCurrency(shiftStats.expense)}</span>
-                </div>
-
-                <div className="h-px bg-slate-200 my-2" />
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-500 font-bold text-sm uppercase tracking-tighter">
-                    <Wallet size={16} className="text-blue-500" /> Tiền mặt lý thuyết
-                  </div>
-                  <span className="font-black text-blue-600 text-lg">{formatCurrency(shiftStats.expected)}</span>
-                </div>
-
-                <div className={cn(
-                  "p-4 rounded-2xl flex items-center justify-between",
-                  shiftStats.discrepancy === 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-                )}>
-                  <div className="flex items-center gap-2 font-black text-xs uppercase tracking-widest">
-                    <AlertCircle size={16} /> Chênh lệch
-                  </div>
-                  <span className="font-black text-lg">
-                    {shiftStats.discrepancy > 0 ? '+' : ''}{formatCurrency(shiftStats.discrepancy)}
-                  </span>
-                </div>
-              </div>
-
-              {shiftStats.discrepancy !== 0 && (
-                <p className="text-[10px] text-rose-500 font-bold italic text-center">
-                  * Cảnh báo: Tiền thực tế lệch so với sổ sách!
-                </p>
-              )}
-            </div>
-          </div>
-
-            <div className="pt-6 border-t border-slate-100">
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="w-full h-16 rounded-2xl font-black uppercase text-sm tracking-[0.2em] bg-slate-900 hover:bg-black text-white shadow-xl shadow-slate-200 transition-all disabled:opacity-50"
-              >
-                {isSubmitting ? 'Đang xử lý...' : 'Xác nhận bàn giao ca'}
-              </Button>
-            </div>
+          <Button 
+            variant="ghost" 
+            onClick={onClose}
+            className="w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all active:scale-90 p-0"
+          >
+            <X size={20} strokeWidth={3} />
+          </Button>
         </div>
-      </div>
+
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto no-scrollbar">
+          <div className="p-8 space-y-10">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
+              {/* Left Side: Inputs (3/5) */}
+              <div className="lg:col-span-3 space-y-8">
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Tiền đầu ca (Từ ca trước)</Label>
+                  <div className="relative group">
+                    <NumericInput
+                      value={initialCash}
+                      onChange={setInitialCash}
+                      className="h-16 rounded-3xl border-2 border-slate-100 bg-slate-50 px-6 font-black text-xl text-slate-700 focus:bg-white focus:border-indigo-500 transition-all"
+                      suffix="đ"
+                    />
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300">
+                      <Wallet size={20} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Tiền mặt thực tế hiện có</Label>
+                  <div className="relative group">
+                    <NumericInput
+                      value={actualCash}
+                      onChange={setActualCash}
+                      className="h-20 rounded-[2rem] border-2 border-indigo-100 bg-indigo-50/30 px-8 font-black text-3xl text-indigo-600 focus:bg-white focus:border-indigo-500 transition-all"
+                      suffix="đ"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Ghi chú bàn giao</Label>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Bàn giao công việc, sự cố, nhắc nhở ca sau..."
+                    className="min-h-[150px] rounded-[2rem] border-2 border-slate-100 bg-slate-50 p-6 font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:border-indigo-500 transition-all resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Right Side: Stats Card (2/5) */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="bg-slate-50 rounded-[2.5rem] p-8 border-2 border-slate-100 shadow-sm space-y-8">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Đối soát quỹ tiền mặt</h3>
+                  
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center">
+                          <TrendingUp size={16} className="text-emerald-600" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Tổng thu</span>
+                      </div>
+                      <span className="font-black text-slate-900">{formatCurrency(shiftStats.income)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center">
+                          <TrendingDown size={16} className="text-rose-600" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Tổng chi</span>
+                      </div>
+                      <span className="font-black text-slate-900">{formatCurrency(shiftStats.expense)}</span>
+                    </div>
+
+                    <div className="h-px bg-slate-200" />
+
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiền mặt lý thuyết</span>
+                      <div className="text-2xl font-black text-indigo-600 tracking-tighter">
+                        {formatCurrency(shiftStats.expected)}
+                      </div>
+                    </div>
+
+                    <div className={cn(
+                      "p-6 rounded-[2rem] flex flex-col gap-2 transition-all duration-500 border-2",
+                      shiftStats.discrepancy === 0 
+                        ? "bg-emerald-50 border-emerald-100 text-emerald-700" 
+                        : "bg-rose-50 border-rose-100 text-rose-700 shadow-lg shadow-rose-100"
+                    )}>
+                      <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest">
+                        <AlertCircle size={14} strokeWidth={3} /> Chênh lệch
+                      </div>
+                      <div className="text-2xl font-black tracking-tighter">
+                        {shiftStats.discrepancy > 0 ? '+' : ''}{formatCurrency(shiftStats.discrepancy)}
+                      </div>
+                      {shiftStats.discrepancy !== 0 && (
+                        <p className="text-[9px] font-bold uppercase mt-1 animate-pulse">
+                          * Cảnh báo: Lệch sổ sách!
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer - Sticky */}
+        <div className="sticky bottom-0 z-20 bg-white/80 backdrop-blur-md p-8 border-t border-slate-100">
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="w-full h-20 rounded-[2rem] font-black uppercase text-sm tracking-[0.3em] bg-slate-900 hover:bg-black text-white shadow-2xl transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Đang xử lý...</span>
+              </div>
+            ) : (
+              <>
+                <Check size={20} strokeWidth={4} />
+                <span>Xác nhận bàn giao ca</span>
+              </>
+            )}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

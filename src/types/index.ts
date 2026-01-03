@@ -82,8 +82,9 @@ export interface CashflowTransaction {
   category_name: string;
   content: string;
   amount: number;
-  payment_method: 'cash' | 'transfer';
+  payment_method: 'cash' | 'transfer' | 'card';
   created_by: string;
+  created_by_id?: string;
   created_at: string;
   notes?: string;
 }

@@ -134,118 +134,170 @@ export default function FinanceSettings() {
   };
 
   return (
-    <div className="space-y-10">
-      <div>
-        <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tight mb-2">Cấu hình Thu Chi</h1>
-        <p className="text-slate-500 font-bold text-sm tracking-wide">Quản lý các danh mục thu và chi của khách sạn</p>
+    <div className="max-w-[1200px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* 1. Header Section - Apple Style */}
+      <div className="relative overflow-hidden bg-white p-10 rounded-[3rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] border-none">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-50 rounded-full blur-3xl -ml-24 -mb-24 opacity-50" />
+        
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+              <Settings2 size={12} strokeWidth={3} />
+              Cấu hình hệ thống
+            </div>
+            <h1 className="text-4xl font-black text-slate-800 uppercase tracking-tighter leading-none">
+              Danh mục <span className="text-indigo-600">Thu Chi</span>
+            </h1>
+            <p className="text-slate-400 font-bold text-sm tracking-tight max-w-md">
+              Tùy chỉnh các nguồn thu và khoản chi để báo cáo tài chính chính xác hơn.
+            </p>
+          </div>
+
+          {categories.length === 0 && !loading && (
+            <button 
+              onClick={handleInitializeDefaultCategories}
+              className="group relative flex items-center gap-4 p-1 pl-6 bg-slate-900 rounded-2xl transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-slate-200"
+            >
+              <span className="text-white font-black uppercase text-[10px] tracking-widest">Thiết lập mặc định</span>
+              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white group-hover:bg-indigo-500 transition-colors">
+                <PlusCircle size={20} />
+              </div>
+            </button>
+          )}
+        </div>
       </div>
 
-      {categories.length === 0 && !loading && (
-        <div className="p-8 bg-blue-50 rounded-[2rem] border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <h4 className="text-blue-900 font-black uppercase tracking-tight mb-1">Chưa có danh mục</h4>
-            <p className="text-blue-600/80 text-sm font-bold">Thiết lập các danh mục mặc định cho khách sạn (Tiền phòng, Điện nước, Lương...)</p>
-          </div>
-          <Button 
-            onClick={handleInitializeDefaultCategories}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest h-12 px-8 rounded-xl shadow-lg shadow-blue-200"
-          >
-            Thiết lập danh mục mặc định
-          </Button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Income Categories */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-              <ArrowUpCircle className="text-emerald-500" size={20} /> Danh mục Thu
-            </h3>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 2. Income Categories Section */}
+        <div className="bg-white rounded-[3rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] border-none overflow-hidden flex flex-col max-h-[600px]">
+          <div className="p-8 pb-4 flex items-center justify-between shrink-0 sticky top-0 bg-white/80 backdrop-blur-md z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 shadow-sm shadow-emerald-100">
+                <ArrowUpCircle size={24} strokeWidth={2.5} />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Nguồn Thu</h3>
+            </div>
+            <button 
               onClick={() => handleAddCategory('income')}
-              className="text-emerald-600 font-black text-[10px] uppercase tracking-widest gap-2"
+              className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-emerald-500 hover:text-white transition-all duration-300 hover:shadow-lg hover:shadow-emerald-100 active:scale-90"
             >
-              <PlusCircle size={16} /> Thêm mới
-            </Button>
+              <PlusCircle size={20} />
+            </button>
           </div>
-          <div className="space-y-3">
-            {categories.filter(c => c.type === 'income').map(cat => (
-              <div key={cat.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                  <span className="font-bold text-slate-700">{cat.name}</span>
-                  {cat.is_system && (
-                    <span className="text-[8px] font-black uppercase bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">Hệ thống</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                  {!cat.is_system && (
-                    <>
-                      <button 
-                        onClick={() => handleEditCategory(cat)}
-                        className="text-slate-300 hover:text-blue-500 transition-all"
-                        title="Sửa"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteCategory(cat.id)}
-                        className="text-slate-300 hover:text-rose-500 transition-all"
-                        title="Xóa"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </>
-                  )}
-                </div>
+
+          <div className="flex-1 overflow-y-auto p-8 pt-0 no-scrollbar space-y-2">
+            {categories.filter(c => c.type === 'income').length === 0 ? (
+              <div className="py-12 flex flex-col items-center justify-center text-center opacity-30">
+                <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-300 mb-4" />
+                <p className="text-[10px] font-black uppercase tracking-widest">Trống</p>
               </div>
-            ))}
+            ) : (
+              categories.filter(c => c.type === 'income').map(cat => (
+                <div 
+                  key={cat.id} 
+                  className="group flex items-center justify-between p-3 pl-4 bg-slate-50/50 hover:bg-white rounded-[1.5rem] transition-all duration-300 hover:shadow-md active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-2 h-6 rounded-full shadow-sm" 
+                      style={{ backgroundColor: cat.color }} 
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-black text-slate-700 text-xs uppercase tracking-tight">{cat.name}</span>
+                      {cat.is_system && (
+                        <span className="text-[7px] font-black uppercase text-emerald-500 tracking-widest">Hệ thống</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                    {!cat.is_system && (
+                      <>
+                        <button 
+                          onClick={() => handleEditCategory(cat)}
+                          className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:shadow-sm transition-all active:scale-90"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-slate-400 hover:text-rose-600 hover:shadow-sm transition-all active:scale-90"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        {/* Expense Categories */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-              <ArrowDownCircle className="text-rose-500" size={20} /> Danh mục Chi
-            </h3>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => handleAddCategory('expense')}
-              className="text-rose-600 font-black text-[10px] uppercase tracking-widest gap-2"
-            >
-              <PlusCircle size={16} /> Thêm mới
-            </Button>
-          </div>
-          <div className="space-y-3">
-            {categories.filter(c => c.type === 'expense').map(cat => (
-              <div key={cat.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                  <span className="font-bold text-slate-700">{cat.name}</span>
-                </div>
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                  <button 
-                    onClick={() => handleEditCategory(cat)}
-                    className="text-slate-300 hover:text-blue-500 transition-all"
-                    title="Sửa"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteCategory(cat.id)}
-                    className="text-slate-300 hover:text-rose-500 transition-all"
-                    title="Xóa"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+        {/* 3. Expense Categories Section */}
+        <div className="bg-white rounded-[3rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] border-none overflow-hidden flex flex-col max-h-[600px]">
+          <div className="p-8 pb-4 flex items-center justify-between shrink-0 sticky top-0 bg-white/80 backdrop-blur-md z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 shadow-sm shadow-rose-100">
+                <ArrowDownCircle size={24} strokeWidth={2.5} />
               </div>
-            ))}
+              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Khoản Chi</h3>
+            </div>
+            <button 
+              onClick={() => handleAddCategory('expense')}
+              className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-rose-500 hover:text-white transition-all duration-300 hover:shadow-lg hover:shadow-rose-100 active:scale-90"
+            >
+              <PlusCircle size={20} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-8 pt-0 no-scrollbar space-y-2">
+            {categories.filter(c => c.type === 'expense').length === 0 ? (
+              <div className="py-12 flex flex-col items-center justify-center text-center opacity-30">
+                <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-300 mb-4" />
+                <p className="text-[10px] font-black uppercase tracking-widest">Trống</p>
+              </div>
+            ) : (
+              categories.filter(c => c.type === 'expense').map(cat => (
+                <div 
+                  key={cat.id} 
+                  className="group flex items-center justify-between p-3 pl-4 bg-slate-50/50 hover:bg-white rounded-[1.5rem] transition-all duration-300 hover:shadow-md active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-2 h-6 rounded-full shadow-sm" 
+                      style={{ backgroundColor: cat.color }} 
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-black text-slate-700 text-xs uppercase tracking-tight">{cat.name}</span>
+                      {cat.is_system && (
+                        <span className="text-[7px] font-black uppercase text-rose-500 tracking-widest">Hệ thống</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                    {!cat.is_system && (
+                      <>
+                        <button 
+                          onClick={() => handleEditCategory(cat)}
+                          className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:shadow-sm transition-all active:scale-90"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-slate-400 hover:text-rose-600 hover:shadow-sm transition-all active:scale-90"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

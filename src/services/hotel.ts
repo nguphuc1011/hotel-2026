@@ -92,9 +92,6 @@ export const HotelService = {
       throw updateRoomErr;
     }
 
-    // 6. Gửi thông báo hệ thống (nếu cần)
-    await this.notifySystemChange('check_in', params.roomId);
-
     return booking;
   },
 
@@ -207,9 +204,6 @@ export const HotelService = {
     // eslint-disable-next-line no-console
     console.log('[HotelService] Check-out thành công qua RPC handle_checkout');
 
-    // Gửi thông báo hệ thống
-    await this.notifySystemChange('check_out', params.roomId);
-
     return { success: true };
   },
 
@@ -275,6 +269,7 @@ export const HotelService = {
             user_id: user.id,
             title: title,
             body: body,
+            tag: `${type}-${roomId}`, // Thêm tag để tránh lặp thông báo trên cùng 1 thiết bị
           }),
         });
 

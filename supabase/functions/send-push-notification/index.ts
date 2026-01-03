@@ -71,13 +71,15 @@ Deno.serve(async (req) => {
       .from('user_push_tokens')
       .select('token')
       .eq('user_id', user_id)
+      .order('last_seen', { ascending: false })
+      .limit(5) // Lấy 5 thiết bị mới nhất để đảm bảo không bỏ lỡ (ĐT, Máy tính, MTB...)
 
     if (dbError) throw dbError;
 
     if (!tokens || tokens.length === 0) {
       return new Response(JSON.stringify({ 
         success: false, 
-        message: 'Không tìm thấy Token nào hợp lệ.' 
+        message: 'Không tìm thấy Token nào.' 
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
@@ -95,18 +97,25 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
               message: {
                 token: t.token,
-                notification: { 
-                  title: body.title || 'MẮT THẦN HÀNH QUÂN', 
-                  body: body.body || `Báo cáo Bệ Hạ, hỏa tiễn đã nổ lúc ${new Date().toLocaleTimeString('vi-VN')}!` 
+                // CHỈ DÙNG DATA ĐỂ SERVICE WORKER TỰ XỬ LÝ, TRÁNH LẶP DO OS TỰ HIỂN THỊ
+                data: {
+                  title: body.title || 'MẮT THẦN HÀNH QUÂN',
+                  body: body.body || 'Báo cáo Bệ Hạ, có biến!',
+                  tag: body.tag || `eye-of-god-${Date.now()}`,
+                  icon: 'https://oyrupgbavjpyyobbnrth.supabase.co/storage/v1/object/public/icons/favicon.ico',
+                  link: 'https://hotel-2026.vercel.app/thao-insight'
                 },
                 webpush: {
+                  headers: {
+                    Urgency: 'high'
+                  },
                   fcm_options: {
                     link: 'https://hotel-2026.vercel.app/thao-insight'
                   },
                   notification: {
                     icon: 'https://oyrupgbavjpyyobbnrth.supabase.co/storage/v1/object/public/icons/favicon.ico',
-                    tag: `eye-of-god-${Date.now()}`, // Tạo tag duy nhất để không bị gộp thông báo
-                    renotify: true // Ép báo rung/chuông kể cả khi cùng tag
+                    tag: body.tag || `eye-of-god-${Date.now()}`,
+                    renotify: true
                   }
                 }
               }

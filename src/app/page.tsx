@@ -526,8 +526,7 @@ export default function Dashboard() {
       await mutateRooms(); // Refresh data immediately
       showNotification(`Nhận phòng ${selectedRoom.room_number} thành công!`, 'success');
 
-      // Gửi thông báo hệ thống (Mắt Thần)
-      // eslint-disable-next-line no-console
+      // 5. Gửi thông báo hệ thống (Mắt Thần)
       HotelService.notifySystemChange('check_in', selectedRoom.id).catch(console.error);
     } catch (error: unknown) {
       const err = error as any;

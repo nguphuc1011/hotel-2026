@@ -153,20 +153,32 @@ export default function FinanceManagement() {
   const handleSaveTransaction = async (data: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Vui lòng đăng nhập để thực hiện');
+        throw new Error('Chưa đăng nhập');
+      }
+
       const userName = user?.user_metadata?.full_name || user?.email || 'Nhân viên';
+      const userId = user.id;
 
       if (editingTransaction) {
         // Yêu cầu nhập lý do khi sửa giao dịch cũ
         const reason = window.prompt('Vui lòng nhập lý do sửa giao dịch này (bắt buộc):') || '';
         if (!reason.trim()) {
           toast.error('Bắt buộc phải có lý do khi sửa giao dịch!');
-          return;
+          throw new Error('Thiếu lý do sửa');
         }
 
         const { error } = await supabase
           .from('cashflow')
           .update({
-            ...data,
+            type: data.type,
+            category: data.category,
+            category_id: data.category_id,
+            category_name: data.category_name,
+            amount: data.amount,
+            content: data.content,
+            payment_method: data.payment_method,
             notes: data.notes ? `${data.notes}\n[SỬA] Lý do: ${reason}` : `[SỬA] Lý do: ${reason}`
           })
           .eq('id', editingTransaction.id);
@@ -175,8 +187,16 @@ export default function FinanceManagement() {
         toast.success('Cập nhật thành công');
       } else {
         const { error } = await supabase.from('cashflow').insert([{
-          ...data,
+          type: data.type,
+          category: data.category,
+          category_id: data.category_id,
+          category_name: data.category_name,
+          amount: data.amount,
+          content: data.content,
+          payment_method: data.payment_method,
+          notes: data.notes,
           created_by: userName,
+          created_by_id: userId,
           created_at: new Date().toISOString()
         }]);
 
@@ -186,9 +206,13 @@ export default function FinanceManagement() {
 
       setIsModalOpen(false);
       setEditingTransaction(null);
-    } catch (error) {
+      fetchData(); // Refresh data manually just in case subscription is slow
+    } catch (error: any) {
       console.error('Error saving transaction:', error);
-      toast.error('Lỗi khi lưu giao dịch');
+      if (error.message !== 'Chưa đăng nhập' && error.message !== 'Thiếu lý do sửa') {
+        toast.error('Lỗi khi lưu giao dịch: ' + (error.message || ''));
+      }
+      throw error; // Rethrow to let modal handle UI state
     }
   };
 
@@ -229,7 +253,7 @@ export default function FinanceManagement() {
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
         {/* Fixed Top Bar Header - Real UX */}
-        <header className="flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-[60]">
+        <header className="flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md sticky top-0 z-[60] shadow-sm">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
               <LayoutGrid className="text-white" size={24} />
@@ -239,7 +263,7 @@ export default function FinanceManagement() {
           
           <button 
             onClick={() => setIsShiftModalOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm hover:bg-slate-50 transition-all active:scale-95"
+            className="flex items-center gap-2 px-6 py-3 bg-white rounded-2xl shadow-[0_4px_15px_-3px_rgba(0,0,0,0.05)] hover:bg-slate-50 transition-all active:scale-95"
           >
             <div className="w-5 h-5 flex items-center justify-center border-2 border-slate-300 rounded-full">
               <div className="w-2 h-2 bg-slate-400 rounded-full" />
@@ -270,7 +294,7 @@ export default function FinanceManagement() {
                     onClick={() => setIsFilterVisible(!isFilterVisible)}
                     className={cn(
                       "p-3 rounded-2xl transition-all active:scale-95",
-                      isFilterVisible ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white text-slate-400 border border-slate-100 shadow-sm"
+                      isFilterVisible ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white text-slate-400 shadow-[0_4px_15px_-3px_rgba(0,0,0,0.05)]"
                     )}
                   >
                     <Filter size={24} strokeWidth={3} />
@@ -281,9 +305,9 @@ export default function FinanceManagement() {
               {/* 3. Combined Smart Filter Bar - Multi Toggle (Toggleable) */}
               {isFilterVisible && (
                 <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="bg-white p-2 rounded-3xl flex flex-wrap items-center gap-2 shadow-sm border border-slate-100">
+                  <div className="bg-white p-2 rounded-3xl flex flex-wrap items-center gap-2 shadow-[0_4px_20px_-5px_rgba(0,0,0,0.05)]">
                     {/* Type Filters */}
-                    <div className="flex gap-1.5 bg-slate-100 p-1 rounded-2xl">
+                    <div className="flex gap-1.5 bg-slate-100/50 p-1 rounded-2xl">
                       <button 
                         onClick={() => setShowIncome(!showIncome)}
                         className={cn(
@@ -305,10 +329,10 @@ export default function FinanceManagement() {
                     </div>
 
                     {/* Vertical Divider */}
-                    <div className="hidden sm:block w-[1px] h-6 bg-slate-200 mx-1" />
+                    <div className="hidden sm:block w-[1px] h-6 bg-slate-100 mx-1" />
 
                     {/* Method Filters */}
-                    <div className="flex gap-1.5 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                    <div className="flex gap-1.5 bg-slate-50/50 p-1 rounded-2xl shadow-inner">
                       <button 
                         onClick={() => setShowCash(!showCash)}
                         className={cn(
@@ -359,9 +383,9 @@ export default function FinanceManagement() {
         {/* Floating Action Button */}
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="fixed bottom-10 right-8 w-20 h-20 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-[0_20px_50px_-10px_rgba(244,63,94,0.5)] hover:scale-110 active:scale-95 transition-all z-[70] group"
+          className="fixed bottom-24 right-8 w-14 h-14 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-[0_15px_30px_-5px_rgba(244,63,94,0.4)] hover:scale-110 active:scale-95 transition-all z-[70] group"
         >
-          <Plus size={36} className="group-hover:rotate-90 transition-transform duration-500" />
+          <Plus size={28} className="group-hover:rotate-90 transition-transform duration-500" />
         </button>
 
       <CashflowModal 

@@ -148,12 +148,24 @@ export const requestForToken = async () => {
   }
 };
 
+let messageListenerRegistered = false;
+let resolveCallback: ((payload: any) => void) | null = null;
+
 export const onMessageListener = () =>
   new Promise((resolve) => {
     if (typeof window === 'undefined' || !messaging) return;
-    onMessage(messaging, (payload) => {
-      resolve(payload);
-    });
+
+    if (!messageListenerRegistered) {
+      onMessage(messaging, (payload) => {
+        if (resolveCallback) {
+          resolveCallback(payload);
+        }
+      });
+      messageListenerRegistered = true;
+    }
+
+    // Luôn cập nhật resolveCallback mới nhất để trả về cho Promise đang chờ
+    resolveCallback = resolve;
   });
 
 export { app, messaging };

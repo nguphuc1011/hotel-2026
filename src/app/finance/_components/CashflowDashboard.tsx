@@ -141,15 +141,15 @@ export const CashflowDashboard: React.FC<CashflowDashboardProps> = ({
           
           <div className="flex flex-col gap-6">
             {!showDetails && (
-              <div className="flex gap-12 items-center">
+              <div className="flex flex-wrap gap-x-12 gap-y-4 items-center">
                 <div className="flex flex-col">
                   <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Tổng Thu</p>
-                  <p className="text-white font-black text-2xl tracking-tight">{formatCurrency(summary.total_income)}</p>
+                  <p className="text-white font-black text-2xl tracking-tight break-all">{formatCurrency(summary.total_income)}</p>
                 </div>
-                <div className="h-10 w-px bg-white/10" />
+                <div className="hidden sm:block h-10 w-px bg-white/10" />
                 <div className="flex flex-col">
                   <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Tổng Chi</p>
-                  <p className="text-white font-black text-2xl tracking-tight">{formatCurrency(summary.total_expense)}</p>
+                  <p className="text-white font-black text-2xl tracking-tight break-all">{formatCurrency(summary.total_expense)}</p>
                 </div>
               </div>
             )}
