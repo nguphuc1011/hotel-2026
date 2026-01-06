@@ -1,28 +1,23 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, 
-  Receipt, 
-  CircleMinus, 
-  CheckCircle2, 
-  Landmark, 
-  Sparkles,
+import {
+  X,
+  CheckCircle2,
+  Landmark,
   MessageSquare,
   CreditCard,
   Wallet,
   AlertTriangle,
-  Clock,
   ArrowRight,
-  AlertCircle
 } from 'lucide-react';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { supabase } from '@/lib/supabase';
-import { Room, PricingBreakdown, RentalType } from '@/types';
-import { formatCurrency, formatDateTime, formatDuration, cn } from '@/lib/utils';
+import { Room, PricingBreakdown } from '@/types';
+import { formatCurrency, cn } from '@/lib/utils';
 import { useCustomerBalance } from '@/hooks/useCustomerBalance';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 // New interfaces aligned with the new design
 export interface CheckoutData {
@@ -58,26 +53,30 @@ export default function CheckoutModal({
 }: CheckoutModalProps) {
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [discountValue, setDiscountValue] = useState(0);
-  const [discountReason, setDiscountReason] = useState('');
+  const [discountReason, _setDiscountReason] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<CheckoutData['paymentMethod']>('cash');
   const [isTaxEnabled, setIsTaxEnabled] = useState(false);
   const [taxPercent] = useState(10);
   const [note, setNote] = useState('');
   const [manualSurcharge, setManualSurcharge] = useState(0);
-  const [showServices, setShowServices] = useState(true);
+  const [_showServices, _setShowServices] = useState(true);
   const [actualPaid, setActualPaid] = useState(0);
+  const [showDebtConfirm, setShowDebtConfirm] = useState(false);
+  const [debtConfirmMessage, setDebtConfirmMessage] = useState('');
 
   const booking = room.current_booking;
   const services = booking?.services_used || [];
   const deposit = booking?.deposit_amount || 0;
   const [customerBalance, setCustomerBalance] = useState<number>(0);
-  const { isDebt, isCredit, absFormattedBalance, label, colorClass } = useCustomerBalance(customerBalance);
+  const { isDebt, _isCredit, absFormattedBalance, _label, _colorClass } =
+    useCustomerBalance(customerBalance);
 
   // Derived discount amount
   const discount = useMemo(() => {
     if (discountType === 'amount') return discountValue;
     if (!pricingBreakdown) return 0;
-    const baseForDiscount = pricingBreakdown.room_charge + pricingBreakdown.service_charge + pricingBreakdown.surcharge;
+    const baseForDiscount =
+      pricingBreakdown.room_charge + pricingBreakdown.service_charge + pricingBreakdown.surcharge;
     return Math.round((baseForDiscount * discountValue) / 100);
   }, [discountType, discountValue, pricingBreakdown]);
 
@@ -111,10 +110,10 @@ export default function CheckoutModal({
     const roomCharge = pricingBreakdown.room_charge;
     const serviceCharge = pricingBreakdown.service_charge;
     const surcharges = pricingBreakdown.surcharge + manualSurcharge;
-    
+
     const subTotal = roomCharge + serviceCharge + surcharges - discount;
-    const taxAmount = isTaxEnabled ? (subTotal * taxPercent / 100) : 0;
-    
+    const taxAmount = isTaxEnabled ? (subTotal * taxPercent) / 100 : 0;
+
     // totalToCollect (UI) should include customer balance
     // balance < 0: Nợ, balance > 0: Dư
     const totalToCollect = subTotal + taxAmount - deposit - customerBalance;
@@ -127,57 +126,44 @@ export default function CheckoutModal({
       taxAmount,
       totalToCollect,
     };
-  }, [pricingBreakdown, discount, deposit, isTaxEnabled, taxPercent, customerBalance]);
-  
+  }, [
+    pricingBreakdown,
+    discount,
+    deposit,
+    isTaxEnabled,
+    taxPercent,
+    customerBalance,
+    manualSurcharge,
+  ]);
+
   // Auto-update actualPaid when totalToCollect or customerBalance changes
   useEffect(() => {
     // Suggest actual payment: the total to collect already includes balance adjustment
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActualPaid(Math.max(0, totalCalculations.totalToCollect));
   }, [totalCalculations.totalToCollect]);
 
-  const handleConfirm = () => {
-    if (isProcessing) return;
-
+  const performCheckout = () => {
     // Detect "Old Debt" services to exclude from backend total
-    // This prevents double-counting because the backend subtracts (Total - Paid) from Balance.
-    // If Total includes Old Debt, we are subtracting Old Debt again from the Balance.
     const oldDebtAmount = services
-      .filter(s => {
-        // Only exclude "Unsafe" debt (manual entries) that backend won't catch
-        // Safe IDs are already handled by backend's v_old_debt_included logic so we KEEP them in the total
-        const isSafeId = String(s.id) === 'debt-carry' || 
-                         String(s.id) === 'old_debt' ||
-                         String(s.id) === '11111111-1111-1111-1111-111111111111';
-        
-        if (isSafeId) return false; // Let backend handle it
+      .filter((s) => {
+        const isSafeId =
+          String(s.id) === 'debt-carry' ||
+          String(s.id) === 'old_debt' ||
+          String(s.id) === '11111111-1111-1111-1111-111111111111';
 
-        // If not safe ID, check if it looks like debt (Manual Entry)
-        // These cause double-counting if we send them, because backend doesn't know they are debt
-        return s.name.toLowerCase().includes('nợ cũ') || 
-               s.name.toLowerCase().includes('công nợ') ||
-               s.name.toLowerCase().includes('debt');
+        if (isSafeId) return false;
+
+        return (
+          s.name.toLowerCase().includes('nợ cũ') ||
+          s.name.toLowerCase().includes('công nợ') ||
+          s.name.toLowerCase().includes('debt')
+        );
       })
-      .reduce((sum, s) => sum + (s.total || (s.price * s.quantity)), 0);
+      .reduce((sum, s) => sum + (s.total || s.price * s.quantity), 0);
 
     // cleanTotalToCollect should NOT include customerBalance because backend handles it
     const cleanTotalToCollect = totalCalculations.totalToCollect + customerBalance - oldDebtAmount;
-
-    if (actualPaid < totalCalculations.totalToCollect) {
-      const currentBookingDebt = totalCalculations.totalToCollect - actualPaid;
-      // balance < 0 là nợ, nên tổng nợ tiềm năng = nợ cũ (số âm) - nợ mới (số dương)
-      const totalPotentialDebt = customerBalance - currentBookingDebt;
-      
-      let message = `CẢNH BÁO NỢ: Khách thanh toán thiếu ${formatCurrency(currentBookingDebt)}.`;
-      if (customerBalance < 0) {
-        message += `\nNợ cũ hiện tại: ${absFormattedBalance}.`;
-        message += `\nTổng nợ sau khi trả phòng: ${formatCurrency(Math.abs(totalPotentialDebt))}.`;
-      }
-      message += `\n\nBạn có chắc chắn muốn cho khách NỢ số tiền này và hoàn tất trả phòng?`;
-
-      if (!window.confirm(message)) {
-        return;
-      }
-    }
 
     // Map payment method to backend code
     const paymentMethodMap: Record<string, string> = {
@@ -200,10 +186,33 @@ export default function CheckoutModal({
     });
   };
 
+  const handleConfirm = () => {
+    if (isProcessing) return;
+
+    if (actualPaid < totalCalculations.totalToCollect) {
+      const currentBookingDebt = totalCalculations.totalToCollect - actualPaid;
+      const totalPotentialDebt = customerBalance - currentBookingDebt;
+      const customerName = booking?.customer?.full_name || 'Khách hàng';
+
+      let message = `Khách hàng: ${customerName}\n\nCẢNH BÁO NỢ: Thanh toán thiếu ${formatCurrency(currentBookingDebt)}.`;
+      if (customerBalance < 0) {
+        message += `\nNợ cũ hiện tại: ${absFormattedBalance}.`;
+        message += `\nTổng nợ sau khi trả phòng: ${formatCurrency(Math.abs(totalPotentialDebt))}.`;
+      }
+      message += `\n\nBạn có chắc chắn muốn cho khách NỢ số tiền này và hoàn tất trả phòng?`;
+
+      setDebtConfirmMessage(message);
+      setShowDebtConfirm(true);
+      return;
+    }
+
+    performCheckout();
+  };
+
   const modalVariants = {
-    hidden: { opacity: 0, y: "-20%" },
+    hidden: { opacity: 0, y: '-20%' },
     visible: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: "-20%" },
+    exit: { opacity: 0, y: '-20%' },
   };
 
   return (
@@ -225,20 +234,22 @@ export default function CheckoutModal({
             initial="hidden"
             animate="visible"
             exit="exit"
-            transition={{ duration: 0.3, ease: "easeInOut" }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="relative w-full h-full bg-slate-50 flex flex-col overflow-hidden"
           >
             {/* Header */}
             <header className="sticky top-0 bg-white border-b border-slate-100 py-4 px-6 z-30 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4">
-                <button 
-                  onClick={onClose} 
+                <button
+                  onClick={onClose}
                   className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
                 >
                   <X size={20} className="text-slate-400" />
                 </button>
                 <div>
-                  <h2 className="font-black text-xl text-slate-800 uppercase tracking-tight">Thanh toán & Trả phòng</h2>
+                  <h2 className="font-black text-xl text-slate-800 uppercase tracking-tight">
+                    Thanh toán & Trả phòng
+                  </h2>
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-black uppercase tracking-wider">
                       Phòng {room.room_number}
@@ -255,31 +266,46 @@ export default function CheckoutModal({
             {/* Body */}
             <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6">
               <div className="max-w-xl mx-auto space-y-4">
-                
                 {/* Simplified Summary Card */}
                 <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                   <div className="p-6 space-y-4">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Tiền phòng</span>
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                          Tiền phòng
+                        </span>
                         {pricingBreakdown?.summary && (
                           <span className="text-[10px] text-slate-300 font-bold">
-                            ({pricingBreakdown.summary.days ? `${pricingBreakdown.summary.days} ngày` : `${pricingBreakdown.summary.hours} giờ`} x {formatCurrency(pricingBreakdown.summary.base_price || 0)})
+                            (
+                            {pricingBreakdown.summary.days
+                              ? `${pricingBreakdown.summary.days} ngày`
+                              : `${pricingBreakdown.summary.hours} giờ`}{' '}
+                            x {formatCurrency(pricingBreakdown.summary.base_price || 0)})
                           </span>
                         )}
                       </div>
-                      <span className="font-black text-slate-800 text-lg">{formatCurrency(totalCalculations.roomCharge)}</span>
+                      <span className="font-black text-slate-800 text-lg">
+                        {formatCurrency(totalCalculations.roomCharge)}
+                      </span>
                     </div>
-                    
-                    {(totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0)) > 0 && (
+
+                    {totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0) > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Dịch vụ</span>
-                        <span className="font-black text-slate-800 text-lg">{formatCurrency(totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0))}</span>
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                          Dịch vụ
+                        </span>
+                        <span className="font-black text-slate-800 text-lg">
+                          {formatCurrency(
+                            totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0)
+                          )}
+                        </span>
                       </div>
                     )}
 
                     <div className="flex justify-between items-center group">
-                      <span className="text-amber-500 font-bold uppercase tracking-widest text-[10px]">Phụ thu</span>
+                      <span className="text-amber-500 font-bold uppercase tracking-widest text-[10px]">
+                        Phụ thu
+                      </span>
                       <div className="flex items-center gap-2">
                         <NumericInput
                           value={manualSurcharge}
@@ -291,40 +317,61 @@ export default function CheckoutModal({
 
                     {deposit > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-emerald-500 font-bold uppercase tracking-widest text-[10px]">Đã đặt cọc</span>
-                        <span className="font-black text-emerald-600 text-lg">-{formatCurrency(deposit)}</span>
+                        <span className="text-emerald-500 font-bold uppercase tracking-widest text-[10px]">
+                          Đã đặt cọc
+                        </span>
+                        <span className="font-black text-emerald-600 text-lg">
+                          -{formatCurrency(deposit)}
+                        </span>
                       </div>
                     )}
 
                     {customerBalance !== 0 && (
                       <div className="flex justify-between items-center">
-                        <span className={cn("font-bold uppercase tracking-widest text-[10px]", isDebt ? "text-rose-500" : "text-emerald-500")}>
-                          {isDebt ? "Nợ cũ" : "Tiền dư cũ"}
+                        <span
+                          className={cn(
+                            'font-bold uppercase tracking-widest text-[10px]',
+                            isDebt ? 'text-rose-500' : 'text-emerald-500'
+                          )}
+                        >
+                          {isDebt ? 'Nợ cũ' : 'Tiền dư cũ'}
                         </span>
-                        <span className={cn("font-black text-lg", isDebt ? "text-rose-600" : "text-emerald-600")}>
-                          {isDebt ? "+" : "-"}{absFormattedBalance}
+                        <span
+                          className={cn(
+                            'font-black text-lg',
+                            isDebt ? 'text-rose-600' : 'text-emerald-600'
+                          )}
+                        >
+                          {isDebt ? '+' : '-'}
+                          {absFormattedBalance}
                         </span>
                       </div>
                     )}
 
                     <div className="flex justify-between items-center group">
                       <div className="flex items-center gap-3">
-                        <span className="text-rose-500 font-bold uppercase tracking-widest text-[10px]">Giảm giá</span>
+                        <span className="text-rose-500 font-bold uppercase tracking-widest text-[10px]">
+                          Giảm giá
+                        </span>
                         <div className="flex bg-slate-100 p-1 rounded-xl">
-                          <button 
+                          <button
                             onClick={() => setDiscountType('amount')}
                             className={cn(
-                              "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all",
-                              discountType === 'amount' ? "bg-white text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                              'px-2 py-0.5 rounded-lg text-[10px] font-black transition-all',
+                              discountType === 'amount'
+                                ? 'bg-white text-rose-600 shadow-sm'
+                                : 'text-slate-400 hover:text-slate-600'
                             )}
                           >
                             Đ
                           </button>
-                          <button 
+                          <button
                             onClick={() => setDiscountType('percent')}
                             className={cn(
-                              "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all",
-                              discountType === 'percent' ? "bg-white text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                              'px-2 py-0.5 rounded-lg text-[10px] font-black transition-all',
+                              discountType === 'percent'
+                                ? 'bg-white text-rose-600 shadow-sm'
+                                : 'text-slate-400 hover:text-slate-600'
                             )}
                           >
                             %
@@ -333,46 +380,58 @@ export default function CheckoutModal({
                       </div>
                       <div className="flex items-center gap-2">
                         <NumericInput
-                            value={discountValue}
-                            onChange={setDiscountValue}
-                            className="w-32 bg-rose-50/50 border-rose-100 rounded-xl px-3 h-10 text-right font-black text-rose-600 text-base focus:ring-2 focus:ring-rose-500/20"
-                            suffix={discountType === 'amount' ? '' : '%'}
-                          />
+                          value={discountValue}
+                          onChange={setDiscountValue}
+                          className="w-32 bg-rose-50/50 border-rose-100 rounded-xl px-3 h-10 text-right font-black text-rose-600 text-base focus:ring-2 focus:ring-rose-500/20"
+                          suffix={discountType === 'amount' ? '' : '%'}
+                        />
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-3">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Thuế VAT (10%)</span>
-                        <button 
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                          Thuế VAT (10%)
+                        </span>
+                        <button
                           onClick={() => setIsTaxEnabled(!isTaxEnabled)}
                           className={cn(
-                            "w-10 h-5 rounded-full relative transition-all duration-300",
-                            isTaxEnabled ? "bg-indigo-600" : "bg-slate-200"
+                            'w-10 h-5 rounded-full relative transition-all duration-300',
+                            isTaxEnabled ? 'bg-indigo-600' : 'bg-slate-200'
                           )}
                         >
-                          <div className={cn(
-                            "absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all duration-300",
-                            isTaxEnabled && "translate-x-5"
-                          )} />
+                          <div
+                            className={cn(
+                              'absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all duration-300',
+                              isTaxEnabled && 'translate-x-5'
+                            )}
+                          />
                         </button>
                       </div>
-                      <span className={cn(
-                        "font-black text-lg transition-all",
-                        isTaxEnabled ? "text-slate-800" : "text-slate-300"
-                      )}>
+                      <span
+                        className={cn(
+                          'font-black text-lg transition-all',
+                          isTaxEnabled ? 'text-slate-800' : 'text-slate-300'
+                        )}
+                      >
                         {isTaxEnabled ? `+${formatCurrency(totalCalculations.taxAmount)}` : '0đ'}
                       </span>
                     </div>
 
                     <div className="pt-4 border-t border-slate-100 space-y-3 min-h-[112px]">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Tổng cần thanh toán</span>
-                        <span className="font-black text-rose-600 text-xl">{formatCurrency(totalCalculations.totalToCollect)}</span>
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                          Tổng cần thanh toán
+                        </span>
+                        <span className="font-black text-rose-600 text-xl">
+                          {formatCurrency(totalCalculations.totalToCollect)}
+                        </span>
                       </div>
 
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Khách thực trả</span>
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                          Khách thực trả
+                        </span>
                         <div className="relative w-40">
                           <NumericInput
                             value={actualPaid}
@@ -384,27 +443,41 @@ export default function CheckoutModal({
 
                       <AnimatePresence mode="wait">
                         {actualPaid !== totalCalculations.totalToCollect && (
-                          <motion.div 
+                          <motion.div
                             key="settlement-diff"
                             initial={{ opacity: 0, height: 0, marginTop: 0 }}
                             animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
                             exit={{ opacity: 0, height: 0, marginTop: 0 }}
                             className={cn(
-                              "flex justify-between items-center p-3 rounded-2xl transition-all overflow-hidden",
-                              actualPaid > totalCalculations.totalToCollect ? "bg-emerald-50" : "bg-rose-50"
+                              'flex justify-between items-center p-3 rounded-2xl transition-all overflow-hidden',
+                              actualPaid > totalCalculations.totalToCollect
+                                ? 'bg-emerald-50'
+                                : 'bg-rose-50'
                             )}
                           >
-                            <span className={cn(
-                              "font-bold uppercase tracking-widest text-[10px]",
-                              actualPaid > totalCalculations.totalToCollect ? "text-emerald-600" : "text-rose-600"
-                            )}>
-                              {actualPaid > totalCalculations.totalToCollect ? "Tiền thối lại" : "Ghi nợ mới"}
+                            <span
+                              className={cn(
+                                'font-bold uppercase tracking-widest text-[10px]',
+                                actualPaid > totalCalculations.totalToCollect
+                                  ? 'text-emerald-600'
+                                  : 'text-rose-600'
+                              )}
+                            >
+                              {actualPaid > totalCalculations.totalToCollect
+                                ? 'Tiền thối lại'
+                                : 'Ghi nợ mới'}
                             </span>
-                            <span className={cn(
-                              "font-black text-lg",
-                              actualPaid > totalCalculations.totalToCollect ? "text-emerald-700" : "text-rose-700"
-                            )}>
-                              {formatCurrency(Math.abs(actualPaid - totalCalculations.totalToCollect))}
+                            <span
+                              className={cn(
+                                'font-black text-lg',
+                                actualPaid > totalCalculations.totalToCollect
+                                  ? 'text-emerald-700'
+                                  : 'text-rose-700'
+                              )}
+                            >
+                              {formatCurrency(
+                                Math.abs(actualPaid - totalCalculations.totalToCollect)
+                              )}
                             </span>
                           </motion.div>
                         )}
@@ -417,36 +490,66 @@ export default function CheckoutModal({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-2">
                     <CreditCard size={12} className="text-slate-400" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phương thức thanh toán</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Phương thức thanh toán
+                    </p>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      {id: 'cash', label: 'Tiền mặt', icon: Wallet, color: 'amber', activeClass: 'bg-amber-50 border-amber-200 shadow-amber-100', iconClass: 'bg-amber-500', textClass: 'text-amber-600'},
-                      {id: 'transfer', label: 'Chuyển khoản', icon: Landmark, color: 'blue', activeClass: 'bg-blue-50 border-blue-200 shadow-blue-100', iconClass: 'bg-blue-500', textClass: 'text-blue-600'},
-                      {id: 'card', label: 'Thẻ / POS', icon: CreditCard, color: 'indigo', activeClass: 'bg-indigo-50 border-indigo-200 shadow-indigo-100', iconClass: 'bg-indigo-500', textClass: 'text-indigo-600'},
-                    ].map(method => (
-                      <button 
-                        key={method.id} 
-                        onClick={() => setPaymentMethod(method.id as any)} 
+                      {
+                        id: 'cash',
+                        label: 'Tiền mặt',
+                        icon: Wallet,
+                        color: 'amber',
+                        activeClass: 'bg-amber-50 border-amber-200 shadow-amber-100',
+                        iconClass: 'bg-amber-500',
+                        textClass: 'text-amber-600',
+                      },
+                      {
+                        id: 'transfer',
+                        label: 'Chuyển khoản',
+                        icon: Landmark,
+                        color: 'blue',
+                        activeClass: 'bg-blue-50 border-blue-200 shadow-blue-100',
+                        iconClass: 'bg-blue-500',
+                        textClass: 'text-blue-600',
+                      },
+                      {
+                        id: 'card',
+                        label: 'Thẻ / POS',
+                        icon: CreditCard,
+                        color: 'indigo',
+                        activeClass: 'bg-indigo-50 border-indigo-200 shadow-indigo-100',
+                        iconClass: 'bg-indigo-500',
+                        textClass: 'text-indigo-600',
+                      },
+                    ].map((method) => (
+                      <button
+                        key={method.id}
+                        onClick={() => setPaymentMethod(method.id as any)}
                         className={cn(
-                          "group relative flex flex-col items-center gap-2 p-4 rounded-[2rem] transition-all border-2",
-                          paymentMethod === method.id 
-                            ? `${method.activeClass} shadow-xl scale-105` 
-                            : "bg-white border-slate-100 hover:border-slate-200 text-slate-400"
+                          'group relative flex flex-col items-center gap-2 p-4 rounded-[2rem] transition-all border-2',
+                          paymentMethod === method.id
+                            ? `${method.activeClass} shadow-xl scale-105`
+                            : 'bg-white border-slate-100 hover:border-slate-200 text-slate-400'
                         )}
                       >
-                        <div className={cn(
-                          "w-10 h-10 rounded-2xl flex items-center justify-center transition-all",
-                          paymentMethod === method.id 
-                            ? `${method.iconClass} text-white shadow-lg shadow-${method.color}-200` 
-                            : "bg-slate-50 text-slate-300 group-hover:bg-slate-100"
-                        )}>
+                        <div
+                          className={cn(
+                            'w-10 h-10 rounded-2xl flex items-center justify-center transition-all',
+                            paymentMethod === method.id
+                              ? `${method.iconClass} text-white shadow-lg shadow-${method.color}-200`
+                              : 'bg-slate-50 text-slate-300 group-hover:bg-slate-100'
+                          )}
+                        >
                           <method.icon size={20} />
                         </div>
-                        <span className={cn(
-                          "text-[9px] font-black uppercase tracking-wider",
-                          paymentMethod === method.id ? method.textClass : "text-slate-400"
-                        )}>
+                        <span
+                          className={cn(
+                            'text-[9px] font-black uppercase tracking-wider',
+                            paymentMethod === method.id ? method.textClass : 'text-slate-400'
+                          )}
+                        >
                           {method.label}
                         </span>
                       </button>
@@ -476,7 +579,7 @@ export default function CheckoutModal({
                 onClick={handleConfirm}
                 disabled={isProcessing}
                 className={cn(
-                  "flex-1 h-16 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed"
+                  'flex-1 h-16 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed'
                 )}
               >
                 {isProcessing ? (
@@ -485,23 +588,50 @@ export default function CheckoutModal({
                   <CheckCircle2 size={24} className="text-emerald-400" />
                 )}
                 <span>{isProcessing ? 'Đang xử lý...' : 'Hoàn tất trả phòng'}</span>
-                {!isProcessing && <ArrowRight size={20} className="opacity-40 group-hover:translate-x-1 transition-transform" />}
+                {!isProcessing && (
+                  <ArrowRight
+                    size={20}
+                    className="opacity-40 group-hover:translate-x-1 transition-transform"
+                  />
+                )}
               </button>
             </footer>
 
             {/* Admin Bar - Optional overlay at bottom */}
             {isAdmin && pricingBreakdown && (
               <div className="bg-amber-900 text-amber-100 px-4 py-1.5 flex justify-between items-center text-[10px] font-bold tracking-tight">
-                <span className="flex items-center gap-1.5"><AlertTriangle size={10}/> ĐỐI SOÁT AI:</span>
+                <span className="flex items-center gap-1.5">
+                  <AlertTriangle size={10} /> ĐỐI SOÁT AI:
+                </span>
                 <div className="flex gap-4">
                   <span>Gợi ý: {formatCurrency(pricingBreakdown.total_amount)}</span>
-                  <span>Chênh lệch: {formatCurrency(totalCalculations.totalToCollect - pricingBreakdown.total_amount)}</span>
+                  <span>
+                    Chênh lệch:{' '}
+                    {formatCurrency(
+                      totalCalculations.totalToCollect - pricingBreakdown.total_amount
+                    )}
+                  </span>
                 </div>
               </div>
             )}
           </motion.div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={showDebtConfirm}
+        title="Xác nhận nợ"
+        description={debtConfirmMessage}
+        confirmText="Xác nhận cho nợ"
+        cancelText="Hủy"
+        variant="danger"
+        isProcessing={isProcessing}
+        onConfirm={() => {
+          setShowDebtConfirm(false);
+          performCheckout();
+        }}
+        onCancel={() => setShowDebtConfirm(false)}
+      />
     </AnimatePresence>
   );
 }

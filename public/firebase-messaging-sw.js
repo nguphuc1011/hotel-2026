@@ -1,11 +1,15 @@
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+try {
+  importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+} catch (e) {
+  console.error('[firebase-messaging-sw.js] Lỗi khi tải script Firebase:', e);
+}
 
-// Tự động lấy config từ URL nếu có (truyền qua query param khi register)
+// Tự động lấy config từ URL nếu có
 const urlParams = new URLSearchParams(location.search);
 const configParam = urlParams.get('config');
 
-// CẤU HÌNH DỰ PHÒNG (Hardcoded cho Vercel)
+// CẤU HÌNH DỰ PHÒNG
 const hardcodedConfig = {
   apiKey: "AIzaSyAKzIBtkOuAFUCTw2GR1KxX8rzVNcJzT1g",
   authDomain: "thaoai.firebaseapp.com",
@@ -18,28 +22,28 @@ const hardcodedConfig = {
 let firebaseConfig = hardcodedConfig; 
 if (configParam) {
   try {
-    const dynamicConfig = JSON.parse(decodeURIComponent(configParam));
+    const decoded = decodeURIComponent(configParam);
+    const dynamicConfig = JSON.parse(decoded);
     if (dynamicConfig && dynamicConfig.apiKey) {
       firebaseConfig = dynamicConfig;
     }
   } catch (e) {
-    console.error('Lỗi khi giải mã Firebase config trong Service Worker:', e);
+    console.error('[firebase-messaging-sw.js] Lỗi khi giải mã Firebase config:', e);
   }
 }
 
-// Nếu không có config từ URL, hy vọng là nó đã được cache hoặc có cách khác
-// Ở môi trường production, chúng ta nên đảm bảo config này chính xác
-if (firebaseConfig.apiKey) {
+// Khởi tạo Firebase nếu scripts đã được tải thành công
+if (typeof firebase !== 'undefined' && firebaseConfig.apiKey) {
   firebase.initializeApp(firebaseConfig);
   const messaging = firebase.messaging();
 
-  messaging.onBackgroundMessage((payload) => {
+  // Sử dụng setBackgroundMessageHandler cho compat version hoặc onBackgroundMessage nếu có
+  const handleBackgroundMessage = (payload) => {
     console.log('[firebase-messaging-sw.js] Nhận thông báo trong nền:', payload);
     
-    // Ưu tiên lấy từ data (do Edge Function gửi data-only message)
-    const title = payload.data?.title || payload.notification?.title || 'MẮT THẦN HÀNH QUÂN';
-    const body = payload.data?.body || payload.notification?.body || 'Báo cáo Bệ Hạ, hỏa tiễn đã nổ!';
-    const tag = payload.data?.tag || payload.notification?.tag || 'eye-of-god-alert';
+    const title = payload.data?.title || payload.notification?.title || 'Thông báo mới';
+    const body = payload.data?.body || payload.notification?.body || 'Bạn có thông báo mới từ hệ thống';
+    const tag = payload.data?.tag || payload.notification?.tag || 'default-tag';
     const icon = payload.data?.icon || '/favicon.ico';
     
     const notificationOptions = {
@@ -51,7 +55,13 @@ if (firebaseConfig.apiKey) {
     };
 
     return self.registration.showNotification(title, notificationOptions);
-  });
+  };
+
+  if (messaging.setBackgroundMessageHandler) {
+    messaging.setBackgroundMessageHandler(handleBackgroundMessage);
+  } else if (messaging.onBackgroundMessage) {
+    messaging.onBackgroundMessage(handleBackgroundMessage);
+  }
 } else {
-  console.warn('[firebase-messaging-sw.js] Không tìm thấy cấu hình Firebase. Thông báo nền có thể không hoạt động.');
+  console.warn('[firebase-messaging-sw.js] Firebase chưa được định nghĩa hoặc thiếu cấu hình.');
 }

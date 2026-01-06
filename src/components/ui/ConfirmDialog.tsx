@@ -39,7 +39,9 @@ export function ConfirmDialog({
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInputValue('');
+
       setError(false);
     }
   }, [isOpen]);
@@ -69,16 +71,20 @@ export function ConfirmDialog({
             className="relative w-full max-w-sm overflow-hidden rounded-[2rem] bg-white p-6 shadow-2xl"
           >
             <div className="flex flex-col items-center text-center">
-              <div className={cn(
-                "mb-4 flex h-16 w-16 items-center justify-center rounded-2xl",
-                variant === 'danger' ? "bg-rose-50 text-rose-500" : "bg-blue-50 text-blue-500"
-              )}>
+              <div
+                className={cn(
+                  'mb-4 flex h-16 w-16 items-center justify-center rounded-2xl',
+                  variant === 'danger' ? 'bg-rose-50 text-rose-500' : 'bg-blue-50 text-blue-500'
+                )}
+              >
                 <AlertCircle size={32} />
               </div>
-              
+
               <h3 className="mb-2 text-xl font-black text-slate-800">{title}</h3>
-              <p className="mb-6 text-sm font-medium text-slate-500">{description}</p>
-              
+              <p className="mb-6 text-sm font-medium text-slate-500 whitespace-pre-line">
+                {description}
+              </p>
+
               {showInput && (
                 <div className="mb-6 w-full">
                   <textarea
@@ -89,8 +95,8 @@ export function ConfirmDialog({
                     }}
                     placeholder={inputPlaceholder}
                     className={cn(
-                      "w-full min-h-[100px] rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-700 outline-none transition-all placeholder:text-slate-300",
-                      error ? "ring-2 ring-rose-500" : "focus:ring-2 focus:ring-blue-500"
+                      'w-full min-h-[100px] rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-700 outline-none transition-all placeholder:text-slate-300',
+                      error ? 'ring-2 ring-rose-500' : 'focus:ring-2 focus:ring-blue-500'
                     )}
                   />
                   {error && (
@@ -100,7 +106,7 @@ export function ConfirmDialog({
                   )}
                 </div>
               )}
-              
+
               <div className="flex w-full gap-3">
                 <button
                   onClick={onCancel}
@@ -113,13 +119,15 @@ export function ConfirmDialog({
                   onClick={handleConfirm}
                   disabled={isProcessing}
                   className={cn(
-                    "flex-1 rounded-2xl py-3 text-sm font-black text-white transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50",
-                    variant === 'danger' 
-                      ? "bg-rose-500 hover:bg-rose-600 shadow-rose-100" 
-                      : "bg-blue-600 hover:bg-blue-700 shadow-blue-100"
+                    'flex-1 rounded-2xl py-3 text-sm font-black text-white transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50',
+                    variant === 'danger'
+                      ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-100'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'
                   )}
                 >
-                  {isProcessing && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  {isProcessing && (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  )}
                   {isProcessing ? 'Đang xử lý...' : confirmText}
                 </button>
               </div>
