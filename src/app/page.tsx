@@ -679,7 +679,7 @@ export default function Dashboard() {
             : filteredRooms.map((room) => (
                 <motion.div
                   layout
-                  key={room.id}
+                  key={`${room.id}-${room.status}`}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}

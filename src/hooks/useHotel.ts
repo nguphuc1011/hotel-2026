@@ -10,17 +10,10 @@ const fetcher = async (key: string) => {
     try {
       // 1. Lấy danh sách phòng và booking SONG SONG
       const [roomsResult, bookingsResult] = await Promise.all([
-        supabase
-          .from('rooms')
-          .select(
-            'id, room_number, area, room_type, status, current_booking_id, enable_overnight, prices'
-          )
-          .order('room_number'),
+        supabase.from('rooms').select('*').order('room_number'),
         supabase
           .from('bookings')
-          .select(
-            'id, room_id, status, rental_type, check_in_at, initial_price, customer_id, services_used, merged_bookings, custom_surcharge, is_printed, deposit_amount, customer:customers(full_name, balance)'
-          )
+          .select('*, customer:customers(full_name, balance)')
           .eq('status', 'active')
           .is('deleted_at', null),
       ]);

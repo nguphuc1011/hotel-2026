@@ -164,24 +164,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Check active sessions and sets the user
     const getSession = async () => {
+      // 10s safety timeout for session fetch
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Session fetch timeout')), 10000)
+      );
+
       try {
+        const sessionPromise = supabase.auth.getSession();
         const {
           data: { session },
-        } = await supabase.auth.getSession();
+        } = (await Promise.race([sessionPromise, timeoutPromise])) as any;
+
         const currentUser = session?.user ?? null;
         setUser(currentUser);
 
         if (currentUser) {
-          // Bắt đầu fetch profile nhưng không block render chính quá lâu
-          fetchProfile(currentUser).finally(() => {
-            setLoading(false);
-          });
-        } else {
-          setLoading(false);
+          await fetchProfile(currentUser);
         }
       } catch (error: any) {
         // eslint-disable-next-line no-console
         console.error('[Auth] Error fetching session:', error);
+        if (error.message === 'Session fetch timeout') {
+          _handleAuthFailure('Hết thời gian kết nối (Timeout 10s)');
+        }
+      } finally {
         setLoading(false);
       }
     };
