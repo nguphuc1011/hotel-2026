@@ -157,10 +157,9 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
         services: servicesUsed,
         notes: note,
       };
-      console.log('CheckInModal: sending data to onConfirm:', checkInData);
       onConfirm(checkInData);
     } catch (err) {
-      console.error('CheckInModal: Error in handleConfirm:', err);
+      // Error handled by parent or notification
     }
   };
 

@@ -1,25 +1,15 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
-  BedDouble, 
-  Coffee, 
-  Zap, 
   Receipt, 
-  CirclePlus, 
   CircleMinus, 
   CheckCircle2, 
   Landmark, 
-  Database, 
-  Calendar, 
-  User, 
-  AlertCircle,
   Sparkles,
-  ChevronDown,
-  Coins,
   MessageSquare,
   CreditCard,
   Wallet,
@@ -28,8 +18,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { NumericInput } from '@/components/ui/NumericInput';
-import { Room, PricingBreakdown, RentalType } from '@/types';
-import { formatCurrency, formatDateTime, formatDuration } from '@/lib/utils';
+import { Room, PricingBreakdown } from '@/types';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 // New interfaces aligned with the new design
@@ -53,17 +43,6 @@ interface CheckoutModalProps {
   isAdmin: boolean;
 }
 
-// Helper to get rental type text
-const getRentalTypeText = (rentalType: RentalType | undefined) => {
-  if (!rentalType) return '';
-  switch (rentalType) {
-    case 'hourly': return 'Theo giờ';
-    case 'daily': return 'Theo ngày';
-    case 'overnight': return 'Qua đêm';
-    default: return 'Không xác định';
-  }
-};
-
 export default function CheckoutModal({
   isOpen,
   onClose,
@@ -76,9 +55,8 @@ export default function CheckoutModal({
   const [discountReason, setDiscountReason] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('cash');
   const [isTaxEnabled, setIsTaxEnabled] = useState(false);
-  const [taxPercent, setTaxPercent] = useState(10);
+  const [taxPercent] = useState(10);
   const [note, setNote] = useState('');
-  const [showServices, setShowServices] = useState(true);
 
   const booking = room.current_booking;
   const services = booking?.services_used || [];

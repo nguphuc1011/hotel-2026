@@ -32,7 +32,7 @@ import {
   DoorOpen,
 } from 'lucide-react';
 import { NumericInput } from '@/components/ui/NumericInput';
-import { Room, Service, Setting, Customer } from '@/types';
+import { Room, Service, Setting } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { calculateRoomPrice } from '@/lib/pricing';
 import { supabase } from '@/lib/supabase';
