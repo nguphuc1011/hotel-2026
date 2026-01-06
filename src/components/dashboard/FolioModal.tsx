@@ -316,7 +316,7 @@ export default function FolioModal({
   }, [customerBalance, room?.current_booking?.customer?.balance]);
 
   const { isDebt, absFormattedBalance } = useCustomerBalance(customerBalanceToDisplay);
-  const _hasDebtWarning = isDebt;
+  const hasDebtWarning = isDebt;
 
   const handleQuantityChange = (serviceId: string | number, newQuantity: number) => {
     const sid = String(serviceId);
@@ -471,7 +471,7 @@ export default function FolioModal({
     }
   };
 
-  const _openDebtModal = async () => {
+  const openDebtModal = async () => {
     if (!room?.current_booking?.customer_id) {
       showNotification('Khách vãng lai không thể thu nợ', 'error');
       return;
@@ -937,15 +937,16 @@ export default function FolioModal({
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
+                    onClick={openDebtModal}
                     className={cn(
-                      'mb-4 rounded-3xl p-4 flex items-center gap-4 shadow-lg border',
+                      'mb-4 rounded-3xl p-4 flex items-center gap-4 shadow-lg border cursor-pointer hover:scale-[1.02] transition-transform active:scale-95',
                       isDebt
                         ? 'bg-rose-600 border-rose-500 text-white'
                         : 'bg-emerald-600 border-emerald-500 text-white'
                     )}
                   >
                     <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      {isDebt ? (
+                      {hasDebtWarning ? (
                         <AlertTriangle size={20} className="text-white animate-pulse" />
                       ) : (
                         <DollarSign size={20} className="text-white" />
@@ -953,7 +954,7 @@ export default function FolioModal({
                     </div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-black uppercase tracking-widest leading-none">
-                        {isDebt ? 'Nợ cũ' : 'Tiền dư'}
+                        {hasDebtWarning ? 'Nợ cũ' : 'Tiền dư'}
                       </p>
                       <p className="text-lg font-black tracking-tight">{absFormattedBalance}</p>
                     </div>

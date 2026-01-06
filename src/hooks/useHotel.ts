@@ -19,7 +19,7 @@ const fetcher = async (key: string) => {
         supabase
           .from('bookings')
           .select(
-            'id, room_id, status, rental_type, check_in_at, initial_price, customer:customers(full_name)'
+            'id, room_id, status, rental_type, check_in_at, initial_price, customer_id, services_used, merged_bookings, custom_surcharge, is_printed, deposit_amount, customer:customers(full_name, balance)'
           )
           .eq('status', 'active')
           .is('deleted_at', null),
