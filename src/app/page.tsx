@@ -125,6 +125,8 @@ export default function Dashboard() {
         cancelText: 'QUAY LẠI',
         variant: 'info',
         onConfirm: async () => {
+          if (isProcessing) return;
+          setIsProcessing(true);
           try {
             const { error } = await supabase
               .from('rooms')
@@ -143,6 +145,8 @@ export default function Dashboard() {
             // eslint-disable-next-line no-console
             console.error('Lỗi cập nhật trạng thái:', error);
             showNotification('Không thể cập nhật trạng thái phòng', 'error');
+          } finally {
+            setIsProcessing(false);
           }
         },
       });
@@ -168,8 +172,16 @@ export default function Dashboard() {
     auditNote?: string,
     actualPaid?: number
   ) => {
-    if (!folioRoom) return;
+    if (!folioRoom || isProcessing) return;
 
+    // Safety timeout: Tự động mở khóa sau 10 giây nếu kẹt
+    const safetyTimeout = setTimeout(() => {
+      setIsProcessing(false);
+      // eslint-disable-next-line no-console
+      console.warn('Payment safety timeout triggered');
+    }, 10000);
+
+    setIsProcessing(true);
     try {
       // eslint-disable-next-line no-console
       console.log('Bắt đầu thanh toán cho phòng:', folioRoom.room_number, {
@@ -186,10 +198,6 @@ export default function Dashboard() {
         .select('notes')
         .eq('id', bookingId)
         .single();
-
-      const updatedNotes = [currentBooking?.notes, auditNote ? `[THANH TOÁN] ${auditNote}` : '']
-        .filter(Boolean)
-        .join('\n');
 
       // 3. Gọi RPC xử lý thanh toán thông qua HotelService (Atomic)
       const normalizedPaymentMethod = paymentMethod === 'transfer' ? 'BANK_TRANSFER' : (paymentMethod || 'CASH').toUpperCase();
@@ -234,6 +242,9 @@ export default function Dashboard() {
       // eslint-disable-next-line no-console
       console.error('Lỗi trong quá trình thanh toán:', error);
       showNotification(`Lỗi thanh toán: ${error.message}`, 'error');
+    } finally {
+      clearTimeout(safetyTimeout);
+      setIsProcessing(false);
     }
   };
 
@@ -323,6 +334,14 @@ export default function Dashboard() {
       inputPlaceholder: 'Lý do hủy phòng...',
       inputRequired: true,
       onConfirm: async (reason) => {
+        if (isProcessing) return;
+        
+        const safetyTimeout = setTimeout(() => {
+          setIsProcessing(false);
+          console.warn('Cancel safety timeout triggered');
+        }, 10000);
+
+        setIsProcessing(true);
         try {
           const bookingId = folioRoom.current_booking_id || folioRoom.current_booking?.id;
 
@@ -382,6 +401,9 @@ export default function Dashboard() {
           // eslint-disable-next-line no-console
           console.error('Lỗi khi hủy phòng:', error);
           showNotification('Lỗi khi hủy phòng', 'error');
+        } finally {
+          clearTimeout(safetyTimeout);
+          setIsProcessing(false);
         }
       },
     });
@@ -390,11 +412,17 @@ export default function Dashboard() {
   const handleCheckIn = async (data: CheckInData) => {
     console.log('page.tsx: handleCheckIn called with data:', data);
     if (isProcessing) return;
+
+    // Safety timeout: Tự động mở khóa sau 10 giây nếu kẹt
+    const safetyTimeout = setTimeout(() => {
+      setIsProcessing(false);
+      console.warn('Check-in safety timeout triggered');
+    }, 10000);
+
     setIsProcessing(true);
     try {
       if (!selectedRoom) {
         console.warn('page.tsx: handleCheckIn aborted because selectedRoom is null');
-        setIsProcessing(false);
         return;
       }
 
@@ -457,6 +485,7 @@ export default function Dashboard() {
       console.error('Lỗi Check-in:', error);
       showNotification(`Lỗi khi nhận phòng: ${error.message || 'Lỗi không xác định'}`, 'error');
     } finally {
+      clearTimeout(safetyTimeout);
       setIsProcessing(false);
     }
   };
@@ -615,6 +644,7 @@ export default function Dashboard() {
         onUpdate={mutateRooms}
         onCancel={handleCancel}
         isAdmin={true}
+        isProcessing={isProcessing}
       />
       {customerInsightsData && (
         <CustomerInsightsModal
@@ -635,6 +665,7 @@ export default function Dashboard() {
         inputRequired={confirmConfig.inputRequired}
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+        isProcessing={isProcessing}
       />
 
       {/* Floating Action Button for Quick Sale */}

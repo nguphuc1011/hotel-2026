@@ -116,6 +116,7 @@ interface FolioModalProps {
   onUpdate: () => void;
   onCancel: (bookingId: string) => void;
   isAdmin?: boolean;
+  isProcessing?: boolean;
 }
 
 export default function FolioModal({
@@ -128,6 +129,7 @@ export default function FolioModal({
   onUpdate,
   onCancel,
   isAdmin,
+  isProcessing = false,
 }: FolioModalProps) {
   const [tempServices, setTempServices] = useState<Record<string, number>>({});
   const [isHeroCardExpanded, setIsHeroCardExpanded] = useState(false);
@@ -1360,6 +1362,7 @@ export default function FolioModal({
             room={room}
             pricingBreakdown={pricingBreakdown}
             isAdmin={isAdmin}
+            isProcessing={isProcessing}
             onConfirm={(data: CheckoutData) => {
               const auditParts = [
                 `Thanh toán: ${data.paymentMethod.toUpperCase()}`,

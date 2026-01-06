@@ -17,6 +17,7 @@ interface ConfirmDialogProps {
   showInput?: boolean;
   inputPlaceholder?: string;
   inputRequired?: boolean;
+  isProcessing?: boolean;
 }
 
 export function ConfirmDialog({
@@ -31,6 +32,7 @@ export function ConfirmDialog({
   showInput = false,
   inputPlaceholder = 'Nhập lý do...',
   inputRequired = false,
+  isProcessing = false,
 }: ConfirmDialogProps) {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState(false);
@@ -99,21 +101,26 @@ export function ConfirmDialog({
                 </div>
               )}
               
-              <div className="flex w-full flex-col gap-2">
-                <button
-                  onClick={handleConfirm}
-                  className={cn(
-                    "h-14 w-full rounded-2xl text-base font-black text-white shadow-lg transition-all active:scale-[0.98]",
-                    variant === 'danger' ? "bg-rose-500 shadow-rose-200" : "bg-blue-600 shadow-blue-200"
-                  )}
-                >
-                  {confirmText}
-                </button>
+              <div className="flex w-full gap-3">
                 <button
                   onClick={onCancel}
-                  className="h-14 w-full rounded-2xl bg-slate-100 text-base font-black text-slate-500 transition-all active:scale-[0.98] hover:bg-slate-200"
+                  disabled={isProcessing}
+                  className="flex-1 rounded-2xl bg-slate-100 py-3 text-sm font-black text-slate-500 transition-all hover:bg-slate-200 disabled:opacity-50"
                 >
                   {cancelText}
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={isProcessing}
+                  className={cn(
+                    "flex-1 rounded-2xl py-3 text-sm font-black text-white transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50",
+                    variant === 'danger' 
+                      ? "bg-rose-500 hover:bg-rose-600 shadow-rose-100" 
+                      : "bg-blue-600 hover:bg-blue-700 shadow-blue-100"
+                  )}
+                >
+                  {isProcessing && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  {isProcessing ? 'Đang xử lý...' : confirmText}
                 </button>
               </div>
             </div>

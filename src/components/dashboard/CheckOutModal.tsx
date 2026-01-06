@@ -44,6 +44,7 @@ interface CheckoutModalProps {
   pricingBreakdown: PricingBreakdown | null;
   onConfirm: (data: CheckoutData) => void;
   isAdmin: boolean;
+  isProcessing?: boolean;
 }
 
 export default function CheckoutModal({
@@ -53,6 +54,7 @@ export default function CheckoutModal({
   pricingBreakdown,
   onConfirm,
   isAdmin,
+  isProcessing = false,
 }: CheckoutModalProps) {
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [discountValue, setDiscountValue] = useState(0);
@@ -134,6 +136,8 @@ export default function CheckoutModal({
   }, [totalCalculations.totalToCollect]);
 
   const handleConfirm = () => {
+    if (isProcessing) return;
+
     // Detect "Old Debt" services to exclude from backend total
     // This prevents double-counting because the backend subtracts (Total - Paid) from Balance.
     // If Total includes Old Debt, we are subtracting Old Debt again from the Balance.
@@ -470,11 +474,18 @@ export default function CheckoutModal({
             <footer className="sticky bottom-0 bg-white border-t border-slate-100 p-6 z-30 flex gap-4 shrink-0">
               <button
                 onClick={handleConfirm}
-                className="flex-1 h-16 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-[0.98] group"
+                disabled={isProcessing}
+                className={cn(
+                  "flex-1 h-16 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
               >
-                <CheckCircle2 size={24} className="text-emerald-400" />
-                <span>Hoàn tất trả phòng</span>
-                <ArrowRight size={20} className="opacity-40 group-hover:translate-x-1 transition-transform" />
+                {isProcessing ? (
+                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle2 size={24} className="text-emerald-400" />
+                )}
+                <span>{isProcessing ? 'Đang xử lý...' : 'Hoàn tất trả phòng'}</span>
+                {!isProcessing && <ArrowRight size={20} className="opacity-40 group-hover:translate-x-1 transition-transform" />}
               </button>
             </footer>
 
