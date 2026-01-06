@@ -7,6 +7,7 @@
 - [x] Thiết kế Database cho hệ thống Ledger chuyên nghiệp (Ledger, Shifts, Payment Methods).
 - [x] Triển khai logic nghiệp vụ tích hợp Ledger vào `HotelService`.
 - [x] Nâng cấp hệ thống Quản lý Khách hàng: Thêm mới, Chi tiết khách hàng (Lịch sử ở & tiền), Phân loại VIP.
+- [x] Chuẩn hóa giao diện Tab Cài đặt chung (Modern UI, Sticky Header, Icon integration).
 
 ## 2. Đang thực hiện
 - [ ] Xây dựng giao diện Quản lý Ca (Shifts) và Báo cáo Sổ cái (Ledger UI).
@@ -24,3 +25,10 @@
         - Xây dựng trang Chi tiết khách hàng: Xem lịch sử ở (bookings) và lịch sử tiền (ledger).
         - Tự động phân loại khách hàng (VIP, Thân thiết, Quen) dựa trên chi tiêu và số lượt đến.
     - Cập nhật quy định giao tiếp: Ưu tiên ngôn ngữ tự nhiên, ngắn gọn.
+- **2026-01-07**:
+    - Chuẩn hóa toàn bộ giao diện Tab trong Cài đặt chung: 
+        - Chuyển sang phong cách Modern UI với hiệu ứng đổ bóng và bo góc mềm mại.
+        - Tích hợp Icon cho từng Tab giúp nhận diện nhanh.
+        - Áp dụng Sticky Header kết hợp Backdrop Blur (làm mờ nền) khi cuộn trang, tối ưu trải nghiệm trên di động.
+        - Cải tiến `TabButton` với hiệu ứng chuyển động `framer-motion` mượt mà.
+    - Chuyển đổi ô nhập "Số phút tính tiếp" sang dạng nhập số tự do (NumericInput) thay vì chọn danh sách cố định.

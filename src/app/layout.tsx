@@ -3,8 +3,6 @@ import { Roboto } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-import Link from "next/link";
-
 
 import { BottomNav } from "@/components/layout/BottomNav";
 import { AuthProvider } from "@/context/AuthContext";
@@ -49,6 +47,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Root Layout
   return (
     <html lang="vi" data-theme="light" className="light">
       <body className={cn(roboto.className, "min-h-screen bg-slate-50 selection:bg-blue-500/30 flex flex-col")}>

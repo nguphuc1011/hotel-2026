@@ -35,13 +35,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchProfile = async (currentUser: User) => {
     const userId = currentUser.id;
+    console.time(`[Hiệu Năng] Tổng thời gian lấy Hồ sơ User (ID: ${userId})`);
     try {
       // 1. Kiểm tra xem profile đã tồn tại chưa
+      console.time(`[Hiệu Năng] Truy vấn DB Profile (ID: ${userId})`);
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('id, username, full_name, role, permissions')
         .eq('id', userId)
         .maybeSingle();
+      console.timeEnd(`[Hiệu Năng] Truy vấn DB Profile (ID: ${userId})`);
 
       if (fetchError) {
         // eslint-disable-next-line no-console
@@ -122,6 +125,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Lỗi hệ thống trong AuthContext:', error);
+    } finally {
+      console.timeEnd(`[Hiệu Năng] Tổng thời gian lấy Hồ sơ User (ID: ${userId})`);
     }
   };
 
@@ -164,32 +169,47 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Check active sessions and sets the user
     const getSession = async () => {
-      // 10s safety timeout for session fetch
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Session fetch timeout')), 10000)
-      );
+      let retryCount = 0;
+      const maxRetries = 3;
 
-      try {
-        const sessionPromise = supabase.auth.getSession();
-        const {
-          data: { session },
-        } = (await Promise.race([sessionPromise, timeoutPromise])) as any;
+      while (retryCount < maxRetries) {
+        // 30s safety timeout for session fetch
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session fetch timeout')), 30000)
+        );
 
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
+        try {
+          console.time('[Hiệu Năng] Kết nối Session Supabase');
+          const sessionPromise = supabase.auth.getSession();
+          const {
+            data: { session },
+          } = (await Promise.race([sessionPromise, timeoutPromise])) as any;
+          console.timeEnd('[Hiệu Năng] Kết nối Session Supabase');
 
-        if (currentUser) {
-          await fetchProfile(currentUser);
+          const currentUser = session?.user ?? null;
+          setUser(currentUser);
+
+          if (currentUser) {
+            await fetchProfile(currentUser);
+          }
+          // Success -> Exit loop
+          break;
+        } catch (error: any) {
+          // eslint-disable-next-line no-console
+          console.error(`[Auth] Error fetching session (Attempt ${retryCount + 1}):`, error);
+          retryCount++;
+
+          if (retryCount >= maxRetries) {
+            if (error.message === 'Session fetch timeout') {
+              _handleAuthFailure('Hết thời gian kết nối (Timeout 30s)');
+            }
+          } else {
+            // Wait 1s before retry
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
         }
-      } catch (error: any) {
-        // eslint-disable-next-line no-console
-        console.error('[Auth] Error fetching session:', error);
-        if (error.message === 'Session fetch timeout') {
-          _handleAuthFailure('Hết thời gian kết nối (Timeout 10s)');
-        }
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
 
     getSession();

@@ -258,7 +258,7 @@ export default function FinanceManagement() {
   const handleDeleteTransaction = async (t: CashflowTransaction) => {
     const reason =
       window.prompt(
-        `Xác nhận XÓA giao dịch "${t.content}" số tiền ${t.amount.toLocaleString()}đ. Vui lòng nhập lý do (bắt buộc):`
+        `Xác nhận XÓA giao dịch "${t.content}" số tiền ${formatCurrency(t.amount)}. Vui lòng nhập lý do (bắt buộc):`
       ) || '';
     if (!reason.trim()) {
       toast.error('Bắt buộc phải có lý do khi xóa giao dịch!');

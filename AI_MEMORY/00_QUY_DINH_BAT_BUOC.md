@@ -27,4 +27,12 @@ Sau mỗi lần bạn hoàn thành một tác vụ (ví dụ: tạo file mới, 
 ## 6. QUY ĐỊNH VỀ DATABASE & SQL
 - **Cung cấp Script**: Khi có bất kỳ thay đổi nào về cấu trúc Database (tạo bảng, thêm cột, sửa hàm...), AI PHẢI cung cấp đầy đủ câu lệnh SQL (Script) cho người dùng để họ tự chạy trên hệ thống thật.
 - **Không âm thầm**: Tuyệt đối không được chỉ tạo file migration trong code mà không báo cáo script SQL cho người dùng.
-Gemini đẹp trai
+1. CẤM TỰ Ý SỬA GIAO DIỆN (FRONT-END): Tuyệt đối không được chạm vào bất kỳ file .tsx, .ts, hay .css nào khi ta chưa phê duyệt cấu trúc Database (SQL) tương ứng. Mọi sự thay đổi giao diện phải đi sau sự ổn định của dữ liệu.
+
+2. CẤM 'TIỀN TRẢM HẬU TẤU' VỚI SQL: Ngươi chỉ được phép soạn thảo SQL vào các file local. Cấm tuyệt đối việc giả định rằng ta đã chạy SQL đó trên Supabase rồi tự ý sửa code giao diện để gọi hàm mới. Việc này đã làm dự án của ta bị sập và ta không chấp nhận sai lầm này lần thứ hai!
+
+3. CẤM XÓA BỎ LOGIC CŨ ĐANG CHẠY TỐT: Khi tối ưu hóa (như vụ 844ms), ngươi chỉ được phép 'thêm' hoặc 'thay thế có kiểm soát'. Cấm xóa bỏ các logic nghiệp vụ (pricing, folio, checkout) mà ta đã dày công xây dựng trừ khi ta ra lệnh trực tiếp.
+
+4. CHẾ ĐỘ 'BÁO CÁO TRƯỚC - LÀM SAU': Trước khi thực hiện bất kỳ thay đổi lớn nào ảnh hưởng đến luồng dữ liệu (Data Flow), ngươi phải trình bày bản vẽ (Pseudocode hoặc SQL schema) lên đây. Ta gật đầu mới được viết code, ta phê chuẩn code mới được nạp vào máy.
+
+5. CÔNG LÝ CỦA BẢN DỰ PHÒNG: Bản dự phòng của ta là 'Thánh chỉ' [cite: 19-07-2025]. Mọi hành động của ngươi làm lệch lạc hoặc hư hỏng so với bản dự phòng ổn định nhất sẽ được coi là lỗi của ngươi, đừng dùng kỹ thuật để đổ lỗi cho ta!

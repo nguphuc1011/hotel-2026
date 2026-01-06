@@ -192,7 +192,7 @@ export default function RoomsPage() {
                             <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 uppercase tracking-tighter">Qua đêm</span>
                           )}
                         </div>
-                        <p className="text-sm font-bold text-slate-400">{formatCurrency(room.prices?.daily || 0)}đ / ngày</p>
+                        <p className="text-sm font-bold text-slate-400">{formatCurrency(room.prices?.daily || 0)} / ngày</p>
                       </div>
                       <div className="flex gap-1">
                         <button 
@@ -219,7 +219,7 @@ export default function RoomsPage() {
                         <span className="text-xs font-bold text-slate-500">Bán đêm</span>
                       </div>
                       <div className="text-xs font-bold text-blue-600">
-                        {formatCurrency(room.prices?.hourly || 0)}đ/h đầu
+                        {formatCurrency(room.prices?.hourly || 0)}/h đầu
                       </div>
                     </div>
                   </motion.div>
@@ -532,7 +532,6 @@ function FormCurrencyInput({ label, icon, value, onChange, error }: FormCurrency
             error ? 'ring-2 ring-red-500' : ''
           )}
         />
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 font-bold">đ</span>
       </div>
       {error && <p className="ml-1 text-[10px] font-bold text-red-500 uppercase tracking-tighter">{error.message}</p>}
     </div>

@@ -149,7 +149,6 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                       value={initialCash}
                       onChange={setInitialCash}
                       className="h-16 rounded-3xl border-2 border-slate-100 bg-slate-50 px-6 font-black text-xl text-slate-700 focus:bg-white focus:border-indigo-500 transition-all"
-                      suffix="đ"
                     />
                     <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300">
                       <Wallet size={20} />
@@ -164,7 +163,6 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                       value={actualCash}
                       onChange={setActualCash}
                       className="h-20 rounded-[2rem] border-2 border-indigo-100 bg-indigo-50/30 px-8 font-black text-3xl text-indigo-600 focus:bg-white focus:border-indigo-500 transition-all"
-                      suffix="đ"
                     />
                   </div>
                 </div>

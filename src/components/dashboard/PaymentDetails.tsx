@@ -58,7 +58,6 @@ export function PaymentDetails({
             placeholder="0"
             className="h-14 rounded-2xl bg-slate-50 border-none px-4 text-base font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 transition-all"
           />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 font-bold">đ</span>
         </div>
       </div>
 

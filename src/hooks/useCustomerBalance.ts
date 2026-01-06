@@ -19,12 +19,9 @@ export function useCustomerBalance(balance: number = 0): CustomerBalanceInfo {
   const isDebt = balance < 0;
   const isCredit = balance > 0;
   
-  // Định dạng tiền tệ
+  // Định dạng tiền tệ - Chỉ định dạng số, không thêm ký tự tiền tệ
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(amount);
+    return new Intl.NumberFormat('vi-VN').format(amount);
   };
 
   return {

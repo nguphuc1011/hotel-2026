@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 
 const fetcher = async (key: string) => {
   if (key === 'rooms') {
+    console.time('[Hiệu Năng] Tải danh sách Phòng & Booking');
     try {
       // 1. Lấy danh sách phòng và booking SONG SONG
       const [roomsResult, bookingsResult] = await Promise.all([
@@ -63,6 +64,8 @@ const fetcher = async (key: string) => {
     } catch (error) {
       // Error handled by SWR
       throw error;
+    } finally {
+      console.timeEnd('[Hiệu Năng] Tải danh sách Phòng & Booking');
     }
   }
 

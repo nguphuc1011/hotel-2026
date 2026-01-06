@@ -210,7 +210,6 @@ export default function EditBookingModal({
                   value={price}
                   onChange={setPrice}
                   className="w-full pl-12 pr-6 py-4 bg-slate-50 border-none rounded-2xl font-black text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all"
-                  suffix="đ"
                 />
               </div>
             </div>

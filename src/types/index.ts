@@ -182,10 +182,38 @@ export interface TimeRules {
     start: string;
     end: string;
   };
-  early_rules: Array<{ from: string; to: string; percent: number }>;
-  late_rules: Array<{ from: string; to: string; percent: number }>;
+  
+  // --- NHÓM 1: GIỜ GIẤC CƠ BẢN ---
+  overnight_checkout_enabled?: boolean;
+  overnight_checkout?: string;
+  
+  // --- NHÓM 2: CƠ CHẾ TÍNH TIỀN GIỜ ---
+  hourly_mode?: 'incremental' | 'block';
+  base_hourly_limit?: number;
+  hourly_unit?: number;
+  hourly_ceiling_enabled?: boolean;
+  hourly_ceiling_percent?: number;
+
+  // --- NHÓM 3: PHỤ THU & MỐC TRÒN NGÀY ---
+  surcharge_method?: 'percent' | 'fixed';
+  enableAutoSurcharge?: boolean;
+  early_rules: Array<{ from: string; to: string; percent: number; amount?: number }>;
+  late_rules: Array<{ from: string; to: string; percent: number; amount?: number }>;
   full_day_early_before?: string;
   full_day_late_after?: string;
+  
+  // --- NHÓM 4: ÂN HẠN (GRACE PERIOD) ---
+  initial_grace_enabled?: boolean;
+  initial_grace_minutes?: number;
+  late_grace_enabled?: boolean;
+  late_grace_minutes?: number;
+  
+  // --- NHÓM 5: TIỆN ÍCH KHÁC ---
+  extra_person_enabled?: boolean;
+  extra_person_fee_adult?: number;
+  extra_person_fee_child?: number;
+
+  // Legacy compatibility
   hourly_grace_period_minutes?: number;
   daily_grace_period_hours?: number;
 }

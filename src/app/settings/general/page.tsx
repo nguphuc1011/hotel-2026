@@ -12,7 +12,9 @@ import {
   Receipt,
   AlertCircle,
   Wrench,
-  ChevronLeft
+  ChevronLeft,
+  Timer,
+  ChevronDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { TimeRules } from '@/types';
@@ -25,30 +27,32 @@ import { NumericInput } from '@/components/ui/NumericInput';
 export const dynamic = 'force-dynamic';
 
 // --- Reusable Tab Components ---
-const TabButton = ({ label, isActive, onClick }: { label: string, isActive: boolean, onClick: () => void }) => (
+const TabButton = ({ label, icon: Icon, isActive, onClick }: { label: string, icon: any, isActive: boolean, onClick: () => void }) => (
   <button
     onClick={onClick}
     className={cn(
-      'relative rounded-full px-4 py-2 text-xs font-bold transition-colors whitespace-nowrap',
-      isActive ? 'text-white' : 'text-slate-500 hover:bg-slate-100'
+      'relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all duration-200 whitespace-nowrap',
+      isActive ? 'text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
     )}
   >
     {isActive && (
       <motion.div
         layoutId="active-tab-indicator"
-        className="absolute inset-0 z-0 rounded-full bg-blue-600"
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="absolute inset-0 z-0 rounded-xl bg-blue-50 border border-blue-100"
+        transition={{ type: 'spring', stiffness: 350, damping: 30 }}
       />
     )}
+    <Icon className={cn("h-3.5 w-3.5 relative z-10", isActive ? "text-blue-600" : "text-slate-400")} />
     <span className="relative z-10">{label}</span>
   </button>
 );
 
 const tabs = [
-  { id: 'time', label: 'Quy định Giờ', icon: Clock },
-  { id: 'tax', label: 'Thuế & Hóa đơn', icon: Receipt },
+  { id: 'basic', label: 'Giờ giấc', icon: Clock },
+  { id: 'hourly', label: 'Tiền giờ', icon: Clock },
   { id: 'surcharge', label: 'Phụ thu', icon: Percent },
-  { id: 'ai', label: 'Cấu hình AI', icon: Wrench },
+  { id: 'grace', label: 'Ân hạn', icon: Clock },
+  { id: 'other', label: 'Tiện ích', icon: Wrench },
 ];
 
 const fetchSettings = async () => {
@@ -73,13 +77,28 @@ export default function GeneralSettingsPage() {
     check_in: '14:00',
     check_out: '12:00',
     overnight: { start: '22:00', end: '08:00' },
+    overnight_checkout_enabled: true,
+    overnight_checkout: '10:00',
+    hourly_mode: 'incremental',
+    base_hourly_limit: 1,
+    hourly_unit: 60,
+    hourly_ceiling_enabled: false,
+    hourly_ceiling_percent: 100,
     early_rules: [],
     late_rules: [
       { from: '12:00', to: '15:00', percent: 30 },
       { from: '15:00', to: '18:00', percent: 50 },
     ],
     full_day_early_before: '05:00',
-    full_day_late_after: '18:00'
+    full_day_late_after: '18:00',
+    initial_grace_enabled: true,
+    initial_grace_minutes: 15,
+    late_grace_enabled: true,
+    late_grace_minutes: 15,
+    extra_person_enabled: false,
+    extra_person_fee_adult: 50000,
+    extra_person_fee_child: 30000,
+    surcharge_method: 'percent'
   });
 
   const [enableAutoSurcharge, setEnableAutoSurcharge] = useState(true);
@@ -209,15 +228,16 @@ export default function GeneralSettingsPage() {
         <h1 className="text-xl font-bold text-slate-800">Cài đặt chung</h1>
       </div>
 
-      {/* Tab Navigation - Apple Style Pill */}
-      <div className="mb-8 py-2 bg-slate-50 -mx-4 px-4">
-        <div className="flex items-center justify-between rounded-2xl bg-slate-200/50 p-1 shadow-inner overflow-x-auto scrollbar-hide gap-1">
-          {tabs.map(tab => (
-            <TabButton 
-              key={tab.id} 
-              label={tab.label} 
-              isActive={activeTab === tab.id} 
-              onClick={() => setActiveTab(tab.id)} 
+      {/* Tab Navigation - Modern Sticky Design */}
+      <div className="sticky top-0 z-50 -mx-4 px-4 pb-4 pt-2 bg-slate-50/80 backdrop-blur-md mb-2">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar max-w-md mx-auto">
+          {tabs.map((tab) => (
+            <TabButton
+              key={tab.id}
+              label={tab.label}
+              icon={tab.icon}
+              isActive={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
             />
           ))}
         </div>
@@ -232,11 +252,12 @@ export default function GeneralSettingsPage() {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
         >
-          {activeTab === 'time' && <TimeSettingsTab timeRules={timeRules} setTimeRules={setTimeRules} />}
-          {activeTab === 'tax' && <TaxSettingsTab taxConfig={taxConfig} setTaxConfig={setTaxConfig} />}
+          {activeTab === 'basic' && <BasicTimeTab timeRules={timeRules} setTimeRules={setTimeRules} />}
+          {activeTab === 'hourly' && <HourlyPricingTab timeRules={timeRules} setTimeRules={setTimeRules} />}
           {activeTab === 'surcharge' && (
-            <SurchargeSettingsTab 
+            <SurchargeTab 
               timeRules={timeRules} 
+              setTimeRules={setTimeRules}
               updateLateRule={updateLateRule} 
               addLateRule={addLateRule} 
               removeLateRule={removeLateRule} 
@@ -247,7 +268,15 @@ export default function GeneralSettingsPage() {
               setEnableAutoSurcharge={setEnableAutoSurcharge}
             />
           )}
-          {activeTab === 'ai' && <AISettingsTab />}
+          {activeTab === 'grace' && <GracePeriodTab timeRules={timeRules} setTimeRules={setTimeRules} />}
+          {activeTab === 'other' && (
+            <OtherSettingsTab 
+              timeRules={timeRules} 
+              setTimeRules={setTimeRules} 
+              taxConfig={taxConfig} 
+              setTaxConfig={setTaxConfig} 
+            />
+          )}
         </motion.div>
       </AnimatePresence>
 
@@ -272,283 +301,430 @@ export default function GeneralSettingsPage() {
   );
 }
 
+// --- Reusable Modern Components ---
+
+/**
+ * Component SettingItem: Khung bao dùng chung cho mỗi mục cài đặt
+ * @param label - Tên hiển thị của cài đặt
+ * @param hint - Giải thích chi tiết hiện ra khi di chuột vào dấu !
+ * @param enabled - Trạng thái bật/tắt (cho các tính năng có nút gạt)
+ * @param onToggle - Hàm xử lý khi bấm nút gạt
+ */
+const SettingItem = ({ 
+  label, 
+  hint, 
+  children, 
+  icon: Icon, 
+  enabled = true, 
+  onToggle 
+}: { 
+  label: string, 
+  hint: string, 
+  children: React.ReactNode, 
+  icon?: any,
+  enabled?: boolean,
+  onToggle?: (val: boolean) => void
+}) => {
+  const [showHint, setShowHint] = useState(false);
+
+  return (
+    <div className={cn("bg-white rounded-[1.5rem] p-5 shadow-sm border border-slate-100 transition-all relative", !enabled && "opacity-50 grayscale-[0.5]")}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="h-4 w-4 text-blue-600" />}
+          <span className="font-bold text-slate-800 flex items-center gap-1.5">
+            {label}
+            <div 
+              className="relative inline-block"
+              onMouseEnter={() => setShowHint(true)}
+              onMouseLeave={() => setShowHint(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowHint(!showHint);
+              }}
+            >
+              <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[10px] font-black text-slate-400 hover:bg-blue-100 hover:text-blue-600 cursor-help transition-colors">!</div>
+              {showHint && (
+                <div className="fixed md:absolute bottom-auto md:bottom-full left-4 md:left-0 right-4 md:right-auto top-1/2 md:top-auto -translate-y-1/2 md:translate-y-0 mb-0 md:mb-2 w-auto md:w-64 rounded-xl bg-slate-900 p-4 text-[11px] leading-relaxed font-medium text-white shadow-2xl z-[999] animate-in fade-in zoom-in duration-200">
+                  <div className="relative">
+                    {hint}
+                    <div className="hidden md:block absolute -bottom-5 left-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-slate-900"></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </span>
+        </div>
+        {onToggle && (
+          <button 
+            onClick={() => onToggle(!enabled)}
+            className={cn(
+              "relative inline-flex h-6 w-10 items-center rounded-full transition-colors focus:outline-none",
+              enabled ? "bg-blue-600" : "bg-slate-200"
+            )}
+          >
+            <span className={cn("inline-block h-4 w-4 transform rounded-full bg-white transition-transform", enabled ? "translate-x-5" : "translate-x-1")} />
+          </button>
+        )}
+      </div>
+      <div className={cn("transition-all", !enabled && "pointer-events-none")}>
+        {children}
+      </div>
+      {/* Lớp phủ để tắt chú thích khi nhấn ra ngoài trên mobile */}
+      {showHint && <div className="fixed inset-0 z-[998] md:hidden" onClick={() => setShowHint(false)} />}
+    </div>
+  );
+};
+
 // --- Individual Tab Components ---
 
-const TimeSettingsTab = ({ timeRules, setTimeRules }: any) => (
-  <section className="space-y-6">
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-      <div className="flex items-center gap-2 mb-4 text-blue-600">
-        <Clock className="h-5 w-5" />
-        <h2 className="font-bold">Giờ nhận/trả phòng</h2>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Check-in</label>
-          <input 
-            type="time" 
-            value={timeRules.check_in} 
-            onChange={(e) => setTimeRules({...timeRules, check_in: e.target.value})} 
-            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all" 
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Check-out</label>
-          <input 
-            type="time" 
-            value={timeRules.check_out} 
-            onChange={(e) => setTimeRules({...timeRules, check_out: e.target.value})} 
-            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all" 
-          />
-        </div>
-      </div>
+/**
+ * NHÓM 1: GIỜ GIẤC CƠ BẢN
+ * Quản lý giờ Check-in/out tiêu chuẩn và khung giờ tự động nhận diện khách Qua đêm.
+ */
+const BasicTimeTab = ({ timeRules, setTimeRules }: any) => (
+  <section className="space-y-4">
+    <div className="grid grid-cols-2 gap-3">
+      {/* Giờ nhận phòng tiêu chuẩn cho khách ở Ngày */}
+      <SettingItem label="Giờ Nhận (Check-in)" hint="Giờ khách bắt đầu nhận phòng tiêu chuẩn hàng ngày. Ví dụ: 14:00.">
+        <input 
+          type="time" 
+          value={timeRules.check_in} 
+          onChange={(e) => setTimeRules({...timeRules, check_in: e.target.value})} 
+          className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none" 
+        />
+      </SettingItem>
+      {/* Giờ trả phòng tiêu chuẩn cho khách ở Ngày */}
+      <SettingItem label="Giờ Trả (Check-out)" hint="Giờ khách phải trả phòng tiêu chuẩn hàng ngày. Ví dụ: 12:00.">
+        <input 
+          type="time" 
+          value={timeRules.check_out} 
+          onChange={(e) => setTimeRules({...timeRules, check_out: e.target.value})} 
+          className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none" 
+        />
+      </SettingItem>
     </div>
 
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-      <div className="flex items-center gap-2 mb-4 text-orange-600">
-        <Clock className="h-5 w-5" />
-        <h2 className="font-bold">Thời gian ân hạn (Grace Period)</h2>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Ân hạn phòng giờ (phút)</label>
-          <NumericInput 
-            value={timeRules.hourly_grace_period_minutes || 15} 
-            onChange={(val) => setTimeRules({...timeRules, hourly_grace_period_minutes: val})} 
-            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-orange-200 outline-none transition-all" 
-          />
-           <p className="mt-1 text-[10px] text-slate-400 italic">Khách quá giờ trong khoảng này không bị tính thêm giờ.</p>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Ân hạn trả muộn (giờ)</label>
-          <NumericInput 
-            value={timeRules.daily_grace_period_hours || 2} 
-            onChange={(val) => setTimeRules({...timeRules, daily_grace_period_hours: val})} 
-            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-orange-200 outline-none transition-all" 
-          />
-          <p className="mt-1 text-[10px] text-slate-400 italic">Khách trả muộn trong khoảng này không bị tính phụ thu.</p>
-        </div>
-      </div>
-    </div>
+    {/* Hạn trả phòng Qua đêm: Thường là 10h hoặc 12h sáng hôm sau */}
+    <SettingItem 
+      label="Hạn trả phòng Qua đêm" 
+      hint="Áp dụng riêng cho khách ở đêm. Ví dụ khách sạn quy định khách đêm phải trả trước 10:00 sáng mai thay vì 12:00 như khách ngày."
+      enabled={timeRules.overnight_checkout_enabled}
+      onToggle={(val) => setTimeRules({...timeRules, overnight_checkout_enabled: val})}
+    >
+      <input 
+        type="time" 
+        value={timeRules.overnight_checkout} 
+        onChange={(e) => setTimeRules({...timeRules, overnight_checkout: e.target.value})} 
+        className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none" 
+      />
+    </SettingItem>
 
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-      <div className="flex items-center gap-2 mb-4 text-purple-600">
-        <Clock className="h-5 w-5" />
-        <h2 className="font-bold">Khung giờ đêm</h2>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Bắt đầu</label>
+    {/* Khung giờ Qua đêm: Dùng để hệ thống tự động nhận diện RentalType là 'overnight' */}
+    <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-slate-100">
+      <span className="font-bold text-slate-800 flex items-center gap-1.5 mb-4">
+        Khung giờ Qua đêm
+        <div className="group relative inline-block cursor-help">
+          <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[10px] font-black text-slate-400">!</div>
+          <div className="absolute bottom-full left-0 mb-2 hidden w-48 rounded-lg bg-slate-800 p-2 text-[10px] font-medium text-white shadow-xl group-hover:block z-50">
+            Khách nhận phòng trong khoảng thời gian này sẽ được hệ thống tự động tính theo giá Qua đêm thay vì giá Giờ hay giá Ngày.
+          </div>
+        </div>
+      </span>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-400 ml-1">Bắt đầu</label>
           <input 
             type="time" 
             value={timeRules.overnight.start} 
             onChange={(e) => setTimeRules({...timeRules, overnight: { ...timeRules.overnight, start: e.target.value }})} 
-            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-purple-200 outline-none transition-all" 
+            className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none" 
           />
         </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Kết thúc</label>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-400 ml-1">Kết thúc</label>
           <input 
             type="time" 
             value={timeRules.overnight.end} 
             onChange={(e) => setTimeRules({...timeRules, overnight: { ...timeRules.overnight, end: e.target.value }})} 
-            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-purple-200 outline-none transition-all" 
+            className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none" 
           />
-        </div>
-      </div>
-    </div>
-
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Mốc check-in sớm</label>
-          <input 
-            type="time" 
-            value={timeRules.full_day_early_before} 
-            onChange={(e) => setTimeRules({...timeRules, full_day_early_before: e.target.value})} 
-            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all" 
-          />
-          <p className="mt-1 text-[10px] text-slate-400 italic">Nhận phòng trước giờ này tính thêm 1 ngày.</p>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Mốc trả muộn</label>
-          <input 
-            type="time" 
-            value={timeRules.full_day_late_after} 
-            onChange={(e) => setTimeRules({...timeRules, full_day_late_after: e.target.value})} 
-            className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all" 
-          />
-          <p className="mt-1 text-[10px] text-slate-400 italic">Trả phòng sau giờ này tính thêm 1 ngày.</p>
         </div>
       </div>
     </div>
   </section>
 );
 
-const TaxSettingsTab = ({ taxConfig, setTaxConfig }: any) => (
-  <section className="space-y-6">
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 space-y-6">
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">Mã số thuế</label>
-        <input 
-          type="text" 
-          placeholder="Nhập mã số thuế..." 
-          value={taxConfig.tax_code} 
-          onChange={(e) => setTaxConfig({...taxConfig, tax_code: e.target.value})} 
-          className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all placeholder:text-slate-300" 
+/**
+ * NHÓM 2: CƠ CHẾ TÍNH TIỀN GIỜ
+ * Cấu hình cho Hotel (Lũy tiến) hoặc Homestay (Theo Block).
+ */
+const HourlyPricingTab = ({ timeRules, setTimeRules }: any) => (
+  <section className="space-y-4">
+    <div className="grid grid-cols-2 gap-3">
+      {/* Ô 1: Định nghĩa block đầu tiên */}
+      <SettingItem 
+        label="Số giờ gói đầu" 
+        hint="Số giờ của gói khởi điểm. Ví dụ: Nhập 1 nếu tính theo giờ, nhập 2 nếu bán gói 2 tiếng đầu."
+        icon={Clock}
+      >
+        <div className="relative">
+          <input 
+            type="number" 
+            value={timeRules.baseHours}
+            onChange={(e) => setTimeRules({...timeRules, baseHours: Number(e.target.value)})}
+            className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 transition-all font-semibold outline-none"
+          />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Giờ</span>
+        </div>
+      </SettingItem>
+
+      {/* Ô 2: Định nghĩa các bước nhảy tiếp theo */}
+      <SettingItem 
+        label="Số phút tính tiếp" 
+        hint="Cứ sau bao nhiêu phút thì tính thêm tiền một lần. Ví dụ: Nhập 60 nếu tính theo giờ, nhập 30 nếu tính theo mỗi nửa tiếng."
+        icon={Timer}
+      >
+        <div className="relative">
+          <NumericInput 
+            value={timeRules.hourUnit}
+            onChange={(val) => setTimeRules({...timeRules, hourUnit: val})}
+            className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 transition-all font-semibold outline-none"
+          />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Phút</span>
+        </div>
+      </SettingItem>
+    </div>
+
+    {/* Trần tiền giờ: Chống việc tiền giờ cao hơn tiền ngày */}
+    <SettingItem 
+      label="Trần tiền giờ" 
+      hint="Khi tiền giờ cộng dồn vượt quá X% giá phòng 1 ngày, hệ thống sẽ tự động chuyển sang tính theo giá Ngày để đảm bảo quyền lợi cho khách."
+      enabled={timeRules.hourly_ceiling_enabled}
+      onToggle={(val) => setTimeRules({...timeRules, hourly_ceiling_enabled: val})}
+    >
+      <div className="relative">
+        <NumericInput 
+          value={timeRules.hourly_ceiling_percent} 
+          onChange={(val) => setTimeRules({...timeRules, hourly_ceiling_percent: val})} 
+          className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none pr-10" 
         />
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">%</span>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">% Thuế Lưu trú</label>
-          <div className="relative">
-            <NumericInput 
-              value={taxConfig.stay_tax} 
-              onChange={(val) => setTaxConfig({...taxConfig, stay_tax: val})} 
-              className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all pr-10" 
-            />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">%</span>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-wider">% Thuế Dịch vụ</label>
-          <div className="relative">
-            <NumericInput 
-              value={taxConfig.service_tax} 
-              onChange={(val) => setTaxConfig({...taxConfig, service_tax: val})} 
-              className="w-full p-4 bg-slate-50 border border-transparent rounded-2xl text-lg font-bold text-slate-800 focus:bg-white focus:border-blue-200 outline-none transition-all pr-10" 
-            />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">%</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    </SettingItem>
   </section>
 );
 
-const SurchargeSettingsTab = ({ 
+/**
+ * NHÓM 3: PHỤ THU & MỐC TRÒN NGÀY
+ * Quản lý tự động tính tiền Nhận sớm / Trả muộn và các mốc nhảy sang 1 ngày.
+ */
+/**
+ * NHÓM 3: PHỤ THU & MỐC TRÒN NGÀY
+ * Quản lý tự động tính tiền Nhận sớm / Trả muộn và các mốc nhảy sang 1 ngày.
+ */
+const SurchargeTab = ({ 
   timeRules, 
+  setTimeRules,
   updateLateRule, 
   addLateRule, 
-  removeLateRule,
+  removeLateRule, 
   updateEarlyRule,
   addEarlyRule,
   removeEarlyRule,
   enableAutoSurcharge,
   setEnableAutoSurcharge
 }: any) => (
-  <section className="space-y-4">
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 mb-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-slate-800">Phụ thu tự động</h3>
-          <p className="text-xs text-slate-500">Hệ thống tự tính % phụ thu khi check-out</p>
-        </div>
+  <section className="space-y-6">
+    {/* Nút gạt chính: Bật để máy tính, Tắt để người nhập tay */}
+    <div className="bg-blue-600 rounded-[1.5rem] p-5 text-white shadow-lg shadow-blue-100">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-bold">Tự động tính phụ thu</h3>
         <button 
           onClick={() => setEnableAutoSurcharge(!enableAutoSurcharge)}
           className={cn(
-            "relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none",
-            enableAutoSurcharge ? "bg-blue-600" : "bg-slate-200"
+            "relative inline-flex h-6 w-10 items-center rounded-full transition-colors bg-white/20 outline-none",
           )}
         >
-          <span
-            className={cn(
-              "inline-block h-5 w-5 transform rounded-full bg-white transition-transform",
-              enableAutoSurcharge ? "translate-x-6" : "translate-x-1"
-            )}
-          />
+          <span className={cn("inline-block h-4 w-4 transform rounded-full bg-white transition-transform", enableAutoSurcharge ? "translate-x-5" : "translate-x-1")} />
         </button>
       </div>
+      <p className="text-[11px] opacity-80 leading-relaxed">
+        Khi bật, hệ thống sẽ dựa vào các mốc thời gian dưới đây để tự động cộng thêm tiền vào hóa đơn khi khách nhận phòng sớm hoặc trả phòng muộn.
+      </p>
     </div>
 
-    {/* Late Check-out Section */}
-    <div className="flex items-center justify-between px-2 mb-2">
-       <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Phụ thu Trả muộn (Late)</span>
-       <button onClick={addLateRule} className="flex items-center gap-1 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white active:scale-95 transition-transform shadow-lg shadow-blue-100">
-        <Plus className="h-4 w-4" /> Thêm mới
-      </button>
-    </div>
-    <div className="space-y-3 mb-8">
+    <div className="space-y-4">
+      {/* Danh sách mốc trả muộn: Ví dụ 12h-15h phụ thu 30% */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+          Trả muộn (Late Check-out)
+          <div 
+            className="relative inline-block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-100 text-[9px] font-black text-slate-400 cursor-help">!</div>
+          </div>
+        </span>
+        <button onClick={addLateRule} className="text-blue-600 text-xs font-bold flex items-center gap-1">
+          <Plus className="h-3 w-3" /> Thêm mốc
+        </button>
+      </div>
+      
       {timeRules.late_rules.map((rule: any, index: number) => (
-        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={index} className="flex items-center gap-3 rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
-          <div className="grid flex-1 grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Từ</span>
-              <input type="time" value={rule.from} onChange={(e) => updateLateRule(index, 'from', e.target.value)} className="w-full bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Đến</span>
-              <input type="time" value={rule.to} onChange={(e) => updateLateRule(index, 'to', e.target.value)} className="w-full bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
-            </div>
-            <div className="col-span-2 space-y-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Phụ thu (%)</span>
-              <div className="flex items-center gap-3">
-                <NumericInput value={rule.percent} onChange={(val) => updateLateRule(index, 'percent', val)} className="flex-1 bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
-                <button onClick={() => removeLateRule(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                  <Trash2 className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
+        <div key={index} className="flex items-center gap-2 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+          <input type="time" value={rule.from} onChange={(e) => updateLateRule(index, 'from', e.target.value)} className="bg-slate-50 p-2 rounded-lg font-bold text-xs outline-none w-20" />
+          <span className="text-slate-300">→</span>
+          <input type="time" value={rule.to} onChange={(e) => updateLateRule(index, 'to', e.target.value)} className="bg-slate-50 p-2 rounded-lg font-bold text-xs outline-none w-20" />
+          <div className="flex-1 relative">
+            <NumericInput value={rule.percent} onChange={(val) => updateLateRule(index, 'percent', val)} className="w-full bg-slate-50 p-2 rounded-lg font-bold text-xs outline-none pr-6 text-right" />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
           </div>
-        </motion.div>
-      ))}
-      {timeRules.late_rules.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-slate-200 py-12 text-slate-400 bg-white/50">
-          <AlertCircle className="h-10 w-10 mb-3 opacity-20" />
-          <p className="font-medium text-xs">Chưa có quy định trả muộn</p>
+          <button onClick={() => removeLateRule(index)} className="p-2 text-slate-300 hover:text-red-500">
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
-      )}
-    </div>
+      ))}
 
-    {/* Early Check-in Section */}
-    <div className="flex items-center justify-between px-2 mb-2">
-       <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Phụ thu Nhận sớm (Early)</span>
-       <button onClick={addEarlyRule} className="flex items-center gap-1 rounded-full bg-purple-600 px-4 py-2 text-xs font-bold text-white active:scale-95 transition-transform shadow-lg shadow-purple-100">
-        <Plus className="h-4 w-4" /> Thêm mới
-      </button>
-    </div>
-    <div className="space-y-3">
-      {(timeRules.early_rules || []).map((rule: any, index: number) => (
-        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={index} className="flex items-center gap-3 rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
-          <div className="grid flex-1 grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Từ</span>
-              <input type="time" value={rule.from} onChange={(e) => updateEarlyRule(index, 'from', e.target.value)} className="w-full bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Đến</span>
-              <input type="time" value={rule.to} onChange={(e) => updateEarlyRule(index, 'to', e.target.value)} className="w-full bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
-            </div>
-            <div className="col-span-2 space-y-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Phụ thu (%)</span>
-              <div className="flex items-center gap-3">
-                <NumericInput value={rule.percent} onChange={(val) => updateEarlyRule(index, 'percent', val)} className="flex-1 bg-slate-50 rounded-xl p-2 font-bold text-slate-800 outline-none" />
-                <button onClick={() => removeEarlyRule(index)} className="rounded-xl bg-rose-50 p-3 text-rose-500 active:scale-90 transition-transform">
-                  <Trash2 className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      ))}
-      {(!timeRules.early_rules || timeRules.early_rules.length === 0) && (
-        <div className="flex flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-slate-200 py-12 text-slate-400 bg-white/50">
-          <AlertCircle className="h-10 w-10 mb-3 opacity-20" />
-          <p className="font-medium text-xs">Chưa có quy định nhận sớm</p>
-        </div>
-      )}
+      {/* Mốc Tròn Ngày: Chống việc phụ thu quá nhiều, tự động tính thành 1 ngày mới */}
+      <div className="grid grid-cols-2 gap-3 pt-2">
+        <SettingItem label="Mốc Tròn Ngày (Sớm)" hint="Ví dụ: Nhận phòng trước 05:00 sáng sẽ tự động tính thành 1 ngày tiền phòng (thay vì tính phụ thu theo giờ).">
+          <input type="time" value={timeRules.full_day_early_before} onChange={(e) => setTimeRules({...timeRules, full_day_early_before: e.target.value})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none" />
+        </SettingItem>
+        <SettingItem label="Mốc Tròn Ngày (Muộn)" hint="Ví dụ: Trả phòng sau 18:00 chiều sẽ tự động tính thêm 1 ngày tiền phòng (thay vì tính phụ thu theo giờ).">
+          <input type="time" value={timeRules.full_day_late_after} onChange={(e) => setTimeRules({...timeRules, full_day_late_after: e.target.value})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none" />
+        </SettingItem>
+      </div>
     </div>
   </section>
 );
 
-const AISettingsTab = () => (
-    <section>
-        <div className="flex flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-slate-200 bg-white/50 py-20 text-slate-400">
-            <div className="p-5 bg-slate-100 rounded-full mb-4">
-              <Wrench className="h-10 w-10 opacity-30" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-600 mb-1">Tính năng AI</h3>
-            <p className="text-sm text-center px-10 leading-relaxed">Cấu hình giọng nói và nhận diện giấy tờ (OCR) đang được phát triển.</p>
+/**
+ * NHÓM 4: ÂN HẠN (GRACE PERIOD)
+ * Khoảng thời gian cho phép khách trễ mà không bị tính tiền.
+ */
+const GracePeriodTab = ({ timeRules, setTimeRules }: any) => (
+  <section className="space-y-4">
+    {/* Ân hạn nhận phòng: Tránh việc khách vào xem phòng rồi ra ngay mà vẫn bị tính tiền */}
+    <SettingItem 
+      label="Ân hạn Nhận phòng" 
+      hint="Khoảng thời gian khách vào rồi ra ngay (ví dụ đổi ý) sẽ không bị tính tiền."
+      enabled={timeRules.initial_grace_enabled}
+      onToggle={(val) => setTimeRules({...timeRules, initial_grace_enabled: val})}
+    >
+      <div className="relative">
+        <NumericInput 
+          value={timeRules.initial_grace_minutes} 
+          onChange={(val) => setTimeRules({...timeRules, initial_grace_minutes: val})} 
+          className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none pr-12" 
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">phút</span>
+      </div>
+    </SettingItem>
+
+    {/* Ân hạn trả phòng: Cho khách thêm thời gian dọn đồ, di chuyển ra quầy */}
+    <SettingItem 
+      label="Ân hạn Trả phòng" 
+      hint="Khoảng thời gian khách trễ mà vẫn được miễn phí phụ thu (thời gian di chuyển, dọn đồ)."
+      enabled={timeRules.late_grace_enabled}
+      onToggle={(val) => setTimeRules({...timeRules, late_grace_enabled: val})}
+    >
+      <div className="relative">
+        <NumericInput 
+          value={timeRules.late_grace_minutes} 
+          onChange={(val) => setTimeRules({...timeRules, late_grace_minutes: val})} 
+          className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none pr-12" 
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">phút</span>
+      </div>
+    </SettingItem>
+  </section>
+);
+
+/**
+ * NHÓM 5: TIỆN ÍCH KHÁC & THUẾ
+ * Quản lý phụ thu thêm người và cấu hình hóa đơn VAT.
+ */
+const OtherSettingsTab = ({ timeRules, setTimeRules, taxConfig, setTaxConfig }: any) => (
+  <section className="space-y-4">
+    {/* Phụ thu thêm người: Tự động tính khi số khách vượt quá tiêu chuẩn phòng */}
+    <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-slate-100">
+      <div className="flex items-center justify-between mb-4">
+        <span className="font-bold text-slate-800 flex items-center gap-1.5">
+          Phụ thu thêm người
+          <div 
+            className="relative inline-block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[10px] font-black text-slate-400 cursor-help">!</div>
+          </div>
+        </span>
+        <button 
+          onClick={() => setTimeRules({...timeRules, extra_person_enabled: !timeRules.extra_person_enabled})}
+          className={cn(
+            "relative inline-flex h-6 w-10 items-center rounded-full transition-colors focus:outline-none",
+            timeRules.extra_person_enabled ? "bg-blue-600" : "bg-slate-200"
+          )}
+        >
+          <span className={cn("inline-block h-4 w-4 transform rounded-full bg-white transition-transform", timeRules.extra_person_enabled ? "translate-x-5" : "translate-x-1")} />
+        </button>
+      </div>
+      
+      <div className={cn("grid grid-cols-2 gap-3 transition-all", !timeRules.extra_person_enabled && "opacity-40 pointer-events-none")}>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-400 ml-1">Người lớn</label>
+          <NumericInput value={timeRules.extra_person_fee_adult} onChange={(val) => setTimeRules({...timeRules, extra_person_fee_adult: val})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none" />
         </div>
-    </section>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-400 ml-1">Trẻ em</label>
+          <NumericInput value={timeRules.extra_person_fee_child} onChange={(val) => setTimeRules({...timeRules, extra_person_fee_child: val})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none" />
+        </div>
+      </div>
+      <p className="mt-3 text-[10px] text-slate-400 italic">Hệ thống sẽ tự tính tiền nếu số khách nhập vào lúc Check-in vượt quá số người tiêu chuẩn của hạng phòng đó.</p>
+    </div>
+
+    {/* Thuế & Hóa đơn: Cấu hình hiển thị và tính toán VAT trên Invoice */}
+    <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-slate-100 space-y-4">
+      <span className="font-bold text-slate-800 flex items-center gap-1.5">
+        Thuế & Hóa đơn
+        <div 
+          className="relative inline-block"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[10px] font-black text-slate-400 cursor-help">!</div>
+        </div>
+      </span>
+      <input type="text" placeholder="Mã số thuế..." value={taxConfig.tax_code} onChange={(e) => setTaxConfig({...taxConfig, tax_code: e.target.value})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none placeholder:text-slate-300" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="relative">
+          <NumericInput value={taxConfig.stay_tax} onChange={(val) => setTaxConfig({...taxConfig, stay_tax: val})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none pr-8" />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">% Thuế</span>
+        </div>
+        <div className="relative">
+          <NumericInput value={taxConfig.service_tax} onChange={(val) => setTaxConfig({...taxConfig, service_tax: val})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none pr-8" />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">% Phí DV</span>
+        </div>
+      </div>
+      <p className="text-[10px] text-slate-400 italic">Thuế này sẽ được cộng trực tiếp vào tổng bill khi in hóa đơn cho khách hàng.</p>
+    </div>
+  </section>
+);
+const AISettingsTab = () => (
+  <section className="space-y-4">
+    <div className="bg-slate-900 rounded-[1.5rem] p-6 text-white">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+          <Wrench className="h-5 w-5 text-blue-400" />
+        </div>
+        <div>
+          <h3 className="font-bold">Cấu hình AI Voice</h3>
+          <p className="text-[11px] text-slate-400">Trợ lý ảo hỗ trợ điều hành khách sạn</p>
+        </div>
+      </div>
+      <div className="space-y-4 opacity-50">
+        <div className="h-12 bg-white/5 rounded-xl border border-white/10 flex items-center px-4 text-xs font-medium">Đang phát triển...</div>
+        <div className="h-12 bg-white/5 rounded-xl border border-white/10 flex items-center px-4 text-xs font-medium">Tự động nhận diện giọng nói</div>
+      </div>
+    </div>
+  </section>
 );

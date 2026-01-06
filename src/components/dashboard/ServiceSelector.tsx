@@ -81,7 +81,7 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
               {selectedServices.reduce((sum, s) => sum + s.quantity, 0)} món
             </span>
             <span className="text-[11px] font-black text-white">
-              {formatCurrency(selectedServices.reduce((sum, s) => sum + s.price * s.quantity, 0))}đ
+              {formatCurrency(selectedServices.reduce((sum, s) => sum + s.price * s.quantity, 0))}
             </span>
           </motion.div>
         )}

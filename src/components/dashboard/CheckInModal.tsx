@@ -76,24 +76,13 @@ export function CheckInModal({
   // Search khách hàng khi gõ tên
   useEffect(() => {
     const searchTimer = setTimeout(async () => {
-      if (customer.name && customer.name.length >= 1 && isFocused && !isProcessing) {
+      if (customer.name && customer.name.length >= 1 && !isProcessing) {
+        console.time('[Hiệu Năng] Tìm kiếm Khách hàng');
         const results = await HotelService.searchCustomers(customer.name);
         setSearchResults(results);
-
-        // Nếu tên thay đổi và không còn khớp với khách đã chọn, xóa ID và balance
-        if (customer.id) {
-          const selected = results.find((r) => r.id === customer.id);
-          if (!selected || selected.full_name !== customer.name) {
-            setCustomer((prev) => ({ ...prev, id: undefined }));
-            setCustomerBalance(0);
-          }
-        }
+        console.timeEnd('[Hiệu Năng] Tìm kiếm Khách hàng');
       } else {
         setSearchResults([]);
-        if (!customer.name) {
-          setCustomer((prev) => ({ ...prev, id: undefined }));
-          setCustomerBalance(0);
-        }
       }
     }, 300); // Debounce 300ms
 
@@ -598,8 +587,7 @@ export function CheckInModal({
                         value={price}
                         onChange={setPrice}
                         disabled={isProcessing}
-                        className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-black focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50"
-                        suffix="đ"
+                        className="w-full text-3xl font-black text-slate-800 border-none p-0 focus:ring-0 bg-transparent"
                       />
                     </div>
                   </div>
@@ -614,7 +602,6 @@ export function CheckInModal({
                           onChange={setDeposit}
                           disabled={isProcessing}
                           className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-black focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50"
-                          suffix="đ"
                         />
                       </div>
                       {deposit > 0 && (
@@ -685,7 +672,6 @@ export function CheckInModal({
                     >
                       {formatCurrency(totalAmount)}
                     </span>
-                    <span className="text-zinc-400 font-bold font-serif">đ</span>
                   </div>
                   {customerBalance !== 0 && (
                     <p

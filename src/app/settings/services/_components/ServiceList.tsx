@@ -328,7 +328,7 @@ export default function ServiceList() {
               <div className="flex justify-between items-end border-t pt-4 gap-4">
                 <div className="flex-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Giá bán</p>
-                  <p className="font-black text-blue-600">{formatCurrency(service.price)}đ/{service.unit}</p>
+                  <p className="font-black text-blue-600">{formatCurrency(service.price)}/{service.unit}</p>
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -387,7 +387,6 @@ export default function ServiceList() {
                   <NumericInput 
                     value={formData.price}
                     onChange={val => setFormData({...formData, price: val})}
-                    suffix="đ"
                   />
                 </div>
                 <div className="space-y-1">

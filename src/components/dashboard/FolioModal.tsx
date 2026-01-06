@@ -962,7 +962,7 @@ export default function FolioModal({
 
                 {/* Hero Summary Card */}
                 <div
-                  className="bg-indigo-700 text-white rounded-[2.5rem] p-6 shadow-2xl cursor-pointer"
+                  className="bg-indigo-700 text-white rounded-[2rem] p-6 shadow-2xl cursor-pointer"
                   onClick={() => setIsHeroCardExpanded(!isHeroCardExpanded)}
                 >
                   <div className="relative z-10 text-center">
@@ -980,8 +980,8 @@ export default function FolioModal({
                           className={cn(
                             'font-black tracking-tighter transition-all duration-300',
                             isDirty && displayPricing.diff !== 0
-                              ? 'text-4xl opacity-90'
-                              : 'text-5xl'
+                              ? 'text-2xl opacity-90'
+                              : 'text-3xl'
                           )}
                         >
                           {formatCurrency(displayPricing.base)}
@@ -1020,13 +1020,13 @@ export default function FolioModal({
                       <motion.div
                         key="hero-expanded-content"
                         initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                        animate={{ opacity: 1, height: 'auto', marginTop: '24px' }}
+                        animate={{ opacity: 1, height: 'auto', marginTop: 8 }}
                         exit={{ opacity: 0, height: 0, marginTop: 0 }}
                         className="border-t border-white/10 overflow-hidden"
                       >
-                        <div className="pt-6 space-y-3">
-                          <div className="flex justify-between">
-                            <span className="font-bold text-indigo-200">Giờ vào</span>
+                        <div className="pt-3 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Giờ vào</span>
                             <span className="font-bold">
                               {format(
                                 parseISO(room.current_booking.check_in_at),
@@ -1034,21 +1034,21 @@ export default function FolioModal({
                               )}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="font-bold text-indigo-200">Tiền phòng</span>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tiền phòng</span>
                             <span className="font-bold">
                               {formatCurrency(pricingBreakdown?.room_charge || 0)}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="font-bold text-indigo-200">Tiền dịch vụ</span>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tiền dịch vụ</span>
                             <span className="font-bold">{formatCurrency(serviceTotals.temp)}</span>
                           </div>
 
                           {/* Customer Balance / Old Debt */}
                           {customerBalanceToDisplay !== 0 && (
-                            <div className="flex justify-between">
-                              <span className="font-bold text-indigo-200">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">
                                 {customerBalanceToDisplay < 0 ? 'Nợ cũ' : 'Tiền dư'}
                               </span>
                               <span
@@ -1085,8 +1085,8 @@ export default function FolioModal({
                             )}
 
                           {deposit > 0 && (
-                            <div className="flex justify-between">
-                              <span className="font-bold text-indigo-200">Tiền cọc</span>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tiền cọc</span>
                               <span className="font-bold text-emerald-300">
                                 -{formatCurrency(deposit)}
                               </span>
@@ -1459,7 +1459,6 @@ export default function FolioModal({
                         value={parseInt(depositValue.replace(/\D/g, '') || '0')}
                         onChange={(val) => setDepositValue(String(val))}
                         className="w-full text-3xl font-black text-emerald-600 border-none p-0 focus:ring-0 bg-transparent"
-                        suffix="đ"
                         autoFocus
                       />
                     </div>
@@ -1501,7 +1500,6 @@ export default function FolioModal({
                         value={parseInt(String(debtValue).replace(/\D/g, '') || '0')}
                         onChange={(val) => setDebtValue(String(val))}
                         className="w-full text-3xl font-black text-emerald-600 border-none p-0 focus:ring-0 bg-transparent"
-                        suffix="đ"
                         autoFocus
                       />
                     </div>

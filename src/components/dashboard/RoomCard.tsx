@@ -259,7 +259,7 @@ export const RoomCard = memo(function RoomCard({ room, settings, onClick }: Room
             <div className="flex flex-col items-start leading-tight">
               <span className="text-[13px] font-bold opacity-80 text-white">Giá ngày</span>
               <span className="text-[22px] font-black tracking-tighter text-white">
-                {formatCurrency(room.prices?.daily || 0)}đ
+                {formatCurrency(room.prices?.daily || 0)}
               </span>
             </div>
           </div>
