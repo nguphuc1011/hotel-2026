@@ -216,407 +216,412 @@ export default function CheckoutModal({
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[10000] bg-slate-900/70 flex flex-col items-center justify-end md:justify-center">
-          <motion.div
-            key="checkout-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0"
-            onClick={onClose}
-          />
-
-          <motion.div
-            key="checkout-modal"
-            variants={modalVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="relative w-full h-full bg-slate-50 flex flex-col overflow-hidden"
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <div
+            key="checkout-modal-overlay"
+            className="fixed inset-0 z-[10000] bg-slate-900/70 flex flex-col items-center justify-end md:justify-center"
           >
-            {/* Header */}
-            <header className="sticky top-0 bg-white border-b border-slate-100 py-4 px-6 z-30 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={onClose}
-                  className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
-                >
-                  <X size={20} className="text-slate-400" />
-                </button>
-                <div>
-                  <h2 className="font-black text-xl text-slate-800 uppercase tracking-tight">
-                    Thanh toán & Trả phòng
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-black uppercase tracking-wider">
-                      Phòng {room.room_number}
-                    </span>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      {pricingBreakdown?.summary?.duration_text || '...'}
-                    </span>
+            <motion.div
+              key="checkout-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              onClick={onClose}
+            />
+
+            <motion.div
+              key="checkout-modal"
+              variants={modalVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              className="relative w-full h-full bg-slate-50 flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <header className="sticky top-0 bg-white border-b border-slate-100 py-4 px-6 z-30 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={onClose}
+                    className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
+                  >
+                    <X size={20} className="text-slate-400" />
+                  </button>
+                  <div>
+                    <h2 className="font-black text-xl text-slate-800 uppercase tracking-tight">
+                      Thanh toán & Trả phòng
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-black uppercase tracking-wider">
+                        Phòng {room.room_number}
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {pricingBreakdown?.summary?.duration_text || '...'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </header>
+              </header>
 
-            {/* Body */}
-            <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6">
-              <div className="max-w-xl mx-auto space-y-4">
-                {/* Simplified Summary Card */}
-                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-6 space-y-4">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-                          Tiền phòng
-                        </span>
-                        {pricingBreakdown?.summary && (
-                          <span className="text-[10px] text-slate-300 font-bold">
-                            (
-                            {pricingBreakdown.summary.days
-                              ? `${pricingBreakdown.summary.days} ngày`
-                              : `${pricingBreakdown.summary.hours} giờ`}{' '}
-                            x {formatCurrency(pricingBreakdown.summary.base_price || 0)})
+              {/* Body */}
+              <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6">
+                <div className="max-w-xl mx-auto space-y-4">
+                  {/* Simplified Summary Card */}
+                  <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-6 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                            Tiền phòng
                           </span>
-                        )}
-                      </div>
-                      <span className="font-black text-slate-800 text-lg">
-                        {formatCurrency(totalCalculations.roomCharge)}
-                      </span>
-                    </div>
-
-                    {totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0) > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-                          Dịch vụ
-                        </span>
+                          {pricingBreakdown?.summary && (
+                            <span className="text-[10px] text-slate-300 font-bold">
+                              (
+                              {pricingBreakdown.summary.days
+                                ? `${pricingBreakdown.summary.days} ngày`
+                                : `${pricingBreakdown.summary.hours} giờ`}{' '}
+                              x {formatCurrency(pricingBreakdown.summary.base_price || 0)})
+                            </span>
+                          )}
+                        </div>
                         <span className="font-black text-slate-800 text-lg">
-                          {formatCurrency(
-                            totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0)
-                          )}
+                          {formatCurrency(totalCalculations.roomCharge)}
                         </span>
                       </div>
-                    )}
 
-                    <div className="flex justify-between items-center group">
-                      <span className="text-amber-500 font-bold uppercase tracking-widest text-[10px]">
-                        Phụ thu
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <NumericInput
-                          value={manualSurcharge}
-                          onChange={setManualSurcharge}
-                          className="w-32 bg-amber-50/50 border-amber-100 rounded-xl px-3 h-10 text-right font-black text-amber-600 text-base focus:ring-2 focus:ring-amber-500/20"
-                        />
-                      </div>
-                    </div>
-
-                    {deposit > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-emerald-500 font-bold uppercase tracking-widest text-[10px]">
-                          Đã đặt cọc
-                        </span>
-                        <span className="font-black text-emerald-600 text-lg">
-                          -{formatCurrency(deposit)}
-                        </span>
-                      </div>
-                    )}
-
-                    {customerBalance !== 0 && (
-                      <div className="flex justify-between items-center">
-                        <span
-                          className={cn(
-                            'font-bold uppercase tracking-widest text-[10px]',
-                            isDebt ? 'text-rose-500' : 'text-emerald-500'
-                          )}
-                        >
-                          {isDebt ? 'Nợ cũ' : 'Tiền dư cũ'}
-                        </span>
-                        <span
-                          className={cn(
-                            'font-black text-lg',
-                            isDebt ? 'text-rose-600' : 'text-emerald-600'
-                          )}
-                        >
-                          {isDebt ? '+' : '-'}
-                          {absFormattedBalance}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-center group">
-                      <div className="flex items-center gap-3">
-                        <span className="text-rose-500 font-bold uppercase tracking-widest text-[10px]">
-                          Giảm giá
-                        </span>
-                        <div className="flex bg-slate-100 p-1 rounded-xl">
-                          <button
-                            onClick={() => setDiscountType('amount')}
-                            className={cn(
-                              'px-2 py-0.5 rounded-lg text-[10px] font-black transition-all',
-                              discountType === 'amount'
-                                ? 'bg-white text-rose-600 shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600'
+                      {totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0) > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                            Dịch vụ
+                          </span>
+                          <span className="font-black text-slate-800 text-lg">
+                            {formatCurrency(
+                              totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0)
                             )}
-                          >
-                            Đ
-                          </button>
-                          <button
-                            onClick={() => setDiscountType('percent')}
-                            className={cn(
-                              'px-2 py-0.5 rounded-lg text-[10px] font-black transition-all',
-                              discountType === 'percent'
-                                ? 'bg-white text-rose-600 shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600'
-                            )}
-                          >
-                            %
-                          </button>
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center group">
+                        <span className="text-amber-500 font-bold uppercase tracking-widest text-[10px]">
+                          Phụ thu
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <NumericInput
+                            value={manualSurcharge}
+                            onChange={setManualSurcharge}
+                            className="w-32 bg-amber-50/50 border-amber-100 rounded-xl px-3 h-10 text-right font-black text-amber-600 text-base focus:ring-2 focus:ring-amber-500/20"
+                          />
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <NumericInput
-                          value={discountValue}
-                          onChange={setDiscountValue}
-                          className="w-32 bg-rose-50/50 border-rose-100 rounded-xl px-3 h-10 text-right font-black text-rose-600 text-base focus:ring-2 focus:ring-rose-500/20"
-                          suffix={discountType === 'amount' ? '' : '%'}
-                        />
+
+                      {deposit > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-emerald-500 font-bold uppercase tracking-widest text-[10px]">
+                            Đã đặt cọc
+                          </span>
+                          <span className="font-black text-emerald-600 text-lg">
+                            -{formatCurrency(deposit)}
+                          </span>
+                        </div>
+                      )}
+
+                      {customerBalance !== 0 && (
+                        <div className="flex justify-between items-center">
+                          <span
+                            className={cn(
+                              'font-bold uppercase tracking-widest text-[10px]',
+                              isDebt ? 'text-rose-500' : 'text-emerald-500'
+                            )}
+                          >
+                            {isDebt ? 'Nợ cũ' : 'Tiền dư cũ'}
+                          </span>
+                          <span
+                            className={cn(
+                              'font-black text-lg',
+                              isDebt ? 'text-rose-600' : 'text-emerald-600'
+                            )}
+                          >
+                            {isDebt ? '+' : '-'}
+                            {absFormattedBalance}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center group">
+                        <div className="flex items-center gap-3">
+                          <span className="text-rose-500 font-bold uppercase tracking-widest text-[10px]">
+                            Giảm giá
+                          </span>
+                          <div className="flex bg-slate-100 p-1 rounded-xl">
+                            <button
+                              onClick={() => setDiscountType('amount')}
+                              className={cn(
+                                'px-2 py-0.5 rounded-lg text-[10px] font-black transition-all',
+                                discountType === 'amount'
+                                  ? 'bg-white text-rose-600 shadow-sm'
+                                  : 'text-slate-400 hover:text-slate-600'
+                              )}
+                            >
+                              Đ
+                            </button>
+                            <button
+                              onClick={() => setDiscountType('percent')}
+                              className={cn(
+                                'px-2 py-0.5 rounded-lg text-[10px] font-black transition-all',
+                                discountType === 'percent'
+                                  ? 'bg-white text-rose-600 shadow-sm'
+                                  : 'text-slate-400 hover:text-slate-600'
+                              )}
+                            >
+                              %
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <NumericInput
+                            value={discountValue}
+                            onChange={setDiscountValue}
+                            className="w-32 bg-rose-50/50 border-rose-100 rounded-xl px-3 h-10 text-right font-black text-rose-600 text-base focus:ring-2 focus:ring-rose-500/20"
+                            suffix={discountType === 'amount' ? '' : '%'}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                            Thuế VAT (10%)
+                          </span>
+                          <button
+                            onClick={() => setIsTaxEnabled(!isTaxEnabled)}
+                            className={cn(
+                              'w-10 h-5 rounded-full relative transition-all duration-300',
+                              isTaxEnabled ? 'bg-indigo-600' : 'bg-slate-200'
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                'absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all duration-300',
+                                isTaxEnabled && 'translate-x-5'
+                              )}
+                            />
+                          </button>
+                        </div>
+                        <span
+                          className={cn(
+                            'font-black text-lg transition-all',
+                            isTaxEnabled ? 'text-slate-800' : 'text-slate-300'
+                          )}
+                        >
+                          {isTaxEnabled ? `+${formatCurrency(totalCalculations.taxAmount)}` : '0đ'}
+                        </span>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-100 space-y-3 min-h-[112px]">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                            Tổng cần thanh toán
+                          </span>
+                          <span className="font-black text-rose-600 text-xl">
+                            {formatCurrency(totalCalculations.totalToCollect)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                            Khách thực trả
+                          </span>
+                          <div className="relative w-40">
+                            <NumericInput
+                              value={actualPaid}
+                              onChange={setActualPaid}
+                              className="w-full bg-indigo-50/50 border-indigo-100 rounded-xl px-3 h-10 text-right font-black text-indigo-600 text-lg focus:ring-2 focus:ring-indigo-500/20"
+                            />
+                          </div>
+                        </div>
+
+                        <AnimatePresence mode="wait">
+                          {actualPaid !== totalCalculations.totalToCollect && (
+                            <motion.div
+                              key="settlement-diff"
+                              initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                              animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                              className={cn(
+                                'flex justify-between items-center p-3 rounded-2xl transition-all overflow-hidden',
+                                actualPaid > totalCalculations.totalToCollect
+                                  ? 'bg-emerald-50'
+                                  : 'bg-rose-50'
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  'font-bold uppercase tracking-widest text-[10px]',
+                                  actualPaid > totalCalculations.totalToCollect
+                                    ? 'text-emerald-600'
+                                    : 'text-rose-600'
+                                )}
+                              >
+                                {actualPaid > totalCalculations.totalToCollect
+                                  ? 'Tiền thối lại'
+                                  : 'Ghi nợ mới'}
+                              </span>
+                              <span
+                                className={cn(
+                                  'font-black text-lg',
+                                  actualPaid > totalCalculations.totalToCollect
+                                    ? 'text-emerald-700'
+                                    : 'text-rose-700'
+                                )}
+                              >
+                                {formatCurrency(
+                                  Math.abs(actualPaid - totalCalculations.totalToCollect)
+                                )}
+                              </span>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-                          Thuế VAT (10%)
-                        </span>
+                  {/* Payment Methods */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 px-2">
+                      <CreditCard size={12} className="text-slate-400" />
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Phương thức thanh toán
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        {
+                          id: 'cash',
+                          label: 'Tiền mặt',
+                          icon: Wallet,
+                          color: 'amber',
+                          activeClass: 'bg-amber-50 border-amber-200 shadow-amber-100',
+                          iconClass: 'bg-amber-500',
+                          textClass: 'text-amber-600',
+                        },
+                        {
+                          id: 'transfer',
+                          label: 'Chuyển khoản',
+                          icon: Landmark,
+                          color: 'blue',
+                          activeClass: 'bg-blue-50 border-blue-200 shadow-blue-100',
+                          iconClass: 'bg-blue-500',
+                          textClass: 'text-blue-600',
+                        },
+                        {
+                          id: 'card',
+                          label: 'Thẻ / POS',
+                          icon: CreditCard,
+                          color: 'indigo',
+                          activeClass: 'bg-indigo-50 border-indigo-200 shadow-indigo-100',
+                          iconClass: 'bg-indigo-500',
+                          textClass: 'text-indigo-600',
+                        },
+                      ].map((method) => (
                         <button
-                          onClick={() => setIsTaxEnabled(!isTaxEnabled)}
+                          key={method.id}
+                          onClick={() => setPaymentMethod(method.id as any)}
                           className={cn(
-                            'w-10 h-5 rounded-full relative transition-all duration-300',
-                            isTaxEnabled ? 'bg-indigo-600' : 'bg-slate-200'
+                            'group relative flex flex-col items-center gap-2 p-4 rounded-[2rem] transition-all border-2',
+                            paymentMethod === method.id
+                              ? `${method.activeClass} shadow-xl scale-105`
+                              : 'bg-white border-slate-100 hover:border-slate-200 text-slate-400'
                           )}
                         >
                           <div
                             className={cn(
-                              'absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all duration-300',
-                              isTaxEnabled && 'translate-x-5'
-                            )}
-                          />
-                        </button>
-                      </div>
-                      <span
-                        className={cn(
-                          'font-black text-lg transition-all',
-                          isTaxEnabled ? 'text-slate-800' : 'text-slate-300'
-                        )}
-                      >
-                        {isTaxEnabled ? `+${formatCurrency(totalCalculations.taxAmount)}` : '0đ'}
-                      </span>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-100 space-y-3 min-h-[112px]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-                          Tổng cần thanh toán
-                        </span>
-                        <span className="font-black text-rose-600 text-xl">
-                          {formatCurrency(totalCalculations.totalToCollect)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-                          Khách thực trả
-                        </span>
-                        <div className="relative w-40">
-                          <NumericInput
-                            value={actualPaid}
-                            onChange={setActualPaid}
-                            className="w-full bg-indigo-50/50 border-indigo-100 rounded-xl px-3 h-10 text-right font-black text-indigo-600 text-lg focus:ring-2 focus:ring-indigo-500/20"
-                          />
-                        </div>
-                      </div>
-
-                      <AnimatePresence mode="wait">
-                        {actualPaid !== totalCalculations.totalToCollect && (
-                          <motion.div
-                            key="settlement-diff"
-                            initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                            animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
-                            exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                            className={cn(
-                              'flex justify-between items-center p-3 rounded-2xl transition-all overflow-hidden',
-                              actualPaid > totalCalculations.totalToCollect
-                                ? 'bg-emerald-50'
-                                : 'bg-rose-50'
+                              'w-10 h-10 rounded-2xl flex items-center justify-center transition-all',
+                              paymentMethod === method.id
+                                ? `${method.iconClass} text-white shadow-lg shadow-${method.color}-200`
+                                : 'bg-slate-50 text-slate-300 group-hover:bg-slate-100'
                             )}
                           >
-                            <span
-                              className={cn(
-                                'font-bold uppercase tracking-widest text-[10px]',
-                                actualPaid > totalCalculations.totalToCollect
-                                  ? 'text-emerald-600'
-                                  : 'text-rose-600'
-                              )}
-                            >
-                              {actualPaid > totalCalculations.totalToCollect
-                                ? 'Tiền thối lại'
-                                : 'Ghi nợ mới'}
-                            </span>
-                            <span
-                              className={cn(
-                                'font-black text-lg',
-                                actualPaid > totalCalculations.totalToCollect
-                                  ? 'text-emerald-700'
-                                  : 'text-rose-700'
-                              )}
-                            >
-                              {formatCurrency(
-                                Math.abs(actualPaid - totalCalculations.totalToCollect)
-                              )}
-                            </span>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                            <method.icon size={20} />
+                          </div>
+                          <span
+                            className={cn(
+                              'text-[9px] font-black uppercase tracking-wider',
+                              paymentMethod === method.id ? method.textClass : 'text-slate-400'
+                            )}
+                          >
+                            {method.label}
+                          </span>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </div>
 
-                {/* Payment Methods */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-2">
-                    <CreditCard size={12} className="text-slate-400" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Phương thức thanh toán
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      {
-                        id: 'cash',
-                        label: 'Tiền mặt',
-                        icon: Wallet,
-                        color: 'amber',
-                        activeClass: 'bg-amber-50 border-amber-200 shadow-amber-100',
-                        iconClass: 'bg-amber-500',
-                        textClass: 'text-amber-600',
-                      },
-                      {
-                        id: 'transfer',
-                        label: 'Chuyển khoản',
-                        icon: Landmark,
-                        color: 'blue',
-                        activeClass: 'bg-blue-50 border-blue-200 shadow-blue-100',
-                        iconClass: 'bg-blue-500',
-                        textClass: 'text-blue-600',
-                      },
-                      {
-                        id: 'card',
-                        label: 'Thẻ / POS',
-                        icon: CreditCard,
-                        color: 'indigo',
-                        activeClass: 'bg-indigo-50 border-indigo-200 shadow-indigo-100',
-                        iconClass: 'bg-indigo-500',
-                        textClass: 'text-indigo-600',
-                      },
-                    ].map((method) => (
-                      <button
-                        key={method.id}
-                        onClick={() => setPaymentMethod(method.id as any)}
-                        className={cn(
-                          'group relative flex flex-col items-center gap-2 p-4 rounded-[2rem] transition-all border-2',
-                          paymentMethod === method.id
-                            ? `${method.activeClass} shadow-xl scale-105`
-                            : 'bg-white border-slate-100 hover:border-slate-200 text-slate-400'
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            'w-10 h-10 rounded-2xl flex items-center justify-center transition-all',
-                            paymentMethod === method.id
-                              ? `${method.iconClass} text-white shadow-lg shadow-${method.color}-200`
-                              : 'bg-slate-50 text-slate-300 group-hover:bg-slate-100'
-                          )}
-                        >
-                          <method.icon size={20} />
-                        </div>
-                        <span
-                          className={cn(
-                            'text-[9px] font-black uppercase tracking-wider',
-                            paymentMethod === method.id ? method.textClass : 'text-slate-400'
-                          )}
-                        >
-                          {method.label}
-                        </span>
-                      </button>
-                    ))}
+                  {/* Note Section - Moved to Bottom */}
+                  <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2">
+                      <MessageSquare size={14} /> Ghi chú trả phòng
+                    </label>
+                    <input
+                      type="text"
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Thêm ghi chú nếu cần..."
+                      className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 placeholder:text-slate-300"
+                    />
                   </div>
                 </div>
+              </main>
 
-                {/* Note Section - Moved to Bottom */}
-                <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2">
-                    <MessageSquare size={14} /> Ghi chú trả phòng
-                  </label>
-                  <input
-                    type="text"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Thêm ghi chú nếu cần..."
-                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 placeholder:text-slate-300"
-                  />
-                </div>
-              </div>
-            </main>
+              {/* Footer */}
+              <footer className="sticky bottom-0 bg-white border-t border-slate-100 p-6 z-30 flex gap-4 shrink-0">
+                <button
+                  onClick={handleConfirm}
+                  disabled={isProcessing}
+                  className={cn(
+                    'flex-1 h-16 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                >
+                  {isProcessing ? (
+                    <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={24} className="text-emerald-400" />
+                  )}
+                  <span>{isProcessing ? 'Đang xử lý...' : 'Hoàn tất trả phòng'}</span>
+                  {!isProcessing && (
+                    <ArrowRight
+                      size={20}
+                      className="opacity-40 group-hover:translate-x-1 transition-transform"
+                    />
+                  )}
+                </button>
+              </footer>
 
-            {/* Footer */}
-            <footer className="sticky bottom-0 bg-white border-t border-slate-100 p-6 z-30 flex gap-4 shrink-0">
-              <button
-                onClick={handleConfirm}
-                disabled={isProcessing}
-                className={cn(
-                  'flex-1 h-16 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed'
-                )}
-              >
-                {isProcessing ? (
-                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <CheckCircle2 size={24} className="text-emerald-400" />
-                )}
-                <span>{isProcessing ? 'Đang xử lý...' : 'Hoàn tất trả phòng'}</span>
-                {!isProcessing && (
-                  <ArrowRight
-                    size={20}
-                    className="opacity-40 group-hover:translate-x-1 transition-transform"
-                  />
-                )}
-              </button>
-            </footer>
-
-            {/* Admin Bar - Optional overlay at bottom */}
-            {isAdmin && pricingBreakdown && (
-              <div className="bg-amber-900 text-amber-100 px-4 py-1.5 flex justify-between items-center text-[10px] font-bold tracking-tight">
-                <span className="flex items-center gap-1.5">
-                  <AlertTriangle size={10} /> ĐỐI SOÁT AI:
-                </span>
-                <div className="flex gap-4">
-                  <span>Gợi ý: {formatCurrency(pricingBreakdown.total_amount)}</span>
-                  <span>
-                    Chênh lệch:{' '}
-                    {formatCurrency(
-                      totalCalculations.totalToCollect - pricingBreakdown.total_amount
-                    )}
+              {/* Admin Bar - Optional overlay at bottom */}
+              {isAdmin && pricingBreakdown && (
+                <div className="bg-amber-900 text-amber-100 px-4 py-1.5 flex justify-between items-center text-[10px] font-bold tracking-tight">
+                  <span className="flex items-center gap-1.5">
+                    <AlertTriangle size={10} /> ĐỐI SOÁT AI:
                   </span>
+                  <div className="flex gap-4">
+                    <span>Gợi ý: {formatCurrency(pricingBreakdown.total_amount)}</span>
+                    <span>
+                      Chênh lệch:{' '}
+                      {formatCurrency(
+                        totalCalculations.totalToCollect - pricingBreakdown.total_amount
+                      )}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </motion.div>
-        </div>
-      )}
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <ConfirmDialog
         isOpen={showDebtConfirm}
@@ -632,6 +637,6 @@ export default function CheckoutModal({
         }}
         onCancel={() => setShowDebtConfirm(false)}
       />
-    </AnimatePresence>
+    </>
   );
 }
