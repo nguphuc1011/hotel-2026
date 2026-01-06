@@ -20,19 +20,29 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notification, setNotification] = useState<Notification | null>(null);
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const hideNotification = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setNotification(null);
   }, []);
 
   const showNotification = useCallback((message: string, type: NotificationType = 'success') => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
     const id = Math.random().toString(36).substring(2, 9);
     setNotification({ id, message, type });
 
     // Tự động ẩn sau 4 giây
-    setTimeout(() => {
-      setNotification(current => current?.id === id ? null : current);
+    timeoutRef.current = setTimeout(() => {
+      setNotification((current) => (current?.id === id ? null : current));
     }, 4000);
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, []);
 
   return (
@@ -47,10 +57,10 @@ export function useNotification() {
   if (context === undefined) {
     // Return a dummy context for server-side rendering to avoid ReferenceError
     if (typeof window === 'undefined') {
-      return { 
-        notification: null, 
-        showNotification: () => {}, 
-        hideNotification: () => {} 
+      return {
+        notification: null,
+        showNotification: () => {},
+        hideNotification: () => {},
       };
     }
     throw new Error('useNotification must be used within a NotificationProvider');

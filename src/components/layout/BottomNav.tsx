@@ -3,14 +3,45 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutGrid, Settings, BarChart3, WalletCards, Users, Package, BrainCircuit } from 'lucide-react';
+import { LayoutGrid, Settings, BarChart3, WalletCards, Users, Package } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { profile, loading, isAdmin } = useAuth();
-  
-  if (loading) return null;
+  const { profile, loading, isAdmin, authError } = useAuth();
+
+  // Không hiện Nav ở trang login
+  if (pathname === '/login') return null;
+
+  // Nếu đang load và chưa có lỗi, tạm thời chưa hiện gì hoặc hiện loading nhẹ
+  if (loading && !authError) return null;
+
+  // Nếu có lỗi Auth (kẹt quá 10s), hiện thông báo yêu cầu đăng nhập lại
+  if (authError) {
+    return (
+      <nav className="fixed bottom-0 left-0 right-0 z-[101] bg-rose-50 border-t border-rose-200 p-4 pb-safe flex items-center justify-between shadow-lg animate-in slide-in-from-bottom duration-300">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 animate-pulse">
+            <LayoutGrid className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-rose-900 uppercase tracking-tight">
+              Kết nối bị kẹt
+            </p>
+            <p className="text-[10px] text-rose-600 font-medium">
+              Vui lòng đăng nhập lại để làm mới session
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/login"
+          className="bg-rose-600 text-white text-[10px] font-black px-4 py-2 rounded-lg shadow-sm active:scale-95 transition-transform"
+        >
+          ĐĂNG NHẬP LẠI
+        </Link>
+      </nav>
+    );
+  }
 
   const isManager = profile?.role === 'manager';
 
@@ -25,7 +56,7 @@ export function BottomNav() {
       // 5 items for admin/manager: Reports, Finance, SƠ ĐỒ (Center), Inventory, Settings
       return [reports, finance, common, inventory, settings];
     }
-    
+
     // Default staff: 3 items: Finance, SƠ ĐỒ (Center), Customers
     const customers = { href: '/customers', label: 'KHÁCH', icon: Users };
     return [finance, common, customers];

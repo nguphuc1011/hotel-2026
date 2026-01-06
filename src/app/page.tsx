@@ -14,16 +14,18 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HotelService } from '@/services/hotel';
-import { ShoppingCart, Plus } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { QuickSaleModal } from '@/components/dashboard/QuickSaleModal';
 
-import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Check, AlertTriangle } from 'lucide-react';
+import { Check, AlertTriangle, RefreshCw, LogIn } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import Link from 'next/link';
 
 export default function Dashboard() {
   const { rooms, settings, services, isLoading, mutateRooms } = useHotel();
   const { showNotification } = useNotification();
+  const { authError, loading: authLoading } = useAuth();
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [folioRoomId, setFolioRoomId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -189,7 +191,7 @@ export default function Dashboard() {
         amount,
         paymentMethod,
         surcharge,
-        actualPaid
+        actualPaid,
       });
 
       // 1. Lấy ghi chú hiện tại để nối thêm audit info
@@ -200,7 +202,8 @@ export default function Dashboard() {
         .single();
 
       // 3. Gọi RPC xử lý thanh toán thông qua HotelService (Atomic)
-      const normalizedPaymentMethod = paymentMethod === 'transfer' ? 'BANK_TRANSFER' : (paymentMethod || 'CASH').toUpperCase();
+      const normalizedPaymentMethod =
+        paymentMethod === 'transfer' ? 'BANK_TRANSFER' : (paymentMethod || 'CASH').toUpperCase();
 
       const result = await HotelService.checkOut({
         bookingId,
@@ -210,7 +213,7 @@ export default function Dashboard() {
         surcharge: Number(surcharge) || 0,
         amountPaid: actualPaid !== undefined ? Number(actualPaid) : Number(amount),
         notes: currentBooking?.notes || '',
-        auditNote: auditNote
+        auditNote: auditNote,
       });
 
       // eslint-disable-next-line no-console
@@ -219,25 +222,28 @@ export default function Dashboard() {
       // 4. Reset state, refresh data, and show notification
       setFolioRoomId(null);
       await mutateRooms();
-      
+
       const newBalance = result.new_balance;
-      
+
       // Hiển thị thông báo dựa trên số dư mới nhất từ Database
       if (newBalance < 0) {
-        toast.warning(`Đã trả phòng ${folioRoom.room_number}. Tổng dư nợ khách hàng: ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.abs(newBalance))}`, {
-          description: "Số dư đã được cập nhật từ Database",
-          duration: 6000,
-          icon: <AlertTriangle className="text-rose-500" />
-        });
+        toast.warning(
+          `Đã trả phòng ${folioRoom.room_number}. Tổng dư nợ khách hàng: ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.abs(newBalance))}`,
+          {
+            description: 'Số dư đã được cập nhật từ Database',
+            duration: 6000,
+            icon: <AlertTriangle className="text-rose-500" />,
+          }
+        );
       } else {
         toast.success(`Trả phòng ${folioRoom.room_number} thành công!`, {
           icon: <Check className="text-emerald-500" />,
-          duration: 4000
+          duration: 4000,
         });
       }
 
       // 5. Gửi thông báo hệ thống (Mắt Thần)
-      HotelService.notifySystemChange('check_out', folioRoom.id).catch(console.error);
+      HotelService.notifySystemChange('check_out', folioRoom.id).catch(() => {});
     } catch (error: any) {
       // eslint-disable-next-line no-console
       console.error('Lỗi trong quá trình thanh toán:', error);
@@ -335,9 +341,10 @@ export default function Dashboard() {
       inputRequired: true,
       onConfirm: async (reason) => {
         if (isProcessing) return;
-        
+
         const safetyTimeout = setTimeout(() => {
           setIsProcessing(false);
+          // eslint-disable-next-line no-console
           console.warn('Cancel safety timeout triggered');
         }, 10000);
 
@@ -410,18 +417,21 @@ export default function Dashboard() {
   };
 
   const handleCheckIn = async (data: CheckInData) => {
+    // eslint-disable-next-line no-console
     console.log('page.tsx: handleCheckIn called with data:', data);
     if (isProcessing) return;
 
     // Safety timeout: Tự động mở khóa sau 10 giây nếu kẹt
     const safetyTimeout = setTimeout(() => {
       setIsProcessing(false);
+      // eslint-disable-next-line no-console
       console.warn('Check-in safety timeout triggered');
     }, 10000);
 
     setIsProcessing(true);
     try {
       if (!selectedRoom) {
+        // eslint-disable-next-line no-console
         console.warn('page.tsx: handleCheckIn aborted because selectedRoom is null');
         return;
       }
@@ -441,10 +451,10 @@ export default function Dashboard() {
         deposit: data.deposit,
         depositMethod: data.depositMethod,
         notes: data.notes,
-        services: data.services.map(s => ({
+        services: data.services.map((s) => ({
           service_id: s.service_id || s.id,
           quantity: s.quantity,
-          price: s.price
+          price: s.price,
         })),
         allServices: services,
       });
@@ -456,7 +466,7 @@ export default function Dashboard() {
           .select('*')
           .eq('id', booking.customer_id)
           .single();
-        
+
         const { data: customerBookings } = await supabase
           .from('bookings')
           .select('*, rooms(room_number)')
@@ -473,15 +483,16 @@ export default function Dashboard() {
       // 3. Kết thúc quy trình
       setSelectedRoomId(null);
       await mutateRooms();
-      
+
       toast.success(`Nhận phòng ${selectedRoom.room_number} thành công!`, {
         icon: <Check className="text-emerald-500" />,
-        duration: 4000
+        duration: 4000,
       });
 
       // 4. Thông báo hệ thống
-      HotelService.notifySystemChange('check_in', selectedRoom.id).catch(console.error);
+      HotelService.notifySystemChange('check_in', selectedRoom.id).catch(() => {});
     } catch (error: any) {
+      // eslint-disable-next-line no-console
       console.error('Lỗi Check-in:', error);
       showNotification(`Lỗi khi nhận phòng: ${error.message || 'Lỗi không xác định'}`, 'error');
     } finally {
@@ -495,7 +506,10 @@ export default function Dashboard() {
       const { data, error } = await supabase.rpc('night_audit', { p_audit_date: today });
       if (error) throw error;
       await mutateRooms();
-      showNotification(`Đã chốt doanh thu ngày ${today}: ${data?.charges_created || 0} phòng`, 'success');
+      showNotification(
+        `Đã chốt doanh thu ngày ${today}: ${data?.charges_created || 0} phòng`,
+        'success'
+      );
     } catch (err: any) {
       showNotification(`Lỗi Night Audit: ${err.message}`, 'error');
     }
@@ -557,20 +571,53 @@ export default function Dashboard() {
     }
   };
 
-  if (isLoading) {
+  if (authError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center">
+        <div className="w-20 h-20 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-6 animate-bounce">
+          <AlertTriangle className="w-10 h-10" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight">
+          Hệ thống bị treo
+        </h2>
+        <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+          Phát hiện kết nối xác thực với Server bị kẹt quá 10 giây. Để đảm bảo an toàn, vui lòng
+          đăng nhập lại.
+        </p>
+        <div className="flex flex-col w-full gap-3">
+          <Link
+            href="/login"
+            className="flex items-center justify-center gap-2 bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-200 active:scale-95 transition-transform"
+          >
+            <LogIn className="w-5 h-5" />
+            ĐĂNG NHẬP LẠI NGAY
+          </Link>
+          <button
+            onClick={() => window.location.reload()}
+            className="flex items-center justify-center gap-2 bg-white text-slate-600 font-bold py-4 rounded-2xl border border-slate-200 active:scale-95 transition-transform"
+          >
+            <RefreshCw className="w-4 h-4" />
+            THỬ TẢI LẠI TRANG
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (authLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-white/80 backdrop-blur-sm fixed inset-0 z-[200]">
         <div className="flex flex-col items-center gap-4">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent shadow-lg" />
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">
-            Đang tải dữ liệu...
+            Đang xác thực...
           </p>
         </div>
       </div>
     );
   }
 
-  // Empty State with Seed Button
+  // Empty State with Seed Button (Only show if not loading and truly empty)
   if (!isLoading && rooms.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center space-y-4">
@@ -612,17 +659,34 @@ export default function Dashboard() {
         className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4 pt-0"
       >
         <AnimatePresence mode="popLayout">
-          {filteredRooms.map((room) => (
-            <motion.div
-              layout
-              key={`${room.id}-${room.status}`}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-            >
-              <RoomCard room={room} settings={settings} onClick={handleRoomClick} />
-            </motion.div>
-          ))}
+          {isLoading && rooms.length === 0
+            ? // Skeletons khi tải lần đầu
+              Array.from({ length: 12 }).map((_, i) => (
+                <motion.div
+                  key={`skeleton-${i}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="aspect-[4/5] rounded-[2.5rem] bg-slate-50 border-2 border-slate-100 animate-pulse flex flex-col p-6 gap-4"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-slate-200" />
+                  <div className="space-y-2 mt-auto">
+                    <div className="w-1/2 h-4 bg-slate-200 rounded" />
+                    <div className="w-3/4 h-3 bg-slate-100 rounded" />
+                  </div>
+                </motion.div>
+              ))
+            : filteredRooms.map((room) => (
+                <motion.div
+                  layout
+                  key={room.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                >
+                  <RoomCard room={room} settings={settings} onClick={handleRoomClick} />
+                </motion.div>
+              ))}
         </AnimatePresence>
       </motion.div>
       <CheckInModal
@@ -667,7 +731,6 @@ export default function Dashboard() {
         onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
         isProcessing={isProcessing}
       />
-
       {/* Floating Action Button for Quick Sale */}
       <div className="fixed bottom-32 right-8 z-[90]">
         <button
@@ -680,7 +743,6 @@ export default function Dashboard() {
           </span>
         </button>
       </div>
-
       <QuickSaleModal
         isOpen={isQuickSaleOpen}
         onClose={() => setIsQuickSaleOpen(false)}

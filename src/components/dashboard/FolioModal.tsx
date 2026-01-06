@@ -30,7 +30,7 @@ import {
   Wine,
   Layers,
   DoorOpen,
-  X
+  X,
 } from 'lucide-react';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Room, Service, Setting } from '@/types';
@@ -152,7 +152,6 @@ export default function FolioModal({
   const [customerBalance, setCustomerBalance] = useState<number | null>(null);
   const [debtHistory, setDebtHistory] = useState<any[]>([]);
   const [printingReceipt, setPrintingReceipt] = useState<any | null>(null);
-  const [ledgerChannel, setLedgerChannel] = useState<any | null>(null);
 
   const { showNotification } = useNotification();
   const { profile } = useAuth();
@@ -186,10 +185,11 @@ export default function FolioModal({
   useEffect(() => {
     if (isOpen && room?.current_booking?.customer_id) {
       setTempServices(savedServices);
-      
+
+      const cid = room.current_booking.customer_id;
+
       // Fetch customer balance and debt history
       const fetchCustomerData = async () => {
-        const cid = room.current_booking!.customer_id;
         const { data: custData } = await supabase
           .from('customers')
           .select('balance')
@@ -205,24 +205,33 @@ export default function FolioModal({
           .limit(5);
         setDebtHistory(transData || []);
       };
+
       fetchCustomerData();
 
       // Realtime: subscribe ledger changes for this customer
       const ch = supabase
-        .channel(`ledger_folio_${room.current_booking.customer_id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger', filter: `customer_id=eq.${room.current_booking.customer_id}` }, fetchCustomerData)
+        .channel(`ledger_folio_${cid}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'ledger',
+            filter: `customer_id=eq.${cid}`,
+          },
+          fetchCustomerData
+        )
         .subscribe();
-      setLedgerChannel(ch);
+
+      return () => {
+        supabase.removeChannel(ch);
+      };
     } else {
       setTempServices({});
       setSearchQuery('');
       setIsHeroCardExpanded(false);
       setCustomerBalance(null);
       setDebtHistory([]);
-      if (ledgerChannel) {
-        supabase.removeChannel(ledgerChannel);
-        setLedgerChannel(null);
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, room?.current_booking?.customer_id]); // Re-run when customer changes
@@ -307,7 +316,7 @@ export default function FolioModal({
   }, [customerBalance, room?.current_booking?.customer?.balance]);
 
   const { isDebt, absFormattedBalance } = useCustomerBalance(customerBalanceToDisplay);
-  const hasDebtWarning = isDebt;
+  const _hasDebtWarning = isDebt;
 
   const handleQuantityChange = (serviceId: string | number, newQuantity: number) => {
     const sid = String(serviceId);
@@ -447,7 +456,7 @@ export default function FolioModal({
         p_booking_id: room.current_booking.id,
         p_amount: amount,
         p_method: 'CASH', // Default to cash for now
-        p_notes: `Thu thêm tiền cọc tại Folio phòng ${room.room_number}`
+        p_notes: `Thu thêm tiền cọc tại Folio phòng ${room.room_number}`,
       });
 
       if (error) throw error;
@@ -462,18 +471,27 @@ export default function FolioModal({
     }
   };
 
-  const openDebtModal = async () => {
+  const _openDebtModal = async () => {
     if (!room?.current_booking?.customer_id) {
       showNotification('Khách vãng lai không thể thu nợ', 'error');
       return;
     }
     // Refresh data before opening
     const cid = room.current_booking.customer_id;
-    const { data: custData } = await supabase.from('customers').select('balance').eq('id', cid).single();
+    const { data: custData } = await supabase
+      .from('customers')
+      .select('balance')
+      .eq('id', cid)
+      .single();
     const bal = Number(custData?.balance || 0);
     setCustomerBalance(bal);
-    
-    const { data: transData } = await supabase.from('ledger').select('*').eq('customer_id', cid).order('created_at', { ascending: false }).limit(5);
+
+    const { data: transData } = await supabase
+      .from('ledger')
+      .select('*')
+      .eq('customer_id', cid)
+      .order('created_at', { ascending: false })
+      .limit(5);
     setDebtHistory(transData || []);
 
     const defaultAmount = bal < 0 ? Math.abs(bal) : 0;
@@ -511,28 +529,37 @@ export default function FolioModal({
       const methodMap: Record<string, string> = {
         cash: 'CASH',
         bank_transfer: 'BANK_TRANSFER',
-        card: 'CARD'
+        card: 'CARD',
       };
-      
+
       const rpc = await HotelService.payDebt({
         customerId: room.current_booking.customer_id,
         amount: amount,
         method: methodMap[debtMethod] || 'CASH',
         note: debtNote || '',
-        bookingId: room.current_booking.id
+        bookingId: room.current_booking.id,
       });
       if (rpc?.success === false) {
         throw new Error(rpc?.message || 'Thu nợ thất bại');
       }
-      
+
       showNotification(`Đã thu nợ ${formatCurrency(amount)}`, 'success');
-      
+
       // Update local data immediately
       const cid = room.current_booking.customer_id;
-      const { data: custData } = await supabase.from('customers').select('balance').eq('id', cid).single();
+      const { data: custData } = await supabase
+        .from('customers')
+        .select('balance')
+        .eq('id', cid)
+        .single();
       setCustomerBalance(Number(custData?.balance || 0));
 
-      const { data: transData } = await supabase.from('ledger').select('*').eq('customer_id', cid).order('created_at', { ascending: false }).limit(5);
+      const { data: transData } = await supabase
+        .from('ledger')
+        .select('*')
+        .eq('customer_id', cid)
+        .order('created_at', { ascending: false })
+        .limit(5);
       setDebtHistory(transData || []);
 
       setShowDebtModal(true); // Keep modal open to show history or close it? User said "Thao tác phải diễn ra trên 1 màn hình duy nhất"
@@ -543,9 +570,15 @@ export default function FolioModal({
     } catch (error: any) {
       // Revert optimistic if failed
       const cid = room.current_booking.customer_id;
-      const { data: custData } = await supabase.from('customers').select('balance').eq('id', cid).single();
+      const { data: custData } = await supabase
+        .from('customers')
+        .select('balance')
+        .eq('id', cid)
+        .single();
       setCustomerBalance(Number(custData?.balance || customerBalanceToDisplay));
-      setDebtHistory((hist) => hist.filter((h) => !(typeof h.id === 'string' && h.id.startsWith('optimistic-'))));
+      setDebtHistory((hist) =>
+        hist.filter((h) => !(typeof h.id === 'string' && h.id.startsWith('optimistic-')))
+      );
       showNotification(`Lỗi thu nợ: ${error.message}`, 'error');
     } finally {
       setIsDebtSaving(false);
@@ -788,9 +821,10 @@ export default function FolioModal({
 
     const mergedTotal =
       room?.current_booking?.merged_bookings?.reduce((sum, mb) => sum + mb.amount, 0) || 0;
-    
+
     // balance < 0: Nợ, balance > 0: Dư
-    const baseAmount = roomAndSurcharges + serviceTotals.saved + mergedTotal - deposit - customerBalanceToDisplay;
+    const baseAmount =
+      roomAndSurcharges + serviceTotals.saved + mergedTotal - deposit - customerBalanceToDisplay;
 
     return {
       base: baseAmount,
@@ -900,24 +934,28 @@ export default function FolioModal({
                 </div>
 
                 {customerBalanceToDisplay !== 0 && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={cn(
-                      "mb-4 rounded-3xl p-4 flex items-center gap-4 shadow-lg border",
-                      isDebt ? "bg-rose-600 border-rose-500 text-white" : "bg-emerald-600 border-emerald-500 text-white"
+                      'mb-4 rounded-3xl p-4 flex items-center gap-4 shadow-lg border',
+                      isDebt
+                        ? 'bg-rose-600 border-rose-500 text-white'
+                        : 'bg-emerald-600 border-emerald-500 text-white'
                     )}
                   >
                     <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      {isDebt ? <AlertTriangle size={20} className="text-white animate-pulse" /> : <DollarSign size={20} className="text-white" />}
+                      {isDebt ? (
+                        <AlertTriangle size={20} className="text-white animate-pulse" />
+                      ) : (
+                        <DollarSign size={20} className="text-white" />
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-black uppercase tracking-widest leading-none">
                         {isDebt ? 'Nợ cũ' : 'Tiền dư'}
                       </p>
-                      <p className="text-lg font-black tracking-tight">
-                        {absFormattedBalance}
-                      </p>
+                      <p className="text-lg font-black tracking-tight">{absFormattedBalance}</p>
                     </div>
                   </motion.div>
                 )}
@@ -1013,8 +1051,16 @@ export default function FolioModal({
                               <span className="font-bold text-indigo-200">
                                 {customerBalanceToDisplay < 0 ? 'Nợ cũ' : 'Tiền dư'}
                               </span>
-                              <span className={cn("font-bold", customerBalanceToDisplay < 0 ? "text-rose-300" : "text-emerald-300")}>
-                                {customerBalanceToDisplay < 0 ? '+' : ''}{formatCurrency(Math.abs(customerBalanceToDisplay))}
+                              <span
+                                className={cn(
+                                  'font-bold',
+                                  customerBalanceToDisplay < 0
+                                    ? 'text-rose-300'
+                                    : 'text-emerald-300'
+                                )}
+                              >
+                                {customerBalanceToDisplay < 0 ? '+' : ''}
+                                {formatCurrency(Math.abs(customerBalanceToDisplay))}
                               </span>
                             </div>
                           )}
@@ -1110,7 +1156,7 @@ export default function FolioModal({
                           handleQuantityChange(
                             service.id,
                             Math.max(0, (tempServices[String(service.id)] || 0) - 1)
-                          )
+                          );
                         }}
                         className="relative flex-shrink-0 w-28 text-center bg-white p-4 rounded-[2rem] shadow-sm cursor-pointer hover:bg-slate-50 transition-colors border border-slate-100"
                       >
@@ -1140,14 +1186,18 @@ export default function FolioModal({
                       <div className="w-5 h-5 rounded-lg bg-slate-200 flex items-center justify-center text-slate-500">
                         <Plus size={10} strokeWidth={3} />
                       </div>
-                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Chạm để thêm</span>
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                        Chạm để thêm
+                      </span>
                     </div>
                     <div className="w-1 h-1 rounded-full bg-slate-300" />
                     <div className="flex items-center gap-2">
                       <div className="w-5 h-5 rounded-lg bg-slate-200 flex items-center justify-center text-slate-500">
                         <Trash2 size={10} strokeWidth={3} />
                       </div>
-                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Giữ để bớt</span>
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                        Giữ để bớt
+                      </span>
                     </div>
                   </div>
 
@@ -1299,7 +1349,6 @@ export default function FolioModal({
                     ))}
                 </div>
               </main>
-
 
               {/* Footer */}
               <footer className="sticky bottom-0 bg-white border-t border-slate-200 p-4 z-10">
@@ -1466,7 +1515,9 @@ export default function FolioModal({
                         onClick={() => setDebtMethod('cash')}
                         className={cn(
                           'py-2 rounded-xl font-bold text-sm',
-                          debtMethod === 'cash' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                          debtMethod === 'cash'
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-white text-slate-700 border border-slate-200'
                         )}
                       >
                         Tiền mặt
@@ -1475,7 +1526,9 @@ export default function FolioModal({
                         onClick={() => setDebtMethod('bank_transfer')}
                         className={cn(
                           'py-2 rounded-xl font-bold text-sm',
-                          debtMethod === 'bank_transfer' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                          debtMethod === 'bank_transfer'
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-white text-slate-700 border border-slate-200'
                         )}
                       >
                         Chuyển khoản
@@ -1484,7 +1537,9 @@ export default function FolioModal({
                         onClick={() => setDebtMethod('card')}
                         className={cn(
                           'py-2 rounded-xl font-bold text-sm',
-                          debtMethod === 'card' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                          debtMethod === 'card'
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-white text-slate-700 border border-slate-200'
                         )}
                       >
                         Thẻ
@@ -1517,20 +1572,29 @@ export default function FolioModal({
                       </p>
                       <div className="space-y-2">
                         {debtHistory.map((trans) => (
-                          <div key={trans.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                          <div
+                            key={trans.id}
+                            className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"
+                          >
                             <div>
-                               <p className="text-xs font-bold text-slate-700">{formatCurrency(trans.amount)}</p>
-                               <p className="text-[10px] text-slate-400">{format(new Date(trans.created_at), 'HH:mm dd/MM/yyyy')}</p>
+                              <p className="text-xs font-bold text-slate-700">
+                                {formatCurrency(trans.amount)}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                {format(new Date(trans.created_at), 'HH:mm dd/MM/yyyy')}
+                              </p>
                             </div>
                             <div className="flex items-center gap-2">
-                               <span className="text-[10px] font-bold text-slate-500 uppercase">{trans.method}</span>
-                               <button 
-                                  onClick={() => setPrintingReceipt(trans)} 
-                                  className="p-1.5 hover:bg-slate-200 rounded-full text-slate-500"
-                                  title="In biên lai"
-                               >
-                                  <Printer size={14} />
-                               </button>
+                              <span className="text-[10px] font-bold text-slate-500 uppercase">
+                                {trans.method}
+                              </span>
+                              <button
+                                onClick={() => setPrintingReceipt(trans)}
+                                className="p-1.5 hover:bg-slate-200 rounded-full text-slate-500"
+                                title="In biên lai"
+                              >
+                                <Printer size={14} />
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -1599,25 +1663,25 @@ export default function FolioModal({
           {/* Hidden Printable Area */}
           <div className="hidden print:block fixed inset-0 bg-white z-[99999]">
             {printingReceipt ? (
-            <PrintableDebtReceipt 
-              customerName={room.current_booking.customer?.full_name || 'Khách hàng'}
-              amount={printingReceipt.amount}
-              paymentMethod={printingReceipt.method}
-              note={printingReceipt.notes}
-              transactionId={printingReceipt.id}
-              transactionDate={printingReceipt.created_at}
-              cashierName={printingReceipt.cashier}
-            />
-          ) : (
-            <PrintableInvoice
-              room={room}
-              booking={room.current_booking}
-              services={room.current_booking.services_used}
-              pricing={pricingBreakdown}
-              totalServiceCost={serviceTotals.temp}
-              totalAmount={finalAmount}
-            />
-          )}
+              <PrintableDebtReceipt
+                customerName={room.current_booking.customer?.full_name || 'Khách hàng'}
+                amount={printingReceipt.amount}
+                paymentMethod={printingReceipt.method}
+                note={printingReceipt.notes}
+                transactionId={printingReceipt.id}
+                transactionDate={printingReceipt.created_at}
+                cashierName={printingReceipt.cashier}
+              />
+            ) : (
+              <PrintableInvoice
+                room={room}
+                booking={room.current_booking}
+                services={room.current_booking.services_used}
+                pricing={pricingBreakdown}
+                totalServiceCost={serviceTotals.temp}
+                totalAmount={finalAmount}
+              />
+            )}
           </div>
         </>
       )}

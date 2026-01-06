@@ -1,8 +1,18 @@
 'use client';
 
-import { useState } from 'react';
 import { Service } from '@/types';
-import { Plus, Trash2, Coffee, Beer, Wine, Cigarette, UtensilsCrossed, Car, Shirt, Briefcase } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Coffee,
+  Beer,
+  Wine,
+  Cigarette,
+  UtensilsCrossed,
+  Car,
+  Shirt,
+  Briefcase,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -13,36 +23,26 @@ interface ServiceSelectorProps {
 }
 
 export function ServiceSelector({ services, selectedServices, onChange }: ServiceSelectorProps) {
-  const [isAdding, setIsAdding] = useState(false);
-
   const handleAddService = (service: Service) => {
-    const existing = selectedServices.find(s => s.id === service.id);
+    const existing = selectedServices.find((s) => s.id === service.id);
     if (existing) {
-      onChange(selectedServices.map(s => s.id === service.id ? { ...s, quantity: s.quantity + 1 } : s));
+      onChange(
+        selectedServices.map((s) => (s.id === service.id ? { ...s, quantity: s.quantity + 1 } : s))
+      );
     } else {
       onChange([...selectedServices, { ...service, quantity: 1 }]);
     }
   };
 
-  const handleRemoveService = (serviceId: any) => {
-    onChange(selectedServices.filter(s => s.id !== serviceId));
-  };
-
-  const handleQtyChange = (serviceId: any, quantity: number) => {
-    if (quantity <= 0) {
-      handleRemoveService(serviceId);
-    } else {
-      onChange(selectedServices.map(s => s.id === serviceId ? { ...s, quantity } : s));
-    }
-  };
-
   const handleRemoveOne = (serviceId: any) => {
-    const existing = selectedServices.find(s => s.id === serviceId);
+    const existing = selectedServices.find((s) => s.id === serviceId);
     if (existing) {
       if (existing.quantity > 1) {
-        onChange(selectedServices.map(s => s.id === serviceId ? { ...s, quantity: s.quantity - 1 } : s));
+        onChange(
+          selectedServices.map((s) => (s.id === serviceId ? { ...s, quantity: s.quantity - 1 } : s))
+        );
       } else {
-        onChange(selectedServices.filter(s => s.id !== serviceId));
+        onChange(selectedServices.filter((s) => s.id !== serviceId));
       }
     }
   };
@@ -50,11 +50,16 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
   // Icon mapping for common services
   const getIcon = (name: string) => {
     const lowerName = name.toLowerCase();
-    if (lowerName.includes('nước') || lowerName.includes('suối') || lowerName.includes('water')) return <Coffee size={24} strokeWidth={2.5} />;
-    if (lowerName.includes('bia') || lowerName.includes('tiger') || lowerName.includes('beer')) return <Beer size={24} strokeWidth={2.5} />;
-    if (lowerName.includes('rượu') || lowerName.includes('wine')) return <Wine size={24} strokeWidth={2.5} />;
-    if (lowerName.includes('thuốc lá') || lowerName.includes('cigarette')) return <Cigarette size={24} strokeWidth={2.5} />;
-    if (lowerName.includes('mì') || lowerName.includes('snack') || lowerName.includes('ăn')) return <UtensilsCrossed size={24} strokeWidth={2.5} />;
+    if (lowerName.includes('nước') || lowerName.includes('suối') || lowerName.includes('water'))
+      return <Coffee size={24} strokeWidth={2.5} />;
+    if (lowerName.includes('bia') || lowerName.includes('tiger') || lowerName.includes('beer'))
+      return <Beer size={24} strokeWidth={2.5} />;
+    if (lowerName.includes('rượu') || lowerName.includes('wine'))
+      return <Wine size={24} strokeWidth={2.5} />;
+    if (lowerName.includes('thuốc lá') || lowerName.includes('cigarette'))
+      return <Cigarette size={24} strokeWidth={2.5} />;
+    if (lowerName.includes('mì') || lowerName.includes('snack') || lowerName.includes('ăn'))
+      return <UtensilsCrossed size={24} strokeWidth={2.5} />;
     if (lowerName.includes('xe')) return <Car size={24} strokeWidth={2.5} />;
     if (lowerName.includes('giặt')) return <Shirt size={24} strokeWidth={2.5} />;
     return <Briefcase size={24} strokeWidth={2.5} />;
@@ -63,9 +68,11 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between px-1">
-        <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.2em]">Dịch vụ đi kèm</h3>
+        <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.2em]">
+          Dịch vụ đi kèm
+        </h3>
         {selectedServices.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-2 bg-blue-600 px-3 py-1.5 rounded-full shadow-lg shadow-blue-200"
@@ -74,20 +81,20 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
               {selectedServices.reduce((sum, s) => sum + s.quantity, 0)} món
             </span>
             <span className="text-[11px] font-black text-white">
-              {formatCurrency(selectedServices.reduce((sum, s) => sum + (s.price * s.quantity), 0))}đ
+              {formatCurrency(selectedServices.reduce((sum, s) => sum + s.price * s.quantity, 0))}đ
             </span>
           </motion.div>
         )}
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-10 pt-4 -mx-6 px-6 scrollbar-hide snap-x snap-mandatory">
-        {services.map((service, idx) => {
-          const selected = selectedServices.find(s => s.id === service.id);
+        {services.map((service) => {
+          const selected = selectedServices.find((s) => s.id === service.id);
           const quantity = selected?.quantity || 0;
 
           return (
-            <motion.div 
-              key={service.id || `service-${idx}`} 
+            <motion.div
+              key={service.id}
               className="relative flex-shrink-0 w-[160px] snap-start"
               whileHover={{ y: -8 }}
               whileTap={{ scale: 0.95 }}
@@ -99,10 +106,10 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
                   handleRemoveOne(service.id);
                 }}
                 className={cn(
-                  "w-full flex flex-col items-center text-center gap-4 p-6 rounded-[2.5rem] transition-all duration-500 border-2 relative group",
-                  quantity > 0 
-                    ? "bg-white border-blue-500 shadow-2xl shadow-blue-100/60" 
-                    : "bg-white/40 border-transparent hover:border-zinc-200 hover:bg-white shadow-sm"
+                  'w-full flex flex-col items-center text-center gap-4 p-6 rounded-[2.5rem] transition-all duration-500 border-2 relative group',
+                  quantity > 0
+                    ? 'bg-white border-blue-500 shadow-2xl shadow-blue-100/60'
+                    : 'bg-white/40 border-transparent hover:border-zinc-200 hover:bg-white shadow-sm'
                 )}
               >
                 {/* Glossy Background for Selected */}
@@ -110,26 +117,32 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none rounded-[2.5rem] overflow-hidden" />
                 )}
 
-                <div className={cn(
-                  "p-5 rounded-[1.5rem] transition-all duration-700 shadow-sm",
-                  quantity > 0 
-                    ? "bg-blue-600 text-white rotate-[12deg] scale-110 shadow-lg shadow-blue-200" 
-                    : "bg-zinc-100 text-zinc-400 group-hover:bg-zinc-200 group-hover:text-zinc-600"
-                )}>
+                <div
+                  className={cn(
+                    'p-5 rounded-[1.5rem] transition-all duration-700 shadow-sm',
+                    quantity > 0
+                      ? 'bg-blue-600 text-white rotate-[12deg] scale-110 shadow-lg shadow-blue-200'
+                      : 'bg-zinc-100 text-zinc-400 group-hover:bg-zinc-200 group-hover:text-zinc-600'
+                  )}
+                >
                   {getIcon(service.name)}
                 </div>
 
                 <div className="space-y-1.5 w-full relative z-10">
-                  <p className={cn(
-                    "text-sm font-black transition-colors truncate",
-                    quantity > 0 ? "text-zinc-900" : "text-zinc-500"
-                  )}>
+                  <p
+                    className={cn(
+                      'text-sm font-black transition-colors truncate',
+                      quantity > 0 ? 'text-zinc-900' : 'text-zinc-500'
+                    )}
+                  >
                     {service.name}
                   </p>
-                  <p className={cn(
-                    "text-[11px] font-bold",
-                    quantity > 0 ? "text-blue-600" : "text-zinc-400"
-                  )}>
+                  <p
+                    className={cn(
+                      'text-[11px] font-bold',
+                      quantity > 0 ? 'text-blue-600' : 'text-zinc-400'
+                    )}
+                  >
                     {formatCurrency(service.price)}đ
                   </p>
                 </div>
@@ -154,20 +167,24 @@ export function ServiceSelector({ services, selectedServices, onChange }: Servic
           );
         })}
       </div>
-      
+
       <div className="flex items-center justify-center gap-4 py-2 opacity-40">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-lg bg-zinc-200 flex items-center justify-center text-zinc-500">
             <Plus size={10} strokeWidth={3} />
           </div>
-          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Chạm để thêm</span>
+          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+            Chạm để thêm
+          </span>
         </div>
         <div className="w-1 h-1 rounded-full bg-zinc-300" />
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-lg bg-zinc-200 flex items-center justify-center text-zinc-500">
             <Trash2 size={10} strokeWidth={3} />
           </div>
-          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Giữ để bớt</span>
+          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+            Giữ để bớt
+          </span>
         </div>
       </div>
     </div>

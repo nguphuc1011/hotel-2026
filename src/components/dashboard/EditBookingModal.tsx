@@ -1,11 +1,10 @@
-
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Clock, DollarSign, User, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Booking, Room, Customer } from '@/types';
 import { HotelService } from '@/services/hotel';
@@ -28,7 +27,7 @@ export default function EditBookingModal({
   onClose,
   booking,
   room,
-  onSave
+  onSave,
 }: EditBookingModalProps) {
   const [checkInAt, setCheckInAt] = useState('');
   const [price, setPrice] = useState(0);
@@ -57,7 +56,7 @@ export default function EditBookingModal({
       try {
         const date = booking.check_in_at ? parseISO(booking.check_in_at) : new Date();
         setCheckInAt(format(date, "yyyy-MM-dd'T'HH:mm"));
-      } catch (error) {
+      } catch {
         setCheckInAt(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
       }
       setPrice(booking.initial_price || 0);
@@ -82,7 +81,7 @@ export default function EditBookingModal({
         customer_name: customerName,
       });
       onClose();
-    } catch (error) {
+    } catch {
       // Error handled by parent
     } finally {
       setIsSaving(false);
@@ -108,7 +107,9 @@ export default function EditBookingModal({
               </div>
               <div>
                 <h2 className="text-xl font-black text-slate-900 uppercase">Sửa thông tin</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phòng {room?.room_number}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Phòng {room?.room_number}
+                </p>
               </div>
             </div>
             <button
@@ -123,7 +124,9 @@ export default function EditBookingModal({
           <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
             {/* Customer Name */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Tên khách hàng</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Tên khách hàng
+              </label>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                   <User size={18} />
@@ -131,13 +134,18 @@ export default function EditBookingModal({
                 <input
                   type="text"
                   value={customerName}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                  onFocus={() => {
+                    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+                    setIsFocused(true);
+                  }}
+                  onBlur={() => {
+                    blurTimeoutRef.current = setTimeout(() => setIsFocused(false), 200);
+                  }}
                   onChange={(e) => setCustomerName(e.target.value)}
                   className="w-full pl-12 pr-6 py-4 bg-slate-50 border-none rounded-2xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all"
                   placeholder="Nhập tên khách hàng..."
                 />
-                
+
                 {/* Customer Suggestions */}
                 <AnimatePresence>
                   {searchResults.length > 0 && (
@@ -158,7 +166,9 @@ export default function EditBookingModal({
                             <User size={16} />
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900 text-sm uppercase">{c.full_name}</p>
+                            <p className="font-bold text-slate-900 text-sm uppercase">
+                              {c.full_name}
+                            </p>
                             <p className="text-[10px] font-bold text-slate-400">{c.phone}</p>
                           </div>
                         </button>
@@ -171,7 +181,9 @@ export default function EditBookingModal({
 
             {/* Check-in Time */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Thời gian vào</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Thời gian vào
+              </label>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                   <Clock size={18} />
@@ -187,7 +199,9 @@ export default function EditBookingModal({
 
             {/* Price */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Giá phòng</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Giá phòng
+              </label>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                   <DollarSign size={18} />
@@ -203,15 +217,17 @@ export default function EditBookingModal({
 
             {/* Price Change Type */}
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Áp dụng giá mới</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Áp dụng giá mới
+              </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setPriceChangeType('from_start')}
                   className={cn(
-                    "p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 text-center",
-                    priceChangeType === 'from_start' 
-                      ? "border-blue-500 bg-blue-50 text-blue-700" 
-                      : "border-slate-100 bg-white text-slate-400"
+                    'p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 text-center',
+                    priceChangeType === 'from_start'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-slate-100 bg-white text-slate-400'
                   )}
                 >
                   <span className="font-black text-xs uppercase tracking-tight">Từ lúc vào</span>
@@ -220,14 +236,16 @@ export default function EditBookingModal({
                 <button
                   onClick={() => setPriceChangeType('from_today')}
                   className={cn(
-                    "p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 text-center",
-                    priceChangeType === 'from_today' 
-                      ? "border-blue-500 bg-blue-50 text-blue-700" 
-                      : "border-slate-100 bg-white text-slate-400"
+                    'p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 text-center',
+                    priceChangeType === 'from_today'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-slate-100 bg-white text-slate-400'
                   )}
                 >
                   <span className="font-black text-xs uppercase tracking-tight">Từ hôm nay</span>
-                  <span className="text-[10px] font-bold opacity-60">Tính lại giá từ thời điểm này</span>
+                  <span className="text-[10px] font-bold opacity-60">
+                    Tính lại giá từ thời điểm này
+                  </span>
                 </button>
               </div>
             </div>
