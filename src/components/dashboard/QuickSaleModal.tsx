@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
 import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { HotelService } from '@/services/hotel';
 
 interface QuickSaleModalProps {
   isOpen: boolean;
@@ -85,19 +86,17 @@ export function QuickSaleModal({ isOpen, onClose, services }: QuickSaleModalProp
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Chưa đăng nhập');
 
-      // 1. Ghi nhận doanh thu vào cashflow
-      const { error: cashflowError } = await supabase
-        .from('cashflow')
-        .insert({
-          amount: totalAmount,
-          type: 'income',
-          category: 'Bán lẻ',
-          payment_method: paymentMethod,
-          description: `Bán lẻ tại quầy: ${selectedItems.map(i => `${i.name} (x${i.quantity})`).join(', ')}`,
-          staff_id: user.id
-        });
-
-      if (cashflowError) throw cashflowError;
+      // 1. Ghi nhận doanh thu vào ledger
+      await HotelService.recordLedger({
+        type: 'PAYMENT',
+        category: 'Bán lẻ',
+        amount: totalAmount,
+        paymentMethodCode: paymentMethod.toUpperCase(),
+        description: `Bán lẻ tại quầy: ${selectedItems.map(i => `${i.name} (x${i.quantity})`).join(', ')}`,
+        meta: {
+          items: selectedItems.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price }))
+        }
+      });
 
       // 2. Trừ kho và ghi log cho từng món
       for (const item of selectedItems) {
@@ -134,7 +133,7 @@ export function QuickSaleModal({ isOpen, onClose, services }: QuickSaleModalProp
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open: boolean) => !open && onClose()}>
       <DialogContent className="max-w-4xl h-[85vh] p-0 overflow-hidden bg-slate-50 border-none rounded-[2.5rem] shadow-2xl flex flex-col">
         <DialogHeader className="p-8 bg-white border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -223,7 +222,7 @@ export function QuickSaleModal({ isOpen, onClose, services }: QuickSaleModalProp
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-black text-slate-700 truncate uppercase">{item.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase">x{item.quantity} • {formatCurrency(item.price)}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">x{item.quantity || 1} • {formatCurrency(item.price)}</p>
                         </div>
                         <p className="text-xs font-black text-slate-900 shrink-0 ml-4">{formatCurrency(item.total)}</p>
                       </motion.div>

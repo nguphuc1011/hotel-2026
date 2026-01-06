@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { differenceInHours, differenceInMinutes, differenceInCalendarDays } from 'date-fns';
 import { useMemo, useEffect, useState, useCallback } from 'react';
+import { useCustomerBalance } from '@/hooks/useCustomerBalance';
 import { calculateRoomPrice } from '@/lib/pricing';
 
 interface RoomCardProps {
@@ -79,6 +80,9 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
   const [amountToCollect, setAmountToCollect] = useState(0);
 
   const isOccupied = ['hourly', 'daily', 'overnight'].includes(room.status);
+  
+  // Lấy thông tin số dư khách hàng qua hook dùng chung
+  const { isDebt, absFormattedBalance } = useCustomerBalance(room.current_booking?.customer?.balance || 0);
 
   // Calculate pricing and duration
   const updateInfo = useCallback(() => {
@@ -132,7 +136,10 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
     );
 
     const deposit = room.current_booking.deposit_amount || 0;
-    setAmountToCollect(breakdown.total_amount - deposit);
+    const balance = room.current_booking.customer?.balance || 0;
+    
+    // total = (current room + current services) - deposit - balance (debt is negative, so it adds up)
+    setAmountToCollect(breakdown.total_amount - deposit - balance);
   }, [room, settings, isOccupied]);
 
   useEffect(() => {
@@ -183,7 +190,16 @@ export function RoomCard({ room, settings, onClick }: RoomCardProps) {
           <span className="text-4xl font-black tracking-tighter">
             {room.room_number}
           </span>
-          <div className="flex gap-1">
+          <div className="flex gap-1 items-center">
+            {isOccupied && isDebt && (
+              <motion.div 
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="flex items-center justify-center w-6 h-6 bg-rose-600 text-white rounded-full shadow-lg border border-rose-400/50"
+              >
+                <AlertTriangle size={12} className="animate-pulse" />
+              </motion.div>
+            )}
             {isOccupied ? (
               (room.current_booking?.notes || room.current_booking?.customer?.notes) ? (
                 <div className="rounded-full p-1.5 bg-black/10 backdrop-blur-md">

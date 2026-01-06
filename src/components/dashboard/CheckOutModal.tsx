@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -15,12 +15,14 @@ import {
   Wallet,
   AlertTriangle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  AlertCircle
 } from 'lucide-react';
 import { NumericInput } from '@/components/ui/NumericInput';
-import { Room, PricingBreakdown } from '@/types';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { Room, PricingBreakdown, RentalType } from '@/types';
+import { formatCurrency, formatDateTime, formatDuration, cn } from '@/lib/utils';
+import { useCustomerBalance } from '@/hooks/useCustomerBalance';
 
 // New interfaces aligned with the new design
 export interface CheckoutData {
@@ -32,6 +34,7 @@ export interface CheckoutData {
   isTaxEnabled: boolean;
   taxPercent: number;
   note: string;
+  actualPaid: number;
 }
 
 interface CheckoutModalProps {
@@ -51,16 +54,45 @@ export default function CheckoutModal({
   onConfirm,
   isAdmin,
 }: CheckoutModalProps) {
-  const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
+  const [discountValue, setDiscountValue] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutData['paymentMethod']>('cash');
   const [isTaxEnabled, setIsTaxEnabled] = useState(false);
   const [taxPercent] = useState(10);
   const [note, setNote] = useState('');
+  const [manualSurcharge, setManualSurcharge] = useState(0);
+  const [showServices, setShowServices] = useState(true);
+  const [actualPaid, setActualPaid] = useState(0);
 
   const booking = room.current_booking;
   const services = booking?.services_used || [];
   const deposit = booking?.deposit_amount || 0;
+  const [customerBalance, setCustomerBalance] = useState<number>(0);
+  const { isDebt, isCredit, absFormattedBalance, label, colorClass } = useCustomerBalance(customerBalance);
+
+  // Derived discount amount
+  const discount = useMemo(() => {
+    if (discountType === 'amount') return discountValue;
+    if (!pricingBreakdown) return 0;
+    const baseForDiscount = pricingBreakdown.room_charge + pricingBreakdown.service_charge + pricingBreakdown.surcharge;
+    return Math.round((baseForDiscount * discountValue) / 100);
+  }, [discountType, discountValue, pricingBreakdown]);
+
+  // Fetch customer balance
+  useEffect(() => {
+    if (isOpen && booking?.customer_id) {
+      const fetchBalance = async () => {
+        const { data } = await supabase
+          .from('customers')
+          .select('balance')
+          .eq('id', booking.customer_id)
+          .single();
+        if (data) setCustomerBalance(Number(data.balance || 0));
+      };
+      fetchBalance();
+    }
+  }, [isOpen, booking?.customer_id]);
 
   const totalCalculations = useMemo(() => {
     if (!pricingBreakdown) {
@@ -76,11 +108,14 @@ export default function CheckoutModal({
 
     const roomCharge = pricingBreakdown.room_charge;
     const serviceCharge = pricingBreakdown.service_charge;
-    const surcharges = pricingBreakdown.surcharge;
+    const surcharges = pricingBreakdown.surcharge + manualSurcharge;
     
     const subTotal = roomCharge + serviceCharge + surcharges - discount;
     const taxAmount = isTaxEnabled ? (subTotal * taxPercent / 100) : 0;
-    const totalToCollect = subTotal + taxAmount - deposit;
+    
+    // totalToCollect (UI) should include customer balance
+    // balance < 0: Nợ, balance > 0: Dư
+    const totalToCollect = subTotal + taxAmount - deposit - customerBalance;
 
     return {
       roomCharge,
@@ -90,18 +125,74 @@ export default function CheckoutModal({
       taxAmount,
       totalToCollect,
     };
-  }, [pricingBreakdown, discount, deposit, isTaxEnabled, taxPercent]);
+  }, [pricingBreakdown, discount, deposit, isTaxEnabled, taxPercent, customerBalance]);
   
+  // Auto-update actualPaid when totalToCollect or customerBalance changes
+  useEffect(() => {
+    // Suggest actual payment: the total to collect already includes balance adjustment
+    setActualPaid(Math.max(0, totalCalculations.totalToCollect));
+  }, [totalCalculations.totalToCollect]);
+
   const handleConfirm = () => {
+    // Detect "Old Debt" services to exclude from backend total
+    // This prevents double-counting because the backend subtracts (Total - Paid) from Balance.
+    // If Total includes Old Debt, we are subtracting Old Debt again from the Balance.
+    const oldDebtAmount = services
+      .filter(s => {
+        // Only exclude "Unsafe" debt (manual entries) that backend won't catch
+        // Safe IDs are already handled by backend's v_old_debt_included logic so we KEEP them in the total
+        const isSafeId = String(s.id) === 'debt-carry' || 
+                         String(s.id) === 'old_debt' ||
+                         String(s.id) === '11111111-1111-1111-1111-111111111111';
+        
+        if (isSafeId) return false; // Let backend handle it
+
+        // If not safe ID, check if it looks like debt (Manual Entry)
+        // These cause double-counting if we send them, because backend doesn't know they are debt
+        return s.name.toLowerCase().includes('nợ cũ') || 
+               s.name.toLowerCase().includes('công nợ') ||
+               s.name.toLowerCase().includes('debt');
+      })
+      .reduce((sum, s) => sum + (s.total || (s.price * s.quantity)), 0);
+
+    // cleanTotalToCollect should NOT include customerBalance because backend handles it
+    const cleanTotalToCollect = totalCalculations.totalToCollect + customerBalance - oldDebtAmount;
+
+    if (actualPaid < totalCalculations.totalToCollect) {
+      const currentBookingDebt = totalCalculations.totalToCollect - actualPaid;
+      // balance < 0 là nợ, nên tổng nợ tiềm năng = nợ cũ (số âm) - nợ mới (số dương)
+      const totalPotentialDebt = customerBalance - currentBookingDebt;
+      
+      let message = `CẢNH BÁO NỢ: Khách thanh toán thiếu ${formatCurrency(currentBookingDebt)}.`;
+      if (customerBalance < 0) {
+        message += `\nNợ cũ hiện tại: ${absFormattedBalance}.`;
+        message += `\nTổng nợ sau khi trả phòng: ${formatCurrency(Math.abs(totalPotentialDebt))}.`;
+      }
+      message += `\n\nBạn có chắc chắn muốn cho khách NỢ số tiền này và hoàn tất trả phòng?`;
+
+      if (!window.confirm(message)) {
+        return;
+      }
+    }
+
+    // Map payment method to backend code
+    const paymentMethodMap: Record<string, string> = {
+      cash: 'CASH',
+      transfer: 'BANK_TRANSFER',
+      card: 'CARD',
+    };
+    const backendPaymentMethod = paymentMethodMap[paymentMethod] || 'CASH';
+
     onConfirm({
       discount,
       discountReason,
-      paymentMethod,
-      totalToCollect: totalCalculations.totalToCollect,
+      paymentMethod: backendPaymentMethod,
+      totalToCollect: cleanTotalToCollect, // Send clean total (excluding Old Debt service)
       surcharge: totalCalculations.surcharges,
       isTaxEnabled,
       taxPercent,
       note,
+      actualPaid,
     });
   };
 
@@ -134,201 +225,258 @@ export default function CheckoutModal({
             className="relative w-full h-full bg-slate-50 flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <header className="sticky top-0 bg-white border-b border-slate-100 py-3 px-4 z-10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <header className="sticky top-0 bg-white border-b border-slate-100 py-4 px-6 z-30 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-4">
                 <button 
                   onClick={onClose} 
-                  className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
+                  className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
                 >
-                  <X size={18} className="text-slate-400" />
+                  <X size={20} className="text-slate-400" />
                 </button>
                 <div>
-                  <h2 className="font-black text-lg text-slate-800 uppercase tracking-tight">Trả phòng</h2>
-                  <p className="text-indigo-600 font-bold text-[10px] tracking-[0.1em] uppercase">
-                    Phòng {room.room_number} • {pricingBreakdown?.summary?.duration_text || '...'}
-                  </p>
+                  <h2 className="font-black text-xl text-slate-800 uppercase tracking-tight">Thanh toán & Trả phòng</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-black uppercase tracking-wider">
+                      Phòng {room.room_number}
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {pricingBreakdown?.summary?.duration_text || '...'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="text-right">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Tổng thu thực tế</p>
-                <p className="text-xl font-black text-indigo-600 leading-none">{formatCurrency(totalCalculations.totalToCollect)}</p>
               </div>
             </header>
 
             {/* Body */}
-            <main className="flex-1 overflow-hidden flex flex-col md:flex-row p-3 gap-3 bg-slate-50/50">
-              {/* Left Column: Summary & Services */}
-              <div className="flex-1 flex flex-col gap-3 min-h-0">
-                {/* Stay Summary Card */}
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 shrink-0">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
-                        <Clock size={10}/> Thời gian lưu trú
-                      </p>
-                      <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                        <span>{formatDateTime(booking?.check_in_at, 'HH:mm dd/MM')}</span>
-                        <ArrowRight size={12} className="text-slate-300"/>
-                        <span>{formatDateTime(new Date().toISOString(), 'HH:mm dd/MM')}</span>
+            <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6">
+              <div className="max-w-xl mx-auto space-y-4">
+                
+                {/* Simplified Summary Card */}
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="p-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Tiền phòng</span>
+                        {pricingBreakdown?.summary && (
+                          <span className="text-[10px] text-slate-300 font-bold">
+                            ({pricingBreakdown.summary.days ? `${pricingBreakdown.summary.days} ngày` : `${pricingBreakdown.summary.hours} giờ`} x {formatCurrency(pricingBreakdown.summary.base_price || 0)})
+                          </span>
+                        )}
                       </div>
+                      <span className="font-black text-slate-800 text-lg">{formatCurrency(totalCalculations.roomCharge)}</span>
                     </div>
-                    <div className="text-right space-y-1 border-l border-slate-50 pl-4">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">Tiền phòng</p>
-                      <p className="font-black text-slate-800">{formatCurrency(totalCalculations.roomCharge)}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Quick Surcharge Badges */}
-                  {(pricingBreakdown?.summary?.early_checkin_surcharge || pricingBreakdown?.summary?.late_checkout_surcharge) && (
-                    <div className="mt-2 pt-2 border-t border-slate-50 flex flex-wrap gap-2">
-                      {pricingBreakdown?.summary?.early_checkin_surcharge ? (
-                        <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100">
-                          Sớm: +{formatCurrency(pricingBreakdown.summary.early_checkin_surcharge)}
-                        </span>
-                      ) : null}
-                      {pricingBreakdown?.summary?.late_checkout_surcharge ? (
-                        <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100">
-                          Muộn: +{formatCurrency(pricingBreakdown.summary.late_checkout_surcharge)}
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-
-                {/* Services List - Scrollable */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden min-h-[150px]">
-                  <div className="p-2 px-3 border-b border-slate-50 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-2">
-                      <Sparkles size={14} className="text-emerald-500" />
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dịch vụ & Phụ thu</span>
-                    </div>
-                    <p className="text-xs font-black text-slate-800">{formatCurrency(totalCalculations.serviceCharge + totalCalculations.surcharges)}</p>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {services.length > 0 ? (
-                      services.map((s, idx) => (
-                        <div key={s.id || `service-${idx}`} className="flex justify-between items-center py-1.5 px-2 hover:bg-slate-50 rounded-lg transition-colors">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                              {s.quantity}
-                            </div>
-                            <p className="text-xs text-slate-600 font-medium">{s.name}</p>
-                          </div>
-                          <p className="text-xs font-bold text-slate-600">{formatCurrency(s.total)}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="h-full flex items-center justify-center italic text-[10px] text-slate-300">
-                        Chưa có dịch vụ nào
+                    
+                    {(totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0)) > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Dịch vụ</span>
+                        <span className="font-black text-slate-800 text-lg">{formatCurrency(totalCalculations.serviceCharge + (pricingBreakdown?.surcharge || 0))}</span>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
 
-              {/* Right Column: Payment Controls */}
-              <div className="w-full md:w-[320px] flex flex-col gap-3 shrink-0">
-                {/* Adjustments Card */}
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
-                    <Receipt size={14} className="text-indigo-500" />
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Điều chỉnh & Thuế</span>
-                  </div>
-                  
-                  {/* Discount */}
-                  <div className="flex justify-between items-center gap-2">
-                    <div className="shrink-0">
-                      <p className="text-[11px] text-slate-600 font-bold flex items-center gap-1.5">
-                        <CircleMinus size={12} className="text-red-500"/> Giảm giá
-                      </p>
-                    </div>
-                    <NumericInput
-                      value={discount}
-                      onChange={setDiscount}
-                      className="w-24 bg-red-50/50 rounded-lg px-2 py-1.5 text-right font-black text-red-600 text-xs focus:ring-1 focus:ring-red-200"
-                      suffix="đ"
-                    />
-                  </div>
-                  {discount > 0 && (
-                    <input 
-                      type="text"
-                      value={discountReason}
-                      onChange={(e) => setDiscountReason(e.target.value)}
-                      placeholder="Lý do giảm..."
-                      className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[10px] focus:ring-1 focus:ring-slate-200"
-                    />
-                  )}
-
-                  {/* VAT & Deposit Row */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div className={cn(
-                      "p-2 rounded-lg border transition-all cursor-pointer flex flex-col gap-1",
-                      isTaxEnabled ? "bg-blue-50 border-blue-100" : "bg-slate-50 border-slate-100"
-                    )} onClick={() => setIsTaxEnabled(!isTaxEnabled)}>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">VAT</p>
-                      <div className="flex items-center justify-between">
-                        <span className={cn("text-xs font-black", isTaxEnabled ? "text-blue-600" : "text-slate-400")}>
-                          {isTaxEnabled ? `${taxPercent}%` : 'Tắt'}
-                        </span>
-                        <div className={cn("w-3 h-3 rounded-full", isTaxEnabled ? "bg-blue-500" : "bg-slate-300")} />
+                    <div className="flex justify-between items-center group">
+                      <span className="text-amber-500 font-bold uppercase tracking-widest text-[10px]">Phụ thu</span>
+                      <div className="flex items-center gap-2">
+                        <NumericInput
+                          value={manualSurcharge}
+                          onChange={setManualSurcharge}
+                          className="w-32 bg-amber-50/50 border-amber-100 rounded-xl px-3 h-10 text-right font-black text-amber-600 text-base focus:ring-2 focus:ring-amber-500/20"
+                        />
                       </div>
                     </div>
-                    <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-100 flex flex-col gap-1">
-                      <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Đã cọc</p>
-                      <p className="text-xs font-black text-emerald-600">{formatCurrency(deposit)}</p>
+
+                    {deposit > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-emerald-500 font-bold uppercase tracking-widest text-[10px]">Đã đặt cọc</span>
+                        <span className="font-black text-emerald-600 text-lg">-{formatCurrency(deposit)}</span>
+                      </div>
+                    )}
+
+                    {customerBalance !== 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className={cn("font-bold uppercase tracking-widest text-[10px]", isDebt ? "text-rose-500" : "text-emerald-500")}>
+                          {isDebt ? "Nợ cũ" : "Tiền dư cũ"}
+                        </span>
+                        <span className={cn("font-black text-lg", isDebt ? "text-rose-600" : "text-emerald-600")}>
+                          {isDebt ? "+" : "-"}{absFormattedBalance}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center group">
+                      <div className="flex items-center gap-3">
+                        <span className="text-rose-500 font-bold uppercase tracking-widest text-[10px]">Giảm giá</span>
+                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                          <button 
+                            onClick={() => setDiscountType('amount')}
+                            className={cn(
+                              "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all",
+                              discountType === 'amount' ? "bg-white text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                            )}
+                          >
+                            Đ
+                          </button>
+                          <button 
+                            onClick={() => setDiscountType('percent')}
+                            className={cn(
+                              "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all",
+                              discountType === 'percent' ? "bg-white text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                            )}
+                          >
+                            %
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <NumericInput
+                            value={discountValue}
+                            onChange={setDiscountValue}
+                            className="w-32 bg-rose-50/50 border-rose-100 rounded-xl px-3 h-10 text-right font-black text-rose-600 text-base focus:ring-2 focus:ring-rose-500/20"
+                            suffix={discountType === 'amount' ? '' : '%'}
+                          />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Thuế VAT (10%)</span>
+                        <button 
+                          onClick={() => setIsTaxEnabled(!isTaxEnabled)}
+                          className={cn(
+                            "w-10 h-5 rounded-full relative transition-all duration-300",
+                            isTaxEnabled ? "bg-indigo-600" : "bg-slate-200"
+                          )}
+                        >
+                          <div className={cn(
+                            "absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all duration-300",
+                            isTaxEnabled && "translate-x-5"
+                          )} />
+                        </button>
+                      </div>
+                      <span className={cn(
+                        "font-black text-lg transition-all",
+                        isTaxEnabled ? "text-slate-800" : "text-slate-300"
+                      )}>
+                        {isTaxEnabled ? `+${formatCurrency(totalCalculations.taxAmount)}` : '0đ'}
+                      </span>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 space-y-3 min-h-[112px]">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Tổng cần thanh toán</span>
+                        <span className="font-black text-rose-600 text-xl">{formatCurrency(totalCalculations.totalToCollect)}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Khách thực trả</span>
+                        <div className="relative w-40">
+                          <NumericInput
+                            value={actualPaid}
+                            onChange={setActualPaid}
+                            className="w-full bg-indigo-50/50 border-indigo-100 rounded-xl px-3 h-10 text-right font-black text-indigo-600 text-lg focus:ring-2 focus:ring-indigo-500/20"
+                          />
+                        </div>
+                      </div>
+
+                      <AnimatePresence mode="wait">
+                        {actualPaid !== totalCalculations.totalToCollect && (
+                          <motion.div 
+                            key="settlement-diff"
+                            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                            animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                            exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                            className={cn(
+                              "flex justify-between items-center p-3 rounded-2xl transition-all overflow-hidden",
+                              actualPaid > totalCalculations.totalToCollect ? "bg-emerald-50" : "bg-rose-50"
+                            )}
+                          >
+                            <span className={cn(
+                              "font-bold uppercase tracking-widest text-[10px]",
+                              actualPaid > totalCalculations.totalToCollect ? "text-emerald-600" : "text-rose-600"
+                            )}>
+                              {actualPaid > totalCalculations.totalToCollect ? "Tiền thối lại" : "Ghi nợ mới"}
+                            </span>
+                            <span className={cn(
+                              "font-black text-lg",
+                              actualPaid > totalCalculations.totalToCollect ? "text-emerald-700" : "text-rose-700"
+                            )}>
+                              {formatCurrency(Math.abs(actualPaid - totalCalculations.totalToCollect))}
+                            </span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
                 </div>
 
-                {/* Payment Method Selector */}
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 space-y-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thanh toán bằng</p>
-                  <div className="grid grid-cols-3 gap-1.5">
+                {/* Payment Methods */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-2">
+                    <CreditCard size={12} className="text-slate-400" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phương thức thanh toán</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
                     {[
-                      {id: 'cash', label: 'Tiền mặt', icon: Wallet},
-                      {id: 'transfer', label: 'C.Khoản', icon: Landmark},
-                      {id: 'card', label: 'Thẻ/POS', icon: CreditCard},
+                      {id: 'cash', label: 'Tiền mặt', icon: Wallet, color: 'amber', activeClass: 'bg-amber-50 border-amber-200 shadow-amber-100', iconClass: 'bg-amber-500', textClass: 'text-amber-600'},
+                      {id: 'transfer', label: 'Chuyển khoản', icon: Landmark, color: 'blue', activeClass: 'bg-blue-50 border-blue-200 shadow-blue-100', iconClass: 'bg-blue-500', textClass: 'text-blue-600'},
+                      {id: 'card', label: 'Thẻ / POS', icon: CreditCard, color: 'indigo', activeClass: 'bg-indigo-50 border-indigo-200 shadow-indigo-100', iconClass: 'bg-indigo-500', textClass: 'text-indigo-600'},
                     ].map(method => (
                       <button 
                         key={method.id} 
                         onClick={() => setPaymentMethod(method.id as any)} 
                         className={cn(
-                          "flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border-2 transition-all",
+                          "group relative flex flex-col items-center gap-2 p-4 rounded-[2rem] transition-all border-2",
                           paymentMethod === method.id 
-                            ? "border-indigo-500 bg-indigo-50 text-indigo-600" 
-                            : "border-slate-50 bg-slate-50 text-slate-400"
+                            ? `${method.activeClass} shadow-xl scale-105` 
+                            : "bg-white border-slate-100 hover:border-slate-200 text-slate-400"
                         )}
                       >
-                        <method.icon size={16}/>
-                        <span className="text-[9px] font-black uppercase whitespace-nowrap">{method.label}</span>
+                        <div className={cn(
+                          "w-10 h-10 rounded-2xl flex items-center justify-center transition-all",
+                          paymentMethod === method.id 
+                            ? `${method.iconClass} text-white shadow-lg shadow-${method.color}-200` 
+                            : "bg-slate-50 text-slate-300 group-hover:bg-slate-100"
+                        )}>
+                          <method.icon size={20} />
+                        </div>
+                        <span className={cn(
+                          "text-[9px] font-black uppercase tracking-wider",
+                          paymentMethod === method.id ? method.textClass : "text-slate-400"
+                        )}>
+                          {method.label}
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Quick Note */}
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2">
-                  <MessageSquare size={14} className="text-slate-400 shrink-0"/>
-                  <input 
+                {/* Note Section - Moved to Bottom */}
+                <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2">
+                    <MessageSquare size={14} /> Ghi chú trả phòng
+                  </label>
+                  <input
                     type="text"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="Ghi chú nhanh..."
-                    className="flex-1 bg-transparent text-xs focus:outline-none"
+                    placeholder="Thêm ghi chú nếu cần..."
+                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 placeholder:text-slate-300"
                   />
                 </div>
-
-                {/* Confirm Button */}
-                <button 
-                  onClick={handleConfirm}
-                  className="w-full h-12 bg-indigo-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-lg shadow-indigo-200"
-                >
-                  <CheckCircle2 size={18} />
-                  XÁC NHẬN TRẢ PHÒNG
-                </button>
               </div>
             </main>
+
+            {/* Footer */}
+            <footer className="sticky bottom-0 bg-white border-t border-slate-100 p-6 z-30 flex gap-4 shrink-0">
+              <button
+                onClick={handleConfirm}
+                className="flex-1 h-16 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-[0.98] group"
+              >
+                <CheckCircle2 size={24} className="text-emerald-400" />
+                <span>Hoàn tất trả phòng</span>
+                <ArrowRight size={20} className="opacity-40 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </footer>
 
             {/* Admin Bar - Optional overlay at bottom */}
             {isAdmin && pricingBreakdown && (

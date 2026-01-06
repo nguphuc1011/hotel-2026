@@ -4,6 +4,7 @@ import { TimeRules, Room, Setting, PricingBreakdown } from '@/types';
 /**
  * BỘ NÃO TÍNH GIÁ HOTEL 2026 - PHIÊN BẢN LOGIC MỚI
  * Xử lý logic Hourly, Daily, Overnight và Thuế theo nghiệp vụ chuẩn
+ * Refreshed: 2026-01-06
  */
 export function calculateRoomPrice(
   checkInTime: Date | string,
@@ -86,7 +87,7 @@ export function calculateRoomPrice(
       service_charge: serviceTotal,
       surcharge: 0,
       tax_details: { room_tax: 0, service_tax: 0 },
-      summary: { rental_type: rentalType, is_overnight: false, duration_text: 'Chưa có giờ vào', days: 0, hours: 0 }
+      summary: { rental_type: rentalType, is_overnight: false, duration_text: 'Chưa có giờ vào', days: 0, hours: 0, base_price: 0 }
     };
   }
 
@@ -117,6 +118,10 @@ export function calculateRoomPrice(
     late_checkout_surcharge: 0
   };
 
+  // Nếu khách ở chưa quá thời gian ân hạn thì miễn phí (hoặc tùy policy, ở đây ta để 0đ nếu muốn)
+  // Tuy nhiên, thường check-in rồi là tính 1 giờ. 
+  // Biến isWithinGracePeriod có thể dùng để UI hiển thị "Vừa check-in".
+
   const totalHours = differenceInHours(checkOut, checkIn);
 
   const getPercentageSurcharge = (time: Date, rules: Array<{ from: string; to: string; percent: number }>, basePrice: number) => {
@@ -130,7 +135,18 @@ export function calculateRoomPrice(
 
   // 2. Xử lý theo từng loại hình thuê
   if (rentalType === 'hourly') {
-    const extraHours = Math.max(0, Math.ceil((minutes - 60) / 60));
+    // Logic cũ: const extraHours = Math.max(0, Math.ceil((minutes - 60) / 60));
+    
+    // Logic mới: Áp dụng ân hạn cho giờ tiếp theo
+    const extraMinutes = Math.max(0, minutes - 60);
+    let extraHours = 0;
+    
+    if (extraMinutes > timeRules.hourly_grace_period_minutes) {
+       // Nếu lố quá ân hạn thì mới tính thêm giờ
+       // Cách tính: lố bao nhiêu tính bấy nhiêu block 1h
+       extraHours = Math.ceil(extraMinutes / 60);
+    }
+
     base_charge = prices.hourly + (extraHours * prices.next_hour);
     summary.base_price = prices.hourly;
     summary.next_hour_price = prices.next_hour;
@@ -138,7 +154,7 @@ export function calculateRoomPrice(
     summary.extra_hours_charge = extraHours * prices.next_hour;
     summary.hours = 1 + extraHours;
     duration_text = `${summary.hours} giờ`;
-  } 
+  }  
   else if (rentalType === 'overnight') {
     if (!room.enable_overnight) {
       let effectiveHours = totalHours;

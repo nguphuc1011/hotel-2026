@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X,
+  AlertTriangle,
   ArrowRight,
   Edit,
   Printer,
@@ -30,6 +30,7 @@ import {
   Wine,
   Layers,
   DoorOpen,
+  X
 } from 'lucide-react';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Room, Service, Setting } from '@/types';
@@ -42,10 +43,12 @@ import { cn } from '@/lib/utils';
 import { EventService } from '@/services/events';
 import { HotelService } from '@/services/hotel';
 import { useAuth } from '@/context/AuthContext';
+import { useCustomerBalance } from '@/hooks/useCustomerBalance';
 import CheckoutModal, { CheckoutData } from './CheckOutModal';
 import EditBookingModal from './EditBookingModal';
 
 import { PrintableInvoice } from './PrintableInvoice';
+import { PrintableDebtReceipt } from './PrintableDebtReceipt';
 
 // Mock data for icons, will be replaced with actual icons
 const Icon = ({ name, className }: { name: string; className?: string }) => {
@@ -54,6 +57,7 @@ const Icon = ({ name, className }: { name: string; className?: string }) => {
     'fa-pen': Edit,
     'fa-print': Printer,
     'fa-wallet': DollarSign,
+    'fa-dollar-sign': DollarSign,
     'fa-trash-alt': Trash2,
     'fa-user-circle': User,
     'fa-clock': Clock,
@@ -106,7 +110,8 @@ interface FolioModalProps {
     finalAmount: number,
     paymentMethod: string,
     surcharge: number,
-    auditNote?: string
+    auditNote?: string,
+    actualPaid?: number
   ) => void;
   onUpdate: () => void;
   onCancel: (bookingId: string) => void;
@@ -137,9 +142,29 @@ export default function FolioModal({
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [selectedTargetRoomId, setSelectedTargetRoomId] = useState<string>('');
   const [tick, setTick] = useState(0);
+  const [showDebtModal, setShowDebtModal] = useState(false);
+  const [debtValue, setDebtValue] = useState('');
+  const [debtMethod, setDebtMethod] = useState<'cash' | 'bank_transfer' | 'card'>('cash');
+  const [debtNote, setDebtNote] = useState('');
+  const [isDebtSaving, setIsDebtSaving] = useState(false);
+  const [customerBalance, setCustomerBalance] = useState<number | null>(null);
+  const [debtHistory, setDebtHistory] = useState<any[]>([]);
+  const [printingReceipt, setPrintingReceipt] = useState<any | null>(null);
+  const [ledgerChannel, setLedgerChannel] = useState<any | null>(null);
 
   const { showNotification } = useNotification();
   const { profile } = useAuth();
+
+  // Handle printing debt receipt
+  useEffect(() => {
+    if (printingReceipt) {
+      const timer = setTimeout(() => {
+        window.print();
+        setPrintingReceipt(null);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [printingReceipt]);
 
   // Tự động làm mới tính toán mỗi phút
   useEffect(() => {
@@ -157,20 +182,61 @@ export default function FolioModal({
   }, [room?.current_booking?.services_used]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && room?.current_booking?.customer_id) {
       setTempServices(savedServices);
+      
+      // Fetch customer balance and debt history
+      const fetchCustomerData = async () => {
+        const cid = room.current_booking!.customer_id;
+        const { data: custData } = await supabase
+          .from('customers')
+          .select('balance')
+          .eq('id', cid)
+          .single();
+        setCustomerBalance(Number(custData?.balance || 0));
+
+        const { data: transData } = await supabase
+          .from('ledger')
+          .select('*')
+          .eq('customer_id', cid)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        setDebtHistory(transData || []);
+      };
+      fetchCustomerData();
+
+      // Realtime: subscribe ledger changes for this customer
+      const ch = supabase
+        .channel(`ledger_folio_${room.current_booking.customer_id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger', filter: `customer_id=eq.${room.current_booking.customer_id}` }, fetchCustomerData)
+        .subscribe();
+      setLedgerChannel(ch);
     } else {
       setTempServices({});
       setSearchQuery('');
       setIsHeroCardExpanded(false);
+      setCustomerBalance(null);
+      setDebtHistory([]);
+      if (ledgerChannel) {
+        supabase.removeChannel(ledgerChannel);
+        setLedgerChannel(null);
+      }
     }
-  }, [isOpen]); // Chỉ chạy khi đóng/mở modal để tránh đè dữ liệu đang nhập
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, room?.current_booking?.customer_id]); // Re-run when customer changes
 
   const serviceTotals = useMemo(() => {
     const calcTotal = (serviceList: Record<string, number>) =>
       Object.entries(serviceList).reduce((total, [sid, qty]) => {
+        // 1. Tìm trong danh mục dịch vụ hệ thống
         const serviceInfo = services.find((s) => String(s.id) === String(sid));
-        return total + (serviceInfo?.price || 0) * qty;
+        if (serviceInfo) return total + serviceInfo.price * qty;
+
+        // 2. Nếu không có trong danh mục (ví dụ: Nợ cũ), tìm trong danh sách dịch vụ đã lưu của booking
+        const savedItem = room?.current_booking?.services_used?.find(
+          (s: any) => String(s.service_id || s.id) === String(sid)
+        );
+        return total + (savedItem?.price || 0) * qty;
       }, 0);
 
     const savedTotal = calcTotal(savedServices);
@@ -181,7 +247,7 @@ export default function FolioModal({
       temp: tempTotal,
       diff: tempTotal - savedTotal,
     };
-  }, [tempServices, savedServices, services]);
+  }, [tempServices, savedServices, services, room?.current_booking?.services_used]);
 
   const isDirty = useMemo(() => {
     // Chỉ so sánh các dịch vụ có số lượng > 0
@@ -211,6 +277,7 @@ export default function FolioModal({
       room.current_booking.custom_surcharge || 0,
       pricesOverride
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room, settings, serviceTotals.temp, tick]);
 
   const duration = useMemo(() => {
@@ -231,6 +298,14 @@ export default function FolioModal({
       return `${Math.max(1, days)} ngày`;
     }
   }, [room?.current_booking?.check_in_at, room?.current_booking?.rental_type, pricingBreakdown]);
+
+  const customerBalanceToDisplay = useMemo(() => {
+    if (customerBalance !== null) return customerBalance;
+    return Number(room?.current_booking?.customer?.balance || 0);
+  }, [customerBalance, room?.current_booking?.customer?.balance]);
+
+  const { isDebt, absFormattedBalance } = useCustomerBalance(customerBalanceToDisplay);
+  const hasDebtWarning = isDebt;
 
   const handleQuantityChange = (serviceId: string | number, newQuantity: number) => {
     const sid = String(serviceId);
@@ -366,22 +441,112 @@ export default function FolioModal({
     }
 
     try {
-      // Cộng dồn tiền cọc mới vào tiền cọc cũ
-      const newTotalDeposit = (room.current_booking.deposit_amount || 0) + amount;
-
-      const { error } = await supabase
-        .from('bookings')
-        .update({ deposit_amount: newTotalDeposit })
-        .eq('id', room.current_booking.id);
+      const { data, error } = await supabase.rpc('handle_deposit', {
+        p_booking_id: room.current_booking.id,
+        p_amount: amount,
+        p_method: 'CASH', // Default to cash for now
+        p_notes: `Thu thêm tiền cọc tại Folio phòng ${room.room_number}`
+      });
 
       if (error) throw error;
+      if (data?.success === false) throw new Error(data.message);
 
       showNotification(`Đã cộng thêm ${formatCurrency(amount)} vào tiền cọc`, 'success');
       setShowDepositModal(false);
       setDepositValue('');
       if (onUpdate) onUpdate();
     } catch (error: any) {
-      showNotification(`Lỗi: ${error.message}`, 'error');
+      showNotification(`Lỗi thu cọc: ${error.message}`, 'error');
+    }
+  };
+
+  const openDebtModal = async () => {
+    if (!room?.current_booking?.customer_id) {
+      showNotification('Khách vãng lai không thể thu nợ', 'error');
+      return;
+    }
+    // Refresh data before opening
+    const cid = room.current_booking.customer_id;
+    const { data: custData } = await supabase.from('customers').select('balance').eq('id', cid).single();
+    const bal = Number(custData?.balance || 0);
+    setCustomerBalance(bal);
+    
+    const { data: transData } = await supabase.from('ledger').select('*').eq('customer_id', cid).order('created_at', { ascending: false }).limit(5);
+    setDebtHistory(transData || []);
+
+    const defaultAmount = bal < 0 ? Math.abs(bal) : 0;
+    setDebtValue(String(defaultAmount));
+    setDebtMethod('cash');
+    setDebtNote('');
+    setShowDebtModal(true);
+  };
+
+  const handleDebtSubmit = async () => {
+    if (!room?.current_booking?.customer_id) return;
+    const amount = parseInt(String(debtValue).replace(/\D/g, ''), 10);
+    if (isNaN(amount) || amount <= 0) {
+      showNotification('Số tiền không hợp lệ', 'error');
+      return;
+    }
+    setIsDebtSaving(true);
+    try {
+      // Optimistic update: cập nhật số dư ngay trên UI
+      const prevBalance = customerBalanceToDisplay;
+      const nextBalance = prevBalance + amount;
+      setCustomerBalance(nextBalance);
+      setDebtHistory((hist) => [
+        {
+          id: 'optimistic-' + Math.random().toString(36).slice(2),
+          type: 'PAYMENT',
+          category: 'DEBT_COLLECTION',
+          amount,
+          description: debtNote || 'Thu nợ',
+          created_at: new Date().toISOString(),
+        },
+        ...hist,
+      ]);
+
+      const methodMap: Record<string, string> = {
+        cash: 'CASH',
+        bank_transfer: 'BANK_TRANSFER',
+        card: 'CARD'
+      };
+      
+      const rpc = await HotelService.payDebt({
+        customerId: room.current_booking.customer_id,
+        amount: amount,
+        method: methodMap[debtMethod] || 'CASH',
+        note: debtNote || '',
+        bookingId: room.current_booking.id
+      });
+      if (rpc?.success === false) {
+        throw new Error(rpc?.message || 'Thu nợ thất bại');
+      }
+      
+      showNotification(`Đã thu nợ ${formatCurrency(amount)}`, 'success');
+      
+      // Update local data immediately
+      const cid = room.current_booking.customer_id;
+      const { data: custData } = await supabase.from('customers').select('balance').eq('id', cid).single();
+      setCustomerBalance(Number(custData?.balance || 0));
+
+      const { data: transData } = await supabase.from('ledger').select('*').eq('customer_id', cid).order('created_at', { ascending: false }).limit(5);
+      setDebtHistory(transData || []);
+
+      setShowDebtModal(true); // Keep modal open to show history or close it? User said "Thao tác phải diễn ra trên 1 màn hình duy nhất"
+      setShowDebtModal(false);
+      setDebtValue('');
+      setDebtNote('');
+      if (onUpdate) onUpdate();
+    } catch (error: any) {
+      // Revert optimistic if failed
+      const cid = room.current_booking.customer_id;
+      const { data: custData } = await supabase.from('customers').select('balance').eq('id', cid).single();
+      setCustomerBalance(Number(custData?.balance || customerBalanceToDisplay));
+      setDebtHistory((hist) => hist.filter((h) => !(typeof h.id === 'string' && h.id.startsWith('optimistic-'))));
+      showNotification(`Lỗi thu nợ: ${error.message}`, 'error');
+    } finally {
+      setIsDebtSaving(false);
     }
   };
 
@@ -613,7 +778,7 @@ export default function FolioModal({
     if (!pricingBreakdown) return { base: 0, diff: serviceTotals.diff };
 
     // Base amount is everything EXCEPT the current temporary services
-    // This includes Room Charge, Surcharges, Saved Services, and Merged Bookings
+    // This includes Room Charge, Surcharges, Saved Services, Merged Bookings, and Old Debt
     const roomAndSurcharges =
       pricingBreakdown.total_amount -
       pricingBreakdown.service_charge -
@@ -621,7 +786,9 @@ export default function FolioModal({
 
     const mergedTotal =
       room?.current_booking?.merged_bookings?.reduce((sum, mb) => sum + mb.amount, 0) || 0;
-    const baseAmount = roomAndSurcharges + serviceTotals.saved + mergedTotal - deposit;
+    
+    // balance < 0: Nợ, balance > 0: Dư
+    const baseAmount = roomAndSurcharges + serviceTotals.saved + mergedTotal - deposit - customerBalanceToDisplay;
 
     return {
       base: baseAmount,
@@ -633,9 +800,10 @@ export default function FolioModal({
     serviceTotals.diff,
     deposit,
     room?.current_booking?.merged_bookings,
+    customerBalanceToDisplay,
   ]);
 
-  const finalAmount = (pricingBreakdown?.total_amount || 0) - deposit;
+  const finalAmount = (pricingBreakdown?.total_amount || 0) - deposit - customerBalanceToDisplay;
 
   return (
     <>
@@ -729,6 +897,29 @@ export default function FolioModal({
                   ))}
                 </div>
 
+                {customerBalanceToDisplay !== 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      "mb-4 rounded-3xl p-4 flex items-center gap-4 shadow-lg border",
+                      isDebt ? "bg-rose-600 border-rose-500 text-white" : "bg-emerald-600 border-emerald-500 text-white"
+                    )}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                      {isDebt ? <AlertTriangle size={20} className="text-white animate-pulse" /> : <DollarSign size={20} className="text-white" />}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-black uppercase tracking-widest leading-none">
+                        {isDebt ? 'Nợ cũ' : 'Tiền dư'}
+                      </p>
+                      <p className="text-lg font-black tracking-tight">
+                        {absFormattedBalance}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Hero Summary Card */}
                 <div
                   className="bg-indigo-700 text-white rounded-[2.5rem] p-6 shadow-2xl cursor-pointer"
@@ -813,6 +1004,18 @@ export default function FolioModal({
                             <span className="font-bold text-indigo-200">Tiền dịch vụ</span>
                             <span className="font-bold">{formatCurrency(serviceTotals.temp)}</span>
                           </div>
+
+                          {/* Customer Balance / Old Debt */}
+                          {customerBalanceToDisplay !== 0 && (
+                            <div className="flex justify-between">
+                              <span className="font-bold text-indigo-200">
+                                {customerBalanceToDisplay < 0 ? 'Nợ cũ' : 'Tiền dư'}
+                              </span>
+                              <span className={cn("font-bold", customerBalanceToDisplay < 0 ? "text-rose-300" : "text-emerald-300")}>
+                                {customerBalanceToDisplay < 0 ? '+' : ''}{formatCurrency(Math.abs(customerBalanceToDisplay))}
+                              </span>
+                            </div>
+                          )}
 
                           {/* Merged Bookings */}
                           {room.current_booking.merged_bookings &&
@@ -900,6 +1103,13 @@ export default function FolioModal({
                             (tempServices[String(service.id)] || 0) + 1
                           )
                         }
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          handleQuantityChange(
+                            service.id,
+                            Math.max(0, (tempServices[String(service.id)] || 0) - 1)
+                          )
+                        }}
                         className="relative flex-shrink-0 w-28 text-center bg-white p-4 rounded-[2rem] shadow-sm cursor-pointer hover:bg-slate-50 transition-colors border border-slate-100"
                       >
                         <div className="mb-2 flex justify-center">
@@ -921,6 +1131,22 @@ export default function FolioModal({
                         )}
                       </div>
                     ))}
+                  </div>
+
+                  <div className="flex items-center justify-center gap-4 py-2 opacity-40">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-lg bg-slate-200 flex items-center justify-center text-slate-500">
+                        <Plus size={10} strokeWidth={3} />
+                      </div>
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Chạm để thêm</span>
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-slate-300" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-lg bg-slate-200 flex items-center justify-center text-slate-500">
+                        <Trash2 size={10} strokeWidth={3} />
+                      </div>
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Giữ để bớt</span>
+                    </div>
                   </div>
 
                   {/* Dịch vụ đã chọn */}
@@ -953,6 +1179,11 @@ export default function FolioModal({
                         >
                           {Object.entries(tempServices)
                             .filter(([_, qty]) => qty > 0)
+                            .sort(([idA], [idB]) => {
+                              if (idA === 'debt-carry') return -1;
+                              if (idB === 'debt-carry') return 1;
+                              return 0;
+                            })
                             .map(([serviceId, quantity], idx) => {
                               // Chuẩn hóa so sánh ID để đảm bảo luôn tìm thấy service
                               const serviceInfo = services.find(
@@ -970,9 +1201,21 @@ export default function FolioModal({
                               const diff = quantity - savedQty;
 
                               return (
-                                <div
+                                <motion.div
                                   key={serviceId || `sel-service-${idx}`}
                                   className="bg-white p-3 rounded-2xl flex items-center gap-3 shadow-sm border border-slate-100"
+                                  drag="x"
+                                  dragConstraints={{ left: -80, right: 80 }}
+                                  onDragEnd={(_, info) => {
+                                    if (info.offset.x < -60) {
+                                      // Vuốt trái: Xóa/Hủy dịch vụ khỏi danh sách
+                                      handleQuantityChange(serviceId, 0);
+                                      handleSaveUpdate();
+                                    } else if (info.offset.x > 60) {
+                                      // Vuốt phải: Thanh toán nhanh -> mở Checkout
+                                      setIsCheckoutOpen(true);
+                                    }
+                                  }}
                                 >
                                   <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center">
                                     <ServiceIcon name={name} />
@@ -1014,7 +1257,7 @@ export default function FolioModal({
                                       <Plus size={14} />
                                     </button>
                                   </div>
-                                </div>
+                                </motion.div>
                               );
                             })}
 
@@ -1054,6 +1297,7 @@ export default function FolioModal({
                     ))}
                 </div>
               </main>
+
 
               {/* Footer */}
               <footer className="sticky bottom-0 bg-white border-t border-slate-200 p-4 z-10">
@@ -1130,7 +1374,8 @@ export default function FolioModal({
                 data.totalToCollect,
                 data.paymentMethod,
                 data.surcharge,
-                auditNote
+                auditNote,
+                data.actualPaid
               );
               setIsCheckoutOpen(false);
             }}
@@ -1175,6 +1420,120 @@ export default function FolioModal({
                   >
                     {isSaving ? 'ĐANG LƯU...' : 'XÁC NHẬN'}
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showDebtModal && (
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-black text-xl text-slate-800 uppercase tracking-tight">
+                    Thu nợ
+                  </h3>
+                  <button
+                    onClick={() => setShowDebtModal(false)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                  >
+                    <X size={20} className="text-slate-400" />
+                  </button>
+                </div>
+                <div className="space-y-6">
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
+                      Số tiền thu
+                    </p>
+                    <div className="flex items-baseline gap-1">
+                      <NumericInput
+                        value={parseInt(String(debtValue).replace(/\D/g, '') || '0')}
+                        onChange={(val) => setDebtValue(String(val))}
+                        className="w-full text-3xl font-black text-emerald-600 border-none p-0 focus:ring-0 bg-transparent"
+                        suffix="đ"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
+                      Phương thức
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => setDebtMethod('cash')}
+                        className={cn(
+                          'py-2 rounded-xl font-bold text-sm',
+                          debtMethod === 'cash' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                        )}
+                      >
+                        Tiền mặt
+                      </button>
+                      <button
+                        onClick={() => setDebtMethod('bank_transfer')}
+                        className={cn(
+                          'py-2 rounded-xl font-bold text-sm',
+                          debtMethod === 'bank_transfer' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                        )}
+                      >
+                        Chuyển khoản
+                      </button>
+                      <button
+                        onClick={() => setDebtMethod('card')}
+                        className={cn(
+                          'py-2 rounded-xl font-bold text-sm',
+                          debtMethod === 'card' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                        )}
+                      >
+                        Thẻ
+                      </button>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
+                      Ghi chú
+                    </p>
+                    <input
+                      value={debtNote}
+                      onChange={(e) => setDebtNote(e.target.value)}
+                      placeholder="Ví dụ: Thu nợ kỳ trước"
+                      className="w-full h-12 px-3 bg-white rounded-xl border border-slate-200 text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+                  <button
+                    onClick={handleDebtSubmit}
+                    disabled={isDebtSaving}
+                    className="w-full h-16 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {isDebtSaving ? 'ĐANG LƯU...' : 'XÁC NHẬN'}
+                  </button>
+
+                  {debtHistory.length > 0 && (
+                    <div className="pt-6 border-t border-slate-100">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">
+                        Lịch sử thanh toán gần đây
+                      </p>
+                      <div className="space-y-2">
+                        {debtHistory.map((trans) => (
+                          <div key={trans.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                            <div>
+                               <p className="text-xs font-bold text-slate-700">{formatCurrency(trans.amount)}</p>
+                               <p className="text-[10px] text-slate-400">{format(new Date(trans.created_at), 'HH:mm dd/MM/yyyy')}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                               <span className="text-[10px] font-bold text-slate-500 uppercase">{trans.method}</span>
+                               <button 
+                                  onClick={() => setPrintingReceipt(trans)} 
+                                  className="p-1.5 hover:bg-slate-200 rounded-full text-slate-500"
+                                  title="In biên lai"
+                               >
+                                  <Printer size={14} />
+                               </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1234,8 +1593,19 @@ export default function FolioModal({
             </div>
           )}
 
-          {/* Hidden Printable Invoice */}
+          {/* Hidden Printable Area */}
           <div className="hidden print:block fixed inset-0 bg-white z-[99999]">
+            {printingReceipt ? (
+            <PrintableDebtReceipt 
+              customerName={room.current_booking.customer?.full_name || 'Khách hàng'}
+              amount={printingReceipt.amount}
+              paymentMethod={printingReceipt.method}
+              note={printingReceipt.notes}
+              transactionId={printingReceipt.id}
+              transactionDate={printingReceipt.created_at}
+              cashierName={printingReceipt.cashier}
+            />
+          ) : (
             <PrintableInvoice
               room={room}
               booking={room.current_booking}
@@ -1244,6 +1614,7 @@ export default function FolioModal({
               totalServiceCost={serviceTotals.temp}
               totalAmount={finalAmount}
             />
+          )}
           </div>
         </>
       )}

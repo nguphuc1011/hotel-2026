@@ -139,9 +139,9 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({ transactions, onEd
                   {/* Superscript-style Payment Badge */}
                   <span className={cn(
                     "ml-0.5 px-1 py-0.5 rounded-md text-[7px] font-black border leading-none shadow-sm uppercase -mt-1.5",
-                    getMethodStyle(t.payment_method || 'cash')
+                    getMethodStyle(t.payment_method_code || t.payment_method || 'cash')
                   )}>
-                    {getMethodSymbol(t.payment_method || 'cash')}
+                    {getMethodSymbol(t.payment_method_code || t.payment_method || 'cash')}
                   </span>
                 </div>
                 

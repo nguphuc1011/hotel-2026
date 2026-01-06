@@ -3,6 +3,7 @@
 import { Customer, Booking } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency, cn } from '@/lib/utils';
+import { useCustomerBalance } from '@/hooks/useCustomerBalance';
 import { Sparkles, History, Wallet, MessageSquare, X, ArrowRight, Star, Clock } from 'lucide-react';
 
 interface Props {
@@ -19,6 +20,7 @@ const daysBetween = (date1: string, date2: string) => {
 };
 
 export default function CustomerInsightsModal({ customer, bookings, onClose }: Props) {
+  const { isDebt, isCredit, absFormattedBalance } = useCustomerBalance(customer.balance || 0);
   const lastCompletedBooking = bookings.find(b => b.status === 'completed');
 
   const daysSinceLastVisit = lastCompletedBooking?.check_out_at 
@@ -31,7 +33,6 @@ export default function CustomerInsightsModal({ customer, bookings, onClose }: P
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
         className="absolute inset-0 bg-slate-900/20"
       />
 
@@ -66,6 +67,16 @@ export default function CustomerInsightsModal({ customer, bookings, onClose }: P
             </div>
             <h2 className="text-3xl font-black tracking-tight mb-1">Chào mừng trở lại!</h2>
             <p className="text-blue-100 font-medium opacity-90">Hệ thống đã nhận diện được khách hàng thân thiết</p>
+            {isDebt && (
+              <div className="mt-2 p-2 bg-rose-500/20 rounded-lg text-white text-sm font-bold">
+                Cảnh báo: Khách hàng có nợ {absFormattedBalance}
+              </div>
+            )}
+            {isCredit && (
+              <div className="mt-2 p-2 bg-emerald-500/20 rounded-lg text-white text-sm font-bold">
+                Khách có tiền dư: {absFormattedBalance}
+              </div>
+            )}
           </div>
         </div>
 

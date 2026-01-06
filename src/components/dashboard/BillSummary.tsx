@@ -1,4 +1,3 @@
-'''
 import { PriceDetails } from "@/lib/pricing";
 import { formatCurrency } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -50,4 +49,3 @@ export function BillSummary({ priceDetails, roomTotal, servicesTotal, surcharge,
     </div>
   );
 }
-'''

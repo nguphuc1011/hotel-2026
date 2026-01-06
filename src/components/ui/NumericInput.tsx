@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
@@ -19,25 +19,18 @@ export function NumericInput({
   suffix,
   ...props 
 }: NumericInputProps) {
-  const [displayValue, setDisplayValue] = useState('');
-
   // Format number to string with dots (vi-VN)
   const format = (val: number | string) => {
     const num = typeof val === 'string' ? parseInt(val.replace(/\D/g, ''), 10) : val;
-    if (isNaN(num) || num === 0) return '';
+    if (isNaN(num)) return '';
     return new Intl.NumberFormat('vi-VN').format(num);
   };
 
-  useEffect(() => {
-    setDisplayValue(format(value));
-  }, [value]);
+  const displayValue = format(value);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/\D/g, '');
     const numValue = rawValue === '' ? 0 : parseInt(rawValue, 10);
-    
-    // Update display immediately for better UX
-    setDisplayValue(format(numValue));
     
     // Notify parent
     onChange(numValue);
@@ -60,6 +53,7 @@ export function NumericInput({
         placeholder={placeholder || '0'}
         className={cn(
           "w-full h-12 bg-slate-50 rounded-xl px-4 outline-none border border-transparent focus:border-blue-500 font-bold transition-all",
+          suffix && "pr-10",
           className
         )}
       />

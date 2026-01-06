@@ -17,6 +17,10 @@ import { HotelService } from '@/services/hotel';
 import { ShoppingCart, Plus } from 'lucide-react';
 import { QuickSaleModal } from '@/components/dashboard/QuickSaleModal';
 
+import { formatCurrency } from '@/lib/utils';
+import { toast } from 'sonner';
+import { Check, AlertTriangle } from 'lucide-react';
+
 export default function Dashboard() {
   const { rooms, settings, services, isLoading, mutateRooms } = useHotel();
   const { showNotification } = useNotification();
@@ -161,7 +165,8 @@ export default function Dashboard() {
     amount: number,
     paymentMethod: string = 'cash',
     surcharge: number = 0,
-    auditNote?: string
+    auditNote?: string,
+    actualPaid?: number
   ) => {
     if (!folioRoom) return;
 
@@ -172,6 +177,7 @@ export default function Dashboard() {
         amount,
         paymentMethod,
         surcharge,
+        actualPaid
       });
 
       // 1. Lấy ghi chú hiện tại để nối thêm audit info
@@ -185,32 +191,42 @@ export default function Dashboard() {
         .filter(Boolean)
         .join('\n');
 
-      // 3. Gọi RPC xử lý thanh toán (Bản cực kỳ ổn định - Alphabetical parameters)
-      const { data, error: rpcError } = await supabase.rpc('handle_checkout', {
-        p_booking_id: bookingId,
-        p_notes: updatedNotes || '',
-        p_payment_method: paymentMethod || 'cash',
-        p_surcharge: Number(surcharge) || 0,
-        p_total_amount: Number(amount) || 0
+      // 3. Gọi RPC xử lý thanh toán thông qua HotelService (Atomic)
+      const normalizedPaymentMethod = paymentMethod === 'transfer' ? 'BANK_TRANSFER' : (paymentMethod || 'CASH').toUpperCase();
+
+      const result = await HotelService.checkOut({
+        bookingId,
+        roomId: folioRoom.id,
+        totalAmount: Number(amount) || 0,
+        paymentMethod: normalizedPaymentMethod,
+        surcharge: Number(surcharge) || 0,
+        amountPaid: actualPaid !== undefined ? Number(actualPaid) : Number(amount),
+        notes: currentBooking?.notes || '',
+        auditNote: auditNote
       });
 
-      if (rpcError) {
-        // eslint-disable-next-line no-console
-        console.error('Lỗi RPC handle_checkout:', rpcError);
-        throw new Error(rpcError.message);
-      }
-
-      if (data?.success === false) {
-        throw new Error(data.message || 'Giao dịch không thành công');
-      }
-
       // eslint-disable-next-line no-console
-      console.log('Thanh toán hoàn tất qua RPC, đang refresh dữ liệu...');
+      console.log('Thanh toán hoàn tất qua RPC, kết quả:', result);
 
       // 4. Reset state, refresh data, and show notification
       setFolioRoomId(null);
       await mutateRooms();
-      showNotification(`Thanh toán phòng ${folioRoom.room_number} thành công!`, 'success');
+      
+      const newBalance = result.new_balance;
+      
+      // Hiển thị thông báo dựa trên số dư mới nhất từ Database
+      if (newBalance < 0) {
+        toast.warning(`Đã trả phòng ${folioRoom.room_number}. Tổng dư nợ khách hàng: ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.abs(newBalance))}`, {
+          description: "Số dư đã được cập nhật từ Database",
+          duration: 6000,
+          icon: <AlertTriangle className="text-rose-500" />
+        });
+      } else {
+        toast.success(`Trả phòng ${folioRoom.room_number} thành công!`, {
+          icon: <Check className="text-emerald-500" />,
+          duration: 4000
+        });
+      }
 
       // 5. Gửi thông báo hệ thống (Mắt Thần)
       HotelService.notifySystemChange('check_out', folioRoom.id).catch(console.error);
@@ -384,24 +400,25 @@ export default function Dashboard() {
 
       // 1. Thực hiện Check-in Atomic qua RPC
       const booking = await HotelService.checkIn({
-              roomId: selectedRoom.id,
-              customer: {
-                id: data.customer?.id,
-                name: data.customer?.name || 'Khách vãng lai',
-                phone: data.customer?.phone,
-                idCard: data.customer?.idCard,
-                address: data.customer?.address,
-              },
+        roomId: selectedRoom.id,
+        customer: {
+          id: data.customer?.id,
+          name: data.customer?.name || 'Khách vãng lai',
+          phone: data.customer?.phone,
+          idCard: data.customer?.idCard,
+          address: data.customer?.address,
+        },
         rentalType: data.rentalType,
         price: data.price,
         deposit: data.deposit,
+        depositMethod: data.depositMethod,
         notes: data.notes,
         services: data.services.map(s => ({
           service_id: s.service_id || s.id,
           quantity: s.quantity,
           price: s.price
         })),
-        allServices: services
+        allServices: services,
       });
 
       // 2. Fetch Customer Insights (Optional UI feature)
@@ -428,7 +445,11 @@ export default function Dashboard() {
       // 3. Kết thúc quy trình
       setSelectedRoomId(null);
       await mutateRooms();
-      showNotification(`Nhận phòng ${selectedRoom.room_number} thành công!`, 'success');
+      
+      toast.success(`Nhận phòng ${selectedRoom.room_number} thành công!`, {
+        icon: <Check className="text-emerald-500" />,
+        duration: 4000
+      });
 
       // 4. Thông báo hệ thống
       HotelService.notifySystemChange('check_in', selectedRoom.id).catch(console.error);
@@ -437,6 +458,17 @@ export default function Dashboard() {
       showNotification(`Lỗi khi nhận phòng: ${error.message || 'Lỗi không xác định'}`, 'error');
     } finally {
       setIsProcessing(false);
+    }
+  };
+  const triggerNightAudit = async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase.rpc('night_audit', { p_audit_date: today });
+      if (error) throw error;
+      await mutateRooms();
+      showNotification(`Đã chốt doanh thu ngày ${today}: ${data?.charges_created || 0} phòng`, 'success');
+    } catch (err: any) {
+      showNotification(`Lỗi Night Audit: ${err.message}`, 'error');
     }
   };
 
@@ -538,6 +570,14 @@ export default function Dashboard() {
         onToggleFilter={onToggleFilter}
         hotelName="Hotel 2026"
       />
+      <div className="flex justify-end px-2">
+        <button
+          onClick={triggerNightAudit}
+          className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-[10px] uppercase tracking-widest active:scale-[0.98] transition-all"
+        >
+          Chốt doanh thu ngay
+        </button>
+      </div>
       <motion.div
         layout
         className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4 pt-0"

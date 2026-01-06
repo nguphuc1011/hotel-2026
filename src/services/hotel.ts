@@ -3,6 +3,63 @@ import { Service } from '@/types';
 
 export const HotelService = {
   /**
+   * Lấy ca làm việc hiện tại của nhân viên
+   */
+  async getCurrentShift() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from('shifts')
+      .select('*')
+      .eq('staff_id', user.id)
+      .eq('status', 'open')
+      .order('start_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return null;
+    return data;
+  },
+
+  /**
+   * Ghi nhận vào Sổ cái (Ledger)
+   */
+  async recordLedger(params: {
+    type: 'REVENUE' | 'PAYMENT' | 'DEPOSIT' | 'REFUND' | 'EXPENSE' | 'DEBT_ADJUSTMENT';
+    category: string;
+    amount: number;
+    paymentMethodCode?: string;
+    bookingId?: string;
+    customerId?: string;
+    description?: string;
+    meta?: any;
+  }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const shift = await this.getCurrentShift();
+
+    const { error } = await supabase.from('ledger').insert({
+      shift_id: shift?.id,
+      staff_id: user.id,
+      booking_id: params.bookingId,
+      customer_id: params.customerId,
+      type: params.type,
+      category: params.category,
+      amount: Math.abs(params.amount),
+      payment_method_code: params.paymentMethodCode || 'CASH',
+      description: params.description,
+      meta: params.meta || {}
+    });
+
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('[Ledger] Lỗi ghi sổ:', error);
+    }
+  },
+
+  /**
    * CHECK-IN: Đảm bảo tính nguyên tử (Atomic)
    * Sử dụng RPC handle_check_in để xử lý toàn bộ quy trình trong một transaction
    */
@@ -19,9 +76,11 @@ export const HotelService = {
     checkInAt?: string;
     price: number;
     deposit?: number;
+    depositMethod?: string;
     notes?: string;
     services?: Array<{ service_id: string; quantity: number; price: number }>;
     allServices?: Service[]; // Để lấy tên dịch vụ
+    includeDebt?: boolean;
   }) {
     // 1. Chuẩn bị dữ liệu services_used
     const servicesUsed =
@@ -39,7 +98,9 @@ export const HotelService = {
         };
       }) || [];
 
-    // 2. Gọi RPC handle_check_in
+    // Gọi RPC handle_check_in
+    const { data: { user } } = await supabase.auth.getUser();
+    
     const { data, error } = await supabase.rpc('handle_check_in', {
       p_room_id: params.roomId,
       p_rental_type: params.rentalType,
@@ -51,8 +112,10 @@ export const HotelService = {
       p_check_in_at: params.checkInAt || new Date().toISOString(),
       p_initial_price: params.price,
       p_deposit_amount: params.deposit || 0,
+      p_deposit_method: (params.depositMethod || 'cash').toUpperCase(),
       p_notes: params.notes || null,
       p_services_used: servicesUsed,
+      p_staff_id: user?.id || null
     });
 
     if (error) {
@@ -160,7 +223,7 @@ export const HotelService = {
     paymentMethod: string;
     discount?: number;
     surcharge?: number;
-    finalAmount: number;
+    amountPaid: number;
     notes?: string;
     auditNote?: string;
     user?: any; // User object for logging
@@ -174,12 +237,17 @@ export const HotelService = {
       .join('\n');
 
     // Gọi RPC handle_checkout (Unified - Alphabetical parameters)
+    const { data: { user } } = await supabase.auth.getUser();
+
     const { data, error } = await supabase.rpc('handle_checkout', {
       p_booking_id: params.bookingId,
       p_notes: fullNotes || '',
       p_payment_method: params.paymentMethod || 'cash',
       p_surcharge: Number(params.surcharge) || 0,
-      p_total_amount: Number(params.finalAmount) || 0
+      p_total_amount: Number(params.totalAmount) || 0,
+      p_amount_paid: Number(params.amountPaid) || 0,
+      p_debt_carry_amount: 0,
+      p_staff_id: user?.id || null
     });
 
     if (error) {
@@ -192,10 +260,31 @@ export const HotelService = {
       throw new Error(data.message || 'Lỗi xử lý thanh toán');
     }
 
-    // eslint-disable-next-line no-console
-    console.log('[HotelService] Check-out thành công qua RPC handle_checkout');
+    return data;
+  },
 
-    return { success: true };
+  /**
+   * THU NỢ KHÁCH HÀNG
+   */
+  async payDebt(params: {
+    customerId: string;
+    amount: number;
+    method: string;
+    cashier: string;
+    note?: string;
+    bookingId?: string;
+  }) {
+    const { data, error } = await supabase.rpc('handle_debt_payment', {
+      p_customer_id: params.customerId,
+      p_amount: params.amount,
+      p_method: params.method,
+      p_cashier_id: params.cashier,
+      p_note: params.note || null,
+    });
+
+    if (error) throw error;
+
+    return data;
   },
 
   /**

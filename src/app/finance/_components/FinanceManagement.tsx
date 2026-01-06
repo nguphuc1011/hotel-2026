@@ -58,15 +58,34 @@ export default function FinanceManagement() {
       if (catError) throw catError;
       setCategories(catData || []);
 
-      // Fetch transactions
-      const { data: transData, error: transError } = await supabase
-        .from('cashflow')
-        .select('*')
-        .is('deleted_at', null)
+      // Fetch transactions from ledger
+      const { data: ledgerData, error: ledgerError } = await supabase
+        .from('ledger')
+        .select(`
+          *,
+          profiles:staff_id(full_name)
+        `)
+        .eq('status', 'completed')
+        .in('type', ['PAYMENT', 'DEPOSIT', 'REFUND', 'EXPENSE'])
         .order('created_at', { ascending: false });
 
-      if (transError) throw transError;
-      setTransactions(transData || []);
+      if (ledgerError) throw ledgerError;
+      
+      const mappedTransactions = (ledgerData || []).map(l => ({
+        id: l.id,
+        type: ['PAYMENT', 'DEPOSIT'].includes(l.type) ? 'income' : 'expense',
+        category_id: l.meta?.category_id || '',
+        category_name: l.category,
+        content: l.description || '',
+        amount: l.amount,
+        payment_method: (l.payment_method_code || 'cash').toLowerCase(),
+        created_by: l.profiles?.full_name || 'Hệ thống',
+        created_by_id: l.staff_id,
+        created_at: l.created_at,
+        notes: l.meta?.notes || ''
+      }));
+
+      setTransactions(mappedTransactions as any);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast.error('Không thể tải dữ liệu tài chính: ' + (error.message || ''));
@@ -79,9 +98,9 @@ export default function FinanceManagement() {
     fetchData();
 
     // Subscriptions
-    const transChannel = supabase
-      .channel('cashflow_changes')
-      .on('postgres_changes', { event: '*', table: 'cashflow', schema: 'public' }, () => fetchData())
+    const ledgerChannel = supabase
+      .channel('ledger_changes')
+      .on('postgres_changes', { event: '*', table: 'ledger', schema: 'public' }, () => fetchData())
       .subscribe();
 
     const catChannel = supabase
@@ -90,7 +109,7 @@ export default function FinanceManagement() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(transChannel);
+      supabase.removeChannel(ledgerChannel);
       supabase.removeChannel(catChannel);
     };
   }, []);
@@ -162,45 +181,56 @@ export default function FinanceManagement() {
       const userId = user.id;
 
       if (editingTransaction) {
-        // Yêu cầu nhập lý do khi sửa giao dịch cũ
         const reason = window.prompt('Vui lòng nhập lý do sửa giao dịch này (bắt buộc):') || '';
         if (!reason.trim()) {
           toast.error('Bắt buộc phải có lý do khi sửa giao dịch!');
           throw new Error('Thiếu lý do sửa');
         }
 
-        const { error } = await supabase
-          .from('cashflow')
-          .update({
-            type: data.type,
-            category: data.category,
-            category_id: data.category_id,
-            category_name: data.category_name,
-            amount: data.amount,
-            content: data.content,
-            payment_method: data.payment_method,
-            notes: data.notes ? `${data.notes}\n[SỬA] Lý do: ${reason}` : `[SỬA] Lý do: ${reason}`
-          })
-          .eq('id', editingTransaction.id);
+        // 1) Ghi dòng đối ứng (Reversal) cho giao dịch cũ (IMMUTABLE LEDGER)
+        const reversalType = editingTransaction.type === 'income' ? 'REFUND' : 'PAYMENT';
+        await HotelService.recordLedger({
+          type: reversalType as any,
+          category: `REVERSAL:${editingTransaction.category_name}`,
+          amount: editingTransaction.amount,
+          paymentMethodCode: editingTransaction.payment_method.toUpperCase(),
+          description: `[ĐỐI ỨNG] Sửa giao dịch ${editingTransaction.id}: ${editingTransaction.content}`,
+          meta: {
+            reversal_of: editingTransaction.id,
+            original_type: editingTransaction.type,
+            reason
+          }
+        });
 
-        if (error) throw error;
-        toast.success('Cập nhật thành công');
-      } else {
-        const { error } = await supabase.from('cashflow').insert([{
-          type: data.type,
-          category: data.category,
-          category_id: data.category_id,
-          category_name: data.category_name,
+        // 2) Ghi giao dịch mới với dữ liệu chỉnh sửa (Corrected Entry)
+        await HotelService.recordLedger({
+          type: data.type === 'income' ? 'PAYMENT' : 'EXPENSE',
+          category: data.category_name,
           amount: data.amount,
-          content: data.content,
-          payment_method: data.payment_method,
-          notes: data.notes,
-          created_by: userName,
-          created_by_id: userId,
-          created_at: new Date().toISOString()
-        }]);
+          paymentMethodCode: data.payment_method.toUpperCase(),
+          description: data.content,
+          meta: {
+            category_id: data.category_id,
+            notes: data.notes ? `${data.notes}\n[SỬA] Lý do: ${reason}` : `[SỬA] Lý do: ${reason}`,
+            corrected_from: editingTransaction.id
+          }
+        });
 
-        if (error) throw error;
+        toast.success('Đã ghi giao dịch đối ứng và giao dịch chỉnh sửa');
+      } else {
+        // Sử dụng HotelService.recordLedger để đồng bộ
+        await HotelService.recordLedger({
+          type: data.type === 'income' ? 'PAYMENT' : 'EXPENSE',
+          category: data.category_name,
+          amount: data.amount,
+          paymentMethodCode: data.payment_method.toUpperCase(),
+          description: data.content,
+          meta: {
+            category_id: data.category_id,
+            notes: data.notes
+          }
+        });
+
         toast.success('Ghi nhận thành công');
       }
 
@@ -225,7 +255,7 @@ export default function FinanceManagement() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const { error: logError } = await supabase.from('audit_logs').insert([{
         user_id: user?.id,
         action: '[CASHFLOW] DELETE_TRANSACTION',
@@ -236,13 +266,21 @@ export default function FinanceManagement() {
 
       if (logError) throw logError;
 
-      const { error } = await supabase
-        .from('cashflow')
-        .delete()
-        .eq('id', t.id);
+      // IMMUTABLE: Thay vì sửa dòng cũ, ghi dòng đối ứng để triệt tiêu
+      const reversalType = t.type === 'income' ? 'REFUND' : 'PAYMENT';
+      await HotelService.recordLedger({
+        type: reversalType as any,
+        category: `REVERSAL:${t.category_name}`,
+        amount: t.amount,
+        paymentMethodCode: t.payment_method.toUpperCase(),
+        description: `[ĐỐI ỨNG] Xóa giao dịch ${t.id}: ${t.content}`,
+        meta: {
+          reversal_of: t.id,
+          reason
+        }
+      });
 
-      if (error) throw error;
-      toast.success('Đã xóa giao dịch');
+      toast.success('Đã ghi dòng đối ứng cho giao dịch cần xóa');
       fetchData();
     } catch (error) {
       console.error('Error deleting transaction:', error);

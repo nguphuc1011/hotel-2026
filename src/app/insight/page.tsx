@@ -69,15 +69,16 @@ export default function ThaoInsight() {
       // 2. HÀNG TREO: view_pending_services
       const { data: pending } = await supabase.from('view_pending_services').select('*');
 
-      // 3. KÉT TIỀN: Cashflow vs Bookings
-      // Thực thu hôm nay (Tiền mặt + Chuyển khoản)
-      const { data: cashflowToday } = await supabase
-        .from('cashflow')
-        .select('amount')
-        .eq('type', 'income')
+      // 3. KÉT TIỀN: Ledger vs Bookings
+      // Thực thu hôm nay (Tiền mặt + Chuyển khoản) từ ledger
+      const { data: ledgerToday } = await supabase
+        .from('ledger')
+        .select('amount, type')
+        .in('type', ['PAYMENT', 'DEPOSIT'])
+        .eq('status', 'completed')
         .gte('created_at', startOfToday);
 
-      const actualIncome = cashflowToday?.reduce((sum, t) => sum + t.amount, 0) || 0;
+      const actualIncome = ledgerToday?.reduce((sum, t) => sum + t.amount, 0) || 0;
 
       // Doanh thu dự kiến từ Bookings đã thanh toán hôm nay
       const { data: bookingsToday } = await supabase
@@ -158,7 +159,7 @@ export default function ThaoInsight() {
     const channel = supabase
       .channel('thao_insight_realtime')
       .on('postgres_changes', { event: '*', table: 'audit_logs' }, () => fetchInsights())
-      .on('postgres_changes', { event: '*', table: 'cashflow' }, () => fetchInsights())
+      .on('postgres_changes', { event: '*', table: 'ledger' }, () => fetchInsights())
       .on('postgres_changes', { event: '*', table: 'bookings' }, () => fetchInsights())
       .subscribe();
 

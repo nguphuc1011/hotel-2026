@@ -29,6 +29,7 @@ export interface Customer {
   address?: string;
   total_spent: number;
   visit_count: number;
+  balance?: number;
   notes?: string;
   ocr_data?: any;
 }
@@ -83,6 +84,7 @@ export interface CashflowTransaction {
   content: string;
   amount: number;
   payment_method: 'cash' | 'transfer' | 'card';
+  payment_method_code?: string;
   created_by: string;
   created_by_id?: string;
   created_at: string;
@@ -226,10 +228,58 @@ export interface CheckInData {
   rentalType: string;
   price: number;
   deposit: number;
+  depositMethod?: string;
   services: Array<{
     service_id: string;
     quantity: number;
     price: number;
   }>;
   notes: string;
+}
+
+export type LedgerType = 'REVENUE' | 'PAYMENT' | 'DEPOSIT' | 'REFUND' | 'EXPENSE' | 'DEBT_ADJUSTMENT';
+export type LedgerStatus = 'completed' | 'void';
+export type ShiftStatus = 'open' | 'closed';
+
+export interface PaymentMethod {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Shift {
+  id: string;
+  staff_id: string;
+  start_at: string;
+  end_at?: string;
+  opening_balance: number;
+  closing_balance?: number;
+  expected_balance?: number;
+  status: ShiftStatus;
+  notes?: string;
+  created_at: string;
+  profiles?: Profile;
+}
+
+export interface LedgerEntry {
+  id: string;
+  shift_id?: string;
+  booking_id?: string;
+  customer_id?: string;
+  staff_id: string;
+  type: LedgerType;
+  category: string;
+  amount: number;
+  payment_method_code?: string;
+  description?: string;
+  status: LedgerStatus;
+  void_reason?: string;
+  void_by?: string;
+  meta?: any;
+  created_at: string;
+  profiles?: Profile;
+  bookings?: Booking;
+  customers?: Customer;
 }

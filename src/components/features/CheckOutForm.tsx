@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, List, DollarSign, ShoppingCart, CreditCard, Banknote } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { HotelService } from "@/services/hotel";
 
 interface CheckOutFormProps {
   room: Room;
@@ -65,18 +66,15 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
     }
     setIsCheckingOut(true);
     try {
-      const { data, error } = await supabase.rpc('handle_checkout', { 
-        p_booking_id: room.current_booking_id,
-        p_notes: `[THANH TOÁN NHANH] Phương thức: ${paymentMethod}`,
-        p_payment_method: paymentMethod || 'cash',
-        p_surcharge: 0,
-        p_total_amount: Number(details?.total_amount) || 0
+      await HotelService.checkOut({
+        bookingId: room.current_booking_id,
+        roomId: room.id,
+        totalAmount: Number(details?.total_amount) || 0,
+        paymentMethod: paymentMethod === 'transfer' ? 'BANK_TRANSFER' : (paymentMethod || 'CASH').toUpperCase(),
+        surcharge: 0,
+        amountPaid: Number(details?.total_amount) || 0,
+        notes: `[THANH TOÁN NHANH] Phương thức: ${paymentMethod}`
       });
-      if (error) throw error;
-      
-      if (data?.success === false) {
-        throw new Error(data.message || 'Thanh toán thất bại');
-      }
       
       showNotification(`Phòng ${room.room_number} đã được thanh toán thành công!`, "success")
       onCheckoutSuccess();

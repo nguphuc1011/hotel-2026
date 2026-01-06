@@ -74,9 +74,10 @@ export const PrintableInvoice = React.forwardRef<HTMLDivElement, PrintableInvoic
 
       <div className="border-t-2 border-dashed pt-4">
         <div className="flex justify-between">
-          <p>Tổng cộng:</p>
+          <p>Tiền phòng + Dịch vụ:</p>
           <p>{formatCurrency((pricing?.room_charge || 0) + totalServiceCost)}</p>
         </div>
+        
         <div className="flex justify-between">
           <p>Đã trả trước:</p>
           <p>-{formatCurrency(booking.deposit_amount)}</p>

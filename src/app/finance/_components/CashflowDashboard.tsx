@@ -34,11 +34,12 @@ export const CashflowDashboard: React.FC<CashflowDashboardProps> = ({
       const amount = t.amount || 0;
       const method = t.payment_method || 'cash';
       const catName = (t.category_name || '').toLowerCase();
+      const content = (t.content || '').toLowerCase();
       
       if (t.type === 'income') {
         // Breakdown by source
-        if (catName.includes('phòng')) income.room += amount;
-        else if (catName.includes('dịch vụ') || catName.includes('dv')) income.service += amount;
+        if (catName.includes('phòng') || content.includes('phòng')) income.room += amount;
+        else if (catName.includes('dịch vụ') || catName.includes('dv') || content.includes('dịch vụ')) income.service += amount;
         else income.other += amount;
 
         // Breakdown by method

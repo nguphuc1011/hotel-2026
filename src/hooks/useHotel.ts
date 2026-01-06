@@ -85,13 +85,13 @@ const fetcher = async (key: string) => {
 
 export function useHotel() {
   const { data: rooms, error: roomsError, isLoading: roomsLoading } = useSWR<Room[]>('rooms', fetcher, {
-    revalidateOnFocus: false, // Giảm tần suất fetch lại khi chuyển tab
-    dedupingInterval: 5000,    // Tránh fetch trùng lặp trong 5 giây
+    revalidateOnFocus: true, // Auto-revalidate to ensure status sync
+    dedupingInterval: 2000,   // Shorten deduping to 2s
   });
 
   const { data: settings } = useSWR('settings', fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 60000,   // Cài đặt ít thay đổi, cache lâu hơn
+    dedupingInterval: 60000,   // Settings rarely change
   });
   
   const { data: services } = useSWR('services', fetcher, {

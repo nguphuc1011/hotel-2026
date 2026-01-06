@@ -30,44 +30,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    // Check active sessions and sets the user
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    };
-
-    getSession();
-
-    // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        await fetchProfile(currentUser.id);
-        // TỰ ĐỘNG LẤY VÀ LƯU PUSH TOKEN KHI ĐĂNG NHẬP
-        requestForToken();
-      } else {
-        setProfile(null);
-        if (pathname !== '/login') {
-          router.push('/login');
-        }
-      }
-      setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [pathname, router]);
-
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (currentUser: User) => {
+    const userId = currentUser.id;
     try {
       // 1. Kiểm tra xem profile đã tồn tại chưa
       const { data: existingProfile, error: fetchError } = await supabase
@@ -86,8 +50,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const isActuallyAdmin = 
           existingProfile.username === 'admin' || 
           existingProfile.username?.startsWith('admin@') ||
-          user.email === 'admin@gmail.com' || // Hardcoded fallback for safety
-          user.email?.startsWith('admin@');
+          currentUser.email === 'admin@gmail.com' || // Hardcoded fallback for safety
+          currentUser.email?.startsWith('admin@');
 
         if (isActuallyAdmin && existingProfile.role !== 'admin') {
           const { data: updatedProfile } = await supabase
@@ -107,15 +71,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // 2. Nếu chưa có, tiến hành tạo mới một lần duy nhất
       console.log('Chưa có hồ sơ, đang khởi tạo hồ sơ Admin mặc định...');
-      const { data: { user } } = await supabase.auth.getUser();
+      // currentUser đã được truyền vào, không cần gọi getUser lại
       
-      if (user && user.id === userId) {
+      if (currentUser && currentUser.id === userId) {
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .upsert([
             { 
               id: userId, 
-              username: user.email || userId, 
+              username: currentUser.email || userId, 
               full_name: 'Quản trị viên', 
               role: 'admin',
               permissions: ['MANAGE_STAFF', 'VIEW_REPORTS', 'MANAGE_ROOMS', 'MANAGE_SERVICES', 'CHECKIN_OUT']
@@ -144,6 +108,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('Lỗi hệ thống trong AuthContext:', error);
     }
   };
+
+  useEffect(() => {
+    // Check active sessions and sets the user
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        await fetchProfile(session.user);
+      }
+      setLoading(false);
+    };
+
+    getSession();
+
+    // Listen for changes on auth state (logged in, signed out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        await fetchProfile(currentUser);
+        // TỰ ĐỘNG LẤY VÀ LƯU PUSH TOKEN KHI ĐĂNG NHẬP
+        requestForToken();
+      } else {
+        setProfile(null);
+        if (pathname !== '/login') {
+          router.push('/login');
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [pathname, router]);
 
   const isAdmin = profile?.role === 'admin';
   const isStaff = profile?.role === 'staff' || profile?.role === 'manager' || profile?.role === 'admin';

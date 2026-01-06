@@ -2,10 +2,12 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Room, Service, Customer, TimeRules, CheckInData } from '@/types';
+import { format } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MoreHorizontal, User, Smartphone, CreditCard, Clock, Settings, FileText, Calendar, Scan, AlertTriangle } from 'lucide-react';
+import { X, MoreHorizontal, User, Smartphone, CreditCard, Clock, Settings, FileText, Calendar, Scan, AlertTriangle, Check } from 'lucide-react';
 import { suggestRentalType } from '@/lib/pricing';
+import { useCustomerBalance } from '@/hooks/useCustomerBalance';
 import { ServiceSelector } from './ServiceSelector';
 import { NumericInput } from '@/components/ui/NumericInput';
 import CCCDScanner from '@/app/settings/customers/_components/CCCDScanner';
@@ -47,11 +49,13 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
   }, [isOpen, room, timeRules]);
   const [price, setPrice] = useState(0);
   const [deposit, setDeposit] = useState(0);
+  const [depositMethod, setDepositMethod] = useState('cash');
   const [servicesUsed, setServicesUsed] = useState<Array<{ service_id: string; quantity: number; price: number }>>([]);
   const [note, setNote] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<Customer[]>([]);
+  const [customerBalance, setCustomerBalance] = useState<number>(0);
 
   // Search khách hàng khi gõ tên
   useEffect(() => {
@@ -59,13 +63,26 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
       if (customer.name && customer.name.length >= 1 && isFocused && !isProcessing) {
         const results = await HotelService.searchCustomers(customer.name);
         setSearchResults(results);
+        
+        // Nếu tên thay đổi và không còn khớp với khách đã chọn, xóa ID và balance
+        if (customer.id) {
+          const selected = results.find(r => r.id === customer.id);
+          if (!selected || selected.full_name !== customer.name) {
+            setCustomer(prev => ({ ...prev, id: undefined }));
+            setCustomerBalance(0);
+          }
+        }
       } else {
         setSearchResults([]);
+        if (!customer.name) {
+          setCustomer(prev => ({ ...prev, id: undefined }));
+          setCustomerBalance(0);
+        }
       }
     }, 300); // Debounce 300ms
 
     return () => clearTimeout(searchTimer);
-  }, [customer.name, isFocused, isProcessing]);
+  }, [customer.name, isFocused, isProcessing, customer.id]);
 
   const handleScanComplete = (data: { fullName: string; idNumber: string; dob: string; address: string }) => {
     // Fill form
@@ -78,26 +95,46 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
     
     // Check blacklist logic "Tháo"
     // Tìm trong DB xem khách này có trong blacklist không
-    const checkBlacklist = async () => {
+    const checkCustomerStatus = async () => {
       const { data: existingCust } = await supabase
         .from('customers')
-        .select('notes')
+        .select('*')
         .or(`id_card.eq.${data.idNumber},full_name.ilike.${data.fullName}`)
-        .filter('notes', 'ilike', '%black-list%')
         .maybeSingle();
 
       if (existingCust) {
-        toast.error('Tháo phát hiện khách này cần lưu tâm!', {
-          description: 'Khách hàng này nằm trong danh sách đen hoặc có lịch sử không tốt.',
-          duration: 5000,
-          icon: <AlertTriangle className="text-red-500" />,
-        });
+        // 1. Check blacklist
+        if (existingCust.notes?.toLowerCase().includes('black-list')) {
+          toast.error('Tháo phát hiện khách này cần lưu tâm!', {
+            description: 'Khách hàng này nằm trong danh sách đen hoặc có lịch sử không tốt.',
+            duration: 5000,
+            icon: <AlertTriangle className="text-red-500" />,
+          });
+        }
+
+        // 2. Check debt
+        const bal = Number(existingCust.balance || 0);
+        setCustomerBalance(bal);
+        if (bal < 0) {
+          setCustomer({
+            id: existingCust.id,
+            name: existingCust.full_name,
+            phone: existingCust.phone || '',
+            idCard: existingCust.id_card || '',
+            address: existingCust.address || ''
+          });
+          
+          toast.warning(`Phát hiện nợ cũ: ${formatCurrency(Math.abs(bal))}`, {
+            description: 'Vui lòng xác nhận phương án xử lý nợ.',
+            duration: 4000
+          });
+        }
       } else {
         toast.success('Đã nhận diện thông tin CCCD');
       }
     };
 
-    checkBlacklist();
+    checkCustomerStatus();
   };
 
   // Synchronize numeric price when room or rentalType changes
@@ -121,19 +158,47 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
       setDeposit(0);
       setServicesUsed([]);
       setNote('');
+      setCustomerBalance(0);
     }
   }, [isOpen]);
 
 
-  const handleSelectCustomer = (selected: Customer) => {
+  // Check blacklist logic "Tháo"
+  const handleSelectCustomer = (data: Customer) => {
     setCustomer({
-      id: selected.id,
-      name: selected.full_name,
-      phone: selected.phone,
-      idCard: selected.id_card || '',
-      address: selected.address || ''
+      id: data.id,
+      name: data.full_name,
+      phone: data.phone || '',
+      idCard: data.id_card || '',
+      address: data.address || ''
     });
+    setSearchResults([]);
     setIsFocused(false);
+    
+    // Check blacklist & balance
+    const checkCustomerStatus = async () => {
+      const { data: existingCust } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', data.id)
+        .maybeSingle();
+
+      if (existingCust) {
+        // 1. Check blacklist
+        if (existingCust.notes?.toLowerCase().includes('black-list')) {
+          toast.error('CẢNH BÁO: Khách hàng trong danh sách đen!', {
+            description: 'Vui lòng kiểm tra kỹ lịch sử và ghi chú của khách hàng này.',
+            duration: 5000,
+            icon: <AlertTriangle className="text-red-500" />,
+          });
+        }
+
+        // 2. Update balance
+        setCustomerBalance(existingCust.balance || 0);
+      }
+    };
+
+    checkCustomerStatus();
   };
 
   const handleConfirm = () => {
@@ -154,6 +219,7 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
         rentalType: rentalType,
         price: price,
         deposit: deposit,
+        depositMethod: depositMethod,
         services: servicesUsed,
         notes: note,
       };
@@ -178,7 +244,11 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
 
   const activeIndex = rentalTypes.findIndex(t => t.id === rentalType);
   const serviceTotal = servicesUsed.reduce((sum, s) => sum + (s.price * s.quantity), 0);
-  const totalAmount = price + serviceTotal;
+  
+  // totalAmount includes room price + services - customerBalance (debt is negative, so it adds up)
+  const totalAmount = price + serviceTotal - customerBalance;
+
+  const { isDebt: hasOldDebt, isCredit: hasCredit, absFormattedBalance: formattedOldDebt } = useCustomerBalance(customerBalance);
 
   return (
     <>
@@ -220,6 +290,56 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
               </div>
             </header>
 
+            {/* Debt/Credit Banner inside CheckInModal */}
+            <AnimatePresence>
+              {hasOldDebt && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="bg-rose-600 text-white px-6 py-3 flex items-center justify-between shadow-inner"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                      <AlertTriangle size={16} className="text-white animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-white/80 leading-none">
+                        Khách đang nợ cũ
+                      </p>
+                      <p className="text-sm font-black mt-0.5">{formattedOldDebt}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white/10 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                    Tự động cộng vào công nợ
+                  </div>
+                </motion.div>
+              )}
+              {hasCredit && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="bg-emerald-600 text-white px-6 py-3 flex items-center justify-between shadow-inner"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                      <Check size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-white/80 leading-none">
+                        Khách đang có tiền dư
+                      </p>
+                      <p className="text-sm font-black mt-0.5">{formattedOldDebt}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white/10 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                    Tự động trừ khi trả phòng
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Scrollable Content */}
             <main className="flex-1 overflow-y-auto space-y-8 p-6 scrollbar-hide">
               {/* Customer Inputs */}
@@ -241,17 +361,42 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
                 <div className="space-y-3">
                   <div className="relative">
                     <input
-                      type="text"
-                      placeholder="Họ và tên khách hàng"
-                      value={customer.name || ''}
-                      onFocus={() => setIsFocused(true)}
-                      onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-                      onChange={(e) => setCustomer({...customer, name: e.target.value})}
-                      disabled={isProcessing}
-                      className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50"
-                    />
-                    
-                    {/* Smart Suggestion Dropdown */}
+                        type="text"
+                        placeholder="Họ và tên khách hàng"
+                        value={customer.name || ''}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                        onChange={(e) => setCustomer({...customer, name: e.target.value})}
+                        disabled={isProcessing}
+                        className={cn(
+                          "w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50",
+                          hasOldDebt && "border-rose-300 bg-rose-50",
+                          hasCredit && "border-emerald-300 bg-emerald-50"
+                        )}
+                      />
+                  
+                    {hasOldDebt && (
+                      <div className={cn(
+                        "absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full animate-bounce shadow-lg text-white",
+                        "bg-rose-600"
+                      )}>
+                        <AlertTriangle size={12} />
+                        <span className="text-[10px] font-black uppercase">
+                          {`Nợ: ${formattedOldDebt}`}
+                        </span>
+                      </div>
+                    )}
+                    {hasCredit && (
+                      <div className={cn(
+                        "absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full animate-bounce shadow-lg text-white",
+                        "bg-emerald-600"
+                      )}>
+                        <Check size={12} />
+                        <span className="text-[10px] font-black uppercase">
+                          {`Dư: ${formattedOldDebt}`}
+                        </span>
+                      </div>
+                    )}
                     <AnimatePresence>
                       {searchResults.length > 0 && (
                         <motion.div
@@ -260,22 +405,40 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
                           exit={{ opacity: 0, y: -10 }}
                           className="absolute z-20 w-full bg-white/80 backdrop-blur-2xl border border-white rounded-3xl mt-2 shadow-2xl overflow-hidden divide-y divide-zinc-50"
                         >
-                          {searchResults.map((c: Customer, index: number) => (
-                            <button
-                              key={c.id || `customer-${index}`}
-                              type="button"
-                              onClick={() => handleSelectCustomer(c)}
-                              className="w-full px-5 py-4 text-left hover:bg-blue-50/50 flex items-center gap-4 transition-all group"
-                            >
-                              <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                                <User size={20} />
-                              </div>
-                              <div>
-                                <p className="font-black text-zinc-900 uppercase text-sm">{c.full_name}</p>
-                                <p className="text-xs font-bold text-zinc-400">{c.phone} {c.address ? `• ${c.address}` : ''}</p>
-                              </div>
-                            </button>
-                          ))}
+                          {searchResults.map((c: Customer, index: number) => {
+                            const balance = Number(c.balance || 0);
+                            const hasDebt = balance < 0;
+                            const hasCredit = balance > 0;
+                            return (
+                              <button
+                                key={c.id || `customer-${index}`}
+                                type="button"
+                                onClick={() => handleSelectCustomer(c)}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-all text-left group"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className={cn(
+                                    "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm",
+                                    hasDebt ? "bg-rose-50 text-rose-600" : (hasCredit ? "bg-emerald-50 text-emerald-600" : "bg-slate-50 text-slate-400")
+                                  )}>
+                                    <User size={20} />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors">{c.full_name}</h4>
+                                    <p className="text-slate-400 font-bold text-xs">{c.phone}</p>
+                                  </div>
+                                </div>
+                                {balance !== 0 && (
+                                  <div className={cn(
+                                    "px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider shadow-sm",
+                                    hasDebt ? "bg-rose-600 text-white" : "bg-emerald-600 text-white"
+                                  )}>
+                                    {hasDebt ? 'Nợ: ' : 'Dư: '} {formatCurrency(Math.abs(balance))}
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -377,14 +540,39 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Trả trước</label>
-                  <div className="relative group">
-                    <NumericInput
-                      value={deposit}
-                      onChange={setDeposit}
-                      disabled={isProcessing}
-                      className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-black focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50"
-                      suffix="đ"
-                    />
+                  <div className="flex flex-col gap-2">
+                    <div className="relative group">
+                      <NumericInput
+                        value={deposit}
+                        onChange={setDeposit}
+                        disabled={isProcessing}
+                        className="w-full px-6 py-4 bg-white border border-slate-100 rounded-full shadow-sm text-slate-900 font-black focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50"
+                        suffix="đ"
+                      />
+                    </div>
+                    {deposit > 0 && (
+                      <div className="flex items-center gap-2 px-2">
+                        {[
+                          { id: 'cash', label: 'Tiền mặt', icon: '💵' },
+                          { id: 'transfer', label: 'Chuyển khoản', icon: '🏦' },
+                          { id: 'card', label: 'Thẻ', icon: '💳' }
+                        ].map((method) => (
+                          <button
+                            key={method.id}
+                            onClick={() => setDepositMethod(method.id)}
+                            className={cn(
+                              "flex-1 py-2 px-1 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1 border",
+                              depositMethod === method.id 
+                                ? "bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200" 
+                                : "bg-white text-slate-400 border-slate-100 hover:border-slate-200"
+                            )}
+                          >
+                            <span>{method.icon}</span>
+                            {method.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -410,13 +598,36 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
             {/* iOS Style Glassmorphism Footer - Fixed height */}
              <footer className="relative shrink-0 p-6 pt-4 pb-safe bg-white border-t border-slate-100 flex items-center justify-between z-[10030] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
                <div className="space-y-0.5 pointer-events-none">
-                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Tổng tạm tính</p>
+                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                   {customerBalance !== 0 ? 'Tổng cộng (gồm nợ/dư)' : 'Tổng tạm tính'}
+                 </p>
                  <div className="flex items-baseline gap-1">
-                   <span className="text-2xl font-black text-zinc-900 tracking-tight">
+                   <span className={cn(
+                     "text-2xl font-black tracking-tight",
+                     hasOldDebt ? "text-rose-600" : (hasCredit ? "text-emerald-600" : "text-zinc-900")
+                   )}>
                      {formatCurrency(totalAmount)}
                    </span>
                    <span className="text-zinc-400 font-bold font-serif">đ</span>
                  </div>
+                 {customerBalance !== 0 && (
+                   <p className={cn(
+                     "text-[9px] font-bold uppercase flex items-center gap-1",
+                     hasOldDebt ? "text-rose-500" : "text-emerald-500"
+                   )}>
+                     {hasOldDebt ? (
+                       <>
+                         <AlertTriangle size={10} />
+                         <span>+ {formattedOldDebt} nợ cũ</span>
+                       </>
+                     ) : (
+                       <>
+                         <Check size={10} />
+                         <span>- {formattedOldDebt} tiền dư</span>
+                       </>
+                     )}
+                   </p>
+                 )}
                </div>
                
                <button
@@ -448,7 +659,6 @@ export function CheckInModal({ room, services, timeRules, isOpen, isProcessing =
         </div>
       )}
     </AnimatePresence>
-    
     <CCCDScanner 
         key="cccd-scanner-modal"
         isOpen={isScannerOpen} 
