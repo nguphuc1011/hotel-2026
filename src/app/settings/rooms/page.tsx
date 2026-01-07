@@ -32,14 +32,26 @@ const roomSchema = z.object({
 type RoomFormData = z.infer<typeof roomSchema>;
 
 const fetchRooms = async () => {
-  const { data, error } = await supabase.from('rooms').select('*').order('area').order('room_number');
-  if (error) throw error;
-  return data || [];
+  const { data: rooms, error: roomsError } = await supabase.from('rooms').select('*').order('area').order('room_number');
+  if (roomsError) throw roomsError;
+
+  const { data: settings, error: settingsError } = await supabase.from('settings').select('*').eq('key', 'system_settings').maybeSingle();
+  
+  return {
+    rooms: rooms || [],
+    settings: settings?.value || {}
+  };
 };
 
 // --- MAIN COMPONENT --- //
 export default function RoomsPage() {
-  const { data: rooms = [], error, isLoading: loading } = useSWR('rooms', fetchRooms);
+  const { data, error, isLoading: loading } = useSWR('rooms_and_settings', fetchRooms);
+  const rooms = data?.rooms || [];
+  const settings = data?.settings || {};
+  
+  const baseHours = settings.baseHours || 1;
+  const hourUnit = settings.hourUnit || 60;
+
   const { showNotification } = useNotification();
   const [groupedRooms, setGroupedRooms] = useState<Record<string, Room[]>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -219,7 +231,7 @@ export default function RoomsPage() {
                         <span className="text-xs font-bold text-slate-500">Bán đêm</span>
                       </div>
                       <div className="text-xs font-bold text-blue-600">
-                        {formatCurrency(room.prices?.hourly || 0)}/h đầu
+                        {formatCurrency(room.prices?.hourly || 0)}/{baseHours}h đầu
                       </div>
                     </div>
                   </motion.div>
@@ -255,7 +267,9 @@ export default function RoomsPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         room={editingRoom}
-        onSave={() => mutate('rooms')}
+        onSave={() => mutate('rooms_and_settings')}
+        baseHours={baseHours}
+        hourUnit={hourUnit}
       />
 
       <ConfirmDialog
@@ -276,9 +290,11 @@ interface RoomModalProps {
   onClose: () => void;
   room: Room | null;
   onSave: () => void;
+  baseHours: number;
+  hourUnit: number;
 }
 
-function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
+function RoomModal({ isOpen, onClose, room, onSave, baseHours, hourUnit }: RoomModalProps) {
   const { showNotification } = useNotification();
   const {
     register,
@@ -391,7 +407,7 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
                       control={control}
                       render={({ field }) => (
                         <FormCurrencyInput 
-                          label="Giá giờ đầu" 
+                          label={`Giá gói ${baseHours}h đầu`} 
                           icon={<Clock size={14} />}
                           value={field.value} 
                           onChange={field.onChange} 
@@ -404,7 +420,7 @@ function RoomModal({ isOpen, onClose, room, onSave }: RoomModalProps) {
                       control={control}
                       render={({ field }) => (
                         <FormCurrencyInput 
-                          label="Giá giờ tiếp theo" 
+                          label={`Giá mỗi ${hourUnit}p tiếp`} 
                           icon={<Clock size={14} className="opacity-50" />}
                           value={field.value} 
                           onChange={field.onChange} 
