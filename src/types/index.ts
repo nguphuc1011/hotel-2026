@@ -2,10 +2,26 @@ export type RoomStatus = 'available' | 'hourly' | 'daily' | 'overnight' | 'dirty
 export type RentalType = 'hourly' | 'daily' | 'overnight';
 export type BookingStatus = 'active' | 'completed' | 'cancelled';
 
+export interface RoomCategory {
+  id: string;
+  name: string;
+  prices: {
+    hourly: number;
+    next_hour: number;
+    overnight: number;
+    daily: number;
+  };
+  surcharge_hourly_rate: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Room {
   id: string;
   room_number: string;
   room_type: string;
+  category_id?: string;
+  category?: RoomCategory;
   area: string;
   status: RoomStatus;
   prices: {
@@ -197,8 +213,12 @@ export interface TimeRules {
   // --- NHÓM 3: PHỤ THU & MỐC TRÒN NGÀY ---
   surcharge_method?: 'percent' | 'fixed';
   enableAutoSurcharge?: boolean;
-  early_rules: Array<{ from: string; to: string; percent: number; amount?: number }>;
-  late_rules: Array<{ from: string; to: string; percent: number; amount?: number }>;
+  early_mode?: 'milestone' | 'hourly';
+  late_mode?: 'milestone' | 'hourly';
+  early_hour_rate?: number;
+  late_hour_rate?: number;
+  early_rules: Array<{ from: string; to: string; percent: number; amount?: number; type?: 'percent' | 'amount' }>;
+  late_rules: Array<{ from: string; to: string; percent: number; amount?: number; type?: 'percent' | 'amount' }>;
   full_day_early_before?: string;
   full_day_late_after?: string;
   

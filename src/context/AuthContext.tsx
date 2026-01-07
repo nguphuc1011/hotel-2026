@@ -127,6 +127,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('Lỗi hệ thống trong AuthContext:', error);
     } finally {
       console.timeEnd(`[Hiệu Năng] Tổng thời gian lấy Hồ sơ User (ID: ${userId})`);
+      setLoading(false); // QUÂN LỆNH: Luôn luôn hạ cờ loading dù thành công hay thất bại
     }
   };
 
@@ -167,23 +168,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
+    // QUÂN LỆNH: BỘ ĐẾM TỬ THẦN 5 GIÂY - KHAI THÔNG CỔNG THÀNH
+    const gateTimeout = setTimeout(() => {
+      if (loading) {
+        // eslint-disable-next-line no-console
+        console.warn('[Auth] Cổng thành kẹt quá 5s! Cưỡng chế mở cổng...');
+        setLoading(false);
+      }
+    }, 5000);
+
     // Check active sessions and sets the user
     const getSession = async () => {
       let retryCount = 0;
-      const maxRetries = 3;
+      const maxRetries = 2; // Giảm số lần thử để nhanh hơn
 
       while (retryCount < maxRetries) {
-        // 30s safety timeout for session fetch
+        // 5s safety timeout for session fetch (Điều 4.1)
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session fetch timeout')), 30000)
+          setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
         );
 
         try {
           console.time('[Hiệu Năng] Kết nối Session Supabase');
           const sessionPromise = supabase.auth.getSession();
+          const sessionResult = await Promise.race([sessionPromise, timeoutPromise]);
+          
+          if (!sessionResult) {
+            throw new Error('Session fetch timeout');
+          }
+
           const {
             data: { session },
-          } = (await Promise.race([sessionPromise, timeoutPromise])) as any;
+          } = sessionResult as any;
           console.timeEnd('[Hiệu Năng] Kết nối Session Supabase');
 
           const currentUser = session?.user ?? null;
@@ -201,11 +217,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           if (retryCount >= maxRetries) {
             if (error.message === 'Session fetch timeout') {
-              _handleAuthFailure('Hết thời gian kết nối (Timeout 30s)');
+              _handleAuthFailure('Hết thời gian kết nối (Timeout 5s)');
             }
           } else {
-            // Wait 1s before retry
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            // Wait 500ms before retry
+            await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
       }
@@ -227,7 +243,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         requestForToken();
       } else {
         setProfile(null);
-        if (pathname !== '/login') {
+        // Chỉ redirect nếu không phải đang ở trang login
+        if (window.location.pathname !== '/login') {
           router.push('/login');
         }
       }
@@ -235,9 +252,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => {
+      clearTimeout(gateTimeout);
       subscription.unsubscribe();
     };
-  }, [pathname, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]); // THANH TRỪNG VÒNG LẶP: Loại bỏ pathname khỏi dependencies
 
   const isAdmin = profile?.role === 'admin';
   const isStaff =

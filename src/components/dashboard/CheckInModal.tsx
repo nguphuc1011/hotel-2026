@@ -2,10 +2,9 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Room, Service, Customer, TimeRules, CheckInData } from '@/types';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency, suggestRentalType } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MoreHorizontal, User, Clock, Calendar, Scan, AlertTriangle, Check } from 'lucide-react';
-import { suggestRentalType } from '@/lib/pricing';
 import { useCustomerBalance } from '@/hooks/useCustomerBalance';
 import { ServiceSelector } from './ServiceSelector';
 import { NumericInput } from '@/components/ui/NumericInput';
@@ -149,15 +148,18 @@ export function CheckInModal({
 
   // Synchronize numeric price when room or rentalType changes
   useEffect(() => {
-    if (isOpen && room && room.prices) {
-      const priceForType = room.prices[rentalType as keyof typeof room.prices];
-      if (typeof priceForType === 'number' && priceForType > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setPrice(priceForType);
-      } else if (typeof priceForType === 'number' && priceForType === 0) {
-        // Fallback to room's default hourly if specific type is 0 (unlikely but possible)
-
-        setPrice(room.prices.hourly || 0);
+    if (isOpen && room) {
+      // Ưu tiên lấy giá từ category, nếu không có mới dùng room.prices
+      const targetPrices = room.category?.prices || room.prices;
+      if (targetPrices) {
+        const priceForType = targetPrices[rentalType as keyof typeof targetPrices];
+        if (typeof priceForType === 'number' && priceForType > 0) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setPrice(priceForType);
+        } else if (typeof priceForType === 'number' && priceForType === 0) {
+          // Fallback to default hourly if specific type is 0
+          setPrice(targetPrices.hourly || 0);
+        }
       }
     }
   }, [isOpen, room, rentalType]);
@@ -310,9 +312,16 @@ export function CheckInModal({
                   <h2 className="font-black text-2xl text-slate-800 uppercase tracking-tight">
                     Nhận phòng
                   </h2>
-                  <p className="text-slate-400 font-bold text-[10px] tracking-[0.2em] uppercase mt-1">
-                    Phòng {room.room_number}
-                  </p>
+                  <div className="flex items-center justify-center gap-2 mt-1">
+                    <p className="text-slate-400 font-bold text-[10px] tracking-[0.2em] uppercase">
+                      Phòng {room.room_number}
+                    </p>
+                    {room.category?.name && (
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black rounded-full uppercase tracking-wider border border-blue-100">
+                        {room.category.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </header>
 

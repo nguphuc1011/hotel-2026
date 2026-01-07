@@ -153,26 +153,36 @@ export const HotelService = {
    * TÍNH TOÁN HÓA ĐƠN TỪ DATABASE (Pricing Brain V2)
    */
   async calculateBill(bookingId: string) {
-    const { data, error } = await supabase.rpc('calculate_booking_bill_v2', {
+    if (!bookingId || bookingId === 'undefined') {
+      console.error('[HotelService] calculateBill bị gọi với bookingId không hợp lệ:', bookingId);
+      return { success: false, message: 'ID đặt phòng không hợp lệ' };
+    }
+
+    const { data, error } = await supabase.rpc('calculate_booking_bill', {
       p_booking_id: bookingId
     });
 
     if (error) {
       // eslint-disable-next-line no-console
-      console.error('[HotelService] Lỗi tính hóa đơn:', {
+      console.error('[HotelService] Lỗi RPC calculate_booking_bill:', {
         message: error.message,
         details: error.details,
         hint: error.hint,
-        code: error.code,
-        bookingId: bookingId
+        code: error.code
       });
-      return null;
+      
+      return { 
+        success: false, 
+        message: `Lỗi hệ thống (RPC): ${error.message || 'Không có phản hồi'}`,
+        total_amount: 0,
+        final_amount: 0
+      };
     }
 
     if (data && data.success === false) {
       // eslint-disable-next-line no-console
       console.warn('[HotelService] RPC trả về thất bại:', data.message);
-      return null;
+      return data;
     }
 
     return data;
@@ -268,13 +278,14 @@ export const HotelService = {
     // Gọi RPC handle_checkout (Unified - Alphabetical parameters)
     const { data: { user } } = await supabase.auth.getUser();
 
+    // Ensure we pass parameters correctly to the UNIFIED handle_checkout
     const { data, error } = await supabase.rpc('handle_checkout', {
       p_booking_id: params.bookingId,
-      p_notes: fullNotes || '',
-      p_payment_method: params.paymentMethod || 'cash',
+      p_amount_paid: Number(params.amountPaid) || 0,
+      p_payment_method: params.paymentMethod || 'CASH',
       p_surcharge: Number(params.surcharge) || 0,
       p_discount: Number(params.discount) || 0,
-      p_amount_paid: Number(params.amountPaid) || 0,
+      p_notes: fullNotes || '',
       p_staff_id: user?.id || null
     });
 

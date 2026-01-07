@@ -25,14 +25,26 @@ Mục tiêu là đưa toàn bộ logic nghiệp vụ phức tạp (Tính tiền,
 
 ## 3. Nhật ký cập nhật (Update Logs)
 
-### [2026-01-07] - Khởi tạo Lộ trình
-- **Nội dung**: Thiết lập file theo dõi `RPC.md`.
-- **Trạng thái**: Đã sẵn sàng khung sườn.
-- **Hành động tiếp theo**: Phân tích logic trong `pricing.ts` để chuyển đổi sang PL/pgSQL.
+### [2026-01-08] - Chuẩn hóa Tuyệt đối (DRY & Database-first)
+- **Nội dung**: Hợp nhất và chuẩn hóa hệ thống RPC Checkout.
+- **Trạng thái**: Đã triển khai (Hệ thống mới).
+- **Thay đổi chính**: 
+    - Khai tử `calculate_booking_bill_v2`, thống nhất dùng `calculate_booking_bill`.
+    - Chuẩn hóa `handle_checkout`: DB tự tính toán tiền, Frontend không cần gửi `p_total_amount`.
+    - Cấp quyền thực thi (`GRANT EXECUTE`) cho các role, dập tắt lỗi RPC {}.
+    - Trả về `total_final` và `final_payment_required` để hiển thị chính xác số tiền cần thu.
 
 ---
 
-## 4. Nguyên tắc thiết kế RPC (Kỷ luật)
+## 4. Danh mục RPC hiện tại (Reference)
+| Tên hàm | Tham số | Đầu ra | Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `calculate_booking_bill` | `p_booking_id: uuid` | `jsonb` | (Single Source of Truth) Trả về chi tiết hóa đơn chuẩn hóa. |
+| `handle_checkout` | `p_booking_id: uuid, ...` | `jsonb` | (Atomic) Hoàn tất thanh toán và cập nhật trạng thái hệ thống. |
+
+---
+
+## 5. Nguyên tắc thiết kế RPC (Kỷ luật)
 1. **Atomic**: Một hàm RPC phải xử lý trọn vẹn một nghiệp vụ (ví dụ: Check-out = Tính tiền + Đổi trạng thái phòng + Ghi sổ nợ + Ghi log).
 2. **Input Validation**: Luôn kiểm tra dữ liệu đầu vào trong SQL để tránh lỗi logic.
 3. **Performance First**: Sử dụng Index và Join tối ưu để đảm bảo tốc độ phản hồi < 200ms.

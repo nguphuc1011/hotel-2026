@@ -15,12 +15,15 @@
 - `PrintableInvoice.tsx` & `PrintableDebtReceipt.tsx`: Các component chuyên trách để in hóa đơn và phiếu thu nợ.
 
 ## 3. Hệ thống Logic & Service
-- `src/lib/pricing.ts`: Chứa hàm `calculateRoomPrice` - Tính tiền dựa trên `RentalType` (Giờ/Ngày/Đêm).
-- `src/services/hotel.ts`: `HotelService` - Chứa các hàm nghiệp vụ chính (`checkIn`, `checkOut`, `payDebt`). Tích hợp hệ thống "Mắt Thần" và **Hệ thống Sổ cái (Ledger)** để quản lý dòng tiền theo ca.
+- `src/services/hotel.ts`: `HotelService` - Trung tâm điều phối nghiệp vụ. Tuân thủ tuyệt đối quy tắc **RPC-Only Calculation**: Mọi phép tính tiền phòng, dịch vụ, thuế phí đều được đẩy xuống Database xử lý thông qua `calculate_booking_bill`. Frontend chỉ đóng vai trò hiển thị và gửi tham số.
 - `src/services/events.ts`: `EventService` - Ghi log các sự kiện quan trọng (Audit Trail).
 - `src/types/index.ts`: Định nghĩa toàn bộ Interface (Room, Booking, Customer, PricingBreakdown).
 
 ## 4. Cấu trúc Database (Supabase)
 - **Bảng chính**: `rooms`, `bookings`, `customers`, `services`.
+- **Bảng cấu hình**: `settings` (Chứa `compiled_pricing_strategy` - Bản đồ số học đã biên dịch).
 - **Bảng tài chính**: `transactions`, `financial_transactions`, `cashflow_transactions`.
-- **Hệ thống RPC**: `handle_check_in`, `handle_checkout` (Đảm bảo tính nguyên tử).
+- **Hệ thống RPC & Trigger (Core Engine)**:
+    - `fn_compile_pricing_strategy()`: (Trigger) Tự động biên dịch quy tắc giá thành JSONB khi có thay đổi cấu hình.
+    - `calculate_booking_bill`: (Arithmetic Engine) Tính toán hóa đơn dựa trên bản đồ số học, triệt tiêu IF/ELSE.
+    - `handle_check_in`, `handle_checkout`: Đảm bảo tính nguyên tử của giao dịch.

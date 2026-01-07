@@ -233,65 +233,7 @@ export default function Dashboard() {
 ```
 
 #### **C. src/lib/pricing.ts (Logic tính tiền)**
-File xử lý tính toán giá giờ, ngày, qua đêm và phụ thu muộn theo DOCUMENTATION.md.
-
-```typescript
-import { differenceInMinutes, addDays } from 'date-fns';
-import { Booking, TimeRules } from '@/types';
-
-export interface PricingResult { price: number; note: string; }
-
-export class PricingLogic {
-  static calculate(booking: Partial<Booking> & { next_hour_price?: number }, timeRules: TimeRules): PricingResult {
-    if (!booking.check_in_at || !booking.initial_price) return { price: 0, note: '' };
-    const checkIn = new Date(booking.check_in_at);
-    const checkOut = booking.check_out_at ? new Date(booking.check_out_at) : new Date();
-    const diffMinutes = differenceInMinutes(checkOut, checkIn);
-    if (diffMinutes < 0) return { price: 0, note: 'Lỗi thời gian' };
-
-    switch (booking.rental_type) {
-      case 'hourly': return this.calculateHourly(booking.initial_price, booking.next_hour_price || booking.initial_price, diffMinutes);
-      case 'daily': return this.calculateDaily(booking.initial_price, checkIn, checkOut, timeRules);
-      case 'overnight': return { price: booking.initial_price, note: 'Qua đêm' };
-      default: return { price: booking.initial_price, note: '' };
-    }
-  }
-
-  static checkOvernightAutoSuggest(checkIn: Date, timeRules: TimeRules): boolean {
-    if (!timeRules?.overnight) return false;
-    const [startH, startM] = timeRules.overnight.start.split(':').map(Number);
-    const [endH, endM] = timeRules.overnight.end.split(':').map(Number);
-    const currentMins = checkIn.getHours() * 60 + checkIn.getMinutes();
-    const startMins = startH * 60 + startM;
-    const endMins = endH * 60 + endM;
-    return startMins > endMins ? (currentMins >= startMins || currentMins <= endMins) : (currentMins >= startMins && currentMins <= endMins);
-  }
-
-  private static calculateHourly(basePrice: number, nextHourPrice: number, minutes: number): PricingResult {
-    const hours = Math.max(1, Math.ceil(minutes / 60));
-    return hours === 1 ? { price: basePrice, note: '1 giờ đầu' } : { price: basePrice + (hours - 1) * nextHourPrice, note: `${hours} giờ` };
-  }
-
-  private static calculateDaily(dailyPrice: number, checkIn: Date, checkOut: Date, timeRules: TimeRules): PricingResult {
-    if (!timeRules) return { price: Math.max(1, Math.ceil(differenceInMinutes(checkOut, checkIn) / 1440)) * dailyPrice, note: 'Theo ngày' };
-    const [coH, coM] = (timeRules.check_out || "12:00").split(':').map(Number);
-    let standardCheckOut = addDays(new Date(checkIn), 1);
-    standardCheckOut.setHours(coH, coM, 0, 0);
-    const diffMinutesAfterCheckout = differenceInMinutes(checkOut, standardCheckOut);
-    let dayCount = 1, extraCharge = 0, note = '';
-
-    if (diffMinutesAfterCheckout > 0) {
-      dayCount += Math.floor(diffMinutesAfterCheckout / 1440);
-      const remainingMinutes = diffMinutesAfterCheckout % 1440;
-      const hoursLate = remainingMinutes / 60;
-      const appliedRule = timeRules.late_rules?.find(rule => hoursLate >= parseFloat(rule.from) && hoursLate <= parseFloat(rule.to));
-      if (appliedRule) { extraCharge = (appliedRule.percent / 100) * dailyPrice; note = ` (Phụ thu ${appliedRule.percent}%)`; }
-      else if (hoursLate >= 6) { dayCount += 1; note = ' (Quá giờ tính 1 ngày)'; extraCharge = 0; }
-    }
-    return { price: (dayCount * dailyPrice) + extraCharge, note: `Ở ${dayCount} ngày${note}` };
-  }
-}
-```
+> **ĐÃ XÓA**: Logic đã chuyển sang Database RPC (`calculate_booking_bill_v2`) để đảm bảo tính nhất quán.
 
 #### **D. src/components/dashboard/CheckInModal.tsx (Giao diện Drawer)**
 Modal nhận phòng dạng Drawer chuẩn iOS, tối ưu cho thao tác chạm và tự động đề xuất giá Qua đêm.

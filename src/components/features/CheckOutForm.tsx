@@ -19,13 +19,18 @@ interface CheckoutDetails {
   check_in_at: string;
   duration_string: string;
   room_charge: number;
+  early_surcharge: number;
+  late_surcharge: number;
   service_charges: {
     name: string;
     quantity: number;
     price: number;
     total: number;
   }[];
-  total_amount: number;
+  total_amount: number; // Doanh thu đơn này
+  deposit: number;      // Tiền cọc
+  old_balance: number;  // Nợ cũ
+  final_amount: number; // Tổng thực thu
 }
 
 export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
@@ -45,9 +50,25 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
     const fetchDetails = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase.rpc('get_checkout_details', { p_booking_id: room.current_booking_id });
-        if (error) throw error;
-        setDetails(data);
+        const bill = await HotelService.calculateBill(room.current_booking_id!);
+        if (bill && bill.success) {
+          console.log('[CheckOutForm] Dữ liệu bill từ RPC:', bill);
+          // Ánh xạ dữ liệu từ calculate_booking_bill (Single Source of Truth)
+          setDetails({
+            check_in_at: bill.check_in_at,
+            duration_string: bill.duration_text || 'Đang tính...',
+            room_charge: Number(bill.room_charge) || 0,
+            early_surcharge: Number(bill.early_surcharge) || 0,
+            late_surcharge: Number(bill.late_surcharge) || 0,
+            service_charges: bill.services_list || [],
+            total_amount: Number(bill.booking_revenue) || Number(bill.total_amount) || 0,
+            deposit: Number(bill.deposit) || 0,
+            old_balance: Number(bill.customer_balance) || 0,
+            final_amount: Number(bill.total_final) || 0
+          });
+        } else {
+          throw new Error(bill?.message || 'Không thể tính toán hóa đơn');
+        }
       } catch (error: any) {
         console.error("Error fetching checkout details:", error);
         showNotification("Không thể lấy chi tiết hóa đơn: " + error.message, "error");
@@ -72,7 +93,8 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
         totalAmount: Number(details?.total_amount) || 0,
         paymentMethod: paymentMethod === 'transfer' ? 'BANK_TRANSFER' : (paymentMethod || 'CASH').toUpperCase(),
         surcharge: 0,
-        amountPaid: Number(details?.total_amount) || 0,
+        discount: Number(details?.discount_amount) || 0,
+        amountPaid: Number(details?.final_amount) || 0, // Dùng final_amount để thu đủ cả nợ cũ
         notes: `[THANH TOÁN NHANH] Phương thức: ${paymentMethod}`
       });
       
@@ -114,20 +136,62 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
         <h3 className="font-semibold text-slate-800 flex items-center gap-2"><List className="h-5 w-5"/> Chi tiết hóa đơn</h3>
         <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
           <div className="flex justify-between">
-            <span>Tiền phòng ({room.status})</span>
+            <span className="text-slate-600">Tiền phòng ({room.status})</span>
             <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(details.room_charge)}</span>
           </div>
+          {(details.early_surcharge > 0 || details.late_surcharge > 0) && (
+            <>
+              {details.early_surcharge > 0 && (
+                <div className="flex justify-between text-amber-600">
+                  <span>Phụ phí nhận sớm</span>
+                  <span className="font-medium">+{new Intl.NumberFormat('vi-VN').format(details.early_surcharge)}</span>
+                </div>
+              )}
+              {details.late_surcharge > 0 && (
+                <div className="flex justify-between text-amber-600">
+                  <span>Phụ phí trả muộn</span>
+                  <span className="font-medium">+{new Intl.NumberFormat('vi-VN').format(details.late_surcharge)}</span>
+                </div>
+              )}
+            </>
+          )}
+          
           {details.service_charges.length > 0 && (
             <>
-              <Separator />
-              <p className="font-medium text-sm pt-1 flex items-center gap-1.5"><ShoppingCart className="h-4 w-4"/> Dịch vụ đã dùng:</p>
-              {details.service_charges.map(item => (
-                <div key={item.name} className="flex justify-between text-sm text-slate-600 pl-4">
+              <Separator className="my-1" />
+              <p className="font-medium text-xs text-slate-500 uppercase tracking-wider flex items-center gap-1.5 pt-1">
+                <ShoppingCart className="h-3 w-3"/> Dịch vụ:
+              </p>
+              {details.service_charges.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-sm text-slate-600 pl-4">
                   <span>{item.name} <span className="text-slate-400">x{item.quantity}</span></span>
                   <span>{new Intl.NumberFormat('vi-VN').format(item.total)}</span>
                 </div>
               ))}
             </>
+          )}
+
+          <Separator className="my-1" />
+          <div className="flex justify-between font-bold text-slate-800 pt-1">
+            <span>Doanh thu đơn phòng</span>
+            <span>{new Intl.NumberFormat('vi-VN').format(details.total_amount)}</span>
+          </div>
+
+          {(details.old_balance !== 0 || details.deposit > 0) && (
+            <div className="mt-2 space-y-1 bg-slate-50 p-2 rounded border border-dashed border-slate-200">
+              {details.old_balance !== 0 && (
+                <div className={cn("flex justify-between text-sm", details.old_balance < 0 ? "text-rose-600" : "text-emerald-600")}>
+                  <span>{details.old_balance < 0 ? "Nợ cũ mang sang" : "Tiền dư khách có"}</span>
+                  <span className="font-medium">{details.old_balance < 0 ? "" : "+"}{new Intl.NumberFormat('vi-VN').format(Math.abs(details.old_balance))}</span>
+                </div>
+              )}
+              {details.deposit > 0 && (
+                <div className="flex justify-between text-sm text-emerald-600">
+                  <span>Tiền cọc đã trả</span>
+                  <span className="font-medium">-{new Intl.NumberFormat('vi-VN').format(details.deposit)}</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -166,10 +230,17 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
       </div>
 
       {/* Total */}
-      <div className="rounded-lg bg-blue-50 p-4">
-        <div className="flex justify-between items-center">
-          <span className="text-lg font-bold text-blue-900 flex items-center gap-2"><DollarSign className="h-6 w-6"/> TỔNG CỘNG</span>
-          <span className="text-2xl font-bold text-blue-900">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(details.total_amount)}</span>
+      <div className="rounded-lg bg-blue-600 p-4 shadow-inner">
+        <div className="flex justify-between items-center text-white">
+          <span className="text-lg font-bold flex items-center gap-2">
+            <DollarSign className="h-6 w-6"/> CẦN THANH TOÁN
+          </span>
+          <div className="text-right">
+            <span className="text-3xl font-black">
+              {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(details.final_amount)}
+            </span>
+            {details.final_amount <= 0 && <p className="text-[10px] opacity-80 uppercase font-bold tracking-widest">Khách không cần trả thêm</p>}
+          </div>
         </div>
       </div>
 

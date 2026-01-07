@@ -76,7 +76,9 @@ export default function CheckoutModal({
     if (discountType === 'amount') return discountValue;
     if (!pricingBreakdown) return 0;
     const baseForDiscount =
-      (pricingBreakdown.room_charge || 0) + (pricingBreakdown.service_charge || 0) + (pricingBreakdown.surcharge || 0);
+      (pricingBreakdown.base_price ?? pricingBreakdown.room_charge ?? 0) + 
+      (pricingBreakdown.service_total ?? pricingBreakdown.service_charge ?? 0) + 
+      ((pricingBreakdown.surcharge_early || 0) + (pricingBreakdown.surcharge_late || 0) + (pricingBreakdown.surcharge || 0));
     return Math.round((baseForDiscount * discountValue) / 100);
   }, [discountType, discountValue, pricingBreakdown]);
 
@@ -96,7 +98,7 @@ export default function CheckoutModal({
   }, [isOpen, booking?.customer_id]);
 
   const totalCalculations = useMemo(() => {
-    if (!pricingBreakdown) {
+    if (!pricingBreakdown || Object.keys(pricingBreakdown).length === 0) {
       return {
         roomCharge: 0,
         serviceCharge: 0,
@@ -108,18 +110,24 @@ export default function CheckoutModal({
     }
 
     // Single Source of Truth: Use RPC calculated total
-    // pricingBreakdown.total_amount = revenue - deposit - balance
-    const rpcTotalToPay = pricingBreakdown.total_amount || 0;
+    // RPC: total_final (hóa đơn + nợ cũ), booking_revenue (doanh thu đơn này)
+    const rpcTotalToPay = Number(pricingBreakdown.total_final ?? pricingBreakdown.final_amount ?? 0);
     
+    if (rpcTotalToPay === 0 && (pricingBreakdown.room_charge || pricingBreakdown.base_price)) {
+        console.warn('[CheckoutModal] CẢNH BÁO: rpcTotalToPay bằng 0 dù có tiền phòng!', pricingBreakdown);
+    }
+
     // Adjust for checkout-time modifiers
     const totalToCollect = rpcTotalToPay - discount + manualSurcharge;
 
+    const rpcSurcharge = (Number(pricingBreakdown.early_surcharge) || 0) + (Number(pricingBreakdown.late_surcharge) || 0) + (Number(pricingBreakdown.custom_surcharge) || 0) + (Number(pricingBreakdown.surcharge) || 0);
+
     return {
-      roomCharge: pricingBreakdown.room_charge || 0,
-      serviceCharge: pricingBreakdown.service_charge || 0,
-      surcharges: (pricingBreakdown.surcharge || 0) + manualSurcharge,
-      subTotal: (pricingBreakdown.booking_revenue || 0) - discount + manualSurcharge,
-      taxAmount: (pricingBreakdown.tax_details?.room_tax || 0) + (pricingBreakdown.tax_details?.service_tax || 0),
+      roomCharge: Number(pricingBreakdown.room_charge) || Number(pricingBreakdown.base_price) || 0,
+      serviceCharge: Number(pricingBreakdown.service_charge) || Number(pricingBreakdown.service_total) || 0,
+      surcharges: rpcSurcharge + manualSurcharge,
+      subTotal: Number(pricingBreakdown.total_final ?? pricingBreakdown.booking_revenue ?? 0) - discount + manualSurcharge,
+      taxAmount: (Number(pricingBreakdown.tax_details?.room_tax) || 0) + (Number(pricingBreakdown.tax_details?.service_tax) || 0),
       totalToCollect,
     };
   }, [
@@ -230,7 +238,7 @@ export default function CheckoutModal({
                       </span>
                       <span className="text-slate-300">•</span>
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        {pricingBreakdown?.summary?.duration_text || '...'}
+                        {pricingBreakdown?.duration_text ?? pricingBreakdown?.summary?.duration_text ?? '...'}
                       </span>
                     </div>
                   </div>
@@ -239,7 +247,13 @@ export default function CheckoutModal({
 
               {/* Body */}
               <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6">
-                <div className="max-w-xl mx-auto space-y-4">
+                {!pricingBreakdown || Object.keys(pricingBreakdown).length === 0 ?
+                  <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Đang tính toán hóa đơn...</p>
+                  </div>
+                :
+                  <div className="max-w-xl mx-auto space-y-4">
                   {/* Simplified Summary Card */}
                   <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                     <div className="p-6 space-y-3">
@@ -248,12 +262,18 @@ export default function CheckoutModal({
                           <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
                             Tiền phòng
                           </span>
-                          {pricingBreakdown?.summary && (
+                          {(pricingBreakdown?.summary || pricingBreakdown?.duration_text) && (
                             <span className="text-[10px] text-slate-300 font-medium italic">
-                              ({pricingBreakdown.summary.days
-                                ? `${pricingBreakdown.summary.days} ngày`
-                                : `${pricingBreakdown.summary.hours} giờ`}{' '}
-                              x {formatCurrency(pricingBreakdown.summary.base_price || 0)})
+                              {pricingBreakdown.summary ? (
+                                <>
+                                  ({pricingBreakdown.summary.days
+                                    ? `${pricingBreakdown.summary.days} ngày`
+                                    : `${pricingBreakdown.summary.hours} giờ`}{' '}
+                                  x {formatCurrency(pricingBreakdown.summary.base_price || 0)})
+                                </>
+                              ) : (
+                                <>({pricingBreakdown.duration_text})</>
+                              )}
                             </span>
                           )}
                         </div>
@@ -540,7 +560,8 @@ export default function CheckoutModal({
                     />
                   </div>
                 </div>
-              </main>
+              }
+            </main>
 
               {/* Footer */}
               <footer className="sticky bottom-0 bg-white border-t border-slate-100 p-6 z-30 flex gap-4 shrink-0">

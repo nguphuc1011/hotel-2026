@@ -48,7 +48,6 @@ Lưu vết mọi biến động tài chính. Đây là nguồn dữ liệu duy n
 ## 4. CẤU TRÚC CODE & TRÁNH TRÙNG LẶP
 
 - **`src/services/hotel.ts`**: Chứa các hàm Service tập trung gọi RPC (`checkIn`, `checkOut`, `payDebt`).
-- **`src/lib/pricing.ts`**: Chứa logic tính toán tiền phòng đồng nhất giữa Frontend và Backend.
 - **`src/components/shared/CustomerDetail.tsx`**: Hiển thị hồ sơ nợ và lịch sử Ledger duy nhất cho toàn ứng dụng.
 
 ---

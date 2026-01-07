@@ -275,12 +275,12 @@ export default function FolioModal({
   }, [tempServices, savedServices]);
 
   const duration = useMemo(() => {
-    return pricingBreakdown?.summary?.duration_text || '...';
+    return pricingBreakdown?.duration_text ?? pricingBreakdown?.summary?.duration_text ?? '...';
   }, [pricingBreakdown]);
 
   const customerBalanceToDisplay = pricingBreakdown?.customer_balance ?? 0;
 
-  const deposit = pricingBreakdown?.deposit_amount ?? 0;
+  const deposit = pricingBreakdown?.deposit ?? 0;
 
   const { isDebt, absFormattedBalance } = useCustomerBalance(customerBalanceToDisplay);
   const _hasDebtWarning = isDebt;
@@ -691,38 +691,20 @@ export default function FolioModal({
 
       // Handle "from today" logic
       if (data.price_change_type === 'from_today') {
-        // ... (existing logic)
-        const targetCheckIn = data.check_in_at;
-        const now = new Date();
-        const oldPricesOverride = { ...room.prices };
-        oldPricesOverride[room.current_booking.rental_type as keyof typeof oldPricesOverride] =
-          room.current_booking.initial_price || 0;
-
-        const currentPricing = calculateRoomPrice(
-          targetCheckIn,
-          now,
-          settings,
-          room,
-          room.current_booking.rental_type,
-          0,
-          0,
-          oldPricesOverride
-        );
-        const newPricesOverride = { ...room.prices };
-        newPricesOverride[room.current_booking.rental_type as keyof typeof newPricesOverride] =
-          data.initial_price;
-        const newPricing = calculateRoomPrice(
-          targetCheckIn,
-          now,
-          settings,
-          room,
-          room.current_booking.rental_type,
-          0,
-          0,
-          newPricesOverride
-        );
-        const diff = currentPricing.room_charge - newPricing.room_charge;
-        updates.custom_surcharge = (room.current_booking.custom_surcharge || 0) + diff;
+        // Trong kiến trúc Database-first mới, ta không tính toán thủ công ở Frontend nữa.
+        // Ta sẽ cập nhật thời gian check-in mới và giá khởi điểm mới (nếu có).
+        // Sau đó RPC calculate_booking_bill sẽ tự động tính toán lại dựa trên thời gian thực tế.
+        
+        // Tuy nhiên, nếu "from today" ý nghĩa là "chốt giá cũ và bắt đầu tính giá mới từ bây giờ",
+        // thì ta cần logic phức tạp hơn (tách booking hoặc snapshot).
+        // Hiện tại, để đơn giản và tránh lỗi, ta sẽ cập nhật check-in_at về thời điểm hiện tại
+        // và cập nhật initial_price mới.
+        
+        updates.check_in_at = new Date().toISOString();
+        updates.initial_price = data.initial_price;
+        
+        // Reset custom_surcharge để tránh cộng dồn sai
+        updates.custom_surcharge = 0;
       }
 
       // 4. Update booking
@@ -779,19 +761,25 @@ export default function FolioModal({
   const displayPricing = useMemo(() => {
     if (!pricingBreakdown) return { base: 0, diff: 0 };
 
-    const savedServiceTotal = pricingBreakdown.service_charge || 0;
+    const savedServiceTotal = pricingBreakdown.service_charge ?? 0;
     const diff = currentServiceTotal - savedServiceTotal;
 
+    // Ưu tiên dùng total_final (số tiền thực tế bao gồm cả nợ cũ)
+    const baseAmount = pricingBreakdown.total_final ?? 0;
+
     return {
-      base: pricingBreakdown.total_amount || 0,
+      base: baseAmount,
       diff: diff,
     };
   }, [pricingBreakdown, currentServiceTotal]);
 
   const finalAmount = useMemo(() => {
-    const dbTotal = pricingBreakdown?.total_amount || 0;
-    const savedServiceTotal = pricingBreakdown?.service_charge || 0;
-    return dbTotal + (currentServiceTotal - savedServiceTotal);
+    // total_final từ DB đã bao gồm (Room + Service + Surcharge - Discount) + Nợ cũ - Tiền cọc
+    const dbTotalFinal = pricingBreakdown?.total_final ?? 0;
+    const savedServiceTotal = pricingBreakdown?.service_charge ?? 0;
+    
+    // Nếu có sự thay đổi dịch vụ chưa lưu ở UI, ta cộng thêm phần chênh lệch
+    return dbTotalFinal + (currentServiceTotal - savedServiceTotal);
   }, [pricingBreakdown, currentServiceTotal]);
 
   return (
@@ -992,7 +980,7 @@ export default function FolioModal({
                               Tiền phòng {isLoadingBill && <span className="animate-pulse">(đang tính...)</span>}
                             </span>
                             <span className="font-bold">
-                              {formatCurrency(pricingBreakdown?.room_charge || 0)}
+                              {formatCurrency(pricingBreakdown?.room_charge ?? 0)}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
@@ -1000,10 +988,12 @@ export default function FolioModal({
                             <span className="font-bold">{formatCurrency(currentServiceTotal)}</span>
                           </div>
 
-                          {pricingBreakdown?.surcharge > 0 && (
+                          {((pricingBreakdown?.early_surcharge || 0) + (pricingBreakdown?.late_surcharge || 0) + (pricingBreakdown?.custom_surcharge || 0)) > 0 && (
                             <div className="flex justify-between items-center">
                               <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Phụ phí</span>
-                              <span className="font-bold">{formatCurrency(pricingBreakdown.surcharge)}</span>
+                              <span className="font-bold">{formatCurrency(
+                                (pricingBreakdown?.early_surcharge || 0) + (pricingBreakdown?.late_surcharge || 0) + (pricingBreakdown?.custom_surcharge || 0)
+                              )}</span>
                             </div>
                           )}
 

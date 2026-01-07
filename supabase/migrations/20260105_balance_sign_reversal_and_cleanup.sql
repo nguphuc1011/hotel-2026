@@ -61,14 +61,11 @@ BEGIN
     p_notes, p_services_used, 'active'
   ) RETURNING id INTO v_booking_id;
 
-  -- 3. Cập nhật visit_count và last_visit cho khách
-  -- balance < 0 là Nợ, > 0 là Dư
-  -- Tiền cọc (Deposit) làm TĂNG số dư (positive)
+  -- 3. Cập nhật visit_count và last_visit cho khách (Balance đã được Trigger xử lý tự động từ Ledger)
   UPDATE customers 
   SET 
     visit_count = COALESCE(visit_count, 0) + 1,
-    last_visit = p_check_in_at,
-    balance = COALESCE(balance, 0) + p_deposit_amount
+    last_visit = p_check_in_at
   WHERE id = v_customer_id;
 
   -- 4. Ghi nhận Tiền cọc vào Ledger (nếu có)

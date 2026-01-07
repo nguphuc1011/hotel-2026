@@ -9,10 +9,13 @@
 6. Gọi RPC `handle_check_in` để khóa phòng và tạo Booking. Xử lý tiền cọc thủ công nếu RPC không hỗ trợ.
 
 ## 2. Quy trình Tính tiền (Pricing Logic - Pricing Brain V2)
-- **Nguồn dữ liệu (Source of Truth)**: Toàn bộ logic tính giá được tập trung tại Database RPC `public.calculate_booking_bill_v2`. Frontend tuyệt đối không tự tính lại giá để tránh sai lệch.
+- **Kiến trúc "Trung dung" (Compiler & Engine)**:
+    - **Bộ biên dịch (Strategy Compiler)**: Một Trigger trên bảng `settings` tự động biên dịch các quy tắc phức tạp (giờ, ngày, đêm, phụ phí sớm/muộn) thành một "Bản đồ số học" (JSONB) lưu tại `settings.compiled_pricing_strategy`.
+    - **Động cơ tính tiền (Arithmetic Engine)**: RPC `public.calculate_booking_bill` chỉ thực hiện các phép tính số học dựa trên "Bản đồ" đã có sẵn, triệt tiêu hoàn toàn các câu lệnh IF/ELSE phức tạp tại thời điểm runtime, đảm bảo tốc độ phản hồi cực nhanh và logic nhất quán 100%.
+- **Nguồn dữ liệu (Source of Truth)**: Toàn bộ logic tính giá được tập trung tại Database RPC. Frontend tuyệt đối không tự tính lại giá để tránh sai lệch.
 - **Cơ chế tính Giờ**: Giá gói đầu (ví dụ: 1h hoặc 2h) + Giá các giờ tiếp theo. Hỗ trợ thời gian ân hạn (Grace period) cấu hình trong `settings`.
-- **Cơ chế tính Đêm**: Giá cố định cho khung giờ qua đêm. Hỗ trợ tự động tính phụ phí check-in sớm hoặc check-out muộn dựa trên `early_rules` và `late_rules`.
-- **Cơ chế tính Ngày**: Tính theo số đêm. Check-out sau giờ quy định (ví dụ: 12h trưa) sẽ tính thêm phụ phí hoặc cộng thêm ngày tùy theo mức độ trễ.
+- **Cơ chế tính Đêm**: Giá cố định cho khung giờ qua đêm. Hỗ trợ tự động tính phụ phí check-in sớm hoặc check-out muộn dựa trên `early_rules` và `late_rules` đã được biên dịch sẵn.
+- **Cơ chế tính Ngày**: Tính theo số đêm. Check-out sau giờ quy định (ví dụ: 12h trưa) sẽ tính thêm phụ phí hoặc cộng thêm ngày tùy theo mức độ trễ dựa trên bản đồ chiến lược.
 - **Hợp nhất Công nợ & Tiền cọc**:
     - `Tổng thanh toán = Doanh thu phòng + Dịch vụ + Thuế + Phụ phí - Tiền cọc + Nợ cũ`.
     - Con số cuối cùng được RPC tính toán sẵn giúp nhân viên thu tiền chính xác 100%.

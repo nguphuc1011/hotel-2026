@@ -103,6 +103,10 @@ BEGIN
             CASE NEW.type
                 WHEN 'PAYMENT', 'DEPOSIT' THEN v_delta := NEW.amount;
                 WHEN 'REVENUE', 'REFUND' THEN v_delta := -NEW.amount;
+                WHEN 'EXPENSE' THEN
+                    IF NEW.category = 'DISCOUNT' THEN v_delta := NEW.amount; -- Discount reduces debt (increases balance)
+                    ELSE v_delta := 0;
+                    END IF;
                 WHEN 'DEBT_ADJUSTMENT' THEN 
                     IF (NEW.meta->>'direction') = 'plus' THEN v_delta := NEW.amount;
                     ELSE v_delta := -NEW.amount;
@@ -150,6 +154,7 @@ SET balance = (
         CASE 
             WHEN type IN ('PAYMENT', 'DEPOSIT') THEN amount
             WHEN type IN ('REVENUE', 'REFUND') THEN -amount
+            WHEN type = 'EXPENSE' AND category = 'DISCOUNT' THEN amount
             WHEN type = 'DEBT_ADJUSTMENT' AND (meta->>'direction') = 'plus' THEN amount
             WHEN type = 'DEBT_ADJUSTMENT' AND (meta->>'direction') != 'plus' THEN -amount
             ELSE 0

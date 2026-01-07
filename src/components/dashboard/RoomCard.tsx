@@ -139,12 +139,13 @@ export const RoomCard = memo(function RoomCard({ room, onClick }: RoomCardProps)
       }
     }
 
-    // Gọi RPC tính giá từ Database (Pricing Brain V2)
+    // Gọi RPC tính giá từ Database (Single Source of Truth)
     const fetchBill = async () => {
       if (!room.current_booking?.id) return;
       const bill = await HotelService.calculateBill(room.current_booking.id);
       if (bill && bill.success) {
-        setAmountToCollect(bill.total_amount || 0);
+        // total_final là con số cuối cùng sau khi đã tính toán mọi thứ ở DB
+        setAmountToCollect(bill.total_final || 0);
       }
     };
     
@@ -207,6 +208,14 @@ export const RoomCard = memo(function RoomCard({ room, onClick }: RoomCardProps)
               >
                 <AlertTriangle size={12} className="animate-pulse" />
               </motion.div>
+            )}
+            {room.category?.name && (
+              <span className={cn(
+                "rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider backdrop-blur-md mr-1",
+                isOccupied ? "bg-white/20 text-white" : "bg-blue-100 text-blue-700"
+              )}>
+                {room.category.name}
+              </span>
             )}
             {isOccupied ? (
               (room.current_booking?.notes || room.current_booking?.customer?.notes) ? (
@@ -271,7 +280,7 @@ export const RoomCard = memo(function RoomCard({ room, onClick }: RoomCardProps)
             <div className="flex flex-col items-start leading-tight">
               <span className="text-[13px] font-bold opacity-80 text-white">Giá ngày</span>
               <span className="text-[22px] font-black tracking-tighter text-white">
-                {formatCurrency(room.prices?.daily || 0)}
+                {formatCurrency((room.category?.prices?.daily || room.prices?.daily) || 0)}
               </span>
             </div>
           </div>

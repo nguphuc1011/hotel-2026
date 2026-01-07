@@ -7,11 +7,10 @@ import { useEffect } from 'react';
 
 const fetcher = async (key: string) => {
   if (key === 'rooms') {
-    console.time('[Hiệu Năng] Tải danh sách Phòng & Booking');
     try {
       // 1. Lấy danh sách phòng và booking SONG SONG
       const [roomsResult, bookingsResult] = await Promise.all([
-        supabase.from('rooms').select('*').order('room_number'),
+        supabase.from('rooms').select('*, category:room_categories(*)').order('room_number'),
         supabase
           .from('bookings')
           .select('*, customer:customers(full_name, balance)')
@@ -64,8 +63,6 @@ const fetcher = async (key: string) => {
     } catch (error) {
       // Error handled by SWR
       throw error;
-    } finally {
-      console.timeEnd('[Hiệu Năng] Tải danh sách Phòng & Booking');
     }
   }
 

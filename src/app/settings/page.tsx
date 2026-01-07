@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   LogOut,
   User,
+  Building2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -58,7 +59,7 @@ export default function SettingsPage() {
     {
       id: 'rooms',
       title: 'Quản lý Phòng',
-      description: 'Cấu hình danh sách phòng & giá',
+      description: 'Cấu hình danh sách phòng & loại phòng',
       icon: Hotel,
       color: 'text-purple-500',
       bg: 'bg-purple-50',

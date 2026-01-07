@@ -15,7 +15,13 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && profile) {
+    if (!loading) {
+      if (!profile) {
+        // QUÂN LỆNH: Cổng thành mở mà không có lệnh bài (profile) -> Tống ra ngoài
+        router.push('/login');
+        return;
+      }
+      
       if (!allowedRoles.includes(profile.role)) {
         toast.error('Bệ Hạ chưa ban quyền cho khanh vào địa bàn này!');
         router.push('/');
