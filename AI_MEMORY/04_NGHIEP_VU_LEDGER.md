@@ -55,6 +55,8 @@ Ngày: 05/01/2026
     - DEPOSIT: +amount (tiền cọc làm tăng balance)
     - REVENUE: -amount (doanh thu làm giảm balance/tăng nợ)
     - REFUND: -amount (trả lại tiền làm giảm balance)
+    - EXPENSE (category DISCOUNT): +amount (giảm giá làm tăng balance/giảm nợ)
+    - DEBT_ADJUSTMENT: +amount (nếu direction = 'plus') hoặc -amount (nếu direction = 'minus')
 
 Ví dụ SQL tham chiếu (để đối chiếu khi cần kiểm toán):
 

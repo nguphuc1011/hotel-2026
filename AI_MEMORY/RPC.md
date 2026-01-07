@@ -25,14 +25,15 @@ Mục tiêu là đưa toàn bộ logic nghiệp vụ phức tạp (Tính tiền,
 
 ## 3. Nhật ký cập nhật (Update Logs)
 
-### [2026-01-08] - Chuẩn hóa Tuyệt đối (DRY & Database-first)
-- **Nội dung**: Hợp nhất và chuẩn hóa hệ thống RPC Checkout.
-- **Trạng thái**: Đã triển khai (Hệ thống mới).
+### [2026-01-08] - Bình Định Công Nợ & Chuẩn hóa Signature
+- **Nội dung**: Giải quyết triệt để lỗi nhân đôi nợ và lỗi xung đột hàm (Ambiguous signature).
+- **Trạng thái**: Đã triển khai.
 - **Thay đổi chính**: 
-    - Khai tử `calculate_booking_bill_v2`, thống nhất dùng `calculate_booking_bill`.
-    - Chuẩn hóa `handle_checkout`: DB tự tính toán tiền, Frontend không cần gửi `p_total_amount`.
-    - Cấp quyền thực thi (`GRANT EXECUTE`) cho các role, dập tắt lỗi RPC {}.
-    - Trả về `total_final` và `final_payment_required` để hiển thị chính xác số tiền cần thu.
+    - **Khôi phục `calculate_booking_bill_v2`**: Là bộ não tính toán chính, xử lý logic Strategy, phụ phí và giảm giá.
+    - **Chuẩn hóa `handle_checkout` (7 tham số)**: 
+        - Tham số: `p_booking_id`, `p_amount_paid`, `p_payment_method`, `p_surcharge`, `p_discount`, `p_notes`, `p_staff_id`.
+        - Loại bỏ cơ chế cập nhật balance thủ công, chuyển giao hoàn toàn cho Trigger sổ cái.
+    - **Dọn dẹp Database**: Xóa bỏ tất cả các bản cũ của hàm checkout để tránh lỗi "Could not choose the best candidate".
 
 ---
 

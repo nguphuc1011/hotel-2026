@@ -21,26 +21,32 @@ Dưới đây là các tệp tin (.tsx) có hiển thị hoặc thao tác trực
 
 ## 2. LOGIC CẢNH BÁO & TÍNH TOÁN
 
-### Cơ chế cảnh báo:
+### Cơ chế cảnh báo (Quy ước chuẩn 2026):
 - **Quy ước số dư (`balance`):** 
-  - `balance > 0`: Khách đang **NỢ** khách sạn.
-  - `balance < 0`: Khách đang **DƯ** tiền (trả trước hoặc cọc dư).
-- **Cảnh báo Check-in:** Khi chọn khách hàng, nếu `balance > 0`, hệ thống hiện popup/badge cảnh báo "Khách đang nợ: [Số tiền]".
-- **Cảnh báo Check-out:** Nếu `Số tiền thực trả < Tổng thu thực tế`, hệ thống tính toán khoản nợ phát sinh và cộng dồn với nợ cũ để cảnh báo người dùng trước khi xác nhận.
+  - `balance < 0`: Khách đang **NỢ** khách sạn (Âm tiền).
+  - `balance > 0`: Khách đang **DƯ** tiền/Cọc dư (Dương tiền).
+- **Cảnh báo Check-in:** Khi chọn khách hàng, nếu `balance < 0`, hệ thống hiện popup/badge cảnh báo màu đỏ: "Khách đang nợ: [Số tiền]".
+- **Cảnh báo Check-out:** Hệ thống lấy nợ cũ cộng dồn với chênh lệch hóa đơn hiện tại để đưa ra con số nợ mới chuẩn xác.
 
-### Công thức tính "Tổng thu thực tế" (Frontend):
-Hệ thống tính toán tại `CheckOutModal.tsx` (sử dụng logic từ `pricing.ts`):
+### Công thức tính "Tổng thu thực tế" (Database RPC):
+Từ phiên bản 2.2, toàn bộ việc tính toán hóa đơn được thực hiện bởi RPC `calculate_booking_bill_v2` trong Database để đảm bảo Single Source of Truth:
 
-$$ \text{Tổng thu thực tế} = (\text{Tiền phòng} + \text{Tiền dịch vụ} + \text{Phụ thu} - \text{Giảm giá}) + \text{VAT} - \text{Tiền cọc} $$
-
-- **Tiền phòng:** Tính dựa trên thời gian thực tế và loại hình thuê (Giờ/Ngày/Đêm).
-- **Tiền dịch vụ:** Tổng các item trong `services_used`.
-- **Phụ thu:** Gồm phụ thu check-in sớm, check-out muộn và phụ thu tùy chỉnh.
-- **Tiền cọc:** Số tiền khách đã đưa lúc check-in hoặc nộp thêm trong quá trình ở.
+$$ \text{Total\_Final} = (\text{Room\_Charge} + \text{Service\_Charge} + \text{Surcharge}_{Early/Late} + \text{Surcharge}_{Custom}) - \text{Discount} $$
 
 ---
 
-## 3. ĐỒNG BỘ LEDGER (SỔ CÁI)
+## 3. ĐỒNG BỘ LEDGER & TỰ ĐỘNG HÓA SỐ DƯ (2026-01-08)
+
+### Loại bỏ Double-Counting (Nhân đôi nợ):
+Trước đây, hệ thống vừa cập nhật balance thủ công vừa ghi Ledger gây ra lỗi cộng dồn sai. 
+**Giải pháp mới:** 
+1. RPC `handle_checkout` CHỈ thực hiện ghi chép các bút toán vào Ledger.
+2. Trigger `fn_sync_customer_balance` tự động theo dõi bảng Ledger và cập nhật `customers.balance` theo thời gian thực.
+
+### Luồng ghi chép chuẩn:
+- **Tiền phòng/Dịch vụ/Phụ phí:** Ghi `type = 'REVENUE'` (làm GIẢM balance - tăng nợ).
+- **Thanh toán của khách:** Ghi `type = 'PAYMENT'` (làm TĂNG balance - giảm nợ).
+- **Giảm giá (Discount):** Ghi `type = 'EXPENSE'`, `category = 'DISCOUNT'` (làm TĂNG balance - giảm nợ).
 
 ### Các hàm Service ghi Ledger:
 Các hàm này nằm trong `src/services/hotel.ts`:

@@ -18,6 +18,13 @@
 - [ ] Xây dựng hệ thống báo cáo doanh thu theo tháng/năm chuyên sâu.
 
 ## 3. Nhật ký thay đổi
+- **2026-01-08**:
+    - **Chiến dịch "Bình Định Công Nợ" (Xử lý lỗi double-counting & RPC Signature)**:
+        - **Khắc phục lỗi nhân đôi nợ**: Loại bỏ hoàn toàn việc cập nhật `balance` thủ công trong `handle_checkout`. Chuyển sang cơ chế **Trigger-based Synchronization** (Tự động cập nhật số dư từ Ledger).
+        - **Chuẩn hóa RPC handle_checkout**: Hợp nhất và xóa bỏ các phiên bản lỗi gây lỗi "Ambiguous function signature". Thiết lập bản chuẩn duy nhất với 7 tham số tương thích hoàn toàn với Frontend.
+        - **Nâng cấp Động cơ tính tiền (Pricing Brain V2.2)**: Khôi phục và tối ưu hóa `calculate_booking_bill_v2`, xử lý chính xác Giảm giá (`discount`) và Phụ phí tùy chỉnh (`custom_surcharge`) vào doanh thu thực tế.
+        - **Logic Giảm giá chuyên sâu**: Cập nhật Trigger `fn_sync_customer_balance` để xử lý loại `EXPENSE/DISCOUNT`, đảm bảo khi giảm giá cho khách thì nợ của khách được giảm trừ một cách hợp lệ.
+        - **Bảo toàn dữ liệu (Data Integrity)**: Cập nhật lại toàn bộ `balance` của khách hàng dựa trên lịch sử Ledger chuẩn sau khi áp dụng logic mới.
 - **2026-01-07**:
     - **Chiến dịch "Khai Thông Cổng Thành" (Điều 4, 11, 14)**:
         - Khắc phục triệt để lỗi "Vòng xoáy tử thần" (treo màn hình trắng khi xác thực).

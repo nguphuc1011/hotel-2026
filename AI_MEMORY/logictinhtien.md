@@ -29,17 +29,19 @@ Mọi hóa đơn đều bắt đầu từ việc xác định "Hình thức ở"
    
    - Ân hạn đầu: Khách vào phòng 15 phút rồi ra (do phòng xấu, điều hòa hỏng) -> Không tính tiền.
    - Ân hạn cuối: Khách trả muộn 15 phút (do đợi thang máy, dọn đồ chậm) -> Không tính phụ phí muộn.
-### PHẦN 3: TỔNG HỢP HÓA ĐƠN CUỐI CÙNG (FINAL SETTLEMENT)
-Công thức tổng quát để bất kỳ trường hợp nào cũng ra kết quả:
+### PHẦN 3: TỔNG HỢP HÓA ĐƠN CUỐI CÙNG (FINAL SETTLEMENT - Cập nhật 01/2026)
+Công thức tổng quát để bất kỳ trường hợp nào cũng ra kết quả (Thực thi bởi RPC `calculate_booking_bill_v2`):
 
-[TỔNG DOANH THU] = [Giá phòng gốc] + [Phụ thu sớm/muộn] + [Tiền Dịch vụ] + [Phụ thu thêm người]
+$$ [TỔNG DOANH THU] = [Giá phòng gốc] + [Phụ thu sớm/muộn] + [Phụ thu tùy chỉnh] + [Tiền Dịch vụ] - [Giảm giá] $$
 
-[SỐ TIỀN THỰC THU] = [TỔNG DOANH THU] - [Tiền Cọc] - [Nợ cũ/Tiền thừa của Khách]
+**Quy ước về Nợ cũ (Customer Balance):**
+Để đồng nhất với hệ thống Ledger, quy ước dấu đã được chuẩn hóa lại như sau:
+- **Nếu khách đang nợ (Ví dụ nợ 500k):** `Balance = -500,000` (Số âm). Số tiền cần thu thêm sẽ tăng lên.
+- **Nếu khách đang dư tiền/cọc (Ví dụ dư 200k):** `Balance = 200,000` (Số dương). Số tiền cần thu sẽ giảm đi.
 
-Giải thích về Nợ cũ (Balance):
-
-- Nếu khách đang nợ 500k (Balance = -500k): Số tiền phải trả sẽ tăng thêm 500k.
-- Nếu khách đang có tiền dư 200k (Balance = 200k): Số tiền phải trả sẽ giảm đi 200k.
+**Công thức thanh toán:**
+$$ [SỐ TIỀN CẦN THU] = [TỔNG DOANH THU] - [Tiền Cọc] - [Số dư hiện tại (Balance)] $$
+*(Nếu kết quả là số dương: Khách phải trả thêm. Nếu là số âm: Khách đang dư tiền).*
 ### PHẦN 4: CHIẾN LƯỢC "TRUNG DUNG" (BẢN ĐỒ CHIẾN LƯỢC)
 Để RPC không bao giờ tính sai, ta thực hiện quy trình "Nén" tại Frontend:
 
