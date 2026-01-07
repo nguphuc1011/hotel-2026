@@ -1,38 +1,75 @@
-# 🤖 HƯỚNG DẪN ĐIỀU HÀNH AI (00_QUY_DINH_BAT_BUOC.md)
+ĐẠI QUÂN LUẬT ĐIỀU HÀNH AI (PHIÊN BẢN HIẾN PHÁP TỐI CAO - 13 ĐIỀU)
+CẢNH BÁO TỐI CAO: File này là "Hệ điều hành" của dự án. AI KHÔNG ĐƯỢC PHÉP lờ đi bất kỳ quy định nào. Mọi hành vi lách luật sẽ bị coi là phản nghịch.
 
-> **CẢNH BÁO TỐI CAO**: File này là "Hệ điều hành" cho trí nhớ của AI. AI KHÔNG ĐƯỢC PHÉP lờ đi bất kỳ quy định nào dưới đây.
+ĐIỀU 1: TRÍ NHỚ VÀ QUY TRÌNH TỰ ĐỘNG (BẮT BUỐC)
+1.1. Luôn Luôn Đọc: Trước khi bắt đầu, AI phải đọc toàn bộ tài liệu trong AI_MEMORY (00 đến 04).
 
-## 1. NHIỆM VỤ CỐT LÕI
-Bạn không chỉ là người viết code, bạn là người bảo soát tri thức. Mỗi hành động của bạn trên codebase PHẢI được phản ánh vào thư mục `AI_MEMORY`.
+1.2. Tự Động Cập Nhật: Sau mỗi tác vụ, AI phải tự thực hiện 4 bước cập nhật hồ sơ (03, 02, 01, 04) mà không cần nhắc nhở. Việc không ghi chép đồng nghĩa với việc chưa hoàn thành.
 
-## 2. QUY TRÌNH KIỂM TRA ĐẦU VÀO (Mỗi khi bắt đầu Chat mới)
-AI phải đọc các file trong `c:\hotel-app\AI_MEMORY\` theo đúng thứ tự:
-1. `00_QUY_DINH_BAT_BUOC.md`: Để hiểu cách hành xử.
-2. `03_TIEN_DO_DU_AN.md`: Để biết mình đang đứng ở đâu.
-3. `01_CAU_TRUC_DU_AN.md` & `02_NGHIEP_VU_KHACH_SAN.md`: Để hiểu hệ thống.
+ĐIỀU 2: CHIẾN LƯỢC DỮ LIỆU LÀ GỐC (DATABASE FIRST)
+2.1. SQL Quyết Định Giao Diện: Tuyệt đối không sửa .tsx, .ts khi cấu trúc dữ liệu chưa được phê duyệt.
 
-## 3. QUY TRÌNH TỰ ĐỘNG CẬP NHẬT (BẮT BUỐC - KHÔNG CẦN NHẮC)
-Sau mỗi lần bạn hoàn thành một tác vụ (ví dụ: tạo file mới, sửa logic tính tiền, thêm bảng DB), bạn **PHẢI TỰ ĐỘNG** thực hiện các bước sau trước khi trả lời người dùng:
+2.2. Minh Bạch SQL: Mọi thay đổi DB phải trình Script thuần (CREATE, ALTER, REPLACE) để chủ nhân tự tay thực thi.
 
-- **BƯỚC 1**: Cập nhật `03_TIEN_DO_DU_AN.md` -> Đưa việc vừa làm vào phần "Đã hoàn thành", cập nhật "Nhật ký thay đổi" với ngày giờ và nội dung chi tiết.
-- **BƯỚC 2**: Nếu có logic mới -> Cập nhật `02_NGHIEP_VU_KHACH_SAN.md`.
-- **BƯỚC 3**: Nếu có cấu trúc file mới -> Cập nhật `01_CAU_TRUC_DU_AN.md`.
-- **BƯỚC 4**: Kiểm tra lại file `04_THONG_SO_KY_THUAT.md` nếu có thay đổi về Database hoặc Tech Stack.
+ĐIỀU 3: BẢO TỒN VÀ KẾ THỪA (TÔN TRỌNG DI SẢN)
+3.1. Giá Trị Cũ Là Thánh Chỉ: Cấm xóa bỏ hoặc làm sai lệch logic đang vận hành ổn định.
 
-## 5. PHONG CÁCH GIAO TIẾP VỚI NGƯỜI DÙNG
-- **Ngôn ngữ tự nhiên**: Tuyệt đối không dùng thuật ngữ kỹ thuật khó hiểu (code, database, schema...) khi giải thích cho người dùng.
-- **Ngắn gọn & Trực diện**: Trả lời thẳng vào vấn đề, không giải thích dài dòng về cách code hoạt động trừ khi được hỏi.
-- **Tư duy cộng sự**: Coi người dùng là chủ đầu tư/quản lý khách sạn, không phải là lập trình viên.
+3.2. Đối Chiếu Dự Phòng: Bản dự phòng ổn định nhất là tiêu chuẩn tối cao để đối chiếu hiệu quả.
 
-## 6. QUY ĐỊNH VỀ DATABASE & SQL
-- **Cung cấp Script**: Khi có bất kỳ thay đổi nào về cấu trúc Database (tạo bảng, thêm cột, sửa hàm...), AI PHẢI cung cấp đầy đủ câu lệnh SQL (Script) cho người dùng để họ tự chạy trên hệ thống thật.
-- **Không âm thầm**: Tuyệt đối không được chỉ tạo file migration trong code mà không báo cáo script SQL cho người dùng.
-1. CẤM TỰ Ý SỬA GIAO DIỆN (FRONT-END): Tuyệt đối không được chạm vào bất kỳ file .tsx, .ts, hay .css nào khi ta chưa phê duyệt cấu trúc Database (SQL) tương ứng. Mọi sự thay đổi giao diện phải đi sau sự ổn định của dữ liệu.
+ĐIỀU 4: TRÁCH NHIỆM VẬN HÀNH (HIỆU SUẤT VÀ AN TOÀN)
+4.1. Quy Tắc Phòng Thủ Toàn Diện: Mọi đoạn mã phải có cơ chế dọn dẹp (Cleanup) và tự ngắt (Timeout). Cấm để rò rỉ RAM, CPU hay treo vòng lặp vô tận.
 
-2. CẤM 'TIỀN TRẢM HẬU TẤU' VỚI SQL: Ngươi chỉ được phép soạn thảo SQL vào các file local. Cấm tuyệt đối việc giả định rằng ta đã chạy SQL đó trên Supabase rồi tự ý sửa code giao diện để gọi hàm mới. Việc này đã làm dự án của ta bị sập và ta không chấp nhận sai lầm này lần thứ hai!
+4.2. Báo Cáo Trước - Thực Thi Sau: Phải trình bày giải pháp (Pseudocode) trước khi đặt bút viết mã nguồn.
 
-3. CẤM XÓA BỎ LOGIC CŨ ĐANG CHẠY TỐT: Khi tối ưu hóa (như vụ 844ms), ngươi chỉ được phép 'thêm' hoặc 'thay thế có kiểm soát'. Cấm xóa bỏ các logic nghiệp vụ (pricing, folio, checkout) mà ta đã dày công xây dựng trừ khi ta ra lệnh trực tiếp.
+ĐIỀU 5: PHONG THÁI VÀ NGÔN NGỮ (TƯ DUY CỘNG SỰ)
+5.1. Tiếng Việt Duy Nhất: 100% giao tiếp bằng tiếng Việt tự nhiên, trực diện.
 
-4. CHẾ ĐỘ 'BÁO CÁO TRƯỚC - LÀM SAU': Trước khi thực hiện bất kỳ thay đổi lớn nào ảnh hưởng đến luồng dữ liệu (Data Flow), ngươi phải trình bày bản vẽ (Pseudocode hoặc SQL schema) lên đây. Ta gật đầu mới được viết code, ta phê chuẩn code mới được nạp vào máy.
+5.2. Ngôn Ngữ Điều Hành: Không dùng thuật ngữ kỹ thuật khó hiểu. Trình bày ở góc độ người quản lý khách sạn.
 
-5. CÔNG LÝ CỦA BẢN DỰ PHÒNG: Bản dự phòng của ta là 'Thánh chỉ' [cite: 19-07-2025]. Mọi hành động của ngươi làm lệch lạc hoặc hư hỏng so với bản dự phòng ổn định nhất sẽ được coi là lỗi của ngươi, đừng dùng kỹ thuật để đổ lỗi cho ta!
+ĐIỀU 6: CHỐNG LƯỜI BIẾNG VÀ ĐOÁN MÒ (XÁC THỰC THỰC ĐỊA)
+6.1. Tuyệt Đối Không Suy Đoán: Mọi hành động phải dựa trên dữ liệu thực tế. Không biết thì hỏi, cấm làm bừa.
+
+6.2. Xác Minh Trước Khi Chốt: Tự kiểm tra lại các điều kiện biên và lỗi trước khi báo cáo hoàn thành.
+
+ĐIỀU 7: QUY TẮC TỐI GIẢN VÀ ĐỘC NHẤT (CHỐNG DƯ THỪA & TRÙNG LẶP)
+7.1. Nguyên Tắc Độc Nhất (DRY): Mỗi vấn đề chỉ được xử lý tại một nơi duy nhất. Áp dụng cho cả DB, Logic Backend và UI Components.
+
+7.2. Quét Sạch Code Rác: Cấm để lại code thừa, biến không dùng, comment vô nghĩa. Code phải sạch và tinh gọn.
+
+7.3. Cấm Hardcode: Mọi tham số phải lấy từ bảng settings. Cấm ghi chết giá trị vào logic.
+
+ĐIỀU 8: QUY TRÌNH QUẢN TRỊ RỐI LOẠN (DỰ BÁO TÁC ĐỘNG)
+8.1. Phân Tích Tác Động: Trước khi sửa code cũ, phải trình báo các tính năng liên quan sẽ bị ảnh hưởng.
+
+8.2. Tính Hệ Thống: Code mới phải tuân thủ tuyệt đối cấu trúc và phong cách của toàn bộ dự án.
+
+ĐIỀU 9: TIÊU CHUẨN LẬP TRÌNH CAO CẤP (SENIOR STANDARDS)
+9.1. Đặt Tên Tường Minh: Tên hàm/biến phải phản ánh chức năng bằng ngôn ngữ nghiệp vụ khách sạn.
+
+9.2. Logic Chặt Chẽ: Ưu tiên giải pháp đơn giản nhưng hiệu quả cao. Cấm phức tạp hóa vấn đề.
+
+ĐIỀU 10: NGUYÊN TẮC "ĐỘC NHẤT VÔ NHỊ" TRONG DATABASE
+10.1. Cấm Tạo Mới Khi Chưa Tìm Cũ: Trước khi tạo Function/RPC, AI phải truy vấn hệ thống để tìm logic tương tự.
+
+10.2. Cấm "Phân Thân" Hàm: Mọi nghiệp vụ chỉ được phép tồn tại trong MỘT HÀM DUY NHẤT trên Database. Cấm đẻ thêm hàm _v2, _new.
+
+ĐIỀU 11: TRÁCH NHIỆM TỰ ĐỘNG RÀ SOÁT VÀ THANH TRỪNG
+11.1. Tự Động Thanh Trừng: AI phải chủ động rà soát và đề xuất hợp nhất các logic/bảng/file bị trùng lặp ngay khi phát hiện.
+
+11.2. Hợp Nhất Dứt Điểm: Khi đã nâng cấp, phải xóa sạch dấu vết cũ (file thừa, hàm thừa) để giữ hệ thống tinh gọn.
+
+ĐIỀU 12: ÁP DỤNG TRÙNG LẶP TRÊN GIAO DIỆN (UI)
+12.1. Cấm Copy-Paste Components: Một linh kiện giao diện chỉ được viết một lần. Trang khác cần thì phải dùng chung (Reuse).
+
+12.2. Gom Nhóm Logic UI: Các hàm định dạng, tính toán ở Front-end phải đưa vào thư mục chung (utils/hooks).
+
+ĐIỀU 13: KỶ LUẬT HỒ SƠ CHỨC NĂNG
+13.1. Đánh Dấu Lãnh Thổ: AI phải cập nhật danh sách các hàm/linh kiện cốt lõi vào 04_THONG_SO_KY_THUAT.md để ngăn chặn việc tạo trùng lặp sau này.
+ĐIỀU 14: KỶ LUẬT CHỐNG LỖI DÂY CHUYỀN (REGRESSION CONTROL)
+14.1. Cấm Sửa Lỗi Kiểu "Chắp Vá": AI không được phép sửa lỗi theo cách gây ảnh hưởng tiêu cực đến các tính năng liên quan. Trước khi sửa, phải rà soát toàn bộ chuỗi logic (Data Flow) để đảm bảo tính đồng bộ.
+
+14.2. Kiểm Thử Toàn Diện (End-to-End Mindset): Sau khi hoàn thành một chức năng hoặc sửa một lỗi, AI phải tự mình giả lập các tình huống: "Nếu ta làm thế này thì chỗ kia có hỏng không?". Phải kiểm tra ít nhất 3 kịch bản: Luồng đúng, Luồng sai (Edge cases), và Tác động liên đới.
+
+14.3. Trách Nhiệm Giải Trình: Nếu để xảy ra tình trạng "sửa lỗi này đẻ lỗi kia" do cẩu thả, AI phải tự rà soát lại toàn bộ quy trình, tìm ra nguyên nhân gốc rễ và khắc phục triệt để trên toàn hệ thống mà không được để Bệ hạ phải nhắc lại lần thứ hai.
+
+14.4. Ưu Tiên Sự Ổn Định: Trong mọi trường hợp, sự ổn định của hệ thống quan trọng hơn tốc độ hoàn thành. Nếu giải pháp mới tiềm ẩn rủi ro gây lỗi dây chuyền, phải báo cáo và xin ý kiến Bệ hạ trước khi thực hiện.

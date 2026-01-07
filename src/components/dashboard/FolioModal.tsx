@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
@@ -35,7 +35,6 @@ import {
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Room, Service, Setting } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { calculateRoomPrice } from '@/lib/pricing';
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/context/NotificationContext';
 import { format, parseISO, differenceInMinutes, differenceInCalendarDays } from 'date-fns';
@@ -111,7 +110,8 @@ interface FolioModalProps {
     paymentMethod: string,
     surcharge: number,
     auditNote?: string,
-    actualPaid?: number
+    actualPaid?: number,
+    discount?: number
   ) => void;
   onUpdate: () => void;
   onCancel: (bookingId: string) => void;
@@ -152,9 +152,34 @@ export default function FolioModal({
   const [customerBalance, setCustomerBalance] = useState<number | null>(null);
   const [debtHistory, setDebtHistory] = useState<any[]>([]);
   const [printingReceipt, setPrintingReceipt] = useState<any | null>(null);
+  const [pricingBreakdown, setPricingBreakdown] = useState<any>(null);
+  const [isLoadingBill, setIsLoadingBill] = useState(false);
 
   const { showNotification } = useNotification();
   const { profile } = useAuth();
+
+  // 1. RPC: Fetch Pricing Brain V2
+  const fetchBill = useCallback(async () => {
+    if (!room?.current_booking?.id || !isOpen) return;
+    setIsLoadingBill(true);
+    try {
+      const bill = await HotelService.calculateBill(room.current_booking.id);
+      if (bill) {
+        setPricingBreakdown(bill);
+      }
+    } catch (error) {
+      console.error('[Folio] Error fetching bill:', error);
+    } finally {
+      setIsLoadingBill(false);
+    }
+  }, [room?.current_booking?.id, isOpen]);
+
+  // Refetch bill when opened or services updated
+  useEffect(() => {
+    if (isOpen) {
+      fetchBill();
+    }
+  }, [isOpen, room?.current_booking?.services_used, fetchBill]);
 
   // Handle printing debt receipt
   useEffect(() => {
@@ -166,12 +191,6 @@ export default function FolioModal({
       return () => clearTimeout(timer);
     }
   }, [printingReceipt]);
-
-  // Tự động làm mới tính toán mỗi phút
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   const savedServices = useMemo(() => {
     const servicesUsed = room?.current_booking?.services_used || [];
@@ -236,29 +255,17 @@ export default function FolioModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, room?.current_booking?.customer_id]); // Re-run when customer changes
 
-  const serviceTotals = useMemo(() => {
-    const calcTotal = (serviceList: Record<string, number>) =>
-      Object.entries(serviceList).reduce((total, [sid, qty]) => {
-        // 1. Tìm trong danh mục dịch vụ hệ thống
-        const serviceInfo = services.find((s) => String(s.id) === String(sid));
-        if (serviceInfo) return total + serviceInfo.price * qty;
+  const currentServiceTotal = useMemo(() => {
+    return Object.entries(tempServices).reduce((total, [sid, qty]) => {
+      const serviceInfo = services.find((s) => String(s.id) === String(sid));
+      if (serviceInfo) return total + serviceInfo.price * qty;
 
-        // 2. Nếu không có trong danh mục (ví dụ: Nợ cũ), tìm trong danh sách dịch vụ đã lưu của booking
-        const savedItem = room?.current_booking?.services_used?.find(
-          (s: any) => String(s.service_id || s.id) === String(sid)
-        );
-        return total + (savedItem?.price || 0) * qty;
-      }, 0);
-
-    const savedTotal = calcTotal(savedServices);
-    const tempTotal = calcTotal(tempServices);
-
-    return {
-      saved: savedTotal,
-      temp: tempTotal,
-      diff: tempTotal - savedTotal,
-    };
-  }, [tempServices, savedServices, services, room?.current_booking?.services_used]);
+      const savedItem = room?.current_booking?.services_used?.find(
+        (s: any) => String(s.service_id || s.id) === String(sid)
+      );
+      return total + (savedItem?.price || 0) * qty;
+    }, 0);
+  }, [tempServices, services, room?.current_booking?.services_used]);
 
   const isDirty = useMemo(() => {
     // Chỉ so sánh các dịch vụ có số lượng > 0
@@ -267,53 +274,13 @@ export default function FolioModal({
     return JSON.stringify(cleanTemp) !== JSON.stringify(cleanSaved);
   }, [tempServices, savedServices]);
 
-  const pricingBreakdown = useMemo(() => {
-    if (!room?.current_booking) return null;
-
-    // Tạo giá ghi đè dựa trên initial_price (giá lúc vào hoặc giá đã sửa)
-    const currentType = room.current_booking.rental_type;
-    const pricesOverride = { ...room.prices };
-    if (room.current_booking.initial_price) {
-      pricesOverride[currentType as keyof typeof pricesOverride] =
-        room.current_booking.initial_price;
-    }
-
-    return calculateRoomPrice(
-      room.current_booking.check_in_at,
-      new Date(),
-      settings,
-      room,
-      room.current_booking.rental_type,
-      serviceTotals.temp,
-      room.current_booking.custom_surcharge || 0,
-      pricesOverride
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room, settings, serviceTotals.temp, tick]);
-
   const duration = useMemo(() => {
-    if (pricingBreakdown?.summary?.duration_text) {
-      return pricingBreakdown.summary.duration_text;
-    }
-    if (!room?.current_booking?.check_in_at) return '0h 0p';
-    const start = parseISO(room.current_booking.check_in_at);
-    const now = new Date();
+    return pricingBreakdown?.summary?.duration_text || '...';
+  }, [pricingBreakdown]);
 
-    if (room.current_booking.rental_type === 'hourly') {
-      const totalMinutes = differenceInMinutes(now, start);
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      return `${hours}h ${minutes}p`;
-    } else {
-      const days = differenceInCalendarDays(now, start);
-      return `${Math.max(1, days)} ngày`;
-    }
-  }, [room?.current_booking?.check_in_at, room?.current_booking?.rental_type, pricingBreakdown]);
+  const customerBalanceToDisplay = pricingBreakdown?.customer_balance ?? 0;
 
-  const customerBalanceToDisplay = useMemo(() => {
-    if (customerBalance !== null) return customerBalance;
-    return Number(room?.current_booking?.customer?.balance || 0);
-  }, [customerBalance, room?.current_booking?.customer?.balance]);
+  const deposit = pricingBreakdown?.deposit_amount ?? 0;
 
   const { isDebt, absFormattedBalance } = useCustomerBalance(customerBalanceToDisplay);
   const _hasDebtWarning = isDebt;
@@ -413,6 +380,7 @@ export default function FolioModal({
 
       showNotification('Đã lưu cập nhật dịch vụ', 'success');
       if (onUpdate) onUpdate();
+      fetchBill(); // Refresh bill data after saving
       onClose(); // Đóng tất cả modal về sơ đồ phòng
     } catch (error: any) {
       showNotification(`Lỗi khi lưu: ${error.message}`, 'error');
@@ -790,6 +758,7 @@ export default function FolioModal({
       showNotification('Đã cập nhật thông tin và tính toán lại tiền', 'success');
       setShowEditBookingModal(false);
       if (onUpdate) onUpdate();
+      fetchBill(); // Refresh bill data after saving
 
       // Gửi thông báo hệ thống (Mắt Thần)
       if (isPriceChanged || isTimeChanged) {
@@ -806,40 +775,24 @@ export default function FolioModal({
     return services.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [searchQuery, services]);
 
-  const deposit = room?.current_booking?.deposit_amount || 0;
-
   // Calculate stable display amounts to avoid flashing during recalculation
   const displayPricing = useMemo(() => {
-    if (!pricingBreakdown) return { base: 0, diff: serviceTotals.diff };
+    if (!pricingBreakdown) return { base: 0, diff: 0 };
 
-    // Base amount is everything EXCEPT the current temporary services
-    // This includes Room Charge, Surcharges, Saved Services, Merged Bookings, and Old Debt
-    const roomAndSurcharges =
-      pricingBreakdown.total_amount -
-      pricingBreakdown.service_charge -
-      (pricingBreakdown.tax_details?.service_tax || 0);
-
-    const mergedTotal =
-      room?.current_booking?.merged_bookings?.reduce((sum, mb) => sum + mb.amount, 0) || 0;
-
-    // balance < 0: Nợ, balance > 0: Dư
-    const baseAmount =
-      roomAndSurcharges + serviceTotals.saved + mergedTotal - deposit - customerBalanceToDisplay;
+    const savedServiceTotal = pricingBreakdown.service_charge || 0;
+    const diff = currentServiceTotal - savedServiceTotal;
 
     return {
-      base: baseAmount,
-      diff: serviceTotals.diff,
+      base: pricingBreakdown.total_amount || 0,
+      diff: diff,
     };
-  }, [
-    pricingBreakdown,
-    serviceTotals.saved,
-    serviceTotals.diff,
-    deposit,
-    room?.current_booking?.merged_bookings,
-    customerBalanceToDisplay,
-  ]);
+  }, [pricingBreakdown, currentServiceTotal]);
 
-  const finalAmount = (pricingBreakdown?.total_amount || 0) - deposit - customerBalanceToDisplay;
+  const finalAmount = useMemo(() => {
+    const dbTotal = pricingBreakdown?.total_amount || 0;
+    const savedServiceTotal = pricingBreakdown?.service_charge || 0;
+    return dbTotal + (currentServiceTotal - savedServiceTotal);
+  }, [pricingBreakdown, currentServiceTotal]);
 
   return (
     <>
@@ -1035,15 +988,39 @@ export default function FolioModal({
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tiền phòng</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">
+                              Tiền phòng {isLoadingBill && <span className="animate-pulse">(đang tính...)</span>}
+                            </span>
                             <span className="font-bold">
                               {formatCurrency(pricingBreakdown?.room_charge || 0)}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tiền dịch vụ</span>
-                            <span className="font-bold">{formatCurrency(serviceTotals.temp)}</span>
+                            <span className="font-bold">{formatCurrency(currentServiceTotal)}</span>
                           </div>
+
+                          {pricingBreakdown?.surcharge > 0 && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Phụ phí</span>
+                              <span className="font-bold">{formatCurrency(pricingBreakdown.surcharge)}</span>
+                            </div>
+                          )}
+
+                          {(pricingBreakdown?.tax_details?.room_tax > 0 ||
+                            pricingBreakdown?.tax_details?.service_tax > 0) && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">
+                                Thuế GTGT
+                              </span>
+                              <span className="font-bold">
+                                {formatCurrency(
+                                  (pricingBreakdown?.tax_details?.room_tax || 0) +
+                                    (pricingBreakdown?.tax_details?.service_tax || 0)
+                                )}
+                              </span>
+                            </div>
+                          )}
 
                           {/* Customer Balance / Old Debt */}
                           {customerBalanceToDisplay !== 0 && (
@@ -1427,7 +1404,8 @@ export default function FolioModal({
                 data.paymentMethod,
                 data.surcharge,
                 auditNote,
-                data.actualPaid
+                data.actualPaid,
+                data.discount
               );
               setIsCheckoutOpen(false);
             }}
@@ -1676,7 +1654,7 @@ export default function FolioModal({
                 booking={room.current_booking}
                 services={room.current_booking.services_used}
                 pricing={pricingBreakdown}
-                totalServiceCost={serviceTotals.temp}
+                totalServiceCost={currentServiceTotal}
                 totalAmount={finalAmount}
               />
             )}

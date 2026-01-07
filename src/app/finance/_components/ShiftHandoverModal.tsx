@@ -34,9 +34,20 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastShift, setLastShift] = useState<any>(null);
 
+  const isOpening = lastShift?.status !== 'open';
+
   // Tính toán các con số trong ca hiện tại (chỉ tính Tiền mặt)
   const shiftStats = useMemo(() => {
-    const cashTransactions = transactions.filter(t => t.payment_method === 'cash');
+    if (isOpening || !lastShift?.start_at) return { income: 0, expense: 0, expected: 0, discrepancy: 0 };
+    
+    const shiftStartTime = new Date(lastShift.start_at);
+    
+    // Chỉ lấy các giao dịch tiền mặt phát sinh TRONG CA (từ lúc start_at)
+    const cashTransactions = transactions.filter(t => 
+      t.payment_method === 'cash' && 
+      new Date(t.created_at) >= shiftStartTime
+    );
+
     const income = cashTransactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
@@ -44,7 +55,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
     
-    const expected = initialCash + income - expense;
+    const expected = (lastShift.opening_balance || 0) + income - expense;
     const discrepancy = actualCash - expected;
 
     return {
@@ -53,7 +64,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
       expected,
       discrepancy
     };
-  }, [transactions, initialCash, actualCash]);
+  }, [transactions, lastShift, actualCash, isOpening]);
 
   useEffect(() => {
     if (isOpen) {
@@ -63,19 +74,40 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
 
   const fetchLastShift = async () => {
     try {
-      const { data, error } = await supabase
-        .from('shift_handovers')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (data) {
-        setLastShift(data);
-        setInitialCash(data.actual_cash || 0);
+      // Tìm ca đang mở của user hiện tại
+      const { data: currentShift } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('staff_id', user.id)
+        .eq('status', 'open')
+        .order('start_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (currentShift) {
+        setLastShift(currentShift);
+        setInitialCash(currentShift.opening_balance || 0);
+      } else {
+        setLastShift(null);
+        // Nếu không có ca mở, lấy số dư cuối của ca gần nhất bất kỳ ai để làm tiền đầu ca gợi ý
+        const { data: lastClosedShift } = await supabase
+          .from('shifts')
+          .select('*')
+          .eq('status', 'closed')
+          .order('end_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (lastClosedShift) {
+          setInitialCash(lastClosedShift.closing_balance || 0);
+          setActualCash(lastClosedShift.closing_balance || 0);
+        }
       }
     } catch (error) {
-      console.error('Error fetching last shift:', error);
+      console.error('Error fetching shift:', error);
     }
   };
 
@@ -85,29 +117,41 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
     setIsSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userName = user?.user_metadata?.full_name || user?.email || 'Nhân viên';
+      if (!user) throw new Error('Bạn cần đăng nhập để thực hiện');
 
-      const { error } = await supabase.from('shift_handovers').insert([{
-        staff_id: user?.id,
-        staff_name: userName,
-        start_at: lastShift?.created_at || new Date().toISOString(),
-        end_at: new Date().toISOString(),
-        initial_cash: initialCash,
-        total_income_cash: shiftStats.income,
-        total_expense_cash: shiftStats.expense,
-        expected_cash: shiftStats.expected,
-        actual_cash: actualCash,
-        discrepancy: shiftStats.discrepancy,
-        notes: notes,
-        status: 'completed'
-      }]);
+      if (!isOpening && lastShift?.id) {
+        // ĐÓNG CA
+        const { error } = await supabase
+          .from('shifts')
+          .update({
+            closing_balance: actualCash,
+            status: 'closed',
+            end_at: new Date().toISOString(),
+            notes: notes.trim()
+          })
+          .eq('id', lastShift.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success('Đóng ca và bàn giao thành công');
+      } else {
+        // MỞ CA MỚI
+        const { error } = await supabase
+          .from('shifts')
+          .insert([{
+            staff_id: user.id,
+            opening_balance: actualCash,
+            status: 'open',
+            start_at: new Date().toISOString(),
+            notes: notes.trim()
+          }]);
+
+        if (error) throw error;
+        toast.success('Bắt đầu ca làm việc mới thành công');
+      }
       
-      toast.success('Bàn giao ca thành công');
       onClose();
     } catch (error: any) {
-      toast.error('Lỗi khi bàn giao ca: ' + error.message);
+      toast.error('Lỗi: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -120,11 +164,11 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md px-8 py-6 flex items-center justify-between border-b border-slate-100">
           <div className="flex flex-col">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
-              Quy trình kết ca
+              {isOpening ? 'Quy trình mở ca' : 'Quy trình kết ca'}
             </span>
             <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none flex items-center gap-3">
-              <RefreshCw className="text-indigo-600" size={24} strokeWidth={3} />
-              Bàn giao ca trực
+              <RefreshCw className={cn("transition-transform duration-700", isOpening ? "text-emerald-600" : "text-indigo-600")} size={24} strokeWidth={3} />
+              {isOpening ? 'Bắt đầu ca làm việc' : 'Bàn giao ca trực'}
             </h2>
           </div>
           <Button 
@@ -143,12 +187,15 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
               {/* Left Side: Inputs (3/5) */}
               <div className="lg:col-span-3 space-y-8">
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Tiền đầu ca (Từ ca trước)</Label>
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">
+                    {isOpening ? 'Tiền mặt bàn giao từ ca trước' : 'Tiền mặt đầu ca'}
+                  </Label>
                   <div className="relative group">
                     <NumericInput
                       value={initialCash}
                       onChange={setInitialCash}
-                      className="h-16 rounded-3xl border-2 border-slate-100 bg-slate-50 px-6 font-black text-xl text-slate-700 focus:bg-white focus:border-indigo-500 transition-all"
+                      disabled={!isOpening}
+                      className="h-16 rounded-3xl border-2 border-slate-100 bg-slate-50 px-6 font-black text-xl text-slate-700 focus:bg-white focus:border-indigo-500 transition-all disabled:opacity-50"
                     />
                     <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300">
                       <Wallet size={20} />
@@ -157,22 +204,29 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                 </div>
 
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Tiền mặt thực tế hiện có</Label>
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">
+                    {isOpening ? 'Số tiền mặt nhận bàn giao' : 'Tiền mặt thực tế hiện có'}
+                  </Label>
                   <div className="relative group">
                     <NumericInput
                       value={actualCash}
                       onChange={setActualCash}
-                      className="h-20 rounded-[2rem] border-2 border-indigo-100 bg-indigo-50/30 px-8 font-black text-3xl text-indigo-600 focus:bg-white focus:border-indigo-500 transition-all"
+                      className={cn(
+                        "h-20 rounded-[2rem] border-2 px-8 font-black text-3xl transition-all",
+                        isOpening 
+                          ? "border-emerald-100 bg-emerald-50/30 text-emerald-600 focus:border-emerald-500" 
+                          : "border-indigo-100 bg-indigo-50/30 text-indigo-600 focus:border-indigo-500"
+                      )}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Ghi chú bàn giao</Label>
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Ghi chú {isOpening ? 'mở ca' : 'bàn giao'}</Label>
                   <Textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Bàn giao công việc, sự cố, nhắc nhở ca sau..."
+                    placeholder={isOpening ? "Ghi chú đầu ca..." : "Bàn giao công việc, sự cố, nhắc nhở ca sau..."}
                     className="min-h-[150px] rounded-[2rem] border-2 border-slate-100 bg-slate-50 p-6 font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:border-indigo-500 transition-all resize-none"
                   />
                 </div>
@@ -180,84 +234,93 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
 
               {/* Right Side: Stats Card (2/5) */}
               <div className="lg:col-span-2 space-y-6">
-                <div className="bg-slate-50 rounded-[2.5rem] p-8 border-2 border-slate-100 shadow-sm space-y-8">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Đối soát quỹ tiền mặt</h3>
-                  
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center">
-                          <TrendingUp size={16} className="text-emerald-600" />
+                {!isOpening ? (
+                  <div className="bg-slate-50 rounded-[2.5rem] p-8 border-2 border-slate-100 shadow-sm space-y-8">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Đối soát quỹ tiền mặt</h3>
+                    
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center">
+                            <TrendingUp size={16} className="text-emerald-600" />
+                          </div>
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Tổng thu</span>
                         </div>
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Tổng thu</span>
+                        <span className="font-black text-slate-900">{formatCurrency(shiftStats.income)}</span>
                       </div>
-                      <span className="font-black text-slate-900">{formatCurrency(shiftStats.income)}</span>
-                    </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center">
-                          <TrendingDown size={16} className="text-rose-600" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center">
+                            <TrendingDown size={16} className="text-rose-600" />
+                          </div>
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Tổng chi</span>
                         </div>
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Tổng chi</span>
+                        <span className="font-black text-slate-900">{formatCurrency(shiftStats.expense)}</span>
                       </div>
-                      <span className="font-black text-slate-900">{formatCurrency(shiftStats.expense)}</span>
-                    </div>
 
-                    <div className="h-px bg-slate-200" />
-
-                    <div className="flex flex-col gap-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiền mặt lý thuyết</span>
-                      <div className="text-2xl font-black text-indigo-600 tracking-tighter">
-                        {formatCurrency(shiftStats.expected)}
+                      <div className="pt-6 border-t border-slate-200 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-tight">Dự kiến trong quỹ</span>
+                          <span className="font-bold text-slate-600">{formatCurrency(shiftStats.expected)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-tight">Thực tế khớp</span>
+                          <div className={cn(
+                            "flex items-center gap-2 px-3 py-1 rounded-full font-black text-sm",
+                            shiftStats.discrepancy === 0 ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+                          )}>
+                            {shiftStats.discrepancy === 0 ? <Check size={14} /> : <AlertCircle size={14} />}
+                            {formatCurrency(shiftStats.discrepancy)}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className={cn(
-                      "p-6 rounded-[2rem] flex flex-col gap-2 transition-all duration-500 border-2",
-                      shiftStats.discrepancy === 0 
-                        ? "bg-emerald-50 border-emerald-100 text-emerald-700" 
-                        : "bg-rose-50 border-rose-100 text-rose-700 shadow-lg shadow-rose-100"
-                    )}>
-                      <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest">
-                        <AlertCircle size={14} strokeWidth={3} /> Chênh lệch
-                      </div>
-                      <div className="text-2xl font-black tracking-tighter">
-                        {shiftStats.discrepancy > 0 ? '+' : ''}{formatCurrency(shiftStats.discrepancy)}
-                      </div>
-                      {shiftStats.discrepancy !== 0 && (
-                        <p className="text-[9px] font-bold uppercase mt-1 animate-pulse">
-                          * Cảnh báo: Lệch sổ sách!
-                        </p>
-                      )}
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-emerald-50/50 rounded-[2.5rem] p-8 border-2 border-emerald-100 shadow-sm space-y-6">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                      <Wallet className="text-emerald-600" size={24} />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-black text-emerald-900 uppercase tracking-tighter">Bắt đầu ca mới</h3>
+                      <p className="text-sm font-bold text-emerald-600/70 leading-relaxed">
+                        Vui lòng kiểm tra kỹ số tiền mặt nhận bàn giao thực tế trước khi xác nhận mở ca.
+                      </p>
+                    </div>
+                    <ul className="space-y-3">
+                      {['Đếm kỹ tiền mặt', 'Kiểm tra sổ sách ca trước', 'Ghi chú các vấn đề tồn đọng'].map((item, i) => (
+                        <li key={i} className="flex items-center gap-3 text-xs font-bold text-emerald-700">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className={cn(
+                    "w-full h-20 rounded-[2rem] text-lg font-black tracking-tighter shadow-xl transition-all active:scale-[0.97] flex items-center justify-center gap-3",
+                    isOpening 
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200" 
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200"
+                  )}
+                >
+                  {isSubmitting ? (
+                    <RefreshCw className="animate-spin" size={24} />
+                  ) : (
+                    <>
+                      {isOpening ? <ArrowRight size={24} /> : <Check size={24} />}
+                      {isOpening ? 'BẮT ĐẦU CA MỚI' : 'XÁC NHẬN KẾT CA'}
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Footer - Sticky */}
-        <div className="sticky bottom-0 z-20 bg-white/80 backdrop-blur-md p-8 border-t border-slate-100">
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full h-20 rounded-[2rem] font-black uppercase text-sm tracking-[0.3em] bg-slate-900 hover:bg-black text-white shadow-2xl transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Đang xử lý...</span>
-              </div>
-            ) : (
-              <>
-                <Check size={20} strokeWidth={4} />
-                <span>Xác nhận bàn giao ca</span>
-              </>
-            )}
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

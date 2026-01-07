@@ -150,6 +150,35 @@ export const HotelService = {
   },
 
   /**
+   * TÍNH TOÁN HÓA ĐƠN TỪ DATABASE (Pricing Brain V2)
+   */
+  async calculateBill(bookingId: string) {
+    const { data, error } = await supabase.rpc('calculate_booking_bill_v2', {
+      p_booking_id: bookingId
+    });
+
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('[HotelService] Lỗi tính hóa đơn:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        bookingId: bookingId
+      });
+      return null;
+    }
+
+    if (data && data.success === false) {
+      // eslint-disable-next-line no-console
+      console.warn('[HotelService] RPC trả về thất bại:', data.message);
+      return null;
+    }
+
+    return data;
+  },
+
+  /**
    * Helper: Tìm hoặc tạo khách hàng
    */
   async findOrCreateCustomer(customerData: {
@@ -244,9 +273,8 @@ export const HotelService = {
       p_notes: fullNotes || '',
       p_payment_method: params.paymentMethod || 'cash',
       p_surcharge: Number(params.surcharge) || 0,
-      p_total_amount: Number(params.totalAmount) || 0,
+      p_discount: Number(params.discount) || 0,
       p_amount_paid: Number(params.amountPaid) || 0,
-      p_debt_carry_amount: 0,
       p_staff_id: user?.id || null
     });
 

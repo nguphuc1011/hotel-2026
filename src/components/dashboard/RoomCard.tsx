@@ -20,7 +20,7 @@ import {
 import { differenceInHours, differenceInMinutes, differenceInCalendarDays } from 'date-fns';
 import { useMemo, useEffect, useState, useCallback, memo } from 'react';
 import { useCustomerBalance } from '@/hooks/useCustomerBalance';
-import { calculateRoomPrice } from '@/lib/pricing';
+import { HotelService } from '@/services/hotel';
 
 interface RoomCardProps {
   room: Room;
@@ -73,7 +73,7 @@ const statusConfig = {
   },
 };
 
-export const RoomCard = memo(function RoomCard({ room, settings, onClick }: RoomCardProps) {
+export const RoomCard = memo(function RoomCard({ room, onClick }: RoomCardProps) {
   const config = statusConfig[room.status] || statusConfig.available;
   const [isMounted, setIsMounted] = useState(false);
   const [duration, setDuration] = useState('');
@@ -81,11 +81,12 @@ export const RoomCard = memo(function RoomCard({ room, settings, onClick }: Room
 
   useEffect(() => {
     setIsMounted(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isOccupied = ['hourly', 'daily', 'overnight'].includes(room.status);
   
-  const { isDebt, absFormattedBalance } = useCustomerBalance(room.current_booking?.customer?.balance || 0);
+  const { isDebt } = useCustomerBalance(room.current_booking?.customer?.balance || 0);
 
   const updateInfo = useCallback(() => {
     if (!isMounted) return;
@@ -112,32 +113,43 @@ export const RoomCard = memo(function RoomCard({ room, settings, onClick }: Room
       return;
     }
 
-    const start = new Date(room.current_booking.check_in_at);
+    const checkInAt = room.current_booking.check_in_at;
+    const start = new Date(checkInAt);
+    
+    if (isNaN(start.getTime())) {
+      setDuration('...');
+      return;
+    }
 
     if (room.status === 'hourly') {
       const totalMinutes = differenceInMinutes(now, start);
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      setDuration(`${hours}h ${minutes}p`);
+      if (isNaN(totalMinutes)) {
+        setDuration('...');
+      } else {
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        setDuration(`${hours}h ${minutes}p`);
+      }
     } else {
       const days = differenceInCalendarDays(now, start);
-      setDuration(`${Math.max(1, days)} ngày`);
+      if (isNaN(days)) {
+        setDuration('...');
+      } else {
+        setDuration(`${Math.max(1, days)} ngày`);
+      }
     }
 
-    const serviceTotal = room.current_booking.services_used?.reduce((sum, s) => sum + (s.total || 0), 0) || 0;
-    const breakdown = calculateRoomPrice(
-      room.current_booking.check_in_at,
-      now,
-      settings,
-      room,
-      room.current_booking.rental_type,
-      serviceTotal
-    );
-
-    const deposit = room.current_booking.deposit_amount || 0;
-    const balance = room.current_booking.customer?.balance || 0;
-    setAmountToCollect(breakdown.total_amount - deposit - balance);
-  }, [room.status, room.last_status_change, room.current_booking, settings, isOccupied, isMounted]);
+    // Gọi RPC tính giá từ Database (Pricing Brain V2)
+    const fetchBill = async () => {
+      if (!room.current_booking?.id) return;
+      const bill = await HotelService.calculateBill(room.current_booking.id);
+      if (bill && bill.success) {
+        setAmountToCollect(bill.total_amount || 0);
+      }
+    };
+    
+    fetchBill();
+  }, [room.status, room.last_status_change, room.current_booking, isOccupied, isMounted]);
 
   useEffect(() => {
     if (!isMounted) return;

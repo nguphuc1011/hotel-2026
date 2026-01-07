@@ -4,24 +4,29 @@
 1. Chọn phòng -> Mở `CheckInModal`.
 2. Nhập thông tin khách (Tìm khách cũ theo SĐT/CCCD hoặc tạo mới).
 3. Chọn loại hình thuê: **Giờ (Hourly)**, **Ngày (Daily)**, **Qua đêm (Overnight)**.
-4. **Gộp nợ cũ**: Nếu khách có số dư nợ (`balance > 0`), hệ thống hiển thị cảnh báo và tùy chọn gộp nợ.
+4. **Gộp nợ cũ**: Nếu khách có số dư nợ (`balance < 0`), hệ thống hiển thị cảnh báo và tùy chọn gộp nợ.
 5. Thu tiền cọc (Deposit): Tiền cọc được ghi nhận vào `balance` khách hàng và tạo một `transaction`.
 6. Gọi RPC `handle_check_in` để khóa phòng và tạo Booking. Xử lý tiền cọc thủ công nếu RPC không hỗ trợ.
 
-## 2. Quy trình Tính tiền (Pricing Logic)
-- **Hàm xử lý**: `calculateRoomPrice` trong `src/lib/pricing.ts`.
-- **Cơ chế tính Giờ**: Giá giờ đầu + Giá các giờ tiếp theo (có grace period).
-- **Cơ chế tính Đêm**: Giá cố định theo khung giờ (ví dụ: 22h - 8h sáng mai).
-- **Cơ chế tính Ngày**: Giá theo ngày, check-out sau giờ quy định sẽ tính thêm phụ phí.
+## 2. Quy trình Tính tiền (Pricing Logic - Pricing Brain V2)
+- **Nguồn dữ liệu (Source of Truth)**: Toàn bộ logic tính giá được tập trung tại Database RPC `public.calculate_booking_bill_v2`. Frontend tuyệt đối không tự tính lại giá để tránh sai lệch.
+- **Cơ chế tính Giờ**: Giá gói đầu (ví dụ: 1h hoặc 2h) + Giá các giờ tiếp theo. Hỗ trợ thời gian ân hạn (Grace period) cấu hình trong `settings`.
+- **Cơ chế tính Đêm**: Giá cố định cho khung giờ qua đêm. Hỗ trợ tự động tính phụ phí check-in sớm hoặc check-out muộn dựa trên `early_rules` và `late_rules`.
+- **Cơ chế tính Ngày**: Tính theo số đêm. Check-out sau giờ quy định (ví dụ: 12h trưa) sẽ tính thêm phụ phí hoặc cộng thêm ngày tùy theo mức độ trễ.
+- **Hợp nhất Công nợ & Tiền cọc**:
+    - `Tổng thanh toán = Doanh thu phòng + Dịch vụ + Thuế + Phụ phí - Tiền cọc + Nợ cũ`.
+    - Con số cuối cùng được RPC tính toán sẵn giúp nhân viên thu tiền chính xác 100%.
 
 ## 3. Quy trình Trả phòng (Check-out Flow)
-1. Mở `CheckOutModal`.
-2. Hệ thống tính toán: `Tiền phòng + Dịch vụ + Phụ phí - Giảm giá - Tiền cọc`.
-3. Thanh toán: Chọn phương thức (Tiền mặt, Chuyển khoản, Thẻ).
-4. **Xử lý công nợ**: 
-    - Nếu trả thiếu: Phần còn lại tự động cộng vào `balance` của khách.
-    - Nếu trả dư: Phần thừa trừ vào `balance` (khách có tiền dư).
-5. Gọi RPC `handle_checkout` để hoàn tất, giải phóng phòng và lưu hóa đơn.
+1. Mở `FolioModal` để kiểm tra dịch vụ và in nháp (nếu cần). Nhân viên phải lưu mọi thay đổi dịch vụ trước khi thanh toán.
+2. Nhấn "Thanh toán" để mở `CheckOutModal`.
+3. Hệ thống hiển thị con số `Cần thu` đã được tính toán từ RPC (đã trừ cọc và cộng nợ cũ).
+4. Thanh toán: Chọn phương thức (Tiền mặt, Chuyển khoản, Thẻ).
+5. **Giảm giá & Phụ phí**: Hỗ trợ nhập giảm giá hoặc phụ phí phát sinh ngay lúc checkout. Các giá trị này được truyền vào RPC `handle_checkout` để tính toán lại doanh thu cuối cùng một cách chính xác.
+6. **Xử lý công nợ**: 
+    - Logic nợ được xử lý nguyên tử (Atomic) trong RPC `handle_checkout`.
+    - `Số dư mới = Số dư cũ - Doanh thu đơn này (đã trừ discount) + Số tiền thực trả`.
+7. Gọi RPC `handle_checkout` để hoàn tất, giải phóng phòng, ghi sổ Ledger và lưu hóa đơn.
 
 ## 4. Chống gian lận & Giám sát (Security & Audit)
 - **Chốt chặn in ấn (Folio)**: Một khi Folio đã được in nháp (`is_printed: true`), nhân viên không thể tự ý xóa/giảm số lượng dịch vụ. Chỉ Admin/Manager mới có quyền ghi đè (Bypass) và phải nhập lý do.

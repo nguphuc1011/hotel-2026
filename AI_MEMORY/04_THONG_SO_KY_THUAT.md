@@ -7,7 +7,7 @@
 - `full_name` (text)
 - `phone` (text, unique)
 - `id_card` (text, unique)
-- `balance` (numeric, default 0) - Quan trọng nhất cho công nợ.
+- `balance` (numeric, default 0) - QUY ƯỚC: < 0 là Khách nợ, > 0 là Khách dư tiền.
 - `visit_count` (int)
 - `total_spent` (numeric)
 
@@ -56,9 +56,10 @@
 - `name` (text)
 - `is_active` (boolean)
 
-## 2. API & RPC quan trọng
+## 2. API & RPC quan trọng (Độc Nhất - Điều 10)
 - `handle_check_in`: Tạo booking, cập nhật trạng thái phòng, xử lý khách hàng.
-- `handle_checkout`: Tính tổng tiền, cập nhật balance khách, giải phóng phòng, tạo giao dịch thanh toán.
+- `handle_checkout`: (UNIFIED) Tính tổng tiền, cập nhật balance khách, hoàn tất booking, ghi Sổ cái (Revenue/Payment).
+  - Tham số: `p_booking_id`, `p_payment_method`, `p_amount_paid`, `p_surcharge`, `p_discount`, `p_notes`, `p_staff_id`.
 - `handle_deposit`: Thu thêm tiền cọc cho booking.
 - `handle_debt_payment`: Thu nợ trực tiếp từ khách hàng (cập nhật balance và tạo transaction).
 - **Edge Functions**: `send-push-notification` - Gửi thông báo real-time qua Firebase Cloud Messaging (FCM).

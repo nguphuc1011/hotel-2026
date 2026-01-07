@@ -76,7 +76,7 @@ export default function CheckoutModal({
     if (discountType === 'amount') return discountValue;
     if (!pricingBreakdown) return 0;
     const baseForDiscount =
-      pricingBreakdown.room_charge + pricingBreakdown.service_charge + pricingBreakdown.surcharge;
+      (pricingBreakdown.room_charge || 0) + (pricingBreakdown.service_charge || 0) + (pricingBreakdown.surcharge || 0);
     return Math.round((baseForDiscount * discountValue) / 100);
   }, [discountType, discountValue, pricingBreakdown]);
 
@@ -107,64 +107,34 @@ export default function CheckoutModal({
       };
     }
 
-    const roomCharge = pricingBreakdown.room_charge;
-    const serviceCharge = pricingBreakdown.service_charge;
-    const surcharges = pricingBreakdown.surcharge + manualSurcharge;
-
-    const subTotal = roomCharge + serviceCharge + surcharges - discount;
-    const taxAmount = isTaxEnabled ? (subTotal * taxPercent) / 100 : 0;
-
-    // totalToCollect (UI) should include customer balance
-    // balance < 0: Nợ, balance > 0: Dư
-    const totalToCollect = subTotal + taxAmount - deposit - customerBalance;
+    // Single Source of Truth: Use RPC calculated total
+    // pricingBreakdown.total_amount = revenue - deposit - balance
+    const rpcTotalToPay = pricingBreakdown.total_amount || 0;
+    
+    // Adjust for checkout-time modifiers
+    const totalToCollect = rpcTotalToPay - discount + manualSurcharge;
 
     return {
-      roomCharge,
-      serviceCharge,
-      surcharges,
-      subTotal,
-      taxAmount,
+      roomCharge: pricingBreakdown.room_charge || 0,
+      serviceCharge: pricingBreakdown.service_charge || 0,
+      surcharges: (pricingBreakdown.surcharge || 0) + manualSurcharge,
+      subTotal: (pricingBreakdown.booking_revenue || 0) - discount + manualSurcharge,
+      taxAmount: (pricingBreakdown.tax_details?.room_tax || 0) + (pricingBreakdown.tax_details?.service_tax || 0),
       totalToCollect,
     };
   }, [
     pricingBreakdown,
     discount,
-    deposit,
-    isTaxEnabled,
-    taxPercent,
-    customerBalance,
     manualSurcharge,
   ]);
 
-  // Auto-update actualPaid when totalToCollect or customerBalance changes
+  // Auto-update actualPaid when totalToCollect changes
   useEffect(() => {
-    // Suggest actual payment: the total to collect already includes balance adjustment
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActualPaid(Math.max(0, totalCalculations.totalToCollect));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalCalculations.totalToCollect]);
 
   const performCheckout = () => {
-    // Detect "Old Debt" services to exclude from backend total
-    const oldDebtAmount = services
-      .filter((s) => {
-        const isSafeId =
-          String(s.id) === 'debt-carry' ||
-          String(s.id) === 'old_debt' ||
-          String(s.id) === '11111111-1111-1111-1111-111111111111';
-
-        if (isSafeId) return false;
-
-        return (
-          s.name.toLowerCase().includes('nợ cũ') ||
-          s.name.toLowerCase().includes('công nợ') ||
-          s.name.toLowerCase().includes('debt')
-        );
-      })
-      .reduce((sum, s) => sum + (s.total || s.price * s.quantity), 0);
-
-    // cleanTotalToCollect should NOT include customerBalance because backend handles it
-    const cleanTotalToCollect = totalCalculations.totalToCollect + customerBalance - oldDebtAmount;
-
     // Map payment method to backend code
     const paymentMethodMap: Record<string, string> = {
       cash: 'CASH',
@@ -177,8 +147,8 @@ export default function CheckoutModal({
       discount,
       discountReason,
       paymentMethod: backendPaymentMethod,
-      totalToCollect: cleanTotalToCollect, // Send clean total (excluding Old Debt service)
-      surcharge: totalCalculations.surcharges,
+      totalToCollect: totalCalculations.totalToCollect,
+      surcharge: manualSurcharge,
       isTaxEnabled,
       taxPercent,
       note,

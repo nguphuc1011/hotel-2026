@@ -172,7 +172,8 @@ export default function Dashboard() {
     paymentMethod: string = 'cash',
     surcharge: number = 0,
     auditNote?: string,
-    actualPaid?: number
+    actualPaid?: number,
+    discount?: number
   ) => {
     if (!folioRoom || isProcessing) return;
 
@@ -211,6 +212,7 @@ export default function Dashboard() {
         totalAmount: Number(amount) || 0,
         paymentMethod: normalizedPaymentMethod,
         surcharge: Number(surcharge) || 0,
+        discount: Number(discount) || 0,
         amountPaid: actualPaid !== undefined ? Number(actualPaid) : Number(amount),
         notes: currentBooking?.notes || '',
         auditNote: auditNote,

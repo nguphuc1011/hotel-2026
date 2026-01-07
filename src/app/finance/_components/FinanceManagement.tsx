@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Filter, LayoutGrid } from 'lucide-react';
+import { Plus, Filter, LayoutGrid, RefreshCw } from 'lucide-react';
 import {
   startOfDay,
   endOfDay,
@@ -39,6 +39,7 @@ export default function FinanceManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<CashflowTransaction | null>(null);
+  const [currentShift, setCurrentShift] = useState<any>(null);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -53,6 +54,18 @@ export default function FinanceManagement() {
 
       if (catError) throw catError;
       setCategories(catData || []);
+
+      // Fetch current shift
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: shiftData } = await supabase
+          .from('shifts')
+          .select('*')
+          .eq('staff_id', user.id)
+          .eq('status', 'open')
+          .maybeSingle();
+        setCurrentShift(shiftData);
+      }
 
       // Fetch transactions from ledger
       const { data: ledgerData, error: ledgerError } = await supabase
@@ -87,6 +100,7 @@ export default function FinanceManagement() {
           content: content,
           amount: l.amount,
           payment_method: (l.payment_method_code || 'cash').toLowerCase(),
+          payment_method_code: l.payment_method_code,
           created_by: l.profiles?.full_name || 'Hệ thống',
           created_by_id: l.staff_id,
           created_at: l.created_at,
@@ -118,9 +132,17 @@ export default function FinanceManagement() {
       )
       .subscribe();
 
+    const shiftChannel = supabase
+      .channel('shift_changes')
+      .on('postgres_changes', { event: '*', table: 'shifts', schema: 'public' }, () =>
+        fetchData()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ledgerChannel);
       supabase.removeChannel(catChannel);
+      supabase.removeChannel(shiftChannel);
     };
   }, []);
 
@@ -311,19 +333,46 @@ export default function FinanceManagement() {
           <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
             <LayoutGrid className="text-white" size={24} />
           </div>
-          <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">THU CHI</h1>
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-none">THU CHI</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <div className={cn(
+                "w-2 h-2 rounded-full",
+                currentShift ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+              )} />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {currentShift ? `Đang trong ca (${currentShift.staff_id.slice(0, 4)})` : 'Chưa vào ca'}
+              </span>
+            </div>
+          </div>
         </div>
 
         <button
           onClick={() => setIsShiftModalOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-white rounded-2xl shadow-[0_4px_15px_-3px_rgba(0,0,0,0.05)] hover:bg-slate-50 transition-all active:scale-95"
+          className={cn(
+            "flex items-center gap-3 px-6 py-3 rounded-2xl transition-all active:scale-95 shadow-sm border",
+            currentShift 
+              ? "bg-white border-slate-100 hover:bg-slate-50" 
+              : "bg-emerald-600 border-emerald-500 text-white hover:bg-emerald-700 shadow-emerald-100 shadow-lg"
+          )}
         >
-          <div className="w-5 h-5 flex items-center justify-center border-2 border-slate-300 rounded-full">
-            <div className="w-2 h-2 bg-slate-400 rounded-full" />
-          </div>
-          <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
-            BÀN GIAO CA
-          </span>
+          {currentShift ? (
+            <>
+              <div className="w-5 h-5 flex items-center justify-center border-2 border-slate-300 rounded-full">
+                <div className="w-2 h-2 bg-slate-400 rounded-full" />
+              </div>
+              <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                BÀN GIAO CA
+              </span>
+            </>
+          ) : (
+            <>
+              <RefreshCw size={16} strokeWidth={3} className="animate-spin-slow" />
+              <span className="text-[11px] font-black uppercase tracking-widest">
+                BẮT ĐẦU CA MỚI
+              </span>
+            </>
+          )}
         </button>
       </header>
 
