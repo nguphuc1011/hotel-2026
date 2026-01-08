@@ -470,7 +470,7 @@ export default function RoomsPage() {
                 Thêm loại phòng mới
               </h2>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
                 <div className="lg:col-span-1">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Tên loại phòng</label>
                   <input 
@@ -529,6 +529,18 @@ export default function RoomsPage() {
                     className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] mb-2">Phụ thu mỗi giờ</label>
+                  <NumericInput 
+                    value={newCategory.surcharge_hourly_rate || 0}
+                    onChange={val => setNewCategory({
+                      ...newCategory, 
+                      surcharge_hourly_rate: val
+                    })}
+                    className="w-full px-4 py-3 bg-orange-50 border-none rounded-2xl font-bold text-orange-600 focus:ring-2 focus:ring-orange-500 transition-all"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end pt-2">
@@ -576,7 +588,7 @@ export default function RoomsPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-8 flex-[2]">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-8 flex-[2]">
                       <div className="space-y-1">
                         <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">
                           <Clock size={12} className="text-blue-500" /> Giờ đầu
@@ -646,6 +658,24 @@ export default function RoomsPage() {
                           />
                         ) : (
                           <p className="text-lg font-black text-slate-700">{formatCurrency(cat.prices.daily)}đ</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1 text-[10px] font-black text-orange-500 uppercase tracking-wider">
+                          <Plus size={12} className="text-orange-500" /> Phụ thu
+                        </div>
+                        {editingCatId === cat.id ? (
+                          <NumericInput 
+                            value={cat.surcharge_hourly_rate || 0}
+                            onChange={val => {
+                              const newCats = categories.map(c => c.id === cat.id ? {...c, surcharge_hourly_rate: val} : c);
+                              mutate('rooms_and_settings', { ...data, categories: newCats }, false);
+                            }}
+                            className="font-bold text-orange-600 bg-orange-50 border-none rounded-lg px-2 py-1 w-full"
+                          />
+                        ) : (
+                          <p className="text-lg font-black text-orange-600">{formatCurrency(cat.surcharge_hourly_rate || 0)}đ</p>
                         )}
                       </div>
                     </div>

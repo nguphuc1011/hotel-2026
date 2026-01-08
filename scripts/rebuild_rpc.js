@@ -33,7 +33,7 @@ BEGIN
 END $$;
 
 -- 2. Xây dựng "Đại Động Cơ" RPC - Phiên bản Chuẩn Hóa
-CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid)
+CREATE OR REPLACE FUNCTION public.calculate_booking_bill_v2(p_booking_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER

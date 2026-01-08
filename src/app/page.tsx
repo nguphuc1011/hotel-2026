@@ -144,8 +144,6 @@ export default function Dashboard() {
             setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
             showNotification(`Phòng ${room.room_number} đã sẵn sàng!`, 'success');
           } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Lỗi cập nhật trạng thái:', error);
             showNotification('Không thể cập nhật trạng thái phòng', 'error');
           } finally {
             setIsProcessing(false);
@@ -180,21 +178,10 @@ export default function Dashboard() {
     // Safety timeout: Tự động mở khóa sau 10 giây nếu kẹt
     const safetyTimeout = setTimeout(() => {
       setIsProcessing(false);
-      // eslint-disable-next-line no-console
-      console.warn('Payment safety timeout triggered');
     }, 10000);
 
     setIsProcessing(true);
     try {
-      // eslint-disable-next-line no-console
-      console.log('Bắt đầu thanh toán cho phòng:', folioRoom.room_number, {
-        bookingId,
-        amount,
-        paymentMethod,
-        surcharge,
-        actualPaid,
-      });
-
       // 1. Lấy ghi chú hiện tại để nối thêm audit info
       const { data: currentBooking } = await supabase
         .from('bookings')
@@ -217,9 +204,6 @@ export default function Dashboard() {
         notes: currentBooking?.notes || '',
         auditNote: auditNote,
       });
-
-      // eslint-disable-next-line no-console
-      console.log('Thanh toán hoàn tất qua RPC, kết quả:', result);
 
       // 4. Reset state, refresh data, and show notification
       setFolioRoomId(null);
@@ -247,8 +231,6 @@ export default function Dashboard() {
       // 5. Gửi thông báo hệ thống (Mắt Thần)
       HotelService.notifySystemChange('check_out', folioRoom.id).catch(() => {});
     } catch (error: any) {
-      // eslint-disable-next-line no-console
-      console.error('Lỗi trong quá trình thanh toán:', error);
       showNotification(`Lỗi thanh toán: ${error.message}`, 'error');
     } finally {
       clearTimeout(safetyTimeout);
@@ -419,22 +401,16 @@ export default function Dashboard() {
   };
 
   const handleCheckIn = async (data: CheckInData) => {
-    // eslint-disable-next-line no-console
-    console.log('page.tsx: handleCheckIn called with data:', data);
     if (isProcessing) return;
 
     // Safety timeout: Tự động mở khóa sau 10 giây nếu kẹt
     const safetyTimeout = setTimeout(() => {
       setIsProcessing(false);
-      // eslint-disable-next-line no-console
-      console.warn('Check-in safety timeout triggered');
     }, 10000);
 
     setIsProcessing(true);
     try {
       if (!selectedRoom) {
-        // eslint-disable-next-line no-console
-        console.warn('page.tsx: handleCheckIn aborted because selectedRoom is null');
         return;
       }
 
@@ -494,8 +470,6 @@ export default function Dashboard() {
       // 4. Thông báo hệ thống
       HotelService.notifySystemChange('check_in', selectedRoom.id).catch(() => {});
     } catch (error: any) {
-      // eslint-disable-next-line no-console
-      console.error('Lỗi Check-in:', error);
       showNotification(`Lỗi khi nhận phòng: ${error.message || 'Lỗi không xác định'}`, 'error');
     } finally {
       clearTimeout(safetyTimeout);

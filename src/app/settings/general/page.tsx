@@ -524,10 +524,10 @@ const HourlyPricingTab = ({ timeRules, setTimeRules }: any) => (
         icon={Clock}
       >
         <div className="relative">
-          <input 
-            type="number" 
+          <NumericInput 
             value={timeRules.baseHours}
-            onChange={(e) => setTimeRules({...timeRules, baseHours: Number(e.target.value)})}
+            onChange={(val) => setTimeRules({...timeRules, baseHours: val})}
+            type="number"
             className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 transition-all font-semibold outline-none"
           />
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Giờ</span>
@@ -544,6 +544,7 @@ const HourlyPricingTab = ({ timeRules, setTimeRules }: any) => (
           <NumericInput 
             value={timeRules.hourUnit}
             onChange={(val) => setTimeRules({...timeRules, hourUnit: val})}
+            type="number"
             className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 transition-all font-semibold outline-none"
           />
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Phút</span>
@@ -562,6 +563,7 @@ const HourlyPricingTab = ({ timeRules, setTimeRules }: any) => (
         <NumericInput 
           value={timeRules.hourly_ceiling_percent} 
           onChange={(val) => setTimeRules({...timeRules, hourly_ceiling_percent: val})} 
+          type="number"
           className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none pr-10" 
         />
         <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">%</span>
@@ -664,18 +666,12 @@ const SurchargeTab = ({
               <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center">
                 <Clock className="h-6 w-6 text-blue-500" />
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-700">Đơn giá phụ thu mỗi giờ</h4>
-                <p className="text-[10px] text-slate-400">Hệ thống sẽ tự tính: (Giờ vào - Giờ quy định) x Đơn giá</p>
+              <div className="flex-1">
+                <h4 className="text-xs font-bold text-slate-700">Tính theo mỗi giờ</h4>
+                <p className="text-[10px] text-blue-600 font-medium mt-1 leading-relaxed">
+                  Lưu ý: Hệ thống sẽ lấy giá phụ thu mỗi giờ được cấu hình riêng trong từng Hạng Phòng để nhân lên.
+                </p>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <NumericInput 
-                value={timeRules.early_hour_rate || 0}
-                onChange={(val) => setTimeRules({...timeRules, early_hour_rate: val})}
-                className="w-32 bg-slate-50 p-3 rounded-xl font-bold text-sm text-right text-blue-600 outline-none"
-              />
-              <span className="text-xs font-bold text-slate-400">đ/giờ</span>
             </div>
           </div>
         ) : (
@@ -705,15 +701,12 @@ const SurchargeTab = ({
                   
                   <div className="flex-1 flex flex-col gap-1">
                     <div className="flex items-center justify-between px-1">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Mức thu</span>
-                      <div className="flex bg-slate-100 p-0.5 rounded-lg">
-                        <button onClick={() => updateEarlyRule(index, 'type', 'percent')} className={cn("px-1.5 py-0.5 rounded-md text-[8px] font-black transition-all", rule.type !== 'amount' ? "bg-white text-blue-600 shadow-sm" : "text-slate-400")}>%</button>
-                        <button onClick={() => updateEarlyRule(index, 'type', 'amount')} className={cn("px-1.5 py-0.5 rounded-md text-[8px] font-black transition-all", rule.type === 'amount' ? "bg-white text-blue-600 shadow-sm" : "text-slate-400")}>đ</button>
-                      </div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Mức thu (%)</span>
                     </div>
                     <NumericInput 
-                      value={rule.type === 'amount' ? (rule.amount || 0) : rule.percent} 
-                      onChange={(val) => updateEarlyRule(index, rule.type === 'amount' ? 'amount' : 'percent', val)} 
+                      value={rule.percent} 
+                      onChange={(val) => updateEarlyRule(index, 'percent', val)} 
+                      type="number"
                       className="w-full bg-slate-50 p-2.5 rounded-xl font-bold text-xs outline-none text-right pr-2 text-blue-600" 
                     />
                   </div>
@@ -766,18 +759,12 @@ const SurchargeTab = ({
               <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center">
                 <Clock className="h-6 w-6 text-orange-500" />
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-700">Đơn giá phụ thu mỗi giờ</h4>
-                <p className="text-[10px] text-slate-400">Hệ thống sẽ tự tính: (Giờ trả - Giờ quy định) x Đơn giá</p>
+              <div className="flex-1">
+                <h4 className="text-xs font-bold text-slate-700">Tính theo mỗi giờ</h4>
+                <p className="text-[10px] text-orange-600 font-medium mt-1 leading-relaxed">
+                  Lưu ý: Hệ thống sẽ lấy giá phụ thu mỗi giờ được cấu hình riêng trong từng Hạng Phòng để nhân lên.
+                </p>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <NumericInput 
-                value={timeRules.late_hour_rate || 0}
-                onChange={(val) => setTimeRules({...timeRules, late_hour_rate: val})}
-                className="w-32 bg-slate-50 p-3 rounded-xl font-bold text-sm text-right text-orange-600 outline-none"
-              />
-              <span className="text-xs font-bold text-slate-400">đ/giờ</span>
             </div>
           </div>
         ) : (
@@ -807,15 +794,12 @@ const SurchargeTab = ({
                   
                   <div className="flex-1 flex flex-col gap-1">
                     <div className="flex items-center justify-between px-1">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Mức thu</span>
-                      <div className="flex bg-slate-100 p-0.5 rounded-lg">
-                        <button onClick={() => updateLateRule(index, 'type', 'percent')} className={cn("px-1.5 py-0.5 rounded-md text-[8px] font-black transition-all", rule.type !== 'amount' ? "bg-white text-orange-600 shadow-sm" : "text-slate-400")}>%</button>
-                        <button onClick={() => updateLateRule(index, 'type', 'amount')} className={cn("px-1.5 py-0.5 rounded-md text-[8px] font-black transition-all", rule.type === 'amount' ? "bg-white text-orange-600 shadow-sm" : "text-slate-400")}>đ</button>
-                      </div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Mức thu (%)</span>
                     </div>
                     <NumericInput 
-                      value={rule.type === 'amount' ? (rule.amount || 0) : rule.percent} 
-                      onChange={(val) => updateLateRule(index, rule.type === 'amount' ? 'amount' : 'percent', val)} 
+                      value={rule.percent} 
+                      onChange={(val) => updateLateRule(index, 'percent', val)} 
+                      type="number"
                       className="w-full bg-slate-50 p-2.5 rounded-xl font-bold text-xs outline-none text-right pr-2 text-orange-600" 
                     />
                   </div>
@@ -921,6 +905,7 @@ const GracePeriodTab = ({ timeRules, setTimeRules }: any) => (
         <NumericInput 
           value={timeRules.initial_grace_minutes} 
           onChange={(val) => setTimeRules({...timeRules, initial_grace_minutes: val})} 
+          type="number"
           className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none pr-12" 
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">phút</span>
@@ -938,6 +923,7 @@ const GracePeriodTab = ({ timeRules, setTimeRules }: any) => (
         <NumericInput 
           value={timeRules.late_grace_minutes} 
           onChange={(val) => setTimeRules({...timeRules, late_grace_minutes: val})} 
+          type="number"
           className="w-full p-3 bg-slate-50 rounded-xl text-lg font-bold text-slate-800 outline-none pr-12" 
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">phút</span>
@@ -966,11 +952,11 @@ const OtherSettingsTab = ({ timeRules, setTimeRules, taxConfig, setTaxConfig }: 
       <input type="text" placeholder="Mã số thuế..." value={taxConfig.tax_code} onChange={(e) => setTaxConfig({...taxConfig, tax_code: e.target.value})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none placeholder:text-slate-300" />
       <div className="grid grid-cols-2 gap-3">
         <div className="relative">
-          <NumericInput value={taxConfig.stay_tax} onChange={(val) => setTaxConfig({...taxConfig, stay_tax: val})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none pr-8" />
+          <NumericInput value={taxConfig.stay_tax} onChange={(val) => setTaxConfig({...taxConfig, stay_tax: val})} type="number" className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none pr-8" />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">% Thuế</span>
         </div>
         <div className="relative">
-          <NumericInput value={taxConfig.service_tax} onChange={(val) => setTaxConfig({...taxConfig, service_tax: val})} className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none pr-8" />
+          <NumericInput value={taxConfig.service_tax} onChange={(val) => setTaxConfig({...taxConfig, service_tax: val})} type="number" className="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none pr-8" />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">% Phí DV</span>
         </div>
       </div>

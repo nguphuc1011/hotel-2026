@@ -35,20 +35,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchProfile = async (currentUser: User) => {
     const userId = currentUser.id;
-    console.time(`[Hiệu Năng] Tổng thời gian lấy Hồ sơ User (ID: ${userId})`);
     try {
       // 1. Kiểm tra xem profile đã tồn tại chưa
-      console.time(`[Hiệu Năng] Truy vấn DB Profile (ID: ${userId})`);
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('id, username, full_name, role, permissions')
         .eq('id', userId)
         .maybeSingle();
-      console.timeEnd(`[Hiệu Năng] Truy vấn DB Profile (ID: ${userId})`);
 
       if (fetchError) {
-        // eslint-disable-next-line no-console
-        console.error('Lỗi khi truy vấn hồ sơ:', fetchError.message);
         return;
       }
 
@@ -77,9 +72,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // 2. Nếu chưa có, tiến hành tạo mới một lần duy nhất
-      // eslint-disable-next-line no-console
-      console.log('Chưa có hồ sơ, đang khởi tạo hồ sơ Admin mặc định...');
-      // currentUser đã được truyền vào, không cần gọi getUser lại
 
       if (currentUser && currentUser.id === userId) {
         const { data: newProfile, error: createError } = await supabase
@@ -114,26 +106,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .eq('id', userId)
               .single();
             if (retryProfile) setProfile(retryProfile);
-          } else {
-            // eslint-disable-next-line no-console
-            console.error('Không thể tạo hồ sơ:', createError.message);
           }
         } else if (newProfile) {
           setProfile(newProfile);
         }
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Lỗi hệ thống trong AuthContext:', error);
+      // Catch silently for production
     } finally {
-      console.timeEnd(`[Hiệu Năng] Tổng thời gian lấy Hồ sơ User (ID: ${userId})`);
       setLoading(false); // QUÂN LỆNH: Luôn luôn hạ cờ loading dù thành công hay thất bại
     }
   };
 
   const _handleAuthFailure = async (reason: string) => {
-    // eslint-disable-next-line no-console
-    console.error(`[Auth] Authentication failed/timed out: ${reason}`);
     setAuthError(reason);
     try {
       // 1. Clear session from Supabase
@@ -161,8 +146,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         router.push('/login');
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('[Auth] Error during cleanup:', error);
       setLoading(false);
     }
   };
@@ -171,8 +154,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // QUÂN LỆNH: BỘ ĐẾM TỬ THẦN 5 GIÂY - KHAI THÔNG CỔNG THÀNH
     const gateTimeout = setTimeout(() => {
       if (loading) {
-        // eslint-disable-next-line no-console
-        console.warn('[Auth] Cổng thành kẹt quá 5s! Cưỡng chế mở cổng...');
         setLoading(false);
       }
     }, 5000);
@@ -183,13 +164,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const maxRetries = 2; // Giảm số lần thử để nhanh hơn
 
       while (retryCount < maxRetries) {
-        // 5s safety timeout for session fetch (Điều 4.1)
+        // 5s safety timeout for session fetch
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
         );
 
         try {
-          console.time('[Hiệu Năng] Kết nối Session Supabase');
           const sessionPromise = supabase.auth.getSession();
           const sessionResult = await Promise.race([sessionPromise, timeoutPromise]);
           
@@ -200,7 +180,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const {
             data: { session },
           } = sessionResult as any;
-          console.timeEnd('[Hiệu Năng] Kết nối Session Supabase');
 
           const currentUser = session?.user ?? null;
           setUser(currentUser);
@@ -211,13 +190,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Success -> Exit loop
           break;
         } catch (error: any) {
-          // eslint-disable-next-line no-console
-          console.error(`[Auth] Error fetching session (Attempt ${retryCount + 1}):`, error);
           retryCount++;
 
           if (retryCount >= maxRetries) {
             if (error.message === 'Session fetch timeout') {
-              _handleAuthFailure('Hết thời gian kết nối (Timeout 5s)');
+              _handleAuthFailure('Hết thời gian kết nối');
             }
           } else {
             // Wait 500ms before retry
@@ -230,7 +207,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     getSession();
 
-    // Listen for changes on auth state (logged in, signed out, etc.)
+    // Listen for changes on auth state
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -239,12 +216,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (currentUser) {
         await fetchProfile(currentUser);
-        // TỰ ĐỘNG LẤY VÀ LƯU PUSH TOKEN KHI ĐĂNG NHẬP
         requestForToken();
       } else {
         setProfile(null);
-        // Chỉ redirect nếu không phải đang ở trang login
-        if (window.location.pathname !== '/login') {
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
           router.push('/login');
         }
       }

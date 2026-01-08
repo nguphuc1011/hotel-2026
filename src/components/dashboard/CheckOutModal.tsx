@@ -372,6 +372,7 @@ export default function CheckoutModal({
                         <NumericInput
                           value={discountValue}
                           onChange={setDiscountValue}
+                          type={discountType === 'amount' ? 'currency' : 'number'}
                           className="w-32 bg-slate-50 border-slate-100 rounded-xl px-3 h-9 text-right font-black text-slate-700 text-base"
                           suffix={discountType === 'amount' ? '' : '%'}
                         />

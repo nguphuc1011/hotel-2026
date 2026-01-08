@@ -170,6 +170,7 @@ export const CashflowModal: React.FC<CashflowModalProps> = ({
                 <NumericInput
                   value={amount}
                   onChange={setAmount}
+                  type="currency"
                   className={cn(
                     "w-full bg-transparent border-none text-3xl font-black text-center p-0 focus:ring-0",
                     type === 'income' ? "text-emerald-600" : "text-rose-600"

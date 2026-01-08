@@ -121,6 +121,7 @@ export const RoomCard = memo(function RoomCard({ room, onClick }: RoomCardProps)
       return;
     }
 
+    // Logic tính thời gian đã ở (duration)
     if (room.status === 'hourly') {
       const totalMinutes = differenceInMinutes(now, start);
       if (isNaN(totalMinutes)) {
@@ -211,29 +212,16 @@ export const RoomCard = memo(function RoomCard({ room, onClick }: RoomCardProps)
             )}
             {room.category?.name && (
               <span className={cn(
-                "rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider backdrop-blur-md mr-1",
-                isOccupied ? "bg-white/20 text-white" : "bg-blue-100 text-blue-700"
+                "rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider backdrop-blur-md bg-black/10",
+                config.textColor
               )}>
                 {room.category.name}
               </span>
             )}
-            {isOccupied ? (
-              (room.current_booking?.notes || room.current_booking?.customer?.notes) ? (
-                <div className="rounded-full p-1.5 bg-black/10 backdrop-blur-md">
-                  <StickyNote size={14} className={config.textColor} />
-                </div>
-              ) : (
-                <div className="rounded-full p-1.5 bg-black/10 backdrop-blur-md">
-                  <Check size={14} className={config.textColor} />
-                </div>
-              )
-            ) : (
-              <span className={cn(
-                "rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-wider backdrop-blur-md",
-                "bg-black/10"
-              )}>
-                {config.label}
-              </span>
+            {isOccupied && (room.current_booking?.notes || room.current_booking?.customer?.notes) && (
+              <div className="rounded-full p-1.5 bg-black/10 backdrop-blur-md">
+                <StickyNote size={14} className={config.textColor} />
+              </div>
             )}
           </div>
         </div>

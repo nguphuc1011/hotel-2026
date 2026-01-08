@@ -40,7 +40,7 @@ Mục tiêu là đưa toàn bộ logic nghiệp vụ phức tạp (Tính tiền,
 ## 4. Danh mục RPC hiện tại (Reference)
 | Tên hàm | Tham số | Đầu ra | Ghi chú |
 | :--- | :--- | :--- | :--- |
-| `calculate_booking_bill` | `p_booking_id: uuid` | `jsonb` | (Single Source of Truth) Trả về chi tiết hóa đơn chuẩn hóa. |
+| `calculate_booking_bill_v2` | `p_booking_id: uuid` | `jsonb` | (Single Source of Truth) Trả về chi tiết hóa đơn chuẩn hóa. |
 | `handle_checkout` | `p_booking_id: uuid, ...` | `jsonb` | (Atomic) Hoàn tất thanh toán và cập nhật trạng thái hệ thống. |
 
 ---

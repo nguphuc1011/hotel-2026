@@ -76,10 +76,8 @@ export function CheckInModal({
   useEffect(() => {
     const searchTimer = setTimeout(async () => {
       if (customer.name && customer.name.length >= 1 && !isProcessing) {
-        console.time('[Hiệu Năng] Tìm kiếm Khách hàng');
         const results = await HotelService.searchCustomers(customer.name);
         setSearchResults(results);
-        console.timeEnd('[Hiệu Năng] Tìm kiếm Khách hàng');
       } else {
         setSearchResults([]);
       }

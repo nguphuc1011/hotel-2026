@@ -693,7 +693,7 @@ export default function FolioModal({
       if (data.price_change_type === 'from_today') {
         // Trong kiến trúc Database-first mới, ta không tính toán thủ công ở Frontend nữa.
         // Ta sẽ cập nhật thời gian check-in mới và giá khởi điểm mới (nếu có).
-        // Sau đó RPC calculate_booking_bill sẽ tự động tính toán lại dựa trên thời gian thực tế.
+        // Sau đó RPC calculate_booking_bill_v2 sẽ tự động tính toán lại dựa trên thời gian thực tế.
         
         // Tuy nhiên, nếu "from today" ý nghĩa là "chốt giá cũ và bắt đầu tính giá mới từ bây giờ",
         // thì ta cần logic phức tạp hơn (tách booking hoặc snapshot).

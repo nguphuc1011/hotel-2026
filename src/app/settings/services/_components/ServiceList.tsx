@@ -469,6 +469,7 @@ export default function ServiceList() {
                   <NumericInput
                     value={stockData.quantity}
                     onChange={val => setStockData({ ...stockData, quantity: val })}
+                    type="number"
                     placeholder="1"
                   />
                 </div>

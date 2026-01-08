@@ -158,13 +158,13 @@ export const HotelService = {
       return { success: false, message: 'ID đặt phòng không hợp lệ' };
     }
 
-    const { data, error } = await supabase.rpc('calculate_booking_bill', {
+    const { data, error } = await supabase.rpc('calculate_booking_bill_v2', {
       p_booking_id: bookingId
     });
 
     if (error) {
       // eslint-disable-next-line no-console
-      console.error('[HotelService] Lỗi RPC calculate_booking_bill:', {
+      console.error('[HotelService] Lỗi RPC calculate_booking_bill_v2:', {
         message: error.message,
         details: error.details,
         hint: error.hint,

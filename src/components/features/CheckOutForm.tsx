@@ -53,7 +53,7 @@ export function CheckOutForm({ room, onCheckoutSuccess }: CheckOutFormProps) {
         const bill = await HotelService.calculateBill(room.current_booking_id!);
         if (bill && bill.success) {
           console.log('[CheckOutForm] Dữ liệu bill từ RPC:', bill);
-          // Ánh xạ dữ liệu từ calculate_booking_bill (Single Source of Truth)
+          // Ánh xạ dữ liệu từ calculate_booking_bill_v2 (Single Source of Truth)
           setDetails({
             check_in_at: bill.check_in_at,
             duration_string: bill.duration_text || 'Đang tính...',

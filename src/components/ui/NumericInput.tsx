@@ -12,6 +12,7 @@ interface NumericInputProps extends Omit<
   className?: string;
   placeholder?: string;
   suffix?: string;
+  type?: 'currency' | 'number';
 }
 
 export function NumericInput({
@@ -20,18 +21,20 @@ export function NumericInput({
   className,
   placeholder,
   suffix,
+  type = 'currency',
   ...props
 }: NumericInputProps) {
   // Format number to string with dots (vi-VN)
   const format = (val: number | string) => {
     const num = typeof val === 'string' ? parseInt(val.replace(/\D/g, ''), 10) : val;
     if (isNaN(num)) return '';
+    if (type === 'number') return num.toString();
     return new Intl.NumberFormat('vi-VN').format(num);
   };
 
   const displayValue = format(value);
-  // Hiển thị ghost zeros nếu giá trị > 0 và < 1000, hoặc nếu giá trị bằng 0 (chưa gõ)
-  const showGhostZeros = value < 1000;
+  // Hiển thị ghost zeros nếu là tiền tệ và giá trị > 0 và < 1000
+  const showGhostZeros = type === 'currency' && value > 0 && value < 1000;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/\D/g, '');
@@ -40,25 +43,25 @@ export function NumericInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // If user presses 'k' or 'K', multiply by 1000
-    if (e.key.toLowerCase() === 'k') {
+    // If user presses 'k' or 'K' and it's currency, multiply by 1000
+    if (e.key.toLowerCase() === 'k' && type === 'currency') {
       e.preventDefault();
       onChange(value * 1000);
     }
     // Tab key handling: If user has ghost zeros and presses Tab, commit them
-    if (e.key === 'Tab' && showGhostZeros && value > 0) {
+    if (e.key === 'Tab' && showGhostZeros) {
       // We don't preventDefault so focus still moves, but we update the value
       onChange(value * 1000);
     }
     // If user presses Enter and value is < 1000 and > 0, auto-multiply by 1000
-    if (e.key === 'Enter' && value > 0 && value < 1000) {
+    if (e.key === 'Enter' && showGhostZeros) {
       onChange(value * 1000);
     }
   };
 
   const handleBlur = () => {
     // When leaving the field, if value is > 0 and < 1000, auto-multiply by 1000
-    if (value > 0 && value < 1000) {
+    if (showGhostZeros) {
       onChange(value * 1000);
     }
   };
