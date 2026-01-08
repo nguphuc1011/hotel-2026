@@ -38,13 +38,14 @@ BEGIN
     SELECT 
         b.*, r.room_number, rc.prices as category_prices,
         c.full_name as customer_name, c.balance as customer_balance,
-        s.compiled_pricing_strategy as strategy
+        s.compiled_pricing_strategy as strategy,
+        s.value as settings_value
     INTO v_booking
     FROM public.bookings b
     JOIN public.rooms r ON b.room_id = r.id
     LEFT JOIN public.room_categories rc ON r.category_id = rc.id
     LEFT JOIN public.customers c ON b.customer_id = c.id
-    CROSS JOIN (SELECT compiled_pricing_strategy FROM public.settings WHERE key = 'system_settings') s
+    CROSS JOIN (SELECT compiled_pricing_strategy, value FROM public.settings WHERE key = 'system_settings') s
     WHERE b.id = p_booking_id;
 
     IF v_booking.id IS NULL THEN
@@ -61,10 +62,22 @@ BEGIN
 
     -- TÍNH GIÁ PHÒNG GỐC
     IF v_booking.rental_type = 'hourly' THEN
-        v_room_price := COALESCE((v_booking.category_prices->>'hourly')::numeric, 0);
-        IF extract(epoch from v_diff)/3600 > 1 THEN
-            v_room_price := v_room_price + (ceil(extract(epoch from v_diff)/3600 - 1) * COALESCE((v_booking.category_prices->>'next_hour')::numeric, 0));
-        END IF;
+        DECLARE
+            v_base_hours numeric := COALESCE((v_booking.value->>'baseHours')::numeric, 1);
+            v_grace_minutes numeric := COALESCE((v_booking.value->>'initial_grace_minutes')::numeric, 0);
+            v_total_seconds numeric := extract(epoch from v_diff);
+            v_billable_hours numeric;
+        BEGIN
+            -- Nếu tổng thời gian (trừ đi thời gian ân hạn) vượt quá block đầu
+            IF v_total_seconds > (v_base_hours * 3600 + v_grace_minutes * 60) THEN
+                -- Số giờ tính thêm = ceil((tổng giây - block đầu giây) / 3600)
+                v_billable_hours := ceil((v_total_seconds - v_base_hours * 3600) / 3600);
+                v_room_price := COALESCE((v_booking.category_prices->>'hourly')::numeric, 0) + 
+                                (v_billable_hours * COALESCE((v_booking.category_prices->>'next_hour')::numeric, 0));
+            ELSE
+                v_room_price := COALESCE((v_booking.category_prices->>'hourly')::numeric, 0);
+            END IF;
+        END;
     ELSIF v_booking.rental_type = 'overnight' THEN
         v_room_price := COALESCE((v_booking.category_prices->>'overnight')::numeric, 0);
     ELSE
