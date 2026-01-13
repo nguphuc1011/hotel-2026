@@ -100,6 +100,19 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const handleUpdate = async () => {
+    if (!customer) return;
+    if (!editForm.full_name.trim()) return alert('Vui lòng nhập tên khách hàng');
+
+    const updated = await customerService.updateCustomer(customer.id, editForm);
+    if (updated) {
+      setShowEditModal(false);
+      loadData();
+    } else {
+      alert('Lỗi khi cập nhật hồ sơ');
+    }
+  };
+
   const getTypeLabel = (type: string) => {
     switch (type) {
       case 'payment': return 'Thanh toán / Nạp tiền';
@@ -173,7 +186,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 >
                   <DollarSign size={18} /> Giao dịch
                 </button>
-                <button className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-main py-3 rounded-xl font-bold border border-gray-200 transition-all active:scale-95">
+                <button 
+                  onClick={() => setShowEditModal(true)}
+                  className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-main py-3 rounded-xl font-bold border border-gray-200 transition-all active:scale-95"
+                >
                   <Edit3 size={18} /> Sửa hồ sơ
                 </button>
               </div>
