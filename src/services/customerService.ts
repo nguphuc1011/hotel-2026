@@ -153,7 +153,7 @@ export const customerService = {
           room:rooms(room_number)
         `)
         .eq('customer_id', customerId)
-        .order('check_in_actual', { ascending: false });
+        .order('check_in_at', { ascending: false });
 
       if (error) throw error;
       return data;

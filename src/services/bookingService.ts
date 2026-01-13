@@ -48,58 +48,59 @@ export interface BookingBill {
 export const bookingService = {
   async calculateBill(bookingId: string): Promise<BookingBill | null> {
     try {
-      // Use the V3 Billing Engine
+      // Use the merged V2 Billing Engine (Rule 4 compliant)
       const { data, error } = await supabase
-        .rpc('get_booking_bill_v3', { p_booking_id: bookingId });
+        .rpc('calculate_booking_bill_v2', { p_booking_id: bookingId });
 
       if (error) {
         console.error('RPC Error details:', JSON.stringify(error, null, 2));
         throw error;
       }
 
-      if (!data) {
-        console.error('No data returned from get_booking_bill_v3');
+      if (!data || !data.success) {
+        console.error('Error or no data returned from calculate_booking_bill_v2:', data?.message);
         return null;
       }
       
       // Map the response structure to BookingBill interface
+      // Note: calculate_booking_bill_v2 returns all necessary fields with aliases for compatibility
       return {
           success: true,
           booking_id: data.booking_id,
-          room_number: data.room_name, // v3 uses room_name
-          customer_name: data.customer_name || 'Khách lẻ',
+          room_number: data.room_number,
+          customer_name: data.customer_name,
           rental_type: data.rental_type,
           
-          check_in_at: data.check_in,
-          check_out_at: data.check_out,
+          check_in_at: data.check_in_at,
+          check_out_at: data.check_out_at,
           duration_text: data.duration_text,
           duration_min: data.duration_minutes || 0,
           
           room_charge: data.room_charge,
-          base_price: data.room_charge, 
+          base_price: data.base_price, 
           
           early_surcharge: data.early_surcharge || 0,
           late_surcharge: data.late_surcharge || 0,
           custom_surcharge: data.custom_surcharge || 0,
           
           service_total: data.service_total || 0,
-          service_charges: data.service_items || [], // v3 uses service_items
+          service_charges: data.service_charges || [],
           
-          subtotal: data.sub_total, // v3 uses sub_total
-          service_fee_percent: 0, 
-          service_fee_amount: data.service_fee || 0,
-          vat_percent: 0,
+          subtotal: data.subtotal,
+          service_fee_percent: 0, // Calculated in SQL
+          service_fee_amount: data.service_fee_amount || 0,
+          vat_percent: 0, // Calculated in SQL
           vat_amount: data.vat_amount || 0,
           
           total_amount: data.total_amount,
           discount_amount: data.discount_amount,
-          final_amount: data.total_amount, 
+          final_amount: data.final_amount, 
           
-          deposit_amount: data.deposit,
-          amount_to_pay: data.final_payable,
+          deposit_amount: data.deposit_amount,
+          amount_to_pay: data.amount_to_pay,
           
-          customer_balance: data.customer_debt_old,
-          total_receivable: data.final_payable
+          customer_balance: data.customer_balance,
+          total_receivable: data.total_receivable
       };
     } catch (err: any) {
       console.error('Error calculating bill:', err.message || err);
@@ -117,7 +118,8 @@ export const bookingService = {
     staffId?: string;
   }): Promise<{ success: boolean; message: string; bill?: any }> {
     try {
-      const { data, error } = await supabase.rpc('process_checkout_v3', {
+      // Use the merged V2 Checkout Engine (Rule 4 compliant)
+      const { data, error } = await supabase.rpc('process_checkout_v2', {
         p_booking_id: params.bookingId,
         p_payment_method: params.paymentMethod,
         p_amount_paid: params.amountPaid,

@@ -1,7 +1,6 @@
 -- CHECK-IN CUSTOMER RPC
 -- Created: 2026-01-12
--- Updated: 2026-01-12 (Added source, fixed check_in_at)
--- Supports Manual Extra Person Input
+-- Updated: 2026-01-14 (Removed missing columns, fixed check_in_at usage)
 
 CREATE OR REPLACE FUNCTION public.check_in_customer(
     p_room_id uuid,
@@ -32,19 +31,17 @@ BEGIN
     END IF;
 
     -- 2. Create Booking
+    -- NOTE: Removed extra_adults, extra_children, custom_price, custom_price_reason, source 
+    -- because they do not exist in the V2 schema yet.
     INSERT INTO public.bookings (
         room_id,
         customer_id,
         rental_type,
-        check_in_at,
+        check_in_actual,
         deposit_amount,
         status,
-        extra_adults,
-        extra_children,
         notes,
-        custom_price,
-        custom_price_reason,
-        source
+        services_used
     ) VALUES (
         p_room_id,
         p_customer_id,
@@ -52,12 +49,8 @@ BEGIN
         v_check_in_time,
         p_deposit,
         'checked_in',
-        p_extra_adults,
-        p_extra_children,
         p_notes,
-        p_custom_price,
-        p_custom_price_reason,
-        p_source
+        p_services
     ) RETURNING id INTO v_booking_id;
 
     -- 3. Update Room Status
@@ -65,24 +58,16 @@ BEGIN
     SET status = 'occupied'
     WHERE id = p_room_id;
 
-    -- 4. Add Services (if any)
-    -- Assuming p_services is array of {id, quantity, price}
+    -- 4. Add Services (Handled via services_used JSONB)
+    -- Legacy table insert removed because service_usage table does not exist.
+    /*
     IF jsonb_array_length(p_services) > 0 THEN
         FOR v_service IN SELECT * FROM jsonb_array_elements(p_services)
         LOOP
-            INSERT INTO public.service_usage (
-                booking_id,
-                service_id,
-                quantity,
-                price_at_booking
-            ) VALUES (
-                v_booking_id,
-                (v_service->>'id')::uuid,
-                (v_service->>'quantity')::int,
-                (v_service->>'price')::numeric
-            );
+            INSERT INTO public.service_usage ...
         END LOOP;
     END IF;
+    */
 
     RETURN jsonb_build_object(
         'success', true,
