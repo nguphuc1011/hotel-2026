@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Toaster } from 'sonner';
+import { GlobalDialogProvider } from '@/providers/GlobalDialogProvider';
 import { cn } from '@/lib/utils';
 import "./globals.css";
 
@@ -28,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className="antialiased bg-system text-main overflow-hidden h-screen flex">
+        <GlobalDialogProvider>
         
         {/* PC Sidebar - Airy Glassmorphism */}
         <aside className="hidden md:flex flex-col w-72 h-screen glass border-r border-white/40 z-50">
@@ -94,6 +97,17 @@ export default function RootLayout({
             </Link>
           ))}
         </nav>
+        
+        <Toaster position="top-right" richColors toastOptions={{
+          style: {
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.4)',
+            borderRadius: '16px',
+            fontFamily: 'inherit',
+          }
+        }} />
+        </GlobalDialogProvider>
       </body>
     </html>
   );

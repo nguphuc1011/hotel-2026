@@ -7,8 +7,11 @@ import { Switch } from '@/components/ui/controls';
 import { settingsService, RoomCategory } from '@/services/settingsService';
 import { roomService, Room } from '@/services/roomService';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { toast } from 'sonner';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function CategoriesPage() {
+  const { confirm } = useGlobalDialog();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'categories' | 'rooms'>('categories');
   const [loading, setLoading] = useState(true);
@@ -65,9 +68,10 @@ export default function CategoriesPage() {
       };
       await settingsService.createRoomCategory(newCat);
       await fetchData();
+      toast.success('Đã tạo hạng phòng mới thành công');
     } catch (error) {
       console.error('Error creating category:', error);
-      alert('Có lỗi xảy ra khi tạo hạng phòng.');
+      toast.error('Có lỗi xảy ra khi tạo hạng phòng.');
     }
   };
 
@@ -80,20 +84,28 @@ export default function CategoriesPage() {
       };
       await settingsService.createRoomCategory(newCat);
       await fetchData();
+      toast.success('Đã sao chép hạng phòng thành công');
     } catch (error) {
       console.error('Error copying category:', error);
-      alert('Có lỗi xảy ra khi sao chép hạng phòng.');
+      toast.error('Có lỗi xảy ra khi sao chép hạng phòng.');
     }
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa hạng phòng này không?')) return;
+    const isConfirmed = await confirm({
+      title: 'Xóa hạng phòng',
+      message: 'Bạn có chắc chắn muốn xóa hạng phòng này không?',
+      type: 'confirm'
+    });
+    if (!isConfirmed) return;
+    
     try {
         await settingsService.deleteRoomCategory(id);
         await fetchData();
+        toast.success('Đã xóa hạng phòng thành công');
     } catch (error) {
         console.error('Error deleting category:', error);
-        alert('Có lỗi xảy ra khi xóa hạng phòng.');
+        toast.error('Có lỗi xảy ra khi xóa hạng phòng.');
     }
   };
 
@@ -103,11 +115,11 @@ export default function CategoriesPage() {
       await Promise.all(
         categories.map(c => settingsService.updateRoomCategory(c.id, c))
       );
-      alert('Đã lưu cấu hình hạng phòng thành công!');
+      toast.success('Đã lưu cấu hình hạng phòng thành công!');
       await fetchData();
     } catch (error) {
       console.error('Failed to save categories:', error);
-      alert('Có lỗi xảy ra khi lưu cấu hình.');
+      toast.error('Có lỗi xảy ra khi lưu cấu hình.');
     } finally {
       setSaving(false);
     }
@@ -119,11 +131,11 @@ export default function CategoriesPage() {
     
     // Validation
     if (!editingRoom.room_number && !editingRoom.name) {
-      alert('Vui lòng nhập số phòng!');
+      toast.error('Vui lòng nhập số phòng!');
       return;
     }
     if (!editingRoom.category_id) {
-      alert('Vui lòng chọn hạng phòng!');
+      toast.error('Vui lòng chọn hạng phòng!');
       return;
     }
 
@@ -136,27 +148,35 @@ export default function CategoriesPage() {
       }
 
       if (!result) {
-        alert('Lưu thất bại. Vui lòng kiểm tra lại thông tin (trùng số phòng hoặc lỗi hệ thống).');
+        toast.error('Lưu thất bại. Vui lòng kiểm tra lại thông tin (trùng số phòng hoặc lỗi hệ thống).');
         return;
       }
 
       setIsRoomModalOpen(false);
       setEditingRoom(null);
       await fetchData();
+      toast.success('Đã lưu phòng thành công');
     } catch (error) {
       console.error('Error saving room:', error);
-      alert('Có lỗi xảy ra khi lưu phòng. Vui lòng kiểm tra lại.');
+      toast.error('Có lỗi xảy ra khi lưu phòng. Vui lòng kiểm tra lại.');
     }
   };
 
   const handleDeleteRoom = async (id: string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa phòng này không?')) return;
+    const isConfirmed = await confirm({
+      title: 'Xóa phòng',
+      message: 'Bạn có chắc chắn muốn xóa phòng này không?',
+      type: 'confirm'
+    });
+    if (!isConfirmed) return;
+    
     try {
       await roomService.deleteRoom(id);
       await fetchData();
+      toast.success('Đã xóa phòng thành công');
     } catch (error) {
       console.error('Error deleting room:', error);
-      alert('Có lỗi xảy ra khi xóa phòng.');
+      toast.error('Có lỗi xảy ra khi xóa phòng.');
     }
   };
 

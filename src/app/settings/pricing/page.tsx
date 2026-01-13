@@ -9,8 +9,11 @@ import { settingsService, Settings, RoomCategory } from '@/services/settingsServ
 import { cn } from '@/lib/utils';
 import { SegmentedControl } from '@/components/ui/controls';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { toast } from 'sonner';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function PricingPage() {
+  const { confirm } = useGlobalDialog();
   const router = useRouter();
   const [subTab, setSubTab] = useState('times');
   const [loading, setLoading] = useState(true);
@@ -112,10 +115,10 @@ export default function PricingPage() {
       
       // Refresh data to show formatted times
       await fetchData();
-      alert('Đã lưu cấu hình thành công!');
+      toast.success('Đã lưu cấu hình thành công!');
     } catch (error) {
       console.error('Failed to save settings:', error);
-      alert('Có lỗi xảy ra khi lưu cấu hình.');
+      toast.error('Có lỗi xảy ra khi lưu cấu hình.');
     } finally {
       setSaving(false);
     }

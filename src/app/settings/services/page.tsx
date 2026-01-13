@@ -24,8 +24,11 @@ import {
 import { serviceService, Service, InventoryLog } from '@/services/serviceService';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function ServicesPage() {
+  const { confirm } = useGlobalDialog();
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,7 +68,7 @@ export default function ServicesPage() {
   // Handlers
   const handleSave = async () => {
     if (!editingService?.name || !editingService?.price || !editingService?.unit_sell) {
-      alert('Vui lòng điền tên, giá bán và đơn vị bán!');
+      toast.error('Vui lòng điền tên, giá bán và đơn vị bán!');
       return;
     }
 
@@ -83,18 +86,27 @@ export default function ServicesPage() {
     setIsEditModalOpen(false);
     setEditingService(null);
     fetchServices();
+    toast.success('Đã lưu dịch vụ thành công');
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa dịch vụ này?')) {
+    const isConfirmed = await confirm({
+      title: 'Xóa dịch vụ',
+      message: 'Bạn có chắc chắn muốn xóa dịch vụ này?',
+      type: 'confirm'
+    });
+
+    if (isConfirmed) {
       await serviceService.deleteService(id);
       fetchServices();
+      toast.success('Đã xóa dịch vụ thành công');
     }
   };
 
   const handleToggleStatus = async (service: Service) => {
     await serviceService.updateService(service.id, { is_active: !service.is_active });
     fetchServices();
+    toast.success(`Đã ${!service.is_active ? 'hiện' : 'ẩn'} dịch vụ thành công`);
   };
 
   const handleImport = async () => {
@@ -122,16 +134,23 @@ export default function ServicesPage() {
     setIsImportModalOpen(false);
     setInventoryForm({ quantity: 0, cost: 0, notes: '' });
     fetchServices();
+    toast.success('Đã nhập kho thành công');
   };
 
   const handleBulkImport = async () => {
     const itemsToImport = bulkItems.filter(i => i.qty > 0);
     if (itemsToImport.length === 0) {
-        alert('Chưa nhập số lượng cho món nào cả!');
+        toast.error('Chưa nhập số lượng cho món nào cả!');
         return;
     }
 
-    if (!confirm(`Xác nhận nhập kho cho ${itemsToImport.length} món?`)) return;
+    const isConfirmed = await confirm({
+      title: 'Nhập kho hàng loạt',
+      message: `Xác nhận nhập kho cho ${itemsToImport.length} món?`,
+      type: 'confirm'
+    });
+
+    if (!isConfirmed) return;
 
     // Process sequentially to avoid race conditions or use Promise.all
     // We will do parallel for speed
@@ -156,7 +175,7 @@ export default function ServicesPage() {
     setIsBulkImportOpen(false);
     setBulkItems([]);
     fetchServices();
-    alert('Đã nhập kho thành công!');
+    toast.success('Đã nhập kho thành công!');
   };
 
   const handleAdjust = async () => {
@@ -165,6 +184,7 @@ export default function ServicesPage() {
     setIsAdjustModalOpen(false);
     setInventoryForm({ quantity: 0, cost: 0, notes: '' });
     fetchServices();
+    toast.success('Đã kiểm kho thành công');
   };
 
   const handleViewHistory = async (service: Service) => {

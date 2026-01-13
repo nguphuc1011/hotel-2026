@@ -1,21 +1,22 @@
+
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.local' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
 
 const client = new Client({
-  connectionString: process.env.DIRECT_URL,
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-async function run() {
-  await client.connect();
+async function checkData() {
   try {
-    const resC = await client.query(`SELECT count(*) FROM customers`);
-    console.log('Customers:', resC.rows[0].count);
+    await client.connect();
+    const rules = await client.query('SELECT * FROM surcharge_rules');
+    console.log(`Surcharge Rules Table Rows: ${rules.rowCount}`);
+    if (rules.rowCount > 0) console.log(rules.rows);
     
-    const resR = await client.query(`SELECT count(*) FROM rooms`);
-    console.log('Rooms:', resR.rows[0].count);
-    
-    const resCat = await client.query(`SELECT count(*) FROM room_categories`);
-    console.log('Categories:', resCat.rows[0].count);
+    const settings = await client.query('SELECT surcharge_rules FROM settings');
+    console.log('Settings Surcharge Rules:', JSON.stringify(settings.rows[0].surcharge_rules));
     
   } catch (e) {
     console.error(e);
@@ -24,4 +25,4 @@ async function run() {
   }
 }
 
-run();
+checkData();

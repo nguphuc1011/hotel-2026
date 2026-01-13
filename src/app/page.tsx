@@ -11,8 +11,11 @@ import DashboardHeader, { FilterState } from '@/components/dashboard/DashboardHe
 import CheckInModal from '@/components/dashboard/CheckInModal';
 import RoomFolioModal from '@/components/dashboard/RoomFolioModal';
 import { differenceInMinutes } from 'date-fns';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
+import { toast } from 'sonner';
 
 export default function DashboardPage() {
+  const { confirm, alert } = useGlobalDialog();
   const [rooms, setRooms] = useState<DashboardRoom[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -184,7 +187,13 @@ export default function DashboardPage() {
     } else if (room.status === 'occupied') {
       setIsFolioOpen(true);
     } else if (room.status === 'dirty') {
-      const confirmClean = window.confirm(`Xác nhận phòng ${room.name} đã dọn xong?`);
+      const confirmClean = await confirm({
+        title: 'Xác nhận dọn phòng',
+        message: `Xác nhận phòng ${room.name} đã dọn xong?`,
+        confirmLabel: 'Đã dọn xong',
+        type: 'confirm'
+      });
+      
       if (confirmClean) {
         // Optimistic update local state
         setRooms(prevRooms => prevRooms.map(r => 
@@ -193,6 +202,7 @@ export default function DashboardPage() {
 
         // Update and refresh
         await updateRoomStatus(room.id, 'available');
+        toast.success(`Phòng ${room.name} đã dọn xong`);
         fetchData();
       }
     }
@@ -203,7 +213,7 @@ export default function DashboardPage() {
       await supabase.from('rooms').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', roomId);
     } catch (e) {
       console.error(e);
-      alert('Lỗi cập nhật trạng thái');
+      toast.error('Lỗi cập nhật trạng thái');
     }
   };
 
@@ -233,11 +243,16 @@ export default function DashboardPage() {
       });
 
       // Refresh Data
+      toast.success('Nhận phòng thành công');
       fetchData();
       setIsCheckInOpen(false);
     } catch (error) {
       console.error('Check-in error:', JSON.stringify(error, null, 2));
-      alert('Lỗi nhận phòng: ' + ((error as any).message || 'Lỗi không xác định'));
+      await alert({
+        title: 'Lỗi nhận phòng',
+        message: (error as any).message || 'Lỗi không xác định',
+        type: 'error'
+      });
     }
   };
 

@@ -6,6 +6,8 @@ import { Room, Booking } from '@/types/dashboard';
 import { bookingService, BookingBill } from '@/services/bookingService';
 import { serviceService, Service, BookingServiceItem } from '@/services/serviceService';
 import PaymentModal from './PaymentModal';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
+import { toast } from 'sonner';
 
 interface RoomFolioModalProps {
   isOpen: boolean;
@@ -63,6 +65,7 @@ function useLongPress(
 }
 
 export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate }: RoomFolioModalProps) {
+  const { confirm, alert } = useGlobalDialog();
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -139,7 +142,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           await Promise.all([loadServices(), loadBill()]);
       } catch (error) {
           console.error("Failed to save services", error);
-          alert("Lỗi khi lưu dịch vụ");
+          toast.error("Lỗi khi lưu dịch vụ");
       } finally {
           setIsSaving(false);
       }
@@ -185,7 +188,15 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleCancelBooking = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn huỷ phòng này không? Hành động này không thể hoàn tác.")) {
+    const confirmed = await confirm({
+      title: 'Huỷ phòng',
+      message: "Bạn có chắc chắn muốn huỷ phòng này không? Hành động này không thể hoàn tác.",
+      type: 'error',
+      confirmLabel: 'Huỷ phòng',
+      destructive: true
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -194,9 +205,10 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       await bookingService.cancelBooking(booking.id);
       onUpdate(); // Refresh dashboard
       onClose(); // Close modal
+      toast.success("Huỷ phòng thành công");
     } catch (error) {
       console.error("Cancel failed", error);
-      alert("Lỗi khi huỷ phòng");
+      toast.error("Lỗi khi huỷ phòng");
     } finally {
       setIsLoading(false);
     }

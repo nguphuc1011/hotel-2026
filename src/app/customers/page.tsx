@@ -9,9 +9,12 @@ import {
 } from 'lucide-react';
 import { customerService, Customer } from '@/services/customerService';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function CustomersPage() {
   const router = useRouter();
+  const { confirm } = useGlobalDialog();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -46,7 +49,10 @@ export default function CustomersPage() {
   }, [search, isBanned]);
 
   const handleCreate = async () => {
-    if (!newCustomer.full_name) return alert('Vui lòng nhập tên khách');
+    if (!newCustomer.full_name) {
+      toast.error('Vui lòng nhập tên khách');
+      return;
+    }
     
     const res = await customerService.createCustomer(newCustomer);
     if (res) {
@@ -55,19 +61,27 @@ export default function CustomersPage() {
         full_name: '', phone: '', id_card: '', email: '', address: '', notes: ''
       });
       loadCustomers();
+      toast.success('Đã tạo khách hàng mới thành công');
     } else {
-      alert('Có lỗi xảy ra khi tạo khách hàng');
+      toast.error('Có lỗi xảy ra khi tạo khách hàng');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Bạn có chắc muốn xóa khách hàng này? Hành động này không thể hoàn tác.')) return;
+    const isConfirmed = await confirm({
+      title: 'Xóa khách hàng',
+      message: 'Bạn có chắc muốn xóa khách hàng này? Hành động này không thể hoàn tác.',
+      type: 'confirm'
+    });
+    
+    if (!isConfirmed) return;
     
     const res = await customerService.deleteCustomer(id);
     if (res.success) {
       loadCustomers();
+      toast.success('Đã xóa khách hàng thành công');
     } else {
-      alert(res.message);
+      toast.error(res.message);
     }
   };
 

@@ -56,3 +56,8 @@ Trước khi viết bất kỳ logic tính toán nào, phải lục soát toàn 
 Điều 9: Chống suy đoán - Chống ảo giác
 Khi gặp một logic cũ (Legacy Code), phải coi đó là "Thánh chỉ". Nếu thấy lạ, phải hỏi lại Bệ Hạ, không được tự ý cho là sai rồi sửa.
 Luôn kiểm tra dữ liệu thực tế trên Database trước khi kết luận logic sai hay đúng.
+
+Điều 10: Kỷ luật sinh tồn của AI
+Trước mỗi lần đề xuất sửa đổi code hay database, AI phải trích dẫn ít nhất 2 Điều trong Hiến pháp này làm căn cứ hành động.
+Nếu làm sai cấu trúc thực tế của Database (cột, bảng) hoặc vi phạm tính nhất thống (tạo ra các phiên bản trùng lặp v2, v3...), AI sẽ tự coi là một thất bại nghiêm trọng và phải dừng lại để rà soát toàn bộ Data Flow trước khi tiếp tục.
+Mọi hành động sửa đổi phải dựa trên kết quả truy vấn `information_schema` thực tế, không dựa trên trí nhớ hay file cũ.

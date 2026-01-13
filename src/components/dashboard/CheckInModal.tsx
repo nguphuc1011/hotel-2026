@@ -14,6 +14,7 @@ import { customerService, Customer } from '@/services/customerService';
 import { serviceService, Service } from '@/services/serviceService';
 import { settingsService, RoomCategory } from '@/services/settingsService';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 interface CheckInModalProps {
   isOpen: boolean;
@@ -168,6 +169,7 @@ function ServiceCard({ service, quantity, onAdd, onRemove }: {
 }
 
 export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: CheckInModalProps) {
+  const { alert } = useGlobalDialog();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<RentalType>('hourly');
   const [searchTerm, setSearchTerm] = useState('');
@@ -359,7 +361,11 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
             await onCheckIn(payload);
         } catch (error) {
             console.error(error);
-            alert('Có lỗi xảy ra khi check-in');
+            alert({
+              title: 'Lỗi',
+              message: 'Có lỗi xảy ra khi check-in',
+              type: 'error'
+            });
         } finally {
             setIsSubmitting(false);
         }

@@ -73,7 +73,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const handleTransaction = async () => {
     if (!customer) return;
     const amountVal = parseFloat(transForm.amount.replace(/[^0-9]/g, ''));
-    if (!amountVal || amountVal <= 0) return alert('Vui lòng nhập số tiền hợp lệ');
+    if (!amountVal || amountVal <= 0) {
+      toast.error('Vui lòng nhập số tiền hợp lệ');
+      return;
+    }
 
     // Calculate signed amount based on type
     let finalAmount = amountVal;
@@ -95,21 +98,26 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       setShowTransModal(false);
       setTransForm({ amount: '', type: 'payment', description: '' });
       loadData(); // Reload all
+      toast.success('Giao dịch thành công');
     } else {
-      alert('Lỗi: ' + res.message);
+      toast.error('Lỗi: ' + res.message);
     }
   };
 
   const handleUpdate = async () => {
     if (!customer) return;
-    if (!editForm.full_name.trim()) return alert('Vui lòng nhập tên khách hàng');
+    if (!editForm.full_name.trim()) {
+      toast.error('Vui lòng nhập tên khách hàng');
+      return;
+    }
 
     const updated = await customerService.updateCustomer(customer.id, editForm);
     if (updated) {
       setShowEditModal(false);
       loadData();
+      toast.success('Cập nhật hồ sơ thành công');
     } else {
-      alert('Lỗi khi cập nhật hồ sơ');
+      toast.error('Lỗi khi cập nhật hồ sơ');
     }
   };
 
