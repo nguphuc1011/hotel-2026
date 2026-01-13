@@ -86,20 +86,20 @@ export const bookingService = {
           service_charges: data.service_items || [], // v3 uses service_items
           
           subtotal: data.sub_total, // v3 uses sub_total
-          service_fee_percent: 0, // Not returned explicitly in v3 top level, but calculated
+          service_fee_percent: 0, 
           service_fee_amount: data.service_fee || 0,
           vat_percent: 0,
           vat_amount: data.vat_amount || 0,
           
           total_amount: data.total_amount,
           discount_amount: data.discount_amount,
-          final_amount: data.total_amount, // total_amount in v3 is final after adjustments
+          final_amount: data.total_amount, 
           
           deposit_amount: data.deposit,
           amount_to_pay: data.final_payable,
           
           customer_balance: data.customer_debt_old,
-          total_receivable: data.final_payable // Assuming same for now
+          total_receivable: data.final_payable
       };
     } catch (err: any) {
       console.error('Error calculating bill:', err.message || err);
@@ -107,6 +107,37 @@ export const bookingService = {
     }
   },
 
+  async processCheckout(params: {
+    bookingId: string;
+    paymentMethod: string;
+    amountPaid: number;
+    discount: number;
+    surcharge: number;
+    notes: string;
+    staffId?: string;
+  }): Promise<{ success: boolean; message: string; bill?: any }> {
+    try {
+      const { data, error } = await supabase.rpc('process_checkout_v3', {
+        p_booking_id: params.bookingId,
+        p_payment_method: params.paymentMethod,
+        p_amount_paid: params.amountPaid,
+        p_discount: params.discount,
+        p_surcharge: params.surcharge,
+        p_notes: params.notes,
+        p_staff_id: params.staffId
+      });
+
+      if (error) {
+        console.error('Checkout RPC Error:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+
+      return data;
+    } catch (err: any) {
+      console.error('Error processing checkout:', err.message || err);
+      return { success: false, message: err.message || 'Lỗi hệ thống khi thanh toán' };
+    }
+  },
 
   async checkIn(data: {
     room_id: string;
@@ -165,19 +196,21 @@ export const bookingService = {
 
       if (updateBookingError) throw updateBookingError;
 
-      // 3. Update room status to available
-      // Note: If room was dirty before, it might need to stay dirty? 
-      // But usually cancelling means "undo checkin", so back to available.
-      // If we want to mark it dirty, we would need to know if it was used.
-      // For now, assume back to available.
-      const { error: updateRoomError } = await supabase
-        .from('rooms')
-        .update({ status: 'available' })
-        .eq('id', booking.room_id);
+      // 3. Reset room status
+      if (booking?.room_id) {
+        const { error: updateRoomError } = await supabase
+          .from('rooms')
+          .update({ 
+            status: 'available',
+            current_booking_id: null,
+            last_status_change: new Date().toISOString()
+          })
+          .eq('id', booking.room_id);
+        
+        if (updateRoomError) throw updateRoomError;
+      }
 
-      if (updateRoomError) throw updateRoomError;
-
-      return true;
+      return { success: true };
     } catch (err) {
       console.error('Cancel booking error:', err);
       throw err;

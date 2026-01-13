@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Room, Booking } from '@/types/dashboard';
 import { bookingService, BookingBill } from '@/services/bookingService';
 import { serviceService, Service, BookingServiceItem } from '@/services/serviceService';
+import PaymentModal from './PaymentModal';
 
 interface RoomFolioModalProps {
   isOpen: boolean;
@@ -73,6 +74,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [showDetails, setShowDetails] = useState(false);
   const [pendingServices, setPendingServices] = useState<BookingServiceItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -479,6 +481,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 </button>
             ) : (
                 <button 
+                    onClick={() => setShowPaymentModal(true)}
                     className="w-full bg-slate-900 hover:bg-slate-800 text-white h-14 rounded-[28px] font-bold text-lg shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
                     <span>THANH TOÁN</span>
@@ -486,6 +489,18 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 </button>
             )}
         </div>
+
+        {bill && (
+            <PaymentModal 
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                bill={bill}
+                onSuccess={() => {
+                    onUpdate();
+                    onClose();
+                }}
+            />
+        )}
       </div>
     </div>,
     document.body
