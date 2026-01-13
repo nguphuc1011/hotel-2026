@@ -561,25 +561,25 @@ BEGIN
     
     IF NOT FOUND THEN RETURN NULL; END IF;
     
-    v_check_out := COALESCE(v_booking.check_out_actual, now());
+    v_check_out := COALESCE(v_booking.check_out_at, now());
     v_room_cat_id := v_booking.category_id;
     v_customer_balance := COALESCE(v_booking.cust_balance, 0);
     v_deposit := COALESCE(v_booking.deposit_amount, 0);
     v_room_name := v_booking.room_name;
     v_customer_name := COALESCE(v_booking.cust_name, 'Khách lẻ');
     
-    v_duration_hours := ROUND((EXTRACT(EPOCH FROM (v_check_out - v_booking.check_in_actual)) / 3600)::numeric, 2);
+    v_duration_hours := ROUND((EXTRACT(EPOCH FROM (v_check_out - v_booking.check_in_at)) / 3600)::numeric, 2);
 
     v_room_res := public.fn_calculate_room_charge(
         p_booking_id,
-        v_booking.check_in_actual,
+        v_booking.check_in_at,
         v_check_out,
         v_booking.rental_type,
         v_room_cat_id
     );
-
+    
     v_surcharge_res := public.fn_calculate_surcharge(
-        v_booking.check_in_actual,
+        v_booking.check_in_at,
         v_check_out,
         v_room_cat_id,
         v_booking.rental_type
@@ -620,7 +620,7 @@ BEGIN
         'room_name', v_room_name,
         'customer_name', v_customer_name,
         'rental_type', v_booking.rental_type,
-        'check_in', v_booking.check_in_actual,
+        'check_in', v_booking.check_in_at,
         'check_out', v_check_out,
         'duration_hours', v_duration_hours,
         'duration_text', CASE 

@@ -2,6 +2,14 @@
 -- Thực hiện toàn bộ quy trình checkout trong một transaction duy nhất
 -- Tuân thủ rule.md: DB-first, single source of truth
 
+-- Đảm bảo cột payment_method tồn tại trong bảng bookings
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bookings' AND column_name='payment_method') THEN
+        ALTER TABLE bookings ADD COLUMN payment_method text;
+    END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.process_checkout_v3(
     p_booking_id uuid,
     p_payment_method text,
@@ -39,7 +47,7 @@ BEGIN
     SET 
         discount_amount = COALESCE(p_discount, 0),
         custom_surcharge = COALESCE(p_surcharge, 0),
-        check_out_actual = now(),
+        check_out_at = now(), -- Sửa từ check_out_actual thành check_out_at
         status = 'completed',
         payment_method = p_payment_method,
         notes = COALESCE(notes, '') || E'\n[Checkout] ' || COALESCE(p_notes, '')
