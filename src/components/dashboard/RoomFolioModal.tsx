@@ -21,8 +21,8 @@ function useLongPress(
     { shouldPreventDefault = true, delay = 500 } = {}
 ) {
     const [longPressTriggered, setLongPressTriggered] = useState(false);
-    const timeout = useRef<NodeJS.Timeout>();
-    const target = useRef<EventTarget>();
+    const timeout = useRef<NodeJS.Timeout | null>(null);
+    const target = useRef<EventTarget | null>(null);
     const lastTouchTime = useRef<number>(0);
 
     const start = (event: React.MouseEvent | React.TouchEvent) => {
@@ -49,7 +49,7 @@ function useLongPress(
             onClick();
         }
         setLongPressTriggered(false);
-        target.current = undefined;
+        target.current = null;
     };
 
     return {

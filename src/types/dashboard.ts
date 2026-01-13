@@ -12,6 +12,7 @@ export interface Room {
   status: RoomStatus;
   clean_status?: 'clean' | 'dirty'; // Sometimes separate from main status
   last_cleaned_at?: string;
+  updated_at?: string;
   notes?: string;
 }
 

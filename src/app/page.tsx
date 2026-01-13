@@ -233,12 +233,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCheckout = async () => {
-      // Placeholder for checkout logic
-      alert('Chức năng thanh toán đang được phát triển');
-      setIsFolioOpen(false);
-  };
-
   return (
     <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-32">
       <div className="max-w-[1600px] mx-auto">
@@ -287,7 +281,6 @@ export default function DashboardPage() {
             room={selectedRoom}
             booking={selectedRoom.current_booking}
             onUpdate={fetchData}
-            onCheckout={handleCheckout}
         />
       )}
     </div>

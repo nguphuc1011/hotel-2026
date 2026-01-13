@@ -369,7 +369,7 @@ export default function CategoriesPage() {
                                 <label className="text-xs font-bold text-gray-500 uppercase">Giá Qua Đêm</label>
                                 <Switch 
                                     checked={cat.overnight_enabled ?? true}
-                                    onChange={(checked) => {
+                                    onChange={(checked: boolean) => {
                                         const newCats = [...categories];
                                         newCats[index].overnight_enabled = checked;
                                         setCategories(newCats);
@@ -398,7 +398,7 @@ export default function CategoriesPage() {
                         </h3>
                         <Switch 
                           checked={cat.auto_surcharge_enabled ?? false}
-                          onChange={(checked) => {
+                          onChange={(checked: boolean) => {
                               const newCats = [...categories];
                               newCats[index].auto_surcharge_enabled = checked;
                               setCategories(newCats);
