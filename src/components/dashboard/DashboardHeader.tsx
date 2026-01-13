@@ -99,25 +99,25 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
       {/* Filter Bar - Single Row, No Scroll, Icons Only */}
       <div className="w-full">
-         <div className="flex items-center justify-between gap-3 md:gap-4">
+         <div className="flex items-center justify-between gap-2 md:gap-3">
             {filterItems.map((f) => (
               <button
                 key={f.key}
                 onClick={() => onToggle(f.key)}
                 className={cn(
-                  "flex-1 h-14 md:h-16 rounded-[2rem] transition-all duration-300 flex items-center justify-center relative border shadow-sm",
+                  "flex-1 h-10 md:h-12 rounded-2xl transition-all duration-300 flex items-center justify-center relative border shadow-sm",
                   filters[f.key]
-                    ? cn("border-transparent shadow-lg transform -translate-y-1", f.activeClass)
+                    ? cn("border-transparent shadow-md transform -translate-y-0.5", f.activeClass)
                     : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
                 )}
               >
-                <f.icon size={24} strokeWidth={2.5} />
+                <f.icon size={20} strokeWidth={2.5} />
                 
-                {/* Badge Count - Bigger */}
+                {/* Badge Count - Compact */}
                 <span className={cn(
-                  "absolute -top-3 -right-3 md:-top-4 md:-right-4 w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-sm font-black border-[3px] border-[#F8F9FB] shadow-sm",
+                  "absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold border-2 border-[#F8F9FB] shadow-sm",
                   filters[f.key] 
-                    ? (f.key === 'hourly' ? "bg-black text-white" : "bg-white text-slate-900") // Special contrast for hourly
+                    ? (f.key === 'hourly' ? "bg-black text-white" : "bg-white text-slate-900") 
                     : "bg-slate-200 text-slate-500"
                 )}>
                   {f.count}
