@@ -4,9 +4,10 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { serviceService } from '@/services/serviceService';
 import { customerService } from '@/services/customerService';
+import { bookingService } from '@/services/bookingService';
 import { DashboardRoom, RoomStatus } from '@/types/dashboard';
 import RoomCard from '@/components/dashboard/RoomCard';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import DashboardHeader, { FilterState } from '@/components/dashboard/DashboardHeader';
 import CheckInModal from '@/components/dashboard/CheckInModal';
 import RoomFolioModal from '@/components/dashboard/RoomFolioModal';
 import { differenceInMinutes } from 'date-fns';
@@ -14,8 +15,15 @@ import { differenceInMinutes } from 'date-fns';
 export default function DashboardPage() {
   const [rooms, setRooms] = useState<DashboardRoom[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<RoomStatus | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  
+  // New Filter State
+  const [filters, setFilters] = useState<FilterState>({
+    available: true,
+    daily: true,
+    hourly: true,
+    dirty: true,
+    repair: true
+  });
 
   // Modal State
   const [selectedRoom, setSelectedRoom] = useState<DashboardRoom | null>(null);
@@ -138,34 +146,38 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // Filtering & Search
+  // Filtering Logic
   const filteredRooms = useMemo(() => {
     return rooms.filter(room => {
-      // 1. Status Filter
-      if (filter !== 'all' && room.status !== filter) return false;
-      
-      // 2. Search Query
-      if (searchQuery) {
-        return room.name.toLowerCase().includes(searchQuery.toLowerCase());
+      if (room.status === 'available') return filters.available;
+      if (room.status === 'dirty') return filters.dirty;
+      if (room.status === 'repair') return filters.repair;
+      if (room.status === 'occupied') {
+         const isHourly = room.current_booking?.booking_type === 'hourly';
+         return isHourly ? filters.hourly : filters.daily;
       }
-      
-      return true;
+      return false; // Should not happen if all statuses covered
     });
-  }, [rooms, filter, searchQuery]);
+  }, [rooms, filters]);
 
   // Counts for Header
   const counts = useMemo(() => {
     return {
       total: rooms.length,
       available: rooms.filter(r => r.status === 'available').length,
-      occupied: rooms.filter(r => r.status === 'occupied').length,
+      daily: rooms.filter(r => r.status === 'occupied' && r.current_booking?.booking_type !== 'hourly').length,
+      hourly: rooms.filter(r => r.status === 'occupied' && r.current_booking?.booking_type === 'hourly').length,
       dirty: rooms.filter(r => r.status === 'dirty').length,
       repair: rooms.filter(r => r.status === 'repair').length,
     };
   }, [rooms]);
 
+  const handleToggleFilter = (key: keyof FilterState) => {
+    setFilters(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   // Handle Click
-  const handleRoomClick = (room: DashboardRoom) => {
+  const handleRoomClick = async (room: DashboardRoom) => {
     setSelectedRoom(room);
     if (room.status === 'available') {
       setIsCheckInOpen(true);
@@ -174,8 +186,14 @@ export default function DashboardPage() {
     } else if (room.status === 'dirty') {
       const confirmClean = window.confirm(`Xác nhận phòng ${room.name} đã dọn xong?`);
       if (confirmClean) {
-        // Optimistic update
-        updateRoomStatus(room.id, 'available');
+        // Optimistic update local state
+        setRooms(prevRooms => prevRooms.map(r => 
+          r.id === room.id ? { ...r, status: 'available' as RoomStatus, current_booking: undefined } : r
+        ));
+
+        // Update and refresh
+        await updateRoomStatus(room.id, 'available');
+        fetchData();
       }
     }
   };
@@ -198,33 +216,23 @@ export default function DashboardPage() {
         customerId = walkIn?.id || null;
       }
       
-      // 1. Create Booking
-      const { data: booking, error: bookingError } = await supabase
-        .from('bookings')
-        .insert([{
-          room_id: bookingData.room_id,
-          customer_id: customerId, // default walk-in if missing
-          rental_type: bookingData.rental_type,
-          check_in_actual: new Date().toISOString(),
-          status: 'checked_in',
-          deposit_amount: bookingData.deposit || 0
-        }])
-        .select()
-        .single();
+      // Use BookingService (RPC) instead of direct insert
+      await bookingService.checkIn({
+        room_id: bookingData.room_id,
+        rental_type: bookingData.rental_type,
+        customer_id: customerId,
+        deposit: bookingData.deposit || 0,
+        services: bookingData.services || [],
+        customer_name: bookingData.customer_name,
+        notes: bookingData.notes,
+        // Optional fields that might be ignored by backend if not supported yet
+        extra_adults: bookingData.extra_adults,
+        extra_children: bookingData.extra_children,
+        custom_price: bookingData.custom_price,
+        custom_price_reason: bookingData.custom_price_reason
+      });
 
-      if (bookingError) throw bookingError;
-
-      // 1.5 Add Services (if any)
-      if (bookingData.services && bookingData.services.length > 0) {
-          await Promise.all(bookingData.services.map((s: any) => 
-              serviceService.addServiceToBooking(booking.id, s.id, s.quantity, s.price)
-          ));
-      }
-
-      // 2. Update Room Status
-      await updateRoomStatus(bookingData.room_id, 'occupied');
-      
-      // 3. Refresh Data
+      // Refresh Data
       fetchData();
       setIsCheckInOpen(false);
     } catch (error) {
@@ -238,9 +246,8 @@ export default function DashboardPage() {
       <div className="max-w-[1600px] mx-auto">
         <DashboardHeader 
           counts={counts}
-          currentFilter={filter}
-          onFilterChange={setFilter}
-          onSearch={setSearchQuery}
+          filters={filters}
+          onToggle={handleToggleFilter}
         />
 
         {loading ? (
@@ -261,7 +268,7 @@ export default function DashboardPage() {
 
         {!loading && filteredRooms.length === 0 && (
           <div className="text-center py-20 text-slate-400">
-            <p>Không tìm thấy phòng nào.</p>
+            <p>Không tìm thấy phòng nào phù hợp bộ lọc.</p>
           </div>
         )}
       </div>
