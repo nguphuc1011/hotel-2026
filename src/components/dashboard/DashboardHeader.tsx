@@ -105,17 +105,17 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 key={f.key}
                 onClick={() => onToggle(f.key)}
                 className={cn(
-                  "flex-1 h-8 md:h-10 rounded-xl transition-all duration-300 flex items-center justify-center relative border shadow-sm",
+                  "flex-1 h-14 md:h-16 rounded-[2rem] transition-all duration-300 flex items-center justify-center relative border shadow-sm",
                   filters[f.key]
-                    ? cn("border-transparent shadow-md transform -translate-y-0.5", f.activeClass)
+                    ? cn("border-transparent shadow-lg transform -translate-y-1", f.activeClass)
                     : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
                 )}
               >
-                <f.icon size={16} strokeWidth={2.5} />
+                <f.icon size={28} strokeWidth={2.5} />
                 
-                {/* Badge Count - Extra Compact */}
+                {/* Badge Count - Super Big */}
                 <span className={cn(
-                  "absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center text-[8px] md:text-[10px] font-bold border-2 border-[#F8F9FB] shadow-sm",
+                  "absolute -top-2 -right-2 md:-top-3 md:-right-3 w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-sm md:text-base font-black border-[3px] border-[#F8F9FB] shadow-sm",
                   filters[f.key] 
                     ? (f.key === 'hourly' ? "bg-black text-white" : "bg-white text-slate-900") 
                     : "bg-slate-200 text-slate-500"
