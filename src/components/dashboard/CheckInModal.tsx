@@ -6,7 +6,7 @@ import {
     X, User, Plus, Minus, Search, Loader2, 
     Calendar, Clock, MapPin, 
     Phone, Globe, Facebook, MessageCircle,
-    Briefcase
+    Briefcase, AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Room } from '@/types/dashboard';
@@ -196,27 +196,43 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
 
   // Settings State
   const [roomCategory, setRoomCategory] = useState<RoomCategory | null>(null);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
 
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Helper to normalize string for search (remove accents)
+  const normalize = (str: string) => {
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .trim();
+  };
 
   // Check for mounting
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Fetch Settings & Category
+  // Fetch Settings, Category & Customers
   useEffect(() => {
     if (isOpen && room) {
-        const fetchSettings = async () => {
+        const fetchData = async () => {
             try {
+                // Fetch categories
                 const categories = await settingsService.getRoomCategories();
                 const currentCat = categories.find(c => c.id === room.category_id);
                 setRoomCategory(currentCat || null);
+
+                // Pre-fetch customers for fast searching
+                const { data } = await customerService.getCustomers({ limit: 1000 });
+                setAllCustomers(data);
             } catch (e) {
-                console.error("Failed to load settings", e);
+                console.error("Failed to load settings or customers", e);
             }
         };
-        fetchSettings();
+        fetchData();
         
         // Reset States
         setExtraAdults(0);
@@ -240,25 +256,23 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
     }
   }, [isOpen, room]);
 
+  // Fast Local Search
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (searchTerm.length > 1 && !selectedCustomer) {
-        setIsSearching(true);
-        try {
-            const { data } = await customerService.getCustomers({ search: searchTerm, limit: 5 });
-            setCustomers(data);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setIsSearching(false);
-        }
-      } else {
+    if (!searchTerm.trim() || selectedCustomer) {
         setCustomers([]);
-      }
-    }, 300);
+        return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [searchTerm, selectedCustomer]);
+    const searchNorm = normalize(searchTerm);
+    const filtered = allCustomers.filter(c => {
+        const nameNorm = normalize(c.full_name);
+        const phone = c.phone || '';
+        const idCard = c.id_card || '';
+        return nameNorm.includes(searchNorm) || phone.includes(searchNorm) || idCard.includes(searchNorm);
+    }).slice(0, 5); // Limit to 5 results for UI
+
+    setCustomers(filtered);
+  }, [searchTerm, allCustomers, selectedCustomer]);
 
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerIdCard, setNewCustomerIdCard] = useState('');
@@ -336,6 +350,35 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                 });
                 if (newCustomer) {
                     finalCustomerId = newCustomer.id;
+                }
+            }
+
+            if (selectedCustomer && selectedCustomer.balance < 0) {
+                const debt = Math.abs(selectedCustomer.balance);
+                const confirmed = await confirm({
+                    title: 'Cảnh báo nợ cũ',
+                    message: `Khách ${selectedCustomer.full_name} đang nợ ${debt.toLocaleString()}đ.\nKhoản nợ này sẽ được cộng vào công nợ phòng và thanh toán khi trả phòng.\n\nLễ tân đã thông báo rõ cho khách và vẫn muốn nhận phòng?`,
+                    confirmLabel: 'ĐÃ THÔNG BÁO, VẪN NHẬN PHÒNG',
+                    type: 'confirm'
+                });
+
+                if (!confirmed) {
+                    setIsSubmitting(false);
+                    return;
+                }
+            } else if (selectedCustomer && selectedCustomer.balance < 0) {
+                // Persistent Debt Alert on Submit
+                const debt = Math.abs(selectedCustomer.balance);
+                const confirmed = await confirm({
+                    title: 'Xác nhận nợ cũ',
+                    message: `Khách hàng đang nợ ${debt.toLocaleString()}đ. Bạn đã chắc chắn thông báo cho khách và muốn tiếp tục check-in?`,
+                    confirmLabel: 'ĐÃ THÔNG BÁO, TIẾP TỤC',
+                    type: 'confirm'
+                });
+
+                if (!confirmed) {
+                    setIsSubmitting(false);
+                    return;
                 }
             }
 
@@ -454,6 +497,20 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                                 </button>
                             )}
                         </div>
+
+                        {selectedCustomer && selectedCustomer.balance < 0 && (
+                            <div className="mx-4 mb-3 p-3 bg-rose-50 rounded-2xl border border-rose-100 flex items-center gap-3 animate-in slide-in-from-top-1">
+                                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                                    <AlertCircle className="w-5 h-5 text-rose-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-[10px] font-bold text-rose-500 uppercase tracking-tight">Cảnh báo nợ cũ</div>
+                                    <div className="text-sm font-black text-rose-700">
+                                        Khách đang nợ {Math.abs(selectedCustomer.balance).toLocaleString()}đ
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         
                         {/* Dropdown Results */}
                         {customers.length > 0 && (

@@ -13,6 +13,11 @@ async function run() {
   const client = new Client({ connectionString: conn });
   await client.connect();
   try {
+    const checkInPath = path.join(__dirname, '../src/lib/check_in_customer.sql');
+    const checkInSql = fs.readFileSync(checkInPath, 'utf8');
+    console.log('--- Applying SQL from check_in_customer.sql ---');
+    await client.query(checkInSql);
+
     const sqlPath = path.join(__dirname, '../src/lib/billing_engine.sql');
     const sql = fs.readFileSync(sqlPath, 'utf8');
     

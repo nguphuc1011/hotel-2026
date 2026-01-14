@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 export interface BookingBill {
   success: boolean;
   booking_id: string;
+  customer_id?: string;
   room_number: string;
   customer_name: string;
   rental_type: 'hourly' | 'daily' | 'overnight';
@@ -18,6 +19,7 @@ export interface BookingBill {
   base_price: number;
   early_surcharge: number;
   late_surcharge: number;
+  extra_people_surcharge?: number;
   custom_surcharge: number;
   service_charges: any[];
   service_total: number;
@@ -77,28 +79,30 @@ export const bookingService = {
           duration_min: data.duration_minutes || 0,
           
           room_charge: data.room_charge,
-          base_price: data.base_price, 
+          base_price: data.room_charge, // Base price is the room charge
           
           early_surcharge: data.early_surcharge || 0,
           late_surcharge: data.late_surcharge || 0,
+          extra_people_surcharge: data.extra_people_surcharge || 0,
           custom_surcharge: data.custom_surcharge || 0,
           
           service_total: data.service_total || 0,
           service_charges: data.service_charges || [],
           
-          subtotal: data.subtotal,
-          service_fee_percent: 0, // Calculated in SQL
-          service_fee_amount: data.service_fee_amount || 0,
-          vat_percent: 0, // Calculated in SQL
-          vat_amount: data.vat_amount || 0,
+          subtotal: data.total_amount, // Subtotal before discount
+          service_fee_percent: 0, 
+          service_fee_amount: 0,
+          vat_percent: 0, 
+          vat_amount: 0,
           
           total_amount: data.total_amount,
           discount_amount: data.discount_amount,
-          final_amount: data.final_amount, 
+          final_amount: data.total_final, 
           
           deposit_amount: data.deposit_amount,
           amount_to_pay: data.amount_to_pay,
           
+          customer_id: data.customer_id,
           customer_balance: data.customer_balance,
           total_receivable: data.total_receivable
       };
@@ -109,24 +113,21 @@ export const bookingService = {
   },
 
   async processCheckout(params: {
-    bookingId: string;
+    bill: BookingBill;
     paymentMethod: string;
     amountPaid: number;
     discount: number;
     surcharge: number;
     notes: string;
-    staffId?: string;
   }): Promise<{ success: boolean; message: string; bill?: any }> {
     try {
-      // Use the merged V2 Checkout Engine (Rule 4 compliant)
       const { data, error } = await supabase.rpc('process_checkout_v2', {
-        p_booking_id: params.bookingId,
+        p_booking_id: params.bill.booking_id,
         p_payment_method: params.paymentMethod,
         p_amount_paid: params.amountPaid,
         p_discount: params.discount,
-        p_surcharge: params.surcharge,
-        p_notes: params.notes,
-        p_staff_id: params.staffId
+        p_surcharge: params.surcharge, // Only pass the custom surcharge part
+        p_notes: params.notes
       });
 
       if (error) {
@@ -156,19 +157,25 @@ export const bookingService = {
     source?: string;
   }) {
     try {
+      const servicesPayload = (data.services || []).map((s) => ({
+        id: s.id,
+        quantity: s.quantity,
+        price: s.price,
+      }));
+
       const { data: result, error } = await supabase.rpc('check_in_customer', {
         p_room_id: data.room_id,
         p_rental_type: data.rental_type,
-        p_customer_id: data.customer_id,
+        p_customer_id: data.customer_id || null,
         p_deposit: data.deposit || 0,
-        p_services: data.services || [],
-        p_customer_name: data.customer_name,
+        p_services: servicesPayload,
+        p_customer_name: data.customer_name || null,
         p_extra_adults: data.extra_adults || 0,
         p_extra_children: data.extra_children || 0,
-        p_notes: data.notes,
-        p_custom_price: data.custom_price,
-        p_custom_price_reason: data.custom_price_reason,
-        p_source: data.source || 'direct'
+        p_notes: data.notes || null,
+        p_custom_price: data.custom_price ?? null,
+        p_custom_price_reason: data.custom_price_reason ?? null,
+        p_source: data.source || 'direct',
       });
 
       if (error) throw error;

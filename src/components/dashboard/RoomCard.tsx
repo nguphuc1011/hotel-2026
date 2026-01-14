@@ -160,18 +160,16 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
             )}
           </div>
 
-          {/* Indicators Row */}
           <div className="flex gap-2">
-            {room.notes && (
-              <StickyNote size={18} className="opacity-80 hover:opacity-100 transition-opacity" />
+            {/* Debt Warning Logic */}
+            {room.current_booking && (room.current_booking.customer_balance || 0) < 0 && (
+               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center animate-bounce shadow-lg shadow-black/20">
+                 <AlertTriangle size={18} className="text-rose-600" />
+               </div>
             )}
             
-            {/* Debt Warning Logic (Mocked for now as logic wasn't fully specified) */}
-            {/* In a real scenario, check if total_amount > prepayment + threshold */}
-            {room.current_booking && (room.current_booking.total_amount || 0) > 1000000 && (
-               <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center animate-pulse shadow-lg shadow-rose-600/40">
-                 <AlertTriangle size={16} className="text-white" />
-               </div>
+            {room.notes && (
+              <StickyNote size={18} className="opacity-80 hover:opacity-100 transition-opacity" />
             )}
           </div>
         </div>

@@ -1,6 +1,10 @@
 -- CHECK-IN CUSTOMER RPC
 -- Created: 2026-01-12
--- Updated: 2026-01-14 (Removed missing columns, fixed check_in_at usage)
+-- Updated: 2026-01-15 (Resolved ambiguity, fixed room status logic)
+
+-- Drop any ambiguous versions first
+DROP FUNCTION IF EXISTS public.check_in_customer(uuid, text, uuid, numeric, jsonb, text, integer, integer, text, numeric, text, text);
+DROP FUNCTION IF EXISTS public.check_in_customer(uuid, text, uuid, text, text, text, text, timestamp with time zone, numeric, text, jsonb, integer, integer, text, numeric, text, text, uuid);
 
 CREATE OR REPLACE FUNCTION public.check_in_customer(
     p_room_id uuid,
@@ -18,21 +22,32 @@ CREATE OR REPLACE FUNCTION public.check_in_customer(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
     v_booking_id uuid;
-    v_room_price numeric;
-    v_check_in_time timestamptz := now();
-    v_service jsonb;
+    v_customer_id uuid;
+    v_room_status text;
+    v_check_in_at timestamptz := now();
 BEGIN
-    -- 1. Validate Room Status
-    IF EXISTS (SELECT 1 FROM public.rooms WHERE id = p_room_id AND status = 'occupied') THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Phòng đang có khách!');
+    SELECT status INTO v_room_status FROM public.rooms WHERE id = p_room_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Lỗi: Phòng không tồn tại.');
+    END IF;
+    IF v_room_status NOT IN ('available', 'dirty') THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Phòng đang có khách hoặc chưa sẵn sàng.');
     END IF;
 
-    -- 2. Create Booking
-    -- NOTE: Removed extra_adults, extra_children, custom_price, custom_price_reason, source 
-    -- because they do not exist in the V2 schema yet.
+    IF p_customer_id IS NOT NULL THEN
+        v_customer_id := p_customer_id;
+    ELSIF p_customer_name IS NOT NULL THEN
+        INSERT INTO public.customers (full_name)
+        VALUES (p_customer_name)
+        RETURNING id INTO v_customer_id;
+    ELSE
+        v_customer_id := NULL;
+    END IF;
+
     INSERT INTO public.bookings (
         room_id,
         customer_id,
@@ -41,38 +56,38 @@ BEGIN
         deposit_amount,
         status,
         notes,
-        services_used
+        services_used,
+        extra_adults,
+        extra_children,
+        custom_price,
+        custom_price_reason,
+        source
     ) VALUES (
         p_room_id,
-        p_customer_id,
+        v_customer_id,
         p_rental_type,
-        v_check_in_time,
+        v_check_in_at,
         p_deposit,
         'checked_in',
         p_notes,
-        p_services
+        p_services,
+        p_extra_adults,
+        p_extra_children,
+        p_custom_price,
+        p_custom_price_reason,
+        p_source
     ) RETURNING id INTO v_booking_id;
 
-    -- 3. Update Room Status
     UPDATE public.rooms
-    SET status = 'occupied'
+    SET
+        status = 'occupied',
+        current_booking_id = v_booking_id,
+        last_status_change = v_check_in_at
     WHERE id = p_room_id;
-
-    -- 4. Add Services (Handled via services_used JSONB)
-    -- Legacy table insert removed because service_usage table does not exist.
-    /*
-    IF jsonb_array_length(p_services) > 0 THEN
-        FOR v_service IN SELECT * FROM jsonb_array_elements(p_services)
-        LOOP
-            INSERT INTO public.service_usage ...
-        END LOOP;
-    END IF;
-    */
 
     RETURN jsonb_build_object(
         'success', true,
-        'booking_id', v_booking_id,
-        'message', 'Check-in thành công!'
+        'booking_id', v_booking_id
     );
 END;
 $$;

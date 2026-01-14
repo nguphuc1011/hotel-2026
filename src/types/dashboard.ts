@@ -21,6 +21,7 @@ export interface Booking {
   room_id: string;
   customer_id?: string;
   customer_name?: string;
+  customer_balance?: number; // New: To track debt
   check_in_at: string;
   check_out_at?: string;
   booking_type: BookingType;

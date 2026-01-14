@@ -68,6 +68,10 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const { confirm, alert } = useGlobalDialog();
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const customerBalance = bill?.customer_balance ?? 0;
+  const hasCustomerBalance = customerBalance !== 0;
+  const isCustomerInDebt = customerBalance < 0;
+  const amountToPayWithDebt = bill ? bill.total_receivable : 0;
   
   // Service State
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
@@ -235,6 +239,23 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             </div>
         </div>
 
+        {isCustomerInDebt && (
+            <div className="mx-4 mt-4 p-4 bg-rose-50 rounded-[24px] border border-rose-100 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0 shadow-sm">
+                    <AlertCircle className="w-6 h-6 text-rose-600" />
+                </div>
+                <div className="flex-1">
+                    <div className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-0.5">Cảnh báo nợ cũ</div>
+                    <div className="text-lg font-black text-rose-700 leading-none">
+                        Khách đang nợ {Math.abs(customerBalance).toLocaleString()}đ
+                    </div>
+                    <div className="text-[11px] text-rose-600/70 font-medium mt-1">
+                        Khoản nợ này sẽ được cộng vào tổng bill khi thanh toán
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4">
             {/* Quick Actions - Scrollable */}
             <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-6">
@@ -250,9 +271,8 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 onClick={() => setShowDetails(!showDetails)}
                 className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-lg shadow-blue-900/20 cursor-pointer transition-all duration-300"
             >
-                {/* Decorative background */}
                 <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
-                
+
                 <div className="relative z-10">
                     <div className="flex justify-center items-center mb-1 relative">
                         <span className="text-xs font-bold uppercase tracking-wider text-blue-100">Cần thanh toán</span>
@@ -266,7 +286,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
                     <div className="flex justify-center items-center gap-3 mb-6 h-10">
                         <div className="text-4xl font-bold tracking-tight flex items-center h-full">
-                            {bill ? bill.amount_to_pay.toLocaleString() : '---'}
+                            {bill ? amountToPayWithDebt.toLocaleString() : '---'}
                             <span className="text-2xl font-medium text-blue-200 ml-1">đ</span>
                         </div>
                         <div className="h-full flex items-center justify-center px-3 rounded-lg border border-white/50 text-xs font-bold text-white uppercase tracking-wider">
@@ -281,8 +301,16 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                     <div className="flex items-center border-t border-white/20 pt-4 mb-2">
                         <div className="flex-1 text-center">
                             <div className="text-[10px] font-bold uppercase tracking-wider text-blue-200 mb-0.5">Khách hàng</div>
-                            <div className="font-bold text-lg leading-tight line-clamp-1">
-                                {bill?.customer_name || booking.customer_name || 'Khách lẻ'}
+                            <div className="flex items-center justify-center gap-2">
+                                <div className="font-bold text-lg leading-tight line-clamp-1">
+                                    {bill?.customer_name || booking.customer_name || 'Khách lẻ'}
+                                </div>
+                                {isCustomerInDebt && (
+                                    <div className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" />
+                                        <span>Nợ {Math.abs(customerBalance).toLocaleString()}đ</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="w-px h-8 bg-white/20 mx-4" />
@@ -308,10 +336,35 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                 <span>Dịch vụ</span>
                                 <span className="font-mono font-medium">{bill?.service_total?.toLocaleString() ?? 0}đ</span>
                             </div>
+                            {/* Surcharge Breakdown */}
+                            {(bill?.early_surcharge || 0) > 0 && (
+                                <div className="flex justify-between text-blue-50">
+                                    <span>Phụ thu nhận sớm</span>
+                                    <span className="font-mono font-medium">{bill?.early_surcharge?.toLocaleString()}đ</span>
+                                </div>
+                            )}
                             {(bill?.late_surcharge || 0) > 0 && (
                                 <div className="flex justify-between text-blue-50">
-                                    <span>Phụ thu</span>
+                                    <span>Phụ thu trả muộn</span>
                                     <span className="font-mono font-medium">{bill?.late_surcharge?.toLocaleString()}đ</span>
+                                </div>
+                            )}
+                            {(bill?.extra_people_surcharge || 0) > 0 && (
+                                <div className="flex justify-between text-blue-50">
+                                    <span>Phụ thu thêm người</span>
+                                    <span className="font-mono font-medium">{bill?.extra_people_surcharge?.toLocaleString()}đ</span>
+                                </div>
+                            )}
+                            {(bill?.custom_surcharge || 0) > 0 && (
+                                <div className="flex justify-between text-blue-50">
+                                    <span>Phụ phí khác</span>
+                                    <span className="font-mono font-medium">{bill?.custom_surcharge?.toLocaleString()}đ</span>
+                                </div>
+                            )}
+                            {(bill?.discount_amount || 0) > 0 && (
+                                <div className="flex justify-between text-rose-200">
+                                    <span>Giảm giá</span>
+                                    <span className="font-mono font-medium">-{bill?.discount_amount?.toLocaleString()}đ</span>
                                 </div>
                             )}
                             {(bill?.service_fee_amount || 0) > 0 && (
@@ -326,10 +379,13 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                     <span className="font-mono font-medium">{bill?.vat_amount?.toLocaleString()}đ</span>
                                 </div>
                             )}
-                            {(bill?.customer_balance || 0) > 0 && (
-                                <div className="flex justify-between text-blue-50">
-                                    <span>Nợ cũ</span>
-                                    <span className="font-mono font-medium">{bill?.customer_balance?.toLocaleString()}đ</span>
+                            {hasCustomerBalance && (
+                                <div className={cn(
+                                    "flex justify-between",
+                                    isCustomerInDebt ? "text-rose-200" : "text-blue-50"
+                                )}>
+                                    <span>{isCustomerInDebt ? 'Nợ cũ' : 'Số dư ví'}</span>
+                                    <span className="font-mono font-medium">{Math.abs(customerBalance).toLocaleString()}đ</span>
                                 </div>
                             )}
                             
@@ -355,7 +411,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                             
                             <div className="flex justify-between font-bold text-white text-base">
                                 <span>Tổng cần thu</span>
-                                <span className="font-mono">{bill?.amount_to_pay?.toLocaleString() ?? 0}đ</span>
+                                <span className="font-mono">
+                                    {bill ? amountToPayWithDebt.toLocaleString() : 0}đ
+                                </span>
                             </div>
                         </div>
                     </div>

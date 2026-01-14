@@ -136,14 +136,14 @@ async function main() {
         `${baseDate} 10:00`, `${baseDate} 11:10`, 50000);
 
     // 5. Daily Early Check-in: 09:00 -> 12:00 (Checkin 14:00). Early 5h.
-    // Default fallback 50% = 200k surcharge + 400k room = 600k
+    // Fallback was 50% = 200k surcharge. Now 0 since no rules defined.
     await runScenario('5. Special - Daily Early Check-in (09:00)', 'daily', 
-        `${baseDate} 09:00`, `2024-01-02 12:00`, 600000);
+        `${baseDate} 09:00`, `2024-01-02 12:00`, 400000);
 
     // 6. Daily Late Check-out: 14:00 -> 16:00 (Checkout 12:00). Late 4h.
-    // Default logic 30% = 120k + 400k = 520k
+    // Fallback was 30% = 120k. Now 0 since no rules defined.
     await runScenario('6. Special - Daily Late Check-out (16:00)', 'daily', 
-        `${baseDate} 14:00`, `2024-01-02 16:00`, 520000);
+        `${baseDate} 14:00`, `2024-01-02 16:00`, 400000);
 
     // 7. Hourly Ceiling: 20 hours. 50 + 19*20 = 430k. Ceiling is 400k. Should be 400k.
     await runScenario('7. Special - Hourly Ceiling', 'hourly', 
@@ -151,9 +151,9 @@ async function main() {
 
     // 8. Overnight Late Checkout: 22:00 -> 13:00.
     // Overnight ends 12:00. 13:00 is 1h late.
-    // Overnight Price 200k + Late Fee (30% of daily = 120k) = 320k
+    // Fallback was 30% of daily = 120k. Now 0.
     await runScenario('8. Special - Overnight Late', 'overnight', 
-        `${baseDate} 22:00`, `2024-01-02 13:00`, 320000);
+        `${baseDate} 22:00`, `2024-01-02 13:00`, 200000);
 
 
     // --- 2 RARE/EXTREME CASES ---

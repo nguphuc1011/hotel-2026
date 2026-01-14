@@ -93,9 +93,14 @@ export const customerService = {
 
   async createCustomer(customer: Partial<Customer>): Promise<Customer | null> {
     try {
-      // Clean undefined
-      const payload = { ...customer };
+      // Clean undefined and empty strings
+      const payload: any = { ...customer };
       if (!payload.balance) payload.balance = 0;
+      
+      // Convert empty strings to null for fields that might have UNIQUE constraints
+      if (payload.id_card === '') payload.id_card = null;
+      if (payload.phone === '') payload.phone = null;
+      if (payload.email === '') payload.email = null;
 
       const { data, error } = await supabase
         .from('customers')
@@ -103,19 +108,35 @@ export const customerService = {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error creating customer:', error);
+        throw error;
+      }
       return data as Customer;
-    } catch (err) {
-      console.error('Error creating customer:', err);
+    } catch (err: any) {
+      console.error('Error creating customer:', {
+        message: err.message,
+        details: err.details,
+        hint: err.hint,
+        code: err.code,
+        payload: customer
+      });
       return null;
     }
   },
 
   async updateCustomer(id: string, updates: Partial<Customer>): Promise<Customer | null> {
     try {
+      const payload: any = { ...updates, updated_at: new Date().toISOString() };
+      
+      // Convert empty strings to null for fields that might have UNIQUE constraints
+      if (payload.id_card === '') payload.id_card = null;
+      if (payload.phone === '') payload.phone = null;
+      if (payload.email === '') payload.email = null;
+
       const { data, error } = await supabase
         .from('customers')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();

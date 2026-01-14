@@ -55,7 +55,7 @@ export default function DashboardPage() {
         .from('bookings')
         .select(`
           *,
-          customer:customers(full_name)
+          customer:customers(full_name, balance)
         `)
         .in('status', ['confirmed', 'checked_in']);
 
@@ -84,6 +84,7 @@ export default function DashboardPage() {
             room_id: booking.room_id,
             customer_id: booking.customer_id,
             customer_name: booking.customer?.full_name,
+            customer_balance: booking.customer?.balance || 0,
             check_in_at: booking.check_in_at,
             booking_type: booking.rental_type, // Map rental_type from DB to booking_type in Interface
             total_amount: booking.total_amount || 0, // In real app, might need calculation logic here

@@ -12,6 +12,7 @@ import { customerService, Customer, CustomerTransaction } from '@/services/custo
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -98,7 +99,15 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       setShowTransModal(false);
       setTransForm({ amount: '', type: 'payment', description: '' });
       loadData(); // Reload all
-      toast.success('Giao dịch thành công');
+      
+      const newBalance = res.new_balance;
+      if (newBalance < 0) {
+        toast.warning(`Giao dịch thành công. Số dư hiện tại: ${newBalance.toLocaleString()}đ (Khách còn nợ)`);
+      } else if (newBalance === 0 && customer.balance < 0) {
+        toast.success('Giao dịch thành công. Khách đã trả hết nợ!');
+      } else {
+        toast.success(`Giao dịch thành công. Số dư hiện tại: ${newBalance.toLocaleString()}đ`);
+      }
     } else {
       toast.error('Lỗi: ' + res.message);
     }
