@@ -76,7 +76,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
 
   if (isSuccess) {
     return createPortal(
-      <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 p-4">
+      <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 p-4">
         <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
           <div className="p-10 text-center space-y-8">
             <div className="w-24 h-24 bg-emerald-500 text-white rounded-[32px] flex items-center justify-center mx-auto shadow-xl shadow-emerald-200 rotate-3">
@@ -178,9 +178,9 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100000] flex flex-col justify-end sm:justify-center items-center backdrop-blur-md bg-slate-900/60 p-0 sm:p-4">
+    <div className="fixed inset-0 z-[60000] flex flex-col justify-end sm:justify-center items-center backdrop-blur-md bg-slate-900/60 p-0 sm:p-4">
       {/* Modal Container */}
-      <div className="w-full h-[95vh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl bg-slate-50 rounded-t-[40px] sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-300">
+      <div className="w-full h-[95vh] sm:h-auto sm:max-h-[90vh] sm:max-w-xl bg-white rounded-t-[40px] sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-300">
         
         {/* --- HEADER --- */}
         <div className="h-20 flex justify-between items-center px-8 bg-white z-50 shrink-0 shadow-sm border-b border-slate-100/50">

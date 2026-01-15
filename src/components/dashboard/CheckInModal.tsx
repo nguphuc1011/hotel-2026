@@ -424,7 +424,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
   if (!mounted) return null;
 
   return createPortal(
-        <div className="fixed inset-0 z-[999999] flex flex-col justify-end sm:justify-center items-center backdrop-blur-md bg-slate-900/60">
+        <div className="fixed inset-0 z-[50000] flex flex-col justify-end sm:justify-center items-center backdrop-blur-md bg-slate-900/60">
             {/* Modal Container */}
             <div className="w-full h-full sm:w-full sm:max-w-2xl sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] bg-slate-50 flex flex-col shadow-2xl overflow-hidden relative">
             

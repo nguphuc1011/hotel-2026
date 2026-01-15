@@ -104,7 +104,7 @@ function DialogOverlay({ config, onClose }: { config: DialogOptions; onClose: (r
   const destructive = config.destructive || config.type === 'error';
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 animate-fade-in">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity" 
