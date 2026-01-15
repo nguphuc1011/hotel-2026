@@ -169,7 +169,7 @@ function ServiceCard({ service, quantity, onAdd, onRemove }: {
 }
 
 export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: CheckInModalProps) {
-  const { alert } = useGlobalDialog();
+  const { alert, confirm } = useGlobalDialog();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<RentalType>('hourly');
   const [searchTerm, setSearchTerm] = useState('');
