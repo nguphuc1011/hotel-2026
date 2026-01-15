@@ -28,7 +28,7 @@ import { toast } from 'sonner';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function ServicesPage() {
-  const { confirm } = useGlobalDialog();
+  const { confirm: confirmDialog } = useGlobalDialog();
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,7 +90,7 @@ export default function ServicesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const isConfirmed = await confirm({
+    const isConfirmed = await confirmDialog({
       title: 'Xóa dịch vụ',
       message: 'Bạn có chắc chắn muốn xóa dịch vụ này?',
       type: 'confirm'
@@ -144,7 +144,7 @@ export default function ServicesPage() {
         return;
     }
 
-    const isConfirmed = await confirm({
+    const isConfirmed = await confirmDialog({
       title: 'Nhập kho hàng loạt',
       message: `Xác nhận nhập kho cho ${itemsToImport.length} món?`,
       type: 'confirm'

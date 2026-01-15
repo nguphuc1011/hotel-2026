@@ -65,7 +65,7 @@ function useLongPress(
 }
 
 export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate }: RoomFolioModalProps) {
-  const { confirm, alert } = useGlobalDialog();
+  const { confirm: confirmDialog, alert } = useGlobalDialog();
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const customerBalance = bill?.customer_balance ?? 0;
@@ -192,7 +192,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleCancelBooking = async () => {
-    const confirmed = await confirm({
+    const confirmed = await confirmDialog({
       title: 'Huỷ phòng',
       message: "Bạn có chắc chắn muốn huỷ phòng này không? Hành động này không thể hoàn tác.",
       type: 'error',

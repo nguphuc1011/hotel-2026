@@ -15,7 +15,7 @@ import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 
 export default function DashboardPage() {
-  const { confirm, alert } = useGlobalDialog();
+  const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [rooms, setRooms] = useState<DashboardRoom[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -188,7 +188,7 @@ export default function DashboardPage() {
     } else if (room.status === 'occupied') {
       setIsFolioOpen(true);
     } else if (room.status === 'dirty') {
-      const confirmClean = await confirm({
+      const confirmClean = await confirmDialog({
         title: 'Xác nhận dọn phòng',
         message: `Xác nhận phòng ${room.name} đã dọn xong?`,
         confirmLabel: 'Đã dọn xong',
@@ -249,7 +249,7 @@ export default function DashboardPage() {
       setIsCheckInOpen(false);
     } catch (error) {
       console.error('Check-in error:', JSON.stringify(error, null, 2));
-      await alert({
+      await alertDialog({
         title: 'Lỗi nhận phòng',
         message: (error as any).message || 'Lỗi không xác định',
         type: 'error'

@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function CategoriesPage() {
-  const { confirm } = useGlobalDialog();
+  const { confirm: confirmDialog } = useGlobalDialog();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'categories' | 'rooms'>('categories');
   const [loading, setLoading] = useState(true);
@@ -92,7 +92,7 @@ export default function CategoriesPage() {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    const isConfirmed = await confirm({
+    const isConfirmed = await confirmDialog({
       title: 'Xóa hạng phòng',
       message: 'Bạn có chắc chắn muốn xóa hạng phòng này không?',
       type: 'confirm'
@@ -163,7 +163,7 @@ export default function CategoriesPage() {
   };
 
   const handleDeleteRoom = async (id: string) => {
-    const isConfirmed = await confirm({
+    const isConfirmed = await confirmDialog({
       title: 'Xóa phòng',
       message: 'Bạn có chắc chắn muốn xóa phòng này không?',
       type: 'confirm'

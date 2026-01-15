@@ -14,7 +14,7 @@ import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function CustomersPage() {
   const router = useRouter();
-  const { confirm } = useGlobalDialog();
+  const { confirm: confirmDialog } = useGlobalDialog();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -68,7 +68,7 @@ export default function CustomersPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const isConfirmed = await confirm({
+    const isConfirmed = await confirmDialog({
       title: 'Xóa khách hàng',
       message: 'Bạn có chắc muốn xóa khách hàng này? Hành động này không thể hoàn tác.',
       type: 'confirm'

@@ -169,7 +169,7 @@ function ServiceCard({ service, quantity, onAdd, onRemove }: {
 }
 
 export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: CheckInModalProps) {
-  const { alert, confirm } = useGlobalDialog();
+  const { alert: alertDialog, confirm: confirmDialog } = useGlobalDialog();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<RentalType>('hourly');
   const [searchTerm, setSearchTerm] = useState('');
@@ -355,24 +355,10 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
 
             if (selectedCustomer && selectedCustomer.balance < 0) {
                 const debt = Math.abs(selectedCustomer.balance);
-                const confirmed = await confirm({
+                const confirmed = await confirmDialog({
                     title: 'Cảnh báo nợ cũ',
                     message: `Khách ${selectedCustomer.full_name} đang nợ ${debt.toLocaleString()}đ.\nKhoản nợ này sẽ được cộng vào công nợ phòng và thanh toán khi trả phòng.\n\nLễ tân đã thông báo rõ cho khách và vẫn muốn nhận phòng?`,
                     confirmLabel: 'ĐÃ THÔNG BÁO, VẪN NHẬN PHÒNG',
-                    type: 'confirm'
-                });
-
-                if (!confirmed) {
-                    setIsSubmitting(false);
-                    return;
-                }
-            } else if (selectedCustomer && selectedCustomer.balance < 0) {
-                // Persistent Debt Alert on Submit
-                const debt = Math.abs(selectedCustomer.balance);
-                const confirmed = await confirm({
-                    title: 'Xác nhận nợ cũ',
-                    message: `Khách hàng đang nợ ${debt.toLocaleString()}đ. Bạn đã chắc chắn thông báo cho khách và muốn tiếp tục check-in?`,
-                    confirmLabel: 'ĐÃ THÔNG BÁO, TIẾP TỤC',
                     type: 'confirm'
                 });
 
@@ -402,11 +388,11 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
             };
             
             await onCheckIn(payload);
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            alert({
+            alertDialog({
               title: 'Lỗi',
-              message: 'Có lỗi xảy ra khi check-in',
+              message: error.message || 'Có lỗi xảy ra khi check-in',
               type: 'error'
             });
         } finally {
