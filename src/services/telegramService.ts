@@ -40,7 +40,7 @@ export const telegramService = {
 -------------------------
 🏠 <b>Phòng:</b> ${bill.room_number}
 👤 <b>Khách hàng:</b> ${bill.customer_name}
-💰 <b>Tổng bill:</b> ${bill.total_receivable.toLocaleString()}đ
+💰 <b>Tổng bill:</b> ${(bill.amount_to_pay || 0).toLocaleString()}đ
 💵 <b>Khách trả:</b> ${amountPaid.toLocaleString()}đ
 -------------------------
 📌 <b>Trạng thái:</b> ${status}

@@ -35,7 +35,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
   const [mounted, setMounted] = useState(false);
   const customerBalance = bill.customer_balance ?? 0;
   const oldDebt = customerBalance < 0 ? Math.abs(customerBalance) : 0;
-  const totalReceivable = bill.total_receivable ?? bill.amount_to_pay;
+  const totalReceivable = bill.amount_to_pay;
 
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'TRANSFER' | 'CARD'>('CASH');
   const [amountPaid, setAmountPaid] = useState<number>(totalReceivable);
@@ -68,7 +68,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
 
   // Update amountPaid if bill changes
   useEffect(() => {
-    const nextTotal = bill.total_receivable ?? bill.amount_to_pay;
+    const nextTotal = bill.amount_to_pay;
     setAmountPaid(nextTotal);
     setDiscount(bill.discount_amount || 0);
     setSurcharge(bill.custom_surcharge || 0);
