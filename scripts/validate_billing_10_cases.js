@@ -21,11 +21,23 @@ async function main() {
     
     // START TRANSACTION
     await client.query('BEGIN');
+    
+    // Set Timezone to Asia/Ho_Chi_Minh for the session to ensure consistent testing
+    await client.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
 
     // 0. UPDATE LOGIC FUNCTIONS (To ensure we test the latest code)
     console.log('Applying latest billing_engine.sql logic...');
     const sqlPath = path.join(__dirname, '../src/lib/billing_engine.sql');
     const sqlContent = fs.readFileSync(sqlPath, 'utf8');
+
+    // Ensure new columns exist in settings table within the transaction
+    await client.query(`
+      ALTER TABLE public.settings 
+      ADD COLUMN IF NOT EXISTS auto_overnight_switch boolean DEFAULT false,
+      ADD COLUMN IF NOT EXISTS auto_full_day_early boolean DEFAULT true,
+      ADD COLUMN IF NOT EXISTS auto_full_day_late boolean DEFAULT true;
+    `);
+
     await client.query(sqlContent);
     console.log('Logic updated successfully within transaction.');
 
@@ -92,15 +104,15 @@ async function main() {
         `, [roomId, custId, type, inTime, outTime]);
         const bookingId = res.rows[0].id;
 
-        const billRes = await client.query(`SELECT calculate_booking_bill_v2($1)`, [bookingId]);
-        const bill = billRes.rows[0].calculate_booking_bill_v2;
+        const billRes = await client.query(`SELECT calculate_booking_bill($1)`, [bookingId]);
+        const bill = billRes.rows[0].calculate_booking_bill;
         
         console.log(`--- ${name} ---`);
         console.log(`Input: ${type} | In: ${formatDate(inTime)} | Out: ${formatDate(outTime)}`);
         console.log(`Duration: ${bill.duration_minutes} min`);
-        console.log(`Explanation: ${bill.explanation || ''}`);
+        console.log(`Audit Trail: ${JSON.stringify(bill.explanation, null, 2)}`);
         
-        const actual = parseInt(bill.final_amount);
+        const actual = parseFloat(bill.total_amount);
         console.log(`Total: ${actual.toLocaleString()} VND (Expected: ~${expected.toLocaleString()} VND)`);
         
         const diff = Math.abs(actual - expected);
@@ -123,6 +135,10 @@ async function main() {
     await runScenario('2. Normal - Daily Standard', 'daily', 
         `${baseDate} 14:00`, `2024-01-02 12:00`, 400000);
 
+    // 2b. Daily Standard (Stay within same day): 06:00 -> 12:00 same day (400k min)
+    await runScenario('2b. Normal - Daily Same Day', 'daily', 
+        `${baseDate} 06:00`, `${baseDate} 12:00`, 400000);
+
     // 3. Overnight Standard: 22:00 -> 08:00 next day (200k)
     // Settings: Overnight 21:00 - 08:00
     await runScenario('3. Normal - Overnight Standard', 'overnight', 
@@ -144,6 +160,14 @@ async function main() {
     // Fallback was 30% = 120k. Now 0 since no rules defined.
     await runScenario('6. Special - Daily Late Check-out (16:00)', 'daily', 
         `${baseDate} 14:00`, `2024-01-02 16:00`, 400000);
+
+    // 6b. Daily Late Check-out after 18:00: Should add 1 full day (400k + 400k = 800k)
+    await runScenario('6b. Special - Daily Full Late (>18:00)', 'daily', 
+        `${baseDate} 14:00`, `2024-01-02 19:00`, 800000);
+
+    // 6c. Daily Early Check-in before 05:00: Should add 1 full day (400k + 400k = 800k)
+    await runScenario('6c. Special - Daily Full Early (<05:00)', 'daily', 
+        `${baseDate} 04:00`, `2024-01-02 12:00`, 800000);
 
     // 7. Hourly Ceiling: 20 hours. 50 + 19*20 = 430k. Ceiling is 400k. Should be 400k.
     await runScenario('7. Special - Hourly Ceiling', 'hourly', 

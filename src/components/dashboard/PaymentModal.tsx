@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BookingBill, bookingService } from '@/services/bookingService';
+import BillBreakdown from './BillBreakdown';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 import { telegramService } from '@/services/telegramService';
 import { MoneyInput } from '@/components/ui/MoneyInput';
@@ -205,7 +207,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
         <div className="flex-1 overflow-y-auto p-8 space-y-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           
           {/* 1. BILL BREAKDOWN CARD */}
-          <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 space-y-4">
+          <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 space-y-6">
             <div className="flex justify-between items-end">
               <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">Tổng cộng cần thu</span>
               <span className="text-4xl font-black text-slate-900 tracking-tighter">
@@ -216,26 +218,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
             
             <div className="h-px bg-slate-50" />
             
-            <div className="grid grid-cols-2 gap-y-3 gap-x-8">
-              <div className="flex justify-between items-center text-sm">
-                <span className="font-bold text-slate-400">Tiền phòng:</span>
-                <span className="font-black text-slate-700">{bill.room_charge.toLocaleString()}đ</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="font-bold text-slate-400">Dịch vụ:</span>
-                <span className="font-black text-slate-700">{bill.service_total.toLocaleString()}đ</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="font-bold text-slate-400">Phụ thu:</span>
-                <span className="font-black text-slate-700">{( (bill.early_surcharge || 0) + (bill.late_surcharge || 0) + (bill.extra_people_surcharge || 0) ).toLocaleString()}đ</span>
-              </div>
-              {oldDebt > 0 && (
-                <div className="flex justify-between items-center text-sm">
-                  <span className="font-bold text-rose-400">Nợ cũ:</span>
-                  <span className="font-black text-rose-600">{oldDebt.toLocaleString()}đ</span>
-                </div>
-              )}
-            </div>
+            <BillBreakdown bill={bill} />
           </div>
 
           {/* 2. PAYMENT METHOD */}

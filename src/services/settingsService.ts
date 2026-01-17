@@ -22,6 +22,9 @@ export interface Settings {
   
   // Nút gạt tổng
   auto_surcharge_enabled: boolean;
+  auto_overnight_switch: boolean;
+  auto_full_day_early: boolean;
+  auto_full_day_late: boolean;
   extra_person_enabled: boolean;
   extra_person_method: 'fixed' | 'percent';
   
@@ -109,6 +112,9 @@ export const settingsService = {
         full_day_late_after: val.full_day_late_after || '18:00:00',
         
         auto_surcharge_enabled: val.auto_surcharge_enabled ?? false,
+        auto_overnight_switch: val.auto_overnight_switch ?? false,
+        auto_full_day_early: val.auto_full_day_early ?? true,
+        auto_full_day_late: val.auto_full_day_late ?? true,
         extra_person_enabled: val.extra_person_enabled ?? false,
         extra_person_method: val.extra_person_method || 'percent',
         
@@ -152,6 +158,9 @@ export const settingsService = {
         full_day_late_after: settings.full_day_late_after,
         
         auto_surcharge_enabled: settings.auto_surcharge_enabled,
+        auto_overnight_switch: settings.auto_overnight_switch,
+        auto_full_day_early: settings.auto_full_day_early,
+        auto_full_day_late: settings.auto_full_day_late,
         extra_person_enabled: settings.extra_person_enabled,
         extra_person_method: settings.extra_person_method,
         

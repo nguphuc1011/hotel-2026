@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle } from 'lucide-react';
+import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Room, Booking } from '@/types/dashboard';
 import { bookingService, BookingBill } from '@/services/bookingService';
 import { serviceService, Service, BookingServiceItem } from '@/services/serviceService';
 import PaymentModal from './PaymentModal';
+import BillBreakdown from './BillBreakdown';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 
@@ -15,6 +16,7 @@ interface RoomFolioModalProps {
   room: Room;
   booking: Booking;
   onUpdate: () => void;
+  virtualTime?: string | null;
 }
 
 // Hook for Long Press
@@ -64,14 +66,16 @@ function useLongPress(
     };
 }
 
-export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate }: RoomFolioModalProps) {
+export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate, virtualTime }: RoomFolioModalProps) {
   const { confirm: confirmDialog, alert } = useGlobalDialog();
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const customerBalance = bill?.customer_balance ?? 0;
   const hasCustomerBalance = customerBalance !== 0;
   const isCustomerInDebt = customerBalance < 0;
-  const amountToPayWithDebt = bill ? bill.total_receivable : 0;
+  
+  // Tổng cộng cần thanh toán bao gồm cả nợ cũ
+  const amountToPayWithDebt = bill ? (bill.amount_to_pay + (isCustomerInDebt ? Math.abs(customerBalance) : 0)) : 0;
   
   // Service State
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
@@ -95,16 +99,18 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       loadBill();
       loadServices();
     }
-  }, [isOpen, booking]);
+  }, [isOpen, booking, virtualTime]);
 
   const loadBill = async () => {
     setIsLoading(true);
-    // NOW: Single Source of Truth from Backend
-    // The service handles calling the RPC 'get_full_booking_bill'
-    const data = await bookingService.calculateBill(booking.id);
-    
-    setBill(data);
-    setIsLoading(false);
+    try {
+      const data = await bookingService.calculateBill(booking.id, virtualTime || undefined);
+      setBill(data);
+    } catch (error) {
+      console.error('Error loading bill:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const loadServices = async () => {
@@ -327,94 +333,13 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                         "grid transition-all duration-300 ease-in-out overflow-hidden",
                         showDetails ? "grid-rows-[1fr] opacity-100 mt-4 border-t border-white/20 pt-4" : "grid-rows-[0fr] opacity-0"
                     )}>
-                        <div className="min-h-0 space-y-2 text-sm">
-                            <div className="flex justify-between text-blue-50">
-                                <span>Tiền phòng</span>
-                                <span className="font-mono font-medium">{bill?.room_charge?.toLocaleString() ?? 0}đ</span>
-                            </div>
-                            <div className="flex justify-between text-blue-50">
-                                <span>Dịch vụ</span>
-                                <span className="font-mono font-medium">{bill?.service_total?.toLocaleString() ?? 0}đ</span>
-                            </div>
-                            {/* Surcharge Breakdown */}
-                            {(bill?.early_surcharge || 0) > 0 && (
-                                <div className="flex justify-between text-blue-50">
-                                    <span>Phụ thu nhận sớm</span>
-                                    <span className="font-mono font-medium">{bill?.early_surcharge?.toLocaleString()}đ</span>
-                                </div>
+                        <div className="min-h-0">
+                            {bill && (
+                                <BillBreakdown 
+                                    bill={bill} 
+                                    isDark={true}
+                                />
                             )}
-                            {(bill?.late_surcharge || 0) > 0 && (
-                                <div className="flex justify-between text-blue-50">
-                                    <span>Phụ thu trả muộn</span>
-                                    <span className="font-mono font-medium">{bill?.late_surcharge?.toLocaleString()}đ</span>
-                                </div>
-                            )}
-                            {(bill?.extra_people_surcharge || 0) > 0 && (
-                                <div className="flex justify-between text-blue-50">
-                                    <span>Phụ thu thêm người</span>
-                                    <span className="font-mono font-medium">{bill?.extra_people_surcharge?.toLocaleString()}đ</span>
-                                </div>
-                            )}
-                            {(bill?.custom_surcharge || 0) > 0 && (
-                                <div className="flex justify-between text-blue-50">
-                                    <span>Phụ phí khác</span>
-                                    <span className="font-mono font-medium">{bill?.custom_surcharge?.toLocaleString()}đ</span>
-                                </div>
-                            )}
-                            {(bill?.discount_amount || 0) > 0 && (
-                                <div className="flex justify-between text-rose-200">
-                                    <span>Giảm giá</span>
-                                    <span className="font-mono font-medium">-{bill?.discount_amount?.toLocaleString()}đ</span>
-                                </div>
-                            )}
-                            {(bill?.service_fee_amount || 0) > 0 && (
-                                <div className="flex justify-between text-blue-50">
-                                    <span>Phí phục vụ</span>
-                                    <span className="font-mono font-medium">{bill?.service_fee_amount?.toLocaleString()}đ</span>
-                                </div>
-                            )}
-                            {(bill?.vat_amount || 0) > 0 && (
-                                <div className="flex justify-between text-blue-50">
-                                    <span>VAT</span>
-                                    <span className="font-mono font-medium">{bill?.vat_amount?.toLocaleString()}đ</span>
-                                </div>
-                            )}
-                            {hasCustomerBalance && (
-                                <div className={cn(
-                                    "flex justify-between",
-                                    isCustomerInDebt ? "text-rose-200" : "text-blue-50"
-                                )}>
-                                    <span>{isCustomerInDebt ? 'Nợ cũ' : 'Số dư ví'}</span>
-                                    <span className="font-mono font-medium">{Math.abs(customerBalance).toLocaleString()}đ</span>
-                                </div>
-                            )}
-                            
-                            {/* Divider for Deductions */}
-                            {((bill?.deposit_amount || 0) > 0 || (bill?.discount_amount || 0) > 0) && (
-                                <div className="my-2 border-t border-white/10" />
-                            )}
-
-                            {(bill?.deposit_amount || 0) > 0 && (
-                                <div className="flex justify-between text-blue-200">
-                                    <span>Đã cọc</span>
-                                    <span className="font-mono font-medium">- {bill?.deposit_amount?.toLocaleString()}đ</span>
-                                </div>
-                            )}
-                            {(bill?.discount_amount || 0) > 0 && (
-                                <div className="flex justify-between text-blue-200">
-                                    <span>Giảm giá</span>
-                                    <span className="font-mono font-medium">- {bill?.discount_amount?.toLocaleString()}đ</span>
-                                </div>
-                            )}
-
-                            <div className="my-2 border-t border-white/20" />
-                            
-                            <div className="flex justify-between font-bold text-white text-base">
-                                <span>Tổng cần thu</span>
-                                <span className="font-mono">
-                                    {bill ? amountToPayWithDebt.toLocaleString() : 0}đ
-                                </span>
-                            </div>
                         </div>
                     </div>
                 </div>

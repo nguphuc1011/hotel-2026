@@ -1,0 +1,575 @@
+--- calculate_booking_bill_v2 ---
+
+DECLARE
+    v_booking record;
+    v_room_cat_id uuid;
+    v_check_out timestamptz;
+    
+    v_room_res jsonb;
+    v_surcharge_res jsonb;
+    v_extra_person_res jsonb;
+    v_adj_res jsonb;
+    
+    v_service_total numeric := 0;
+    v_service_items jsonb;
+    
+    v_total_amount numeric;
+    v_final_amount numeric;
+    v_deposit numeric;
+    v_customer_balance numeric;
+    
+    v_room_name text;
+    v_customer_name text;
+    v_duration_hours numeric;
+    v_duration_minutes numeric;
+BEGIN
+    -- 1. Get Booking Info (Using actual V2 columns)
+    SELECT 
+        b.id, b.room_id, b.customer_id, 
+        b.check_in_actual as check_in_at, 
+        b.check_out_actual as check_out_at, 
+        b.rental_type, 0 as initial_price, b.deposit_amount, 
+        COALESCE(b.custom_surcharge, 0) as custom_surcharge, 
+        COALESCE(b.discount_amount, 0) as discount_amount,
+        r.category_id, 
+        r.room_number as room_name,
+        c.balance as cust_balance,
+        c.full_name as cust_name,
+        b.services_used
+    INTO v_booking 
+    FROM public.bookings b
+    JOIN public.rooms r ON b.room_id = r.id
+    LEFT JOIN public.customers c ON b.customer_id = c.id
+    WHERE b.id = p_booking_id;
+    
+    IF NOT FOUND THEN 
+        RETURN jsonb_build_object('success', false, 'message', 'Không tìm thấy booking');
+    END IF;
+    
+    v_check_out := COALESCE(v_booking.check_out_at, now());
+    v_room_cat_id := v_booking.category_id;
+    v_customer_balance := COALESCE(v_booking.cust_balance, 0);
+    v_deposit := COALESCE(v_booking.deposit_amount, 0);
+    v_room_name := v_booking.room_name;
+    v_customer_name := COALESCE(v_booking.cust_name, 'Khách lẻ');
+    
+    v_duration_minutes := EXTRACT(EPOCH FROM (v_check_out - v_booking.check_in_at)) / 60;
+    v_duration_hours := ROUND((v_duration_minutes / 60)::numeric, 2);
+
+    -- 2. Calc Room Charge
+    v_room_res := public.fn_calculate_room_charge(
+        p_booking_id,
+        v_booking.check_in_at,
+        v_check_out,
+        v_booking.rental_type,
+        v_room_cat_id
+    );
+
+    -- 3. Calc Surcharge (Early/Late)
+    v_surcharge_res := public.fn_calculate_surcharge(
+        v_booking.check_in_at,
+        v_check_out,
+        v_room_cat_id,
+        v_booking.rental_type
+    );
+    
+    -- 4. Calc Extra Person
+    v_extra_person_res := public.fn_calculate_extra_person_charge(
+        p_booking_id
+    );
+
+    -- 5. Calc Services
+    BEGIN
+        SELECT 
+            COALESCE(SUM(quantity * price_at_time), 0),
+            COALESCE(jsonb_agg(jsonb_build_object(
+                'name', s.name, 
+                'quantity', bs.quantity, 
+                'price', bs.price_at_time, 
+                'total', bs.quantity * bs.price_at_time
+            )), '[]'::jsonb)
+        INTO v_service_total, v_service_items
+        FROM public.booking_services bs
+        JOIN public.services s ON bs.service_id = s.id
+        WHERE bs.booking_id = p_booking_id;
+    EXCEPTION WHEN OTHERS THEN
+        SELECT 
+            COALESCE(SUM((item->>'price')::numeric * (item->>'quantity')::numeric), 0),
+            COALESCE(jsonb_agg(item), '[]'::jsonb)
+        INTO v_service_total, v_service_items
+        FROM jsonb_array_elements(COALESCE(v_booking.services_used, '[]'::jsonb)) AS item;
+    END;
+
+    -- 6. Totals & Adjustments
+    v_total_amount := (v_room_res->>'amount')::numeric + 
+                      (v_surcharge_res->>'amount')::numeric + 
+                      (v_extra_person_res->>'amount')::numeric +
+                      v_service_total;
+
+    v_adj_res := public.fn_calculate_bill_adjustments(
+        v_total_amount,
+        v_booking.discount_amount,
+        v_booking.custom_surcharge
+    );
+    
+    v_final_amount := (v_adj_res->>'final_amount')::numeric;
+
+    -- 7. Return (Format for Frontend)
+    RETURN jsonb_build_object(
+        'success', true,
+        'booking_id', p_booking_id,
+        'room_number', v_room_name,
+        'room_name', v_room_name,
+        'customer_name', v_customer_name,
+        'rental_type', v_booking.rental_type,
+        'check_in_at', v_booking.check_in_at,
+        'check_out_at', v_check_out,
+        'check_in', v_booking.check_in_at,
+        'check_out', v_check_out,
+        'duration_hours', v_duration_hours,
+        'duration_minutes', v_duration_minutes,
+        'duration_text', CASE 
+            WHEN v_duration_hours < 1 THEN format('%s phút', ROUND(v_duration_minutes))
+            WHEN v_duration_hours < 24 THEN format('%s giờ %s phút', FLOOR(v_duration_hours), ROUND(MOD(v_duration_minutes, 60)))
+            ELSE format('%s ngày %s giờ', FLOOR(v_duration_hours/24), ROUND(MOD(v_duration_hours,24)::numeric,1))
+        END,
+        
+        'room_charge', (v_room_res->>'amount')::numeric,
+        'base_price', (v_room_res->>'amount')::numeric,
+        'explanation', COALESCE(v_room_res->>'explanation', '') || ' ' || 
+                       COALESCE(v_surcharge_res->>'explanation', '') || ' ' || 
+                       COALESCE(v_extra_person_res->>'explanation', ''),
+        'room_explanation', v_room_res->>'explanation',
+        'surcharge', (v_surcharge_res->>'amount')::numeric,
+        'early_surcharge', (v_surcharge_res->>'early_amount')::numeric,
+        'late_surcharge', (v_surcharge_res->>'late_amount')::numeric,
+        'custom_surcharge', v_booking.custom_surcharge,
+        'extra_person', (v_extra_person_res->>'amount')::numeric,
+        'extra_person_details', v_extra_person_res,
+        'service_total', v_service_total,
+        'service_charges', v_service_items,
+        'service_items', v_service_items,
+        
+        'sub_total', v_total_amount,
+        'subtotal', v_total_amount,
+        'discount_amount', v_booking.discount_amount,
+        'service_fee_amount', (v_adj_res->>'service_fee')::numeric,
+        'vat_amount', (v_adj_res->>'vat_amount')::numeric,
+        
+        'total_amount', v_final_amount,
+        'final_amount', v_final_amount,
+        'deposit_amount', v_deposit,
+        'deposit', v_deposit,
+        'customer_balance', v_customer_balance,
+        'amount_to_pay', (v_final_amount - v_deposit),
+        'total_receivable', (v_final_amount - v_deposit - v_customer_balance)
+    );
+END;
+
+
+--- fn_calculate_room_charge ---
+
+DECLARE
+    -- Settings variables
+    v_grace_in_enabled boolean;
+    v_grace_out_enabled boolean;
+    v_grace_minutes int;
+    v_hourly_unit int;
+    v_base_block_count int;
+    v_ceiling_enabled boolean;
+    v_ceiling_percent numeric;
+    v_overnight_start time;
+    v_overnight_end time;
+    v_std_check_out time;
+    v_full_day_cutoff time;
+    
+    -- Price variables
+    v_price_hourly numeric;
+    v_price_next numeric;
+    v_price_daily numeric;
+    v_price_overnight numeric;
+    v_overnight_enabled boolean;
+   
+   v_duration_minutes numeric;
+   v_total_charge numeric := 0;
+   v_explanation text := '';
+   v_ceiling_amount numeric;
+   
+   v_first_block_min numeric;
+   v_remaining_min numeric;
+   v_next_blocks int;
+   v_check_in_time time;
+BEGIN
+    -- 1. Load settings from COLUMNS
+    SELECT 
+        COALESCE(grace_in_enabled, false),
+        COALESCE(grace_out_enabled, false),
+        COALESCE(grace_minutes, 0),
+        COALESCE(hourly_unit, 60),
+        COALESCE(base_hourly_limit, 1),
+        COALESCE(hourly_ceiling_enabled, false),
+        COALESCE(hourly_ceiling_percent, 100),
+        COALESCE(overnight_start_time, '22:00:00'::time),
+        COALESCE(overnight_end_time, '06:00:00'::time),
+        COALESCE(check_out_time, '12:00:00'::time),
+        COALESCE(full_day_late_after, '18:00:00'::time)
+    INTO 
+        v_grace_in_enabled, 
+        v_grace_out_enabled, 
+        v_grace_minutes,
+        v_hourly_unit, 
+        v_base_block_count, 
+        v_ceiling_enabled,
+        v_ceiling_percent,
+        v_overnight_start, 
+        v_overnight_end,
+        v_std_check_out, 
+        v_full_day_cutoff
+    FROM public.settings LIMIT 1;
+    
+    -- Fallback if settings not found
+    IF NOT FOUND THEN
+         v_grace_in_enabled := false;
+         v_grace_out_enabled := false;
+         v_grace_minutes := 0;
+         v_hourly_unit := 60;
+         v_base_block_count := 1;
+         v_ceiling_enabled := false;
+         v_ceiling_percent := 100;
+         v_overnight_start := '22:00:00'::time;
+         v_overnight_end := '06:00:00'::time;
+         v_std_check_out := '12:00:00'::time;
+         v_full_day_cutoff := '18:00:00'::time;
+    END IF;
+
+    -- 2. Load prices from room_categories columns
+    SELECT 
+        price_hourly, 
+        price_next_hour, 
+        price_daily, 
+        price_overnight,
+        overnight_enabled,
+        hourly_unit,
+        base_hourly_limit
+    INTO 
+        v_price_hourly, 
+        v_price_next, 
+        v_price_daily, 
+        v_price_overnight,
+        v_overnight_enabled,
+        v_hourly_unit,
+        v_base_block_count
+    FROM public.room_categories 
+    WHERE id = p_room_cat_id;
+    
+    -- Apply Overrides (Priority: Room > Global)
+    -- If room config is NULL, keep the global value loaded in step 1
+    IF v_hourly_unit IS NULL THEN v_hourly_unit := 60; END IF; 
+    IF v_base_block_count IS NULL THEN v_base_block_count := 1; END IF;
+
+    v_duration_minutes := EXTRACT(EPOCH FROM (p_check_out - p_check_in)) / 60;
+    v_check_in_time := p_check_in::time;
+    
+    IF p_rental_type = 'hourly' THEN
+        v_explanation := v_explanation || 'Thuê Giờ. ';
+        v_first_block_min := v_base_block_count * v_hourly_unit;
+        v_total_charge := v_price_hourly;
+        v_explanation := v_explanation || format('Gói đầu %s phút: %s. ', v_first_block_min, v_price_hourly);
+        
+        IF v_duration_minutes > v_first_block_min THEN
+            v_remaining_min := v_duration_minutes - v_first_block_min;
+            IF v_remaining_min <= v_grace_minutes THEN
+                v_explanation := v_explanation || format('(Dư %s phút trong ân hạn -> Miễn phí). ', ROUND(v_remaining_min,0));
+                v_remaining_min := 0;
+            END IF;
+            
+            IF v_remaining_min > 0 THEN
+                v_next_blocks := CEIL(v_remaining_min / v_hourly_unit);
+                v_total_charge := v_total_charge + (v_next_blocks * v_price_next);
+                v_explanation := v_explanation || format('Tiếp theo: %s phút = %s block x %s = %s. ', 
+                    ROUND(v_remaining_min,0), v_next_blocks, v_price_next, (v_next_blocks * v_price_next));
+            END IF;
+        END IF;
+        
+        IF v_ceiling_enabled THEN
+            v_ceiling_amount := v_price_daily * (v_ceiling_percent / 100);
+            IF v_total_charge > v_ceiling_amount THEN
+                v_total_charge := v_ceiling_amount;
+                v_explanation := v_explanation || format(' -> Chạm trần giá giờ (%s%% giá ngày): %s.', v_ceiling_percent, v_ceiling_amount);
+            END IF;
+        END IF;
+
+    ELSIF p_rental_type = 'overnight' THEN
+        IF v_overnight_enabled = true AND (v_check_in_time >= v_overnight_start OR v_check_in_time <= v_overnight_end) THEN
+             v_total_charge := v_price_overnight;
+             v_explanation := format('Giá qua đêm (trong khung): %s. ', v_price_overnight);
+        ELSE
+             v_total_charge := v_price_daily;
+             v_explanation := format('Ngoài khung qua đêm -> Áp giá ngày: %s. ', v_price_daily);
+        END IF;
+
+    ELSE -- Daily
+        DECLARE
+            v_days int;
+            v_check_out_time time;
+            v_late_min numeric;
+        BEGIN
+           -- Calculate days by date difference
+           v_days := (p_check_out::date - p_check_in::date);
+           
+           v_check_out_time := p_check_out::time;
+           v_late_min := EXTRACT(EPOCH FROM (v_check_out_time - v_std_check_out)) / 60;
+           
+           -- If checkout is past full_day_cutoff, add another day
+           IF (v_check_out_time > v_full_day_cutoff) THEN
+               IF NOT (v_grace_out_enabled AND v_late_min <= v_grace_minutes) THEN
+                   v_days := v_days + 1;
+                   v_explanation := v_explanation || format('Qua mốc 100%% (%s) -> Cộng thêm 1 ngày. ', v_full_day_cutoff);
+               END IF;
+           END IF;
+           
+           IF v_days < 1 THEN v_days := 1; END IF;
+           
+           v_total_charge := v_days * v_price_daily;
+           v_explanation := format('Giá theo ngày (%s ngày): %s. ', v_days, v_total_charge);
+        END;
+    END IF;
+
+    RETURN jsonb_build_object(
+        'amount', v_total_charge,
+        'explanation', v_explanation,
+        'duration_minutes', v_duration_minutes
+    );
+END;
+
+
+--- fn_calculate_surcharge ---
+
+DECLARE
+    -- Settings
+    v_std_check_in time;
+    v_std_check_out time;
+    v_overnight_checkout_time time;
+    v_full_day_cutoff time;
+    v_grace_minutes int;
+    v_grace_in_enabled boolean;
+    v_grace_out_enabled boolean;
+    v_surcharge_rules jsonb;
+    v_auto_surcharge_enabled boolean;
+    
+    v_price_daily numeric;
+    v_hourly_surcharge_rate numeric;
+    v_surcharge_mode text;
+    
+    v_early_min numeric := 0;
+    v_late_min numeric := 0;
+    v_early_amount numeric := 0;
+    v_late_amount numeric := 0;
+    v_explanation text := '';
+    
+    v_rule jsonb;
+    v_rule_from_min int;
+    v_rule_to_min int;
+    v_rule_percent numeric;
+    v_rule_type text;
+    v_rule_from time;
+    v_rule_to time;
+    
+    v_check_out_time time;
+    v_check_in_time time;
+    v_rule_matched boolean := false;
+BEGIN
+    IF p_rental_type = 'hourly' THEN
+        RETURN jsonb_build_object(
+            'amount', 0, 'early_amount', 0, 'late_amount', 0,
+            'explanation', 'Thuê giờ: Không áp dụng phụ thu Sớm/Muộn.'
+        );
+    END IF;
+
+    -- Load Settings from COLUMNS
+    SELECT 
+        COALESCE(check_in_time, '14:00:00'::time),
+        COALESCE(check_out_time, '12:00:00'::time),
+        COALESCE(overnight_checkout_time, '12:00:00'::time),
+        COALESCE(full_day_late_after, '18:00:00'::time),
+        COALESCE(grace_minutes, 0),
+        COALESCE(grace_in_enabled, false),
+        COALESCE(grace_out_enabled, false),
+        COALESCE(surcharge_rules, '[]'::jsonb),
+        COALESCE(auto_surcharge_enabled, false)
+    INTO 
+        v_std_check_in, 
+        v_std_check_out, 
+        v_overnight_checkout_time, 
+        v_full_day_cutoff, 
+        v_grace_minutes, 
+        v_grace_in_enabled, 
+        v_grace_out_enabled, 
+        v_surcharge_rules,
+        v_auto_surcharge_enabled
+    FROM public.settings LIMIT 1;
+    
+    -- Load Category Overrides
+    SELECT 
+        price_daily,
+        COALESCE(hourly_surcharge_amount, 0),
+        COALESCE(surcharge_mode, 'percent'),
+        COALESCE(surcharge_rules, v_surcharge_rules),
+        COALESCE(auto_surcharge_enabled, v_auto_surcharge_enabled)
+    INTO 
+        v_price_daily, 
+        v_hourly_surcharge_rate,
+        v_surcharge_mode,
+        v_surcharge_rules,
+        v_auto_surcharge_enabled
+    FROM public.room_categories WHERE id = p_room_cat_id;
+
+    IF NOT v_auto_surcharge_enabled THEN
+        RETURN jsonb_build_object(
+            'amount', 0, 'early_amount', 0, 'late_amount', 0,
+            'explanation', 'Phụ thu tự động đang tắt.'
+        );
+    END IF;
+
+    -- 1. LATE CHECK-OUT
+    DECLARE
+        v_target_checkout time;
+    BEGIN
+        IF p_rental_type = 'overnight' THEN
+            v_target_checkout := v_overnight_checkout_time;
+        ELSE 
+            v_target_checkout := v_std_check_out;
+        END IF;
+        
+        v_check_out_time := p_check_out::time;
+
+        IF (v_check_out_time > v_target_checkout) THEN
+            v_late_min := EXTRACT(EPOCH FROM (v_check_out_time - v_target_checkout)) / 60;
+            
+            IF v_grace_out_enabled AND v_late_min <= v_grace_minutes THEN
+                v_late_min := 0;
+                v_explanation := v_explanation || format('(Trễ %s phút trong ân hạn). ', ROUND(v_late_min, 0));
+            ELSE
+                IF p_rental_type = 'daily' AND v_check_out_time > v_full_day_cutoff THEN
+                    v_late_amount := 0;
+                    v_explanation := v_explanation || format('Qua mốc 100%% (%s) -> Đã tính vào tiền phòng. ', v_full_day_cutoff);
+                ELSIF v_surcharge_mode = 'amount' THEN
+                    v_late_amount := CEIL(v_late_min / 60) * v_hourly_surcharge_rate;
+                    v_explanation := v_explanation || format('Phụ thu trễ (Số tiền): %s giờ x %s = %s. ', CEIL(v_late_min/60), v_hourly_surcharge_rate, v_late_amount);
+                ELSE
+                    -- Mode: Percent
+                    IF v_surcharge_rules IS NOT NULL AND jsonb_typeof(v_surcharge_rules) = 'array' THEN
+                         FOR v_rule IN SELECT * FROM jsonb_array_elements(v_surcharge_rules)
+                         LOOP
+                            v_rule_type := v_rule->>'type';
+                            IF v_rule_type = 'Late' THEN
+                                v_rule_from_min := COALESCE((v_rule->>'from_minute')::int, 0);
+                                v_rule_to_min := COALESCE((v_rule->>'to_minute')::int, 0);
+                                v_rule_percent := (v_rule->>'percentage')::numeric;
+                                
+                                IF v_late_min > v_rule_from_min AND v_late_min <= v_rule_to_min THEN
+                                    v_late_amount := v_price_daily * (v_rule_percent / 100);
+                                    v_explanation := v_explanation || format('Trả muộn %s phút (Rule %s%%) -> %s. ', ROUND(v_late_min), v_rule_percent, v_late_amount);
+                                    v_rule_matched := true;
+                                    EXIT;
+                                END IF;
+                            END IF;
+                         END LOOP;
+                    END IF;
+                    
+                    -- Fallback for structured rules {late_rules: [...]}
+                    IF NOT v_rule_matched AND v_surcharge_rules ? 'late_rules' THEN
+                         FOR v_rule IN SELECT * FROM jsonb_array_elements(v_surcharge_rules->'late_rules')
+                         LOOP
+                            v_rule_from := (v_rule->>'from')::time;
+                            v_rule_to := (v_rule->>'to')::time;
+                            v_rule_percent := (v_rule->>'percent')::numeric;
+                            IF v_check_out_time > v_rule_from AND v_check_out_time <= v_rule_to THEN
+                                v_late_amount := v_price_daily * (v_rule_percent / 100);
+                                v_explanation := v_explanation || format('Trả muộn đến %s (Rule %s%%) -> %s. ', v_rule_from, v_rule_percent, v_late_amount);
+                                v_rule_matched := true;
+                                EXIT;
+                            END IF;
+                         END LOOP;
+                    END IF;
+
+                    IF NOT v_rule_matched THEN
+                         v_late_amount := 0;
+                         v_explanation := v_explanation || 'Chưa cấu hình luật phụ thu trễ cho khung giờ này. ';
+                    END IF;
+                END IF;
+            END IF;
+        END IF;
+    END;
+
+    -- 2. EARLY CHECK-IN
+    IF p_rental_type = 'daily' THEN
+        v_check_in_time := p_check_in::time;
+        IF (v_check_in_time < v_std_check_in) THEN
+            v_early_min := EXTRACT(EPOCH FROM (v_std_check_in - v_check_in_time)) / 60;
+            
+            IF v_grace_in_enabled AND v_early_min <= v_grace_minutes THEN
+                v_early_min := 0;
+                v_explanation := v_explanation || format('(Sớm %s phút trong ân hạn). ', ROUND(v_early_min, 0));
+            ELSE
+                 v_rule_matched := false;
+                 
+                 IF v_surcharge_mode = 'amount' THEN
+                    v_early_amount := CEIL(v_early_min / 60) * v_hourly_surcharge_rate;
+                    v_explanation := v_explanation || format('Phụ thu sớm (Số tiền): %s giờ x %s = %s. ', CEIL(v_early_min/60), v_hourly_surcharge_rate, v_early_amount);
+                    v_rule_matched := true;
+                 ELSE
+                     -- Mode: Percent
+                     IF v_surcharge_rules IS NOT NULL AND jsonb_typeof(v_surcharge_rules) = 'array' THEN
+                         FOR v_rule IN SELECT * FROM jsonb_array_elements(v_surcharge_rules)
+                         LOOP
+                            v_rule_type := v_rule->>'type';
+                            IF v_rule_type = 'Early' THEN
+                                v_rule_from_min := COALESCE((v_rule->>'from_minute')::int, 0);
+                                v_rule_to_min := COALESCE((v_rule->>'to_minute')::int, 0);
+                                v_rule_percent := (v_rule->>'percentage')::numeric;
+                                
+                                IF v_early_min > v_rule_from_min AND v_early_min <= v_rule_to_min THEN
+                                    v_early_amount := v_price_daily * (v_rule_percent / 100);
+                                    v_explanation := v_explanation || format('Vào sớm %s phút (Rule %s%%) -> %s. ', ROUND(v_early_min), v_rule_percent, v_early_amount);
+                                    v_rule_matched := true;
+                                    EXIT;
+                                END IF;
+                            END IF;
+                         END LOOP;
+                     END IF;
+
+                     -- Fallback for structured rules {early_rules: [...]}
+                     IF NOT v_rule_matched AND v_surcharge_rules ? 'early_rules' THEN
+                         FOR v_rule IN SELECT * FROM jsonb_array_elements(v_surcharge_rules->'early_rules')
+                         LOOP
+                             v_rule_from := (v_rule->>'from')::time;
+                             v_rule_to := (v_rule->>'to')::time;
+                             v_rule_percent := (v_rule->>'percent')::numeric;
+                             IF v_check_in_time >= v_rule_from AND v_check_in_time < v_rule_to THEN
+                                 v_early_amount := v_price_daily * (v_rule_percent / 100);
+                                 v_explanation := v_explanation || format('Vào sớm (%s-%s) (Rule %s%%) -> %s. ', v_rule_from, v_rule_to, v_rule_percent, v_early_amount);
+                                 v_rule_matched := true;
+                                 EXIT;
+                             END IF;
+                         END LOOP;
+                     END IF;
+                 END IF;
+
+                 IF NOT v_rule_matched THEN
+                     v_early_amount := 0;
+                     v_explanation := v_explanation || 'Chưa cấu hình luật phụ thu sớm cho khung giờ này. ';
+                 END IF;
+            END IF;
+        END IF;
+    END IF;
+
+    RETURN jsonb_build_object(
+        'amount', v_early_amount + v_late_amount,
+        'early_amount', v_early_amount,
+        'late_amount', v_late_amount,
+        'explanation', v_explanation
+    );
+END;
+
+

@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabase';
 
+// Helper function to format duration
+function formatDuration(hours: number | undefined | null, minutes: number | undefined | null): string {
+  const h = hours || 0;
+  const m = minutes || 0;
+  if (h > 0) {
+    return `${h} giờ ${m} phút`;
+  }
+  return `${m} phút`;
+}
+
 export interface BookingBill {
   success: boolean;
   booking_id: string;
@@ -16,43 +26,37 @@ export interface BookingBill {
   
   // Price Breakdown
   room_charge: number;
-  base_price: number;
-  early_surcharge: number;
-  late_surcharge: number;
-  extra_people_surcharge?: number;
+  surcharge_total: number; // Tổng phụ thu (sớm, muộn, người thêm)
   custom_surcharge: number;
   service_charges: any[];
   service_total: number;
   
-  // Subtotal
-  subtotal: number;
-  
-  // Taxes
-  service_fee_percent: number;
+  // Totals
+  subtotal: number; // Tổng trước thuế/phí
   service_fee_amount: number;
-  vat_percent: number;
   vat_amount: number;
-  
-  // Finals
-  total_amount: number; // Before discount
+  total_amount: number; // Tổng sau thuế/phí, trước giảm giá
   discount_amount: number;
-  final_amount: number; // After discount
+  final_amount: number; // Tổng cuối cùng khách phải trả cho booking này
   
   // Payments
   deposit_amount: number;
-  amount_to_pay: number;
+  amount_to_pay: number; // Số tiền còn lại cần thanh toán (final_amount - deposit)
   
-  // Debt
+  // Customer Balance
   customer_balance: number;
-  total_receivable: number;
+  explanation?: string[];
 }
 
 export const bookingService = {
-  async calculateBill(bookingId: string): Promise<BookingBill | null> {
+  async calculateBill(bookingId: string, nowOverride?: string): Promise<BookingBill | null> {
     try {
-      // Use the merged V2 Billing Engine (Rule 4 compliant)
+      // Use the standardized Billing Engine
       const { data, error } = await supabase
-        .rpc('calculate_booking_bill_v2', { p_booking_id: bookingId });
+        .rpc('calculate_booking_bill', { 
+          p_booking_id: bookingId,
+          p_now_override: nowOverride || null
+        });
 
       if (error) {
         console.error('RPC Error details:', JSON.stringify(error, null, 2));
@@ -60,51 +64,44 @@ export const bookingService = {
       }
 
       if (!data || !data.success) {
-        console.error('Error or no data returned from calculate_booking_bill_v2:', data?.message);
+        console.error('Error or no data returned from calculate_booking_bill:', data?.message);
         return null;
       }
       
       // Map the response structure to BookingBill interface
-      // Note: calculate_booking_bill_v2 returns all necessary fields with aliases for compatibility
       return {
           success: true,
           booking_id: data.booking_id,
-          room_number: data.room_number,
+          room_number: data.room_name,
           customer_name: data.customer_name,
           rental_type: data.rental_type,
           
           check_in_at: data.check_in_at,
           check_out_at: data.check_out_at,
-          duration_text: data.duration_text,
+          duration_text: formatDuration(data.duration_hours, data.duration_minutes),
           duration_min: data.duration_minutes || 0,
           
           room_charge: data.room_charge,
-          base_price: data.room_charge, // Base price is the room charge
-          
-          early_surcharge: data.early_surcharge || 0,
-          late_surcharge: data.late_surcharge || 0,
-          extra_people_surcharge: data.extra_people_surcharge || 0,
+          surcharge_total: (data.surcharge_amount || 0) + (data.extra_person_charge || 0),
           custom_surcharge: data.custom_surcharge || 0,
           
           service_total: data.service_total || 0,
-          service_charges: data.service_charges || [],
+          service_charges: data.service_items || [],
           
-          subtotal: data.total_amount, // Subtotal before discount
-          service_fee_percent: 0, 
-          service_fee_amount: 0,
-          vat_percent: 0, 
-          vat_amount: 0,
+          subtotal: data.sub_total,
+          service_fee_amount: data.service_fee_amount || 0,
+          vat_amount: data.vat_amount || 0,
           
           total_amount: data.total_amount,
           discount_amount: data.discount_amount,
-          final_amount: data.total_final, 
+          final_amount: data.total_amount - data.discount_amount,
           
           deposit_amount: data.deposit_amount,
           amount_to_pay: data.amount_to_pay,
           
           customer_id: data.customer_id,
           customer_balance: data.customer_balance,
-          total_receivable: data.total_receivable
+          explanation: data.explanation || []
       };
     } catch (err: any) {
       console.error('Error calculating bill:', err.message || err);
@@ -121,12 +118,12 @@ export const bookingService = {
     notes: string;
   }): Promise<{ success: boolean; message: string; bill?: any }> {
     try {
-      const { data, error } = await supabase.rpc('process_checkout_v2', {
+      const { data, error } = await supabase.rpc('process_checkout', {
         p_booking_id: params.bill.booking_id,
         p_payment_method: params.paymentMethod,
         p_amount_paid: params.amountPaid,
         p_discount: params.discount,
-        p_surcharge: params.surcharge, // Only pass the custom surcharge part
+        p_surcharge: params.surcharge,
         p_notes: params.notes
       });
 

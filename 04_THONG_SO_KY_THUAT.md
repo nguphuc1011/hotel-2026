@@ -27,9 +27,9 @@ Tất cả logic tính tiền tập trung tại file: `src/lib/billing_engine.sq
 - **Tham số**: `p_booking_id`.
 - **Đặc điểm**: Lấy số lượng người từ `bookings` và đơn giá từ `room_categories`.
 
-### 1.4. calculate_booking_bill_v2
+### 1.4. calculate_booking_bill
 - **Chức năng**: Hàm Master tổng hợp toàn bộ hóa đơn.
-- **Tham số**: `p_booking_id`.
+- **Tham số**: `p_booking_id`, `p_now_override`.
 - **Trả về**: JSON chi tiết bao gồm tiền phòng, phụ thu, dịch vụ, giảm giá, thuế và phí.
 
 ## 2. Nghiệp Vụ Phòng (Room Operations)
@@ -49,4 +49,4 @@ Tất cả logic tính tiền tập trung tại file: `src/lib/billing_engine.sq
 - **Rental Type**: `hourly`, `daily`, `overnight`.
 
 ---
-*Cập nhật lần cuối: 2026-01-15 bởi AI Assistant*
+*Cập nhật lần cuối: 2026-01-16 bởi AI Assistant*

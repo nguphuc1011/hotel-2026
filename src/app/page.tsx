@@ -33,6 +33,10 @@ export default function DashboardPage() {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [isFolioOpen, setIsFolioOpen] = useState(false);
 
+  // Virtual Time State
+  const [isVirtualEnabled, setIsVirtualEnabled] = useState(false);
+  const [virtualTime, setVirtualTime] = useState(new Date().toISOString());
+
   // Fetch initial data
   const fetchData = async () => {
     try {
@@ -61,9 +65,29 @@ export default function DashboardPage() {
 
       if (bookingsError) throw bookingsError;
 
+      // 2.1 Calculate real-time bills for active bookings
+      const activeBookings = await Promise.all((bookingsData || []).map(async (b) => {
+        try {
+          const { data: billData } = await supabase.rpc('calculate_booking_bill', { 
+            p_booking_id: b.id,
+            p_now_override: isVirtualEnabled ? virtualTime : null
+          });
+          return { 
+            ...b, 
+            // Use the calculated total_amount from the billing engine
+            total_amount: billData?.total_amount || 0,
+            // Ensure we have the correct check-in time for the timer
+            check_in_at: b.check_in_actual
+          };
+        } catch (e) {
+          console.error(`Error calculating bill for booking ${b.id}:`, e);
+          return { ...b, check_in_at: b.check_in_actual };
+        }
+      }));
+
       // 3. Merge Data
       const mergedRooms: DashboardRoom[] = roomsData.map((room: any) => {
-        const booking = bookingsData?.find(b => b.room_id === room.id);
+        const booking = activeBookings.find(b => b.room_id === room.id);
         
         let dashboardRoom: DashboardRoom = {
           id: room.id,
@@ -119,7 +143,7 @@ export default function DashboardPage() {
     }
   };
 
-  // Real-time Subscription
+  // Real-time Subscription & Initial Fetch
   useEffect(() => {
     fetchData();
 
@@ -127,7 +151,7 @@ export default function DashboardPage() {
     const roomsChannel = supabase
       .channel('public:rooms')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
-        fetchData(); // Reload all for simplicity, or optimize to update specific room
+        fetchData();
       })
       .subscribe();
 
@@ -140,7 +164,10 @@ export default function DashboardPage() {
 
     // Interval to update "minutes ago" or timers every minute
     const interval = setInterval(() => {
-       setRooms(prev => [...prev]); // Trigger re-render to update relative times/flashing
+       // If virtual time is NOT enabled, we just trigger re-render
+       // If virtual time IS enabled, we might want to increment it, 
+       // but for testing usually static is better or manually controlled.
+       setRooms(prev => [...prev]); 
     }, 60000);
 
     return () => {
@@ -148,7 +175,15 @@ export default function DashboardPage() {
       supabase.removeChannel(bookingsChannel);
       clearInterval(interval);
     };
-  }, []);
+  }, [isVirtualEnabled, virtualTime]);
+
+  // Handle virtual time toggle
+  const handleVirtualToggle = (enabled: boolean) => {
+    setIsVirtualEnabled(enabled);
+    if (enabled) {
+      setVirtualTime(new Date().toISOString());
+    }
+  };
 
   // Filtering Logic
   const filteredRooms = useMemo(() => {
@@ -264,6 +299,10 @@ export default function DashboardPage() {
           counts={counts}
           filters={filters}
           onToggle={handleToggleFilter}
+          isVirtualEnabled={isVirtualEnabled}
+          virtualTime={virtualTime}
+          onVirtualToggle={handleVirtualToggle}
+          onVirtualTimeChange={setVirtualTime}
         />
 
         {loading ? (
@@ -277,6 +316,7 @@ export default function DashboardPage() {
                 key={room.id} 
                 room={room} 
                 onClick={handleRoomClick} 
+                virtualTime={isVirtualEnabled ? virtualTime : null}
               />
             ))}
           </div>
@@ -298,14 +338,15 @@ export default function DashboardPage() {
       />
       
       {selectedRoom && selectedRoom.current_booking && (
-        <RoomFolioModal
+          <RoomFolioModal 
             isOpen={isFolioOpen}
             onClose={() => setIsFolioOpen(false)}
             room={selectedRoom}
             booking={selectedRoom.current_booking}
             onUpdate={fetchData}
-        />
-      )}
+            virtualTime={isVirtualEnabled ? virtualTime : null}
+          />
+        )}
     </div>
   );
 }

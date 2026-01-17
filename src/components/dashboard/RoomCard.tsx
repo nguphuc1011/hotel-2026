@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Sun, 
   Moon, 
@@ -13,14 +13,33 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardRoom, BookingType } from '@/types/dashboard';
-import { format } from 'date-fns';
+import { format, differenceInMinutes, differenceInDays } from 'date-fns';
 
 interface RoomCardProps {
   room: DashboardRoom;
   onClick: (room: DashboardRoom) => void;
+  virtualTime?: string | null;
 }
 
-const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
+const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, virtualTime }) => {
+  const [now, setNow] = useState(new Date());
+
+  // Update "now" every minute to keep duration real-time, or use virtualTime
+  useEffect(() => {
+    if (virtualTime) {
+      const vDate = new Date(virtualTime);
+      if (!isNaN(vDate.getTime())) {
+        setNow(vDate);
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [virtualTime]);
+
   // Determine display properties based on status and booking
   const display = useMemo(() => {
     let bgColor = 'bg-[#155e75]'; // Default: Available (Xanh Teal)
@@ -46,41 +65,64 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
         isFlashing = true;
       }
     } else if (room.status === 'occupied' && room.current_booking) {
-      const { booking_type } = room.current_booking;
+      const { booking_type, check_in_at } = room.current_booking;
       subText = room.current_booking.customer_name || 'Khách vãng lai';
       
+      const checkIn = check_in_at ? new Date(check_in_at) : null;
+      const isValidDate = checkIn && !isNaN(checkIn.getTime());
+
       switch (booking_type) {
         case 'hourly':
           bgColor = 'bg-[#f59e0b]'; // Hourly (Vàng Hổ Phách)
           textColor = 'text-black';
           Icon = Clock;
-          statusText = 'Khách giờ';
+          
+          if (isValidDate) {
+            // Format hh:mm duration
+            const diffMin = Math.max(0, differenceInMinutes(now, checkIn));
+            const h = Math.floor(diffMin / 60);
+            const m = diffMin % 60;
+            statusText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          } else {
+            statusText = '--:--';
+          }
           break;
         case 'daily':
-          bgColor = 'bg-[#1e40af]'; // Daily (Xanh Dương)
-          Icon = Sun;
-          statusText = 'Khách ngày';
-          break;
         case 'overnight':
-          bgColor = 'bg-[#1e40af]'; // Overnight (Xanh Dương)
-          Icon = Moon;
-          statusText = 'Qua đêm';
+          bgColor = 'bg-[#1e40af]'; // Daily/Overnight (Xanh Dương)
+          Icon = booking_type === 'daily' ? Sun : Moon;
+          
+          if (isValidDate) {
+            // Format number of days
+            // Using calendar days difference + 1 to match "nights" logic in billing engine
+            const diffDays = Math.max(1, differenceInDays(now, checkIn));
+            statusText = `${diffDays} ngày`;
+          } else {
+            statusText = '--- ngày';
+          }
           break;
       }
     }
 
     return { bgColor, textColor, Icon, statusText, subText, isFlashing };
-  }, [room]);
+  }, [room, now]);
 
   const { bgColor, textColor, Icon, statusText, subText, isFlashing } = display;
 
   // Formatting currency
   const formattedAmount = useMemo(() => {
-    if (room.current_booking?.total_amount) {
-      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(room.current_booking.total_amount);
+    const amount = room.status === 'occupied' 
+      ? room.current_booking?.total_amount 
+      : (room.status === 'available' ? room.price_daily : null);
+
+    if (amount !== undefined && amount !== null) {
+      return new Intl.NumberFormat('vi-VN', { 
+        style: 'decimal', 
+        minimumFractionDigits: 0 
+      }).format(amount) + ' ₫';
     }
     return null;
-  }, [room.current_booking]);
+  }, [room.status, room.current_booking, room.price_daily]);
 
   return (
     <div 
@@ -129,13 +171,32 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
           </div>
         </div>
 
-        {/* Middle: Customer Name (if occupied) */}
+        {/* Middle: Customer Name & Booking Details (if occupied) */}
         <div className="mt-auto mb-2">
-          {room.status === 'occupied' && (
-            <div className="animate-fade-in">
+          {room.status === 'occupied' && room.current_booking && (
+            <div className="animate-fade-in flex flex-col gap-1">
               <p className="text-[11px] font-bold uppercase tracking-wide opacity-90 truncate">
                 {subText}
               </p>
+              
+              <div className="flex flex-col gap-0.5">
+                <p className="text-[9px] font-medium opacity-80 whitespace-nowrap">
+                  {room.current_booking.booking_type === 'daily' ? (
+                    <>
+                      <strong className="font-bold">{format(new Date(room.current_booking.check_in_at), 'dd/MM')}</strong>
+                      <span className="ml-1">{format(new Date(room.current_booking.check_in_at), 'HH:mm')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong className="font-bold">{format(new Date(room.current_booking.check_in_at), 'HH:mm')}</strong>
+                      <span className="ml-1">{format(new Date(room.current_booking.check_in_at), 'dd/MM')}</span>
+                    </>
+                  )}
+                </p>
+                <p className="text-[10px] font-black text-emerald-600 bg-white/50 px-1.5 py-0.5 rounded-full shadow-sm w-fit">
+                  {room.current_booking.total_amount?.toLocaleString()}đ
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -149,7 +210,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
             </span>
             
             {/* Amount */}
-            {room.status === 'occupied' ? (
+            {room.status === 'occupied' || room.status === 'available' ? (
                <span className="text-[22px] font-black tracking-tighter leading-none">
                  {formattedAmount || '0 ₫'}
                </span>

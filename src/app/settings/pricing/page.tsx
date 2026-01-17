@@ -52,6 +52,9 @@ export default function PricingPage() {
           full_day_early_before: '05:00',
           full_day_late_after: '18:00',
           auto_surcharge_enabled: true,
+          auto_overnight_switch: false,
+          auto_full_day_early: true,
+          auto_full_day_late: true,
           extra_person_enabled: false,
           extra_person_method: 'fixed',
           grace_in_enabled: true,
@@ -262,6 +265,16 @@ export default function PricingPage() {
                           className="font-bold text-[17px] bg-black/5 px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-32"
                         />
                       </div>
+                      <div className="px-6 py-4 flex justify-between items-center bg-indigo-50/30">
+                        <div className="flex flex-col">
+                          <span className="text-[17px] text-[#1D1D1F] font-bold">Tự động chuyển Qua đêm</span>
+                          <span className="text-[13px] text-gray-500">Tự động áp giá Đêm khi khách vào đúng khung giờ</span>
+                        </div>
+                        <Switch 
+                          checked={settings.auto_overnight_switch} 
+                          onChange={(val: boolean) => setSettings({...settings, auto_overnight_switch: val})} 
+                        />
+                      </div>
                     </div>
                   </BentoCard>
                 </div>
@@ -290,6 +303,13 @@ export default function PricingPage() {
                           className="font-bold text-[17px] bg-black/5 px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20"
                         />
                       </div>
+                      <div className="px-6 py-4 flex justify-between items-center bg-red-50/30">
+                        <span className="text-[17px] text-[#1D1D1F]">Kích hoạt tính sớm (Full day)</span>
+                        <Switch 
+                          checked={settings.auto_full_day_early} 
+                          onChange={(val: boolean) => setSettings({...settings, auto_full_day_early: val})} 
+                        />
+                      </div>
                       <div className="px-6 py-4 flex justify-between items-center">
                         <div className="flex flex-col">
                           <span className="text-[17px] text-[#1D1D1F]">Trả muộn tính thêm ngày</span>
@@ -300,6 +320,13 @@ export default function PricingPage() {
                           value={settings.full_day_late_after} 
                           onChange={(e) => setSettings({...settings, full_day_late_after: e.target.value})}
                           className="font-bold text-[17px] bg-black/5 px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                        />
+                      </div>
+                      <div className="px-6 py-4 flex justify-between items-center bg-red-50/30">
+                        <span className="text-[17px] text-[#1D1D1F]">Kích hoạt tính trễ (Full day)</span>
+                        <Switch 
+                          checked={settings.auto_full_day_late} 
+                          onChange={(val: boolean) => setSettings({...settings, auto_full_day_late: val})} 
                         />
                       </div>
                     </div>

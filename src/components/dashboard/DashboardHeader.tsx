@@ -30,13 +30,30 @@ interface DashboardHeaderProps {
   };
   filters: FilterState;
   onToggle: (key: keyof FilterState) => void;
+  // Virtual Time Props
+  isVirtualEnabled: boolean;
+  virtualTime: string;
+  onVirtualToggle: (enabled: boolean) => void;
+  onVirtualTimeChange: (time: string) => void;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
   counts, 
   filters, 
-  onToggle
+  onToggle,
+  isVirtualEnabled,
+  virtualTime,
+  onVirtualToggle,
+  onVirtualTimeChange
 }) => {
+  // Helper to format ISO string to local datetime-local format (YYYY-MM-DDTHH:mm)
+  const formatToLocalDatetime = (isoString: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const offset = date.getTimezoneOffset() * 60000; // offset in milliseconds
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 16);
+  };
   
   const filterItems = [
     { 
@@ -85,15 +102,55 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </p>
         </div>
 
-        {/* User Profile */}
-        <div className="flex items-center gap-3 pl-4">
-          <div className="text-right hidden md:block">
-            <p className="text-xs font-bold text-slate-800">Admin</p>
-            <p className="text-[10px] font-medium text-slate-400 uppercase">Quản lý</p>
+        {/* User Profile & Virtual Clock */}
+        <div className="flex items-center gap-4">
+          {/* Virtual Clock Control */}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300",
+            isVirtualEnabled 
+              ? "bg-purple-50 border-purple-200 shadow-sm shadow-purple-100" 
+              : "bg-slate-50 border-slate-200"
+          )}>
+            <div className="flex items-center gap-2">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer" 
+                  checked={isVirtualEnabled}
+                  onChange={(e) => onVirtualToggle(e.target.checked)}
+                />
+                <div className="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+              <Clock size={14} className={isVirtualEnabled ? "text-purple-600 animate-pulse" : "text-slate-400"} />
+            </div>
+
+            {isVirtualEnabled && (
+              <input 
+                type="datetime-local" 
+                className="bg-transparent border-none text-[11px] font-bold text-purple-700 focus:ring-0 p-0 w-36"
+                value={formatToLocalDatetime(virtualTime)}
+                onChange={(e) => {
+                  const date = new Date(e.target.value);
+                  if (!isNaN(date.getTime())) {
+                    onVirtualTimeChange(date.toISOString());
+                  }
+                }}
+              />
+            )}
+            {!isVirtualEnabled && (
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Giờ thực</span>
+            )}
           </div>
-          <button className="w-10 h-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm active:scale-95 transition-transform">
-            <User size={20} className="text-slate-600" />
-          </button>
+
+          <div className="flex items-center gap-3 pl-2 border-l border-slate-200">
+            <div className="text-right hidden md:block">
+              <p className="text-xs font-bold text-slate-800">Admin</p>
+              <p className="text-[10px] font-medium text-slate-400 uppercase">Quản lý</p>
+            </div>
+            <button className="w-10 h-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm active:scale-95 transition-transform">
+              <User size={20} className="text-slate-600" />
+            </button>
+          </div>
         </div>
       </div>
 
