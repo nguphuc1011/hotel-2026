@@ -180,22 +180,6 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, virtualTime }) => {
               </p>
               
               <div className="flex flex-col gap-0.5">
-                <p className="text-[9px] font-medium opacity-80 whitespace-nowrap">
-                  {room.current_booking.booking_type === 'daily' ? (
-                    <>
-                      <strong className="font-bold">{format(new Date(room.current_booking.check_in_at), 'dd/MM')}</strong>
-                      <span className="ml-1">{format(new Date(room.current_booking.check_in_at), 'HH:mm')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <strong className="font-bold">{format(new Date(room.current_booking.check_in_at), 'HH:mm')}</strong>
-                      <span className="ml-1">{format(new Date(room.current_booking.check_in_at), 'dd/MM')}</span>
-                    </>
-                  )}
-                </p>
-                <p className="text-[10px] font-black text-emerald-600 bg-white/50 px-1.5 py-0.5 rounded-full shadow-sm w-fit">
-                  {room.current_booking.total_amount?.toLocaleString()}đ
-                </p>
               </div>
             </div>
           )}

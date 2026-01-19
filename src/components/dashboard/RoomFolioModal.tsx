@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare } from 'lucide-react';
+import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Room, Booking } from '@/types/dashboard';
 import { bookingService, BookingBill } from '@/services/bookingService';
@@ -29,10 +29,20 @@ function useLongPress(
     const timeout = useRef<NodeJS.Timeout | null>(null);
     const target = useRef<EventTarget | null>(null);
     const lastTouchTime = useRef<number>(0);
+    const startCoord = useRef<{x: number, y: number} | null>(null);
+    const isSwipe = useRef(false);
 
     const start = (event: React.MouseEvent | React.TouchEvent) => {
         if (event.type === 'mousedown' && Date.now() - lastTouchTime.current < 500) return;
-        if (event.type === 'touchstart') lastTouchTime.current = Date.now();
+        
+        isSwipe.current = false;
+        if (event.type === 'touchstart') {
+            lastTouchTime.current = Date.now();
+            const touch = (event as React.TouchEvent).touches[0];
+            startCoord.current = { x: touch.clientX, y: touch.clientY };
+        } else {
+            startCoord.current = null;
+        }
 
         if (shouldPreventDefault && event.target) {
             target.current = event.target;
@@ -43,6 +53,20 @@ function useLongPress(
         }, delay);
     };
 
+    const move = (event: React.TouchEvent) => {
+        if (!startCoord.current) return;
+        const touch = event.touches[0];
+        const moveX = Math.abs(touch.clientX - startCoord.current.x);
+        const moveY = Math.abs(touch.clientY - startCoord.current.y);
+        
+        if (moveX > 10 || moveY > 10) {
+            isSwipe.current = true;
+            if (timeout.current) {
+                clearTimeout(timeout.current);
+            }
+        }
+    };
+
     const clear = (event: React.MouseEvent | React.TouchEvent, shouldTriggerClick = true) => {
         if (event.type === 'mouseup' && Date.now() - lastTouchTime.current < 500) return;
         if (event.type === 'touchend') lastTouchTime.current = Date.now();
@@ -50,16 +74,18 @@ function useLongPress(
         if (timeout.current) {
             clearTimeout(timeout.current);
         }
-        if (shouldTriggerClick && !longPressTriggered) {
+        if (shouldTriggerClick && !longPressTriggered && !isSwipe.current) {
             onClick();
         }
         setLongPressTriggered(false);
+        isSwipe.current = false;
         target.current = null;
     };
 
     return {
         onMouseDown: (e: React.MouseEvent) => start(e),
         onTouchStart: (e: React.TouchEvent) => start(e),
+        onTouchMove: (e: React.TouchEvent) => move(e),
         onMouseUp: (e: React.MouseEvent) => clear(e),
         onMouseLeave: (e: React.MouseEvent) => clear(e, false),
         onTouchEnd: (e: React.TouchEvent) => clear(e)
@@ -86,7 +112,48 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [pendingServices, setPendingServices] = useState<BookingServiceItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Modal Component for Audit Trail
+  const AuditTrailModal = () => {
+    if (!showAuditTrail || !bill) return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                <Clock className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 leading-none">Chi tiết tính tiền</h3>
+                <p className="text-xs text-slate-500 mt-1 font-medium">Lá sớ hệ thống</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowAuditTrail(false)}
+              className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
+            >
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
+          <div className="p-6 max-h-[70vh] overflow-y-auto bg-white">
+            <BillBreakdown bill={bill} />
+          </div>
+          <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+            <button 
+              onClick={() => setShowAuditTrail(false)}
+              className="px-6 py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -245,23 +312,6 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             </div>
         </div>
 
-        {isCustomerInDebt && (
-            <div className="mx-4 mt-4 p-4 bg-rose-50 rounded-[24px] border border-rose-100 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0 shadow-sm">
-                    <AlertCircle className="w-6 h-6 text-rose-600" />
-                </div>
-                <div className="flex-1">
-                    <div className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-0.5">Cảnh báo nợ cũ</div>
-                    <div className="text-lg font-black text-rose-700 leading-none">
-                        Khách đang nợ {Math.abs(customerBalance).toLocaleString()}đ
-                    </div>
-                    <div className="text-[11px] text-rose-600/70 font-medium mt-1">
-                        Khoản nợ này sẽ được cộng vào tổng bill khi thanh toán
-                    </div>
-                </div>
-            </div>
-        )}
-
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4">
             {/* Quick Actions - Scrollable */}
             <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-6">
@@ -272,7 +322,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 <QuickActionButton icon={Trash2} label="Huỷ phòng" onClick={handleCancelBooking} variant="danger" />
             </div>
 
-            {/* Main Blue Toggle Card */}
+            {/* Main Toggle Card */}
             <div 
                 onClick={() => setShowDetails(!showDetails)}
                 className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-lg shadow-blue-900/20 cursor-pointer transition-all duration-300"
@@ -295,35 +345,84 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                             {bill ? amountToPayWithDebt.toLocaleString() : '---'}
                             <span className="text-2xl font-medium text-blue-200 ml-1">đ</span>
                         </div>
-                        <div className="h-full flex items-center justify-center px-3 rounded-lg border border-white/50 text-xs font-bold text-white uppercase tracking-wider">
-                            {bill?.rental_type === 'hourly' ? 'Theo Giờ' : 
-                             bill?.rental_type === 'overnight' ? 'Qua Đêm' : 
-                             bill?.rental_type === 'daily' ? 'Theo Ngày' : 
-                             booking.booking_type === 'hourly' ? 'Theo Giờ' :
-                             booking.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày'}
-                        </div>
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowAuditTrail(true);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center rounded-full border border-white/50 text-lg font-black text-white hover:bg-white/10 transition-all"
+                        >
+                            !
+                        </button>
                     </div>
 
                     <div className="flex items-center border-t border-white/20 pt-4 mb-2">
-                        <div className="flex-1 text-center">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-blue-200 mb-0.5">Khách hàng</div>
-                            <div className="flex items-center justify-center gap-2">
-                                <div className="font-bold text-lg leading-tight line-clamp-1">
-                                    {bill?.customer_name || booking.customer_name || 'Khách lẻ'}
+                        <div className="flex-1 text-center border-r border-white/20 pr-2">
+                            <div className="font-bold text-lg leading-tight mb-1 flex items-center justify-center gap-2">
+                                <div className="bg-blue-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold text-blue-100 uppercase tracking-wider border border-blue-400/30">
+                                    Vào
                                 </div>
-                                {isCustomerInDebt && (
-                                    <div className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center gap-1">
-                                        <AlertCircle className="w-3 h-3" />
-                                        <span>Nợ {Math.abs(customerBalance).toLocaleString()}đ</span>
-                                    </div>
-                                )}
+                                {(() => {
+                                    if (!bill?.check_in_at) return '--';
+                                    const date = new Date(bill.check_in_at);
+                                    const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                                    const dateStr = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+                                    const isHourly = bill.rental_type === 'hourly';
+                                    
+                                    const primary = isHourly ? timeStr : dateStr;
+                                    const secondary = isHourly ? dateStr : timeStr;
+
+                                    return (
+                                        <span>
+                                            <span className="font-bold text-xl text-yellow-300">
+                                                {primary}
+                                            </span>
+                                            <span className="font-bold text-white/80 text-sm ml-1">
+                                                {secondary}
+                                            </span>
+                                        </span>
+                                    );
+                                })()}
+                            </div>
+                            <div className="flex items-center justify-center gap-1.5 min-h-[20px]">
+                                <User className="w-3.5 h-3.5 text-blue-200" />
+                                <div className="text-sm font-bold text-white">
+                                    {bill?.customer_name || 'Khách lẻ'}
+                                </div>
                             </div>
                         </div>
-                        <div className="w-px h-8 bg-white/20 mx-4" />
-                        <div className="flex-1 text-center">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-blue-200 mb-0.5">Thời gian</div>
+                        <div className="flex-1 text-center pl-2">
+                            <div className="flex items-center justify-center gap-2 mb-1">
+                                <div className="text-xs font-bold uppercase tracking-wider text-blue-200">Đã ở</div>
+                                <div className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white border border-white/40 bg-white/10 uppercase tracking-wider whitespace-nowrap">
+                                    {bill?.rental_type === 'hourly' ? 'Theo Giờ' : 
+                                     bill?.rental_type === 'overnight' ? 'Qua Đêm' : 
+                                     bill?.rental_type === 'daily' ? 'Theo Ngày' : 
+                                     booking.booking_type === 'hourly' ? 'Theo Giờ' :
+                                     booking.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày'}
+                                </div>
+                            </div>
                             <div className="font-bold text-lg leading-tight">
-                                {bill?.duration_text || '--'}
+                                {(() => {
+                                    if (!bill) return '--';
+                                    
+                                    // Priority 1: Check explanation for explicit unit (fixes auto-switch cases)
+                                    const hasDay = bill.explanation?.some(e => e.includes('ngày') && (e.includes('x') || e.includes('Tính')));
+                                    const hasNight = bill.explanation?.some(e => e.includes('đêm') && (e.includes('x') || e.includes('Tính')));
+                                    
+                                    if (hasDay || hasNight || bill.rental_type === 'daily' || bill.rental_type === 'overnight') {
+                                        const unit = hasNight || bill.rental_type === 'overnight' ? 'đêm' : 'ngày';
+                                        const exp = bill.explanation?.find(e => e.includes(` ${unit}`) && (e.includes('x') || e.includes('Tính')));
+                                        if (exp) {
+                                            const match = exp.match(/(\d+)\s+(?:ngày|đêm)/);
+                                            if (match) return `${match[1]} ${unit}`;
+                                        }
+                                        // Fallback if no explicit number found but type is daily/overnight
+                                        return `1 ${unit}`;
+                                    }
+                                    
+                                    return bill.duration_text;
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -333,11 +432,14 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                         "grid transition-all duration-300 ease-in-out overflow-hidden",
                         showDetails ? "grid-rows-[1fr] opacity-100 mt-4 border-t border-white/20 pt-4" : "grid-rows-[0fr] opacity-0"
                     )}>
-                        <div className="min-h-0">
+                        <div className="min-h-0 space-y-4">
+                            {/* 2. Detailed Breakdown (Re-using BillBreakdown logic but inline/cleaner) */}
                             {bill && (
                                 <BillBreakdown 
                                     bill={bill} 
                                     isDark={true}
+                                    className="pt-2"
+                                    hideAuditLog={true}
                                 />
                             )}
                         </div>
@@ -458,22 +560,31 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
         <div className="bg-white border-t border-slate-100 px-4 py-4 shrink-0">
             {pendingServices.length > 0 ? (
-                <button 
-                    onClick={handleSaveServices}
-                    disabled={isSaving}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white h-14 rounded-[28px] font-bold text-lg shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 animate-pulse"
-                >
-                    {isSaving ? (
-                        <span>Đang lưu...</span>
-                    ) : (
-                        <>
-                            <span>LƯU CẬP NHẬT</span>
-                            <div className="bg-white text-blue-600 text-xs px-2 py-0.5 rounded-full font-bold">
-                                {pendingServices.length}
-                            </div>
-                        </>
-                    )}
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => setPendingServices([])}
+                        disabled={isSaving}
+                        className="w-24 bg-slate-100 hover:bg-slate-200 text-slate-600 h-14 rounded-[28px] font-bold text-sm shadow-sm active:scale-[0.98] transition-all flex items-center justify-center"
+                    >
+                        HỦY
+                    </button>
+                    <button 
+                        onClick={handleSaveServices}
+                        disabled={isSaving}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-14 rounded-[28px] font-bold text-lg shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 animate-pulse"
+                    >
+                        {isSaving ? (
+                            <span>Đang lưu...</span>
+                        ) : (
+                            <>
+                                <span>LƯU CẬP NHẬT</span>
+                                <div className="bg-white text-blue-600 text-xs px-2 py-0.5 rounded-full font-bold">
+                                    {pendingServices.length}
+                                </div>
+                            </>
+                        )}
+                    </button>
+                </div>
             ) : (
                 <button 
                     onClick={() => setShowPaymentModal(true)}
@@ -485,6 +596,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             )}
         </div>
 
+        <AuditTrailModal />
         {bill && (
             <PaymentModal 
                 isOpen={showPaymentModal}
