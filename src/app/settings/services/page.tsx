@@ -25,6 +25,8 @@ import { serviceService, Service, InventoryLog } from '@/services/serviceService
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
+
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function ServicesPage() {
@@ -34,6 +36,7 @@ export default function ServicesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modals
+  const [isControlModalOpen, setIsControlModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
   
@@ -56,6 +59,10 @@ export default function ServicesPage() {
   // Fetch Services
   const fetchServices = async () => {
     setIsLoading(true);
+    // Check auth status
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log('Current Session:', session ? 'Active' : 'Missing', session?.user?.id);
+    
     const data = await serviceService.getAllServices();
     setServices(data);
     setIsLoading(false);
@@ -112,25 +119,48 @@ export default function ServicesPage() {
   const handleImport = async () => {
     if (!selectedService || inventoryForm.quantity <= 0) return;
 
-    // Calculate final quantity based on mode
-    let finalQty = inventoryForm.quantity;
-    let finalCost = inventoryForm.cost;
+    // We now use p_qty_buy and p_total_amount directly
+    // The RPC will handle conversion if needed
+    const qtyBuy = inventoryForm.quantity;
+    const totalAmount = inventoryForm.cost;
     let note = inventoryForm.notes;
 
-    if (importMode === 'buy_unit' && selectedService.conversion_factor && selectedService.conversion_factor > 1) {
-        finalQty = inventoryForm.quantity * selectedService.conversion_factor;
-        // Cost per unit (backend stores cost per sell_unit if needed, but usually we just track total value or avg cost)
-        // Here we just pass the input cost. The RPC logic might need adjustment if we want strict accounting, 
-        // but for now let's assume cost is passed as-is or handled by user.
-        // Actually, user enters "Cost for 1 Box". RPC expects cost? RPC logic is simple. 
-        // Let's just update quantity. Cost tracking is advanced.
-        
-        note = `${inventoryForm.notes} (Nhập ${inventoryForm.quantity} ${selectedService.unit_buy})`;
+    if (importMode === 'buy_unit') {
+        note = `${inventoryForm.notes} (Nhập theo ${selectedService.unit_buy})`;
     } else {
-        note = `${inventoryForm.notes} (Nhập ${inventoryForm.quantity} ${selectedService.unit_sell})`;
+        note = `${inventoryForm.notes} (Nhập theo ${selectedService.unit_sell})`;
+        // If importing by sell unit, but RPC expects qty_buy (which usually means the larger unit),
+        // we might need to handle this. But wait, if importMode is 'sell_unit', 
+        // we can either pass it as qty_buy = quantity and conversion_factor = 1,
+        // OR we just pass it and let the RPC know.
+        
+        // Actually, let's keep it simple: if importMode is sell_unit, we pass it as is.
+        // If importMode is buy_unit, the RPC will multiply by conversion_factor.
+        // WAIT: My RPC logic says: v_qty_sell := p_qty_buy * v_conversion_factor;
+        // This means p_qty_buy ALWAYS gets multiplied.
+        // So if user selects 'sell_unit', we should pass qtyBuy = quantity / conversion_factor? 
+        // No, that's confusing.
+        
+        // Let's modify the RPC to be smarter, OR handle it here.
+        // Let's handle it here: always pass the quantity as "sell units" to the RPC, 
+        // and tell the RPC that conversion_factor is 1 for this call? 
+        // No, the RPC fetches conversion_factor from the DB.
     }
 
-    await serviceService.importInventory(selectedService.id, finalQty, finalCost, note);
+    // RE-DESIGNED LOGIC: 
+    // If user imports by 'sell_unit', we pass qtyBuy = quantity / conversion_factor so that 
+    // (quantity / conversion_factor) * conversion_factor = quantity.
+    // BUT that's prone to rounding.
+    
+    // BETTER: I will update the RPC to take an optional p_is_sell_unit boolean.
+    // Or just calculate here.
+    
+    let finalQtyBuy = qtyBuy;
+    if (importMode === 'sell_unit') {
+        finalQtyBuy = qtyBuy / (selectedService.conversion_factor || 1);
+    }
+
+    await serviceService.importInventory(selectedService.id, finalQtyBuy, totalAmount, note);
     setIsImportModalOpen(false);
     setInventoryForm({ quantity: 0, cost: 0, notes: '' });
     fetchServices();
@@ -154,21 +184,17 @@ export default function ServicesPage() {
 
     // Process sequentially to avoid race conditions or use Promise.all
     // We will do parallel for speed
+    const note = "Nhập hàng loạt";
     const promises = itemsToImport.map(async (item) => {
         const service = services.find(s => s.id === item.id);
         if (!service) return;
 
-        let finalQty = item.qty;
-        let note = 'Nhập hàng loạt';
-
-        if (item.mode === 'buy_unit' && service.conversion_factor && service.conversion_factor > 1) {
-            finalQty = item.qty * service.conversion_factor;
-            note += ` (${item.qty} ${service.unit_buy})`;
-        } else {
-            note += ` (${item.qty} ${service.unit_sell})`;
+        let finalQtyBuy = item.qty;
+        if (item.mode === 'sell_unit') {
+            finalQtyBuy = item.qty / (service.conversion_factor || 1);
         }
 
-        await serviceService.importInventory(service.id, finalQty, 0, note);
+        await serviceService.importInventory(service.id, finalQtyBuy, 0, note);
     });
 
     await Promise.all(promises);
@@ -212,21 +238,21 @@ export default function ServicesPage() {
   );
 
   return (
-    <div className="p-8 md:p-16 max-w-6xl mx-auto pb-32 md:pb-16 animate-in fade-in duration-500">
+    <div className="p-4 md:p-16 max-w-6xl mx-auto pb-32 md:pb-16 animate-in fade-in duration-500">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Quản lý Dịch vụ</h1>
-          <p className="text-slate-500 font-medium">Menu đồ ăn, thức uống và quản lý kho hàng</p>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-2 text-center md:text-left">Dịch vụ & Kho</h1>
+          <p className="text-slate-500 font-medium text-center md:text-left text-sm md:text-base">Quản lý menu và tồn kho thông minh</p>
         </div>
-        <div className="flex gap-3">
+        <div className="grid grid-cols-2 md:flex gap-3">
             <button 
             onClick={() => setIsBulkImportOpen(true)}
-            className="px-6 py-3 bg-white border-2 border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-600 rounded-2xl font-bold transition-all active:scale-95 flex items-center gap-2"
+            className="px-4 md:px-6 py-3 bg-white border-2 border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-600 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 text-sm md:text-base"
             >
             <Truck className="w-5 h-5" />
-            <span>Nhập hàng loạt</span>
+            <span>Nhập nhanh</span>
             </button>
             <button 
             onClick={() => {
@@ -242,36 +268,27 @@ export default function ServicesPage() {
                 });
                 setIsEditModalOpen(true);
             }}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2"
+            className="px-4 md:px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 text-sm md:text-base"
             >
             <Plus className="w-5 h-5" />
-            <span>Thêm món mới</span>
+            <span>Thêm món</span>
             </button>
         </div>
       </div>
 
       {/* Search & List */}
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
+      <div className="bg-white rounded-[24px] md:rounded-[32px] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
         
         {/* Search Bar */}
-        <div className="p-6 border-b border-slate-100 flex items-center gap-4">
+        <div className="p-5 md:p-6 border-b border-slate-100 flex items-center gap-4">
           <Search className="w-5 h-5 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Tìm kiếm dịch vụ..." 
+            placeholder="Tìm món..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 text-lg outline-none placeholder:text-slate-300 text-slate-700 font-medium"
+            className="flex-1 text-base md:text-lg outline-none placeholder:text-slate-300 text-slate-700 font-medium"
           />
-        </div>
-
-        {/* Table Header */}
-        <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50/50 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-            <div className="col-span-4 pl-4">Tên dịch vụ</div>
-            <div className="col-span-2 text-center">Đơn vị</div>
-            <div className="col-span-2 text-right">Giá bán</div>
-            <div className="col-span-2 text-center">Kho hàng</div>
-            <div className="col-span-2 text-right pr-4">Thao tác</div>
         </div>
 
         {/* List Items */}
@@ -281,122 +298,202 @@ export default function ServicesPage() {
           ) : filteredServices.length === 0 ? (
              <div className="p-10 text-center text-slate-400">Chưa có dịch vụ nào.</div>
           ) : (
-             filteredServices.map(service => (
-               <div key={service.id} className={cn(
-                 "grid grid-cols-12 gap-4 p-4 items-center hover:bg-slate-50 transition-colors group",
-                 !service.is_active && "opacity-60 bg-slate-50"
-               )}>
-                 {/* Name */}
-                 <div className="col-span-4 pl-4 flex items-center gap-4">
-                    <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-                        service.is_active ? "bg-orange-50 text-orange-500" : "bg-slate-100 text-slate-400"
-                    )}>
-                        <Coffee className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <div className="font-bold text-slate-800">{service.name}</div>
-                        {!service.is_active && <span className="text-[10px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase">Đang ẩn</span>}
-                    </div>
-                 </div>
-
-                 {/* Unit */}
-                 <div className="col-span-2 text-center">
-                    <span className="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">
-                        {service.unit_sell}
-                    </span>
-                 </div>
-
-                 {/* Price */}
-                 <div className="col-span-2 text-right">
-                    <span className="font-bold text-slate-800">
-                        {service.price.toLocaleString()}
-                    </span>
-                 </div>
-
-                 {/* Inventory */}
-                 <div className="col-span-2 text-center">
-                    {service.track_inventory ? (
-                        <div className="flex flex-col items-center">
-                            <span className={cn(
-                                "font-bold px-2 py-0.5 rounded-md text-sm",
-                                (service.stock_quantity || 0) <= (service.min_stock_level || 5) 
-                                    ? "bg-red-100 text-red-600" 
-                                    : "bg-emerald-100 text-emerald-600"
-                            )}>
-                                {service.stock_quantity}
-                            </span>
-                            <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                    onClick={() => {
-                                        setSelectedService(service);
-                                        setImportMode('buy_unit'); // Default to buy unit
-                                        setInventoryForm({ quantity: 1, cost: service.cost_price || 0, notes: '' });
-                                        setIsImportModalOpen(true);
-                                    }}
-                                    className="p-1 hover:bg-blue-100 text-blue-600 rounded" 
-                                    title="Nhập kho"
-                                >
-                                    <ArrowDownToLine className="w-3 h-3" />
-                                </button>
-                                <button 
-                                    onClick={() => {
-                                        setSelectedService(service);
-                                        setInventoryForm({ quantity: service.stock_quantity || 0, cost: 0, notes: '' });
-                                        setIsAdjustModalOpen(true);
-                                    }}
-                                    className="p-1 hover:bg-amber-100 text-amber-600 rounded" 
-                                    title="Kiểm kho"
-                                >
-                                    <RefreshCw className="w-3 h-3" />
-                                </button>
-                                <button 
-                                    onClick={() => handleViewHistory(service)}
-                                    className="p-1 hover:bg-slate-100 text-slate-600 rounded" 
-                                    title="Lịch sử"
-                                >
-                                    <History className="w-3 h-3" />
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <span className="text-xs text-slate-400 italic">Không theo dõi</span>
+             <div className="grid grid-cols-1 md:block">
+               {filteredServices.map(service => (
+                 <div 
+                    key={service.id} 
+                    onClick={() => {
+                        setSelectedService(service);
+                        setIsControlModalOpen(true);
+                    }}
+                    className={cn(
+                        "p-4 md:p-5 hover:bg-slate-50 transition-all border-b border-slate-50 last:border-none relative cursor-pointer active:bg-slate-100",
+                        !service.is_active && "opacity-60 grayscale"
                     )}
-                 </div>
+                 >
+                   <div className="flex items-center justify-between gap-3 md:gap-4">
+                     {/* Left: Icon & Info */}
+                     <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                       <div className={cn(
+                           "w-12 h-12 md:w-14 md:h-14 rounded-[18px] md:rounded-[20px] flex items-center justify-center transition-all shadow-sm shrink-0",
+                           service.is_active ? "bg-white text-orange-500 border border-orange-100" : "bg-slate-100 text-slate-400"
+                       )}>
+                           <Coffee className="w-6 h-6 md:w-7 md:h-7" />
+                       </div>
+                       
+                       <div className="flex-1 min-w-0">
+                         <div className="font-bold text-slate-900 text-[16px] md:text-[17px] leading-tight truncate">
+                           {service.name}
+                         </div>
+                         <div className="flex items-center gap-2 mt-1">
+                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-1.5 py-0.5 rounded-md">
+                              {service.unit_sell}
+                           </span>
+                         </div>
+                       </div>
+                     </div>
 
-                 {/* Actions */}
-                 <div className="col-span-2 flex justify-end gap-2 pr-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                        onClick={() => handleToggleStatus(service)}
-                        className={cn(
-                            "p-2 rounded-lg transition-colors",
-                            service.is_active ? "hover:bg-amber-50 text-amber-500" : "hover:bg-emerald-50 text-emerald-500"
-                        )}
-                        title={service.is_active ? "Ẩn món" : "Hiện món"}
-                    >
-                        {service.is_active ? <Archive className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                    </button>
-                    <button 
-                        onClick={() => {
-                            setEditingService(service);
-                            setIsEditModalOpen(true);
-                        }}
-                        className="p-2 hover:bg-blue-50 text-blue-500 rounded-lg transition-colors"
-                    >
-                        <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button 
-                        onClick={() => handleDelete(service.id)}
-                        className="p-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                    {/* Right: Price & Stock */}
+                    <div className="flex flex-col items-end gap-1 min-w-fit">
+                       <div className="font-black text-slate-900 text-[16px] md:text-lg">
+                         {service.price.toLocaleString()}đ
+                       </div>
+                       
+                       {service.track_inventory && (
+                         <span className={cn(
+                           "text-[11px] font-bold px-2 py-0.5 rounded-full",
+                           (service.stock_quantity || 0) <= (service.min_stock_level || 5) 
+                            ? "bg-red-50 text-red-500" 
+                            : "bg-emerald-50 text-emerald-600"
+                         )}>
+                           Tồn {service.stock_quantity}
+                         </span>
+                       )}
+                    </div>
+                   </div>
                  </div>
-               </div>
-             ))
-          )}
+               ))}
+              </div>
+           )}
         </div>
       </div>
+
+      {/* Control Modal */}
+      {isControlModalOpen && selectedService && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white rounded-[32px] w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h3 className="text-xl font-black text-slate-800">{selectedService.name}</h3>
+                        <p className="text-sm font-bold text-slate-500">{selectedService.price.toLocaleString()}đ / {selectedService.unit_sell}</p>
+                    </div>
+                    <button onClick={() => setIsControlModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                        <X className="w-6 h-6 text-slate-400" />
+                    </button>
+                </div>
+                
+                <div className="p-4 space-y-2">
+                    {selectedService.track_inventory && (
+                        <>
+                            <div className="grid grid-cols-2 gap-3 mb-2">
+                                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Tồn kho</span>
+                                    <span className={cn(
+                                        "text-xl font-black",
+                                        (selectedService.stock_quantity || 0) <= (selectedService.min_stock_level || 5) ? "text-red-500" : "text-emerald-600"
+                                    )}>
+                                        {selectedService.stock_quantity}
+                                    </span>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Trạng thái</span>
+                                    <span className={cn(
+                                        "text-sm font-black",
+                                        selectedService.is_active ? "text-blue-600" : "text-slate-400"
+                                    )}>
+                                        {selectedService.is_active ? 'Đang bán' : 'Đã ẩn'}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <button 
+                                onClick={() => {
+                                    setImportMode('buy_unit');
+                                    setInventoryForm({ quantity: 1, cost: 0, notes: '' });
+                                    setIsImportModalOpen(true);
+                                    setIsControlModalOpen(false);
+                                }}
+                                className="w-full flex items-center gap-4 px-5 py-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold hover:bg-emerald-100 transition-all active:scale-95"
+                            >
+                                <div className="w-10 h-10 rounded-xl bg-emerald-200 flex items-center justify-center">
+                                    <Plus className="w-5 h-5" />
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-sm">Nhập hàng</div>
+                                    <div className="text-[10px] opacity-70 font-normal">Thêm tồn kho mới</div>
+                                </div>
+                            </button>
+
+                            <button 
+                                onClick={() => {
+                                    setInventoryForm({ quantity: selectedService.stock_quantity || 0, cost: 0, notes: '' });
+                                    setIsAdjustModalOpen(true);
+                                    setIsControlModalOpen(false);
+                                }}
+                                className="w-full flex items-center gap-4 px-5 py-4 bg-amber-50 text-amber-700 rounded-2xl font-bold hover:bg-amber-100 transition-all active:scale-95"
+                            >
+                                <div className="w-10 h-10 rounded-xl bg-amber-200 flex items-center justify-center">
+                                    <RefreshCw className="w-5 h-5" />
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-sm">Kiểm kho</div>
+                                    <div className="text-[10px] opacity-70 font-normal">Điều chỉnh số lượng thực tế</div>
+                                </div>
+                            </button>
+
+                            <button 
+                                onClick={() => {
+                                    handleViewHistory(selectedService);
+                                    setIsControlModalOpen(false);
+                                }}
+                                className="w-full flex items-center gap-4 px-5 py-4 bg-blue-50 text-blue-700 rounded-2xl font-bold hover:bg-blue-100 transition-all active:scale-95"
+                            >
+                                <div className="w-10 h-10 rounded-xl bg-blue-200 flex items-center justify-center">
+                                    <History className="w-5 h-5" />
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-sm">Lịch sử kho</div>
+                                    <div className="text-[10px] opacity-70 font-normal">Xem biến động xuất nhập</div>
+                                </div>
+                            </button>
+                            
+                            <div className="h-px bg-slate-100 my-2" />
+                        </>
+                    )}
+
+                    <button 
+                        onClick={() => {
+                            setEditingService(selectedService);
+                            setIsEditModalOpen(true);
+                            setIsControlModalOpen(false);
+                        }}
+                        className="w-full flex items-center gap-4 px-5 py-4 bg-slate-50 text-slate-700 rounded-2xl font-bold hover:bg-slate-100 transition-all active:scale-95"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                            <Edit3 className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                            <div className="text-sm">Chỉnh sửa thông tin</div>
+                            <div className="text-[10px] opacity-70 font-normal">Tên, giá, đơn vị tính...</div>
+                        </div>
+                    </button>
+                    
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                        <button 
+                            onClick={() => {
+                                handleToggleStatus(selectedService);
+                                setIsControlModalOpen(false);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-95 text-xs"
+                        >
+                            {selectedService.is_active ? <Archive className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                            {selectedService.is_active ? 'Ẩn món' : 'Hiện món'}
+                        </button>
+                        <button 
+                            onClick={() => {
+                                handleDelete(selectedService.id);
+                                setIsControlModalOpen(false);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-all active:scale-95 text-xs"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Xóa món
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {isEditModalOpen && editingService && (
@@ -539,90 +636,123 @@ export default function ServicesPage() {
       {/* Import Modal */}
       {isImportModalOpen && selectedService && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-50/50">
-                    <h3 className="text-xl font-black text-emerald-800 flex items-center gap-2">
-                        <ArrowDownToLine className="w-6 h-6" />
-                        Nhập kho: {selectedService.name}
-                    </h3>
+            <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-emerald-50/50">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center">
+                            <ArrowDownToLine className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-emerald-900">Nhập kho</h3>
+                            <p className="text-sm font-bold text-emerald-600/70 uppercase tracking-wider">{selectedService.name}</p>
+                        </div>
+                    </div>
                     <button onClick={() => setIsImportModalOpen(false)} className="p-2 hover:bg-emerald-100 rounded-full transition-colors">
-                        <X className="w-5 h-5 text-emerald-600" />
+                        <X className="w-6 h-6 text-emerald-600" />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-8 space-y-8">
                     {/* Unit Selector */}
                     {selectedService.unit_buy && selectedService.unit_sell && selectedService.unit_buy !== selectedService.unit_sell && (
-                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                        <div className="flex bg-slate-100 p-1.5 rounded-2xl">
                             <button
                                 onClick={() => setImportMode('buy_unit')}
                                 className={cn(
-                                    "flex-1 py-2 rounded-lg text-sm font-bold transition-all",
-                                    importMode === 'buy_unit' ? "bg-white shadow text-slate-800" : "text-slate-400 hover:text-slate-600"
+                                    "flex-1 py-3 rounded-xl text-sm font-black transition-all",
+                                    importMode === 'buy_unit' ? "bg-white shadow-lg text-emerald-600" : "text-slate-400 hover:text-slate-600"
                                 )}
                             >
-                                Nhập theo {selectedService.unit_buy}
+                                Theo {selectedService.unit_buy}
                             </button>
                             <button
                                 onClick={() => setImportMode('sell_unit')}
                                 className={cn(
-                                    "flex-1 py-2 rounded-lg text-sm font-bold transition-all",
-                                    importMode === 'sell_unit' ? "bg-white shadow text-slate-800" : "text-slate-400 hover:text-slate-600"
+                                    "flex-1 py-3 rounded-xl text-sm font-black transition-all",
+                                    importMode === 'sell_unit' ? "bg-white shadow-lg text-emerald-600" : "text-slate-400 hover:text-slate-600"
                                 )}
                             >
-                                Nhập theo {selectedService.unit_sell}
+                                Theo {selectedService.unit_sell}
                             </button>
                         </div>
                     )}
 
-                    <div className="space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-400 uppercase">
-                                Số lượng ({importMode === 'buy_unit' ? selectedService.unit_buy : selectedService.unit_sell})
-                            </label>
+                    <div className="space-y-6">
+                        {/* Quantity */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Số lượng nhập</label>
                             <div className="relative">
                                 <input 
                                     autoFocus
                                     type="number" 
                                     value={inventoryForm.quantity || ''}
                                     onChange={(e) => setInventoryForm({...inventoryForm, quantity: Number(e.target.value)})}
-                                    className="w-full px-4 py-3 pl-4 pr-12 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none font-bold text-2xl text-emerald-600 transition-all"
+                                    className="w-full px-6 py-5 rounded-[24px] border-2 border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none font-black text-3xl text-emerald-600 transition-all placeholder:text-slate-200"
                                     placeholder="0"
                                 />
-                                {importMode === 'buy_unit' && selectedService.conversion_factor && selectedService.conversion_factor > 1 && (
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400">
-                                        = {((inventoryForm.quantity || 0) * selectedService.conversion_factor).toLocaleString()} {selectedService.unit_sell}
-                                    </div>
-                                )}
+                                <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end">
+                                    <span className="text-sm font-black text-slate-400 uppercase">{importMode === 'buy_unit' ? selectedService.unit_buy : selectedService.unit_sell}</span>
+                                    {importMode === 'buy_unit' && selectedService.conversion_factor && selectedService.conversion_factor > 1 && (
+                                        <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                                            = {((inventoryForm.quantity || 0) * selectedService.conversion_factor).toLocaleString()} {selectedService.unit_sell}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-400 uppercase">Ghi chú (Tùy chọn)</label>
+                        {/* Total Cost */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tổng tiền thanh toán (VNĐ)</label>
+                            <div className="relative">
+                                <input 
+                                    type="number" 
+                                    value={inventoryForm.cost || ''}
+                                    onChange={(e) => setInventoryForm({...inventoryForm, cost: Number(e.target.value)})}
+                                    className="w-full px-6 py-5 rounded-[24px] border-2 border-slate-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none font-black text-2xl text-blue-600 transition-all placeholder:text-slate-200"
+                                    placeholder="0"
+                                />
+                                <div className="absolute right-6 top-1/2 -translate-y-1/2">
+                                    <span className="text-sm font-black text-slate-400">VNĐ</span>
+                                </div>
+                            </div>
+                            {inventoryForm.quantity > 0 && inventoryForm.cost > 0 && (
+                                <div className="flex justify-between items-center px-2">
+                                    <span className="text-xs font-bold text-slate-400 italic">Giá vốn dự kiến:</span>
+                                    <span className="text-sm font-black text-slate-600">
+                                        {(inventoryForm.cost / (importMode === 'buy_unit' ? (inventoryForm.quantity * (selectedService.conversion_factor || 1)) : inventoryForm.quantity)).toLocaleString()}đ / {selectedService.unit_sell}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ghi chú nhập hàng</label>
                             <input 
                                 type="text" 
                                 value={inventoryForm.notes}
                                 onChange={(e) => setInventoryForm({...inventoryForm, notes: e.target.value})}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none font-medium"
-                                placeholder="VD: Nhập hàng từ NPP..."
+                                className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-emerald-500 outline-none font-bold text-slate-600 transition-all placeholder:text-slate-300"
+                                placeholder="Tên nhà cung cấp, lý do..."
                             />
                         </div>
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex gap-3">
+                <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
                     <button 
                         onClick={() => setIsImportModalOpen(false)}
-                        className="flex-1 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                        className="flex-1 py-4 rounded-2xl font-black text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-all active:scale-95"
                     >
-                        Hủy
+                        HỦY BỎ
                     </button>
                     <button 
                         onClick={handleImport}
                         disabled={inventoryForm.quantity <= 0}
-                        className="flex-1 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-[2] py-4 rounded-2xl font-black text-white bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-200 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                     >
-                        Xác nhận nhập
+                        XÁC NHẬN NHẬP
                     </button>
                 </div>
             </div>
@@ -632,58 +762,82 @@ export default function ServicesPage() {
       {/* Adjust Modal */}
       {isAdjustModalOpen && selectedService && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-amber-50/50">
-                    <h3 className="text-xl font-black text-amber-800 flex items-center gap-2">
-                        <RefreshCw className="w-6 h-6" />
-                        Kiểm kê: {selectedService.name}
-                    </h3>
+            <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-amber-50/50">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+                            <RefreshCw className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-amber-900">Kiểm kê kho</h3>
+                            <p className="text-sm font-bold text-amber-600/70 uppercase tracking-wider">{selectedService.name}</p>
+                        </div>
+                    </div>
                     <button onClick={() => setIsAdjustModalOpen(false)} className="p-2 hover:bg-amber-100 rounded-full transition-colors">
-                        <X className="w-5 h-5 text-amber-600" />
+                        <X className="w-6 h-6 text-amber-600" />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-4">
-                    <div className="bg-amber-50 p-4 rounded-xl text-amber-800 text-sm mb-4">
-                        <p>Đang điều chỉnh số lượng thực tế trong kho.</p>
-                        <p className="font-bold mt-1">Tồn hiện tại trên hệ thống: {selectedService.stock_quantity} {selectedService.unit_sell}</p>
+                <div className="p-8 space-y-8">
+                    <div className="bg-amber-100/50 p-6 rounded-[24px] border border-amber-200/50">
+                        <div className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Tồn kho hệ thống</div>
+                        <div className="text-3xl font-black text-amber-900">
+                            {selectedService.stock_quantity} <span className="text-sm opacity-60 uppercase">{selectedService.unit_sell}</span>
+                        </div>
                     </div>
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-400 uppercase">Số lượng thực tế ({selectedService.unit_sell})</label>
-                        <input 
-                            autoFocus
-                            type="number" 
-                            value={inventoryForm.quantity}
-                            onChange={(e) => setInventoryForm({...inventoryForm, quantity: Number(e.target.value)})}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 outline-none font-bold text-2xl text-amber-600 transition-all"
-                        />
-                    </div>
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Số lượng thực tế tại kho</label>
+                            <div className="relative">
+                                <input 
+                                    autoFocus
+                                    type="number" 
+                                    value={inventoryForm.quantity}
+                                    onChange={(e) => setInventoryForm({...inventoryForm, quantity: Number(e.target.value)})}
+                                    className="w-full px-6 py-5 rounded-[24px] border-2 border-slate-100 focus:border-amber-500 focus:ring-4 focus:ring-amber-100 outline-none font-black text-4xl text-amber-600 transition-all"
+                                />
+                                <div className="absolute right-6 top-1/2 -translate-y-1/2">
+                                    <span className="text-sm font-black text-slate-400 uppercase">{selectedService.unit_sell}</span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center px-2">
+                                <span className="text-xs font-bold text-slate-400 italic">Chênh lệch:</span>
+                                <span className={cn(
+                                    "text-sm font-black",
+                                    (inventoryForm.quantity - (selectedService.stock_quantity || 0)) >= 0 ? "text-emerald-600" : "text-red-600"
+                                )}>
+                                    {(inventoryForm.quantity - (selectedService.stock_quantity || 0)) > 0 ? '+' : ''}
+                                    {inventoryForm.quantity - (selectedService.stock_quantity || 0)} {selectedService.unit_sell}
+                                </span>
+                            </div>
+                        </div>
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-400 uppercase">Lý do điều chỉnh</label>
-                        <input 
-                            type="text" 
-                            value={inventoryForm.notes}
-                            onChange={(e) => setInventoryForm({...inventoryForm, notes: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-amber-500 outline-none font-medium"
-                            placeholder="VD: Hư hỏng, thất thoát, tìm thấy..."
-                        />
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Lý do điều chỉnh</label>
+                            <input 
+                                type="text" 
+                                value={inventoryForm.notes}
+                                onChange={(e) => setInventoryForm({...inventoryForm, notes: e.target.value})}
+                                className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-amber-500 outline-none font-bold text-slate-600 transition-all"
+                                placeholder="Hư hỏng, thất thoát, bù kho..."
+                            />
+                        </div>
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex gap-3">
+                <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
                     <button 
                         onClick={() => setIsAdjustModalOpen(false)}
-                        className="flex-1 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                        className="flex-1 py-4 rounded-2xl font-black text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-all active:scale-95"
                     >
-                        Hủy
+                        HỦY
                     </button>
                     <button 
                         onClick={handleAdjust}
-                        className="flex-1 py-3 rounded-xl font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-200 transition-colors"
+                        className="flex-[2] py-4 rounded-2xl font-black text-white bg-amber-500 hover:bg-amber-600 shadow-xl shadow-amber-200 transition-all active:scale-95"
                     >
-                        Cập nhật tồn kho
+                        CẬP NHẬT KHO
                     </button>
                 </div>
             </div>
@@ -708,25 +862,28 @@ export default function ServicesPage() {
                     {logs.length === 0 ? (
                         <div className="p-10 text-center text-slate-400">Chưa có lịch sử giao dịch.</div>
                     ) : (
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-slate-400 uppercase bg-slate-50 sticky top-0">
-                                <tr>
-                                    <th className="px-6 py-3">Thời gian</th>
-                                    <th className="px-6 py-3">Loại</th>
-                                    <th className="px-6 py-3 text-right">Số lượng</th>
-                                    <th className="px-6 py-3 text-right">Tồn sau</th>
-                                    <th className="px-6 py-3">Ghi chú</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {logs.map(log => (
-                                    <tr key={log.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4 text-slate-500">
+                        <div className="divide-y divide-slate-100">
+                            {/* Desktop Table Header */}
+                            <div className="hidden md:grid grid-cols-5 text-xs text-slate-400 uppercase bg-slate-50 sticky top-0 z-10 px-6 py-3 font-bold">
+                                <div>Thời gian</div>
+                                <div>Loại</div>
+                                <div className="text-right">Số lượng</div>
+                                <div className="text-right">Tồn sau</div>
+                                <div className="pl-6">Ghi chú</div>
+                            </div>
+
+                            {logs.map(log => (
+                                <div key={log.id} className="p-4 md:px-6 md:py-4 hover:bg-slate-50 transition-colors">
+                                    <div className="md:grid md:grid-cols-5 flex flex-wrap items-center justify-between gap-2">
+                                        {/* Time - Full width on mobile */}
+                                        <div className="text-slate-500 text-xs md:text-sm w-full md:w-auto">
                                             {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm')}
-                                        </td>
-                                        <td className="px-6 py-4">
+                                        </div>
+
+                                        {/* Type */}
+                                        <div className="md:block">
                                             <span className={cn(
-                                                "px-2 py-1 rounded text-xs font-bold",
+                                                "px-2 py-0.5 md:py-1 rounded text-[10px] md:text-xs font-bold",
                                                 log.type === 'IMPORT' ? "bg-emerald-100 text-emerald-600" :
                                                 log.type === 'SALE' ? "bg-blue-100 text-blue-600" :
                                                 log.type === 'RETURN' ? "bg-purple-100 text-purple-600" :
@@ -737,23 +894,29 @@ export default function ServicesPage() {
                                                  log.type === 'RETURN' ? 'Hoàn trả' :
                                                  'Điều chỉnh'}
                                             </span>
-                                        </td>
-                                        <td className={cn(
-                                            "px-6 py-4 text-right font-bold",
+                                        </div>
+
+                                        {/* Quantity */}
+                                        <div className={cn(
+                                            "text-right font-bold md:text-sm",
                                             log.quantity > 0 ? "text-emerald-600" : "text-red-600"
                                         )}>
                                             {log.quantity > 0 ? '+' : ''}{log.quantity}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-medium text-slate-800">
-                                            {log.balance_after}
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500 max-w-xs truncate" title={log.notes || ''}>
+                                        </div>
+
+                                        {/* Balance After */}
+                                        <div className="text-right font-medium text-slate-800 md:text-sm">
+                                            Tồn: {log.balance_after}
+                                        </div>
+
+                                        {/* Notes - Full width on mobile */}
+                                        <div className="text-slate-400 text-[11px] md:text-sm md:text-slate-500 w-full md:w-auto md:pl-6 truncate italic md:not-italic">
                                             {log.notes || '-'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
 
@@ -787,98 +950,123 @@ export default function ServicesPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-0 bg-slate-50">
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-slate-500 uppercase bg-slate-100 sticky top-0 z-10 shadow-sm">
-                            <tr>
-                                <th className="px-6 py-4">Tên dịch vụ</th>
-                                <th className="px-6 py-4 text-center">Tồn hiện tại</th>
-                                <th className="px-6 py-4">Đơn vị nhập</th>
-                                <th className="px-6 py-4 w-40">Số lượng nhập</th>
-                                <th className="px-6 py-4">Quy đổi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 bg-white">
-                            {bulkItems.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="p-8 text-center text-slate-400">Không có dịch vụ nào đang theo dõi tồn kho.</td>
-                                </tr>
-                            ) : (
-                                bulkItems.map((item, index) => {
-                                    const service = services.find(s => s.id === item.id);
-                                    if (!service) return null;
-                                    
-                                    return (
-                                        <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-6 py-4 font-bold text-slate-700">
-                                                {service.name}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
+                    <div className="divide-y divide-slate-200">
+                        {/* Desktop Header */}
+                        <div className="hidden md:grid grid-cols-12 text-xs text-slate-500 uppercase bg-slate-100 sticky top-0 z-10 px-6 py-4 font-bold shadow-sm">
+                            <div className="col-span-4">Tên dịch vụ</div>
+                            <div className="col-span-2 text-center">Tồn hiện tại</div>
+                            <div className="col-span-2">Đơn vị nhập</div>
+                            <div className="col-span-2">Số lượng nhập</div>
+                            <div className="col-span-2">Quy đổi</div>
+                        </div>
+
+                        {bulkItems.length === 0 ? (
+                            <div className="p-10 text-center text-slate-400 bg-white">Không có dịch vụ nào đang theo dõi tồn kho.</div>
+                        ) : (
+                            bulkItems.map((item, index) => {
+                                const service = services.find(s => s.id === item.id);
+                                if (!service) return null;
+                                
+                                return (
+                                    <div key={item.id} className="p-4 md:px-6 md:py-4 bg-white hover:bg-slate-50 transition-colors">
+                                        <div className="md:grid md:grid-cols-12 flex flex-col gap-4">
+                                            {/* Service Name & Stock */}
+                                            <div className="md:col-span-4 flex flex-col">
+                                                <div className="font-bold text-slate-900 text-[15px]">{service.name}</div>
+                                                <div className="md:hidden flex items-center gap-2 mt-1">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Tồn:</span>
+                                                    <span className={cn(
+                                                        "px-2 py-0.5 rounded text-[10px] font-bold",
+                                                        (service.stock_quantity || 0) <= (service.min_stock_level || 5) ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"
+                                                    )}>
+                                                        {service.stock_quantity} {service.unit_sell}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Stock (Desktop only) */}
+                                            <div className="hidden md:col-span-2 md:flex items-center justify-center">
                                                 <span className={cn(
                                                     "px-2 py-1 rounded text-xs font-bold",
                                                     (service.stock_quantity || 0) <= (service.min_stock_level || 5) ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"
                                                 )}>
                                                     {service.stock_quantity} {service.unit_sell}
                                                 </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {service.unit_buy && service.unit_sell && service.unit_buy !== service.unit_sell ? (
-                                                     <div className="flex bg-slate-100 rounded-lg p-1 w-fit">
-                                                        <button 
-                                                            onClick={() => {
-                                                                const newItems = [...bulkItems];
-                                                                newItems[index].mode = 'buy_unit';
-                                                                setBulkItems(newItems);
-                                                            }}
-                                                            className={cn(
-                                                                "px-3 py-1 rounded text-xs font-bold transition-all",
-                                                                item.mode === 'buy_unit' ? "bg-white shadow text-blue-600" : "text-slate-400"
-                                                            )}
-                                                        >
-                                                            {service.unit_buy}
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => {
-                                                                const newItems = [...bulkItems];
-                                                                newItems[index].mode = 'sell_unit';
-                                                                setBulkItems(newItems);
-                                                            }}
-                                                            className={cn(
-                                                                "px-3 py-1 rounded text-xs font-bold transition-all",
-                                                                item.mode === 'sell_unit' ? "bg-white shadow text-blue-600" : "text-slate-400"
-                                                            )}
-                                                        >
+                                            </div>
+
+                                            {/* Unit Selector & Quantity Input */}
+                                            <div className="md:col-span-4 grid grid-cols-2 gap-3 items-center">
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="md:hidden text-[9px] font-bold text-slate-400 uppercase">Đơn vị</label>
+                                                    {service.unit_buy && service.unit_sell && service.unit_buy !== service.unit_sell ? (
+                                                        <div className="flex bg-slate-100 rounded-lg p-1 w-full">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newItems = [...bulkItems];
+                                                                    newItems[index].mode = 'buy_unit';
+                                                                    setBulkItems(newItems);
+                                                                }}
+                                                                className={cn(
+                                                                    "flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-all",
+                                                                    item.mode === 'buy_unit' ? "bg-white shadow text-blue-600" : "text-slate-400"
+                                                                )}
+                                                            >
+                                                                {service.unit_buy}
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newItems = [...bulkItems];
+                                                                    newItems[index].mode = 'sell_unit';
+                                                                    setBulkItems(newItems);
+                                                                }}
+                                                                className={cn(
+                                                                    "flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-all",
+                                                                    item.mode === 'sell_unit' ? "bg-white shadow text-blue-600" : "text-slate-400"
+                                                                )}
+                                                            >
+                                                                {service.unit_sell}
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-slate-50 px-3 py-2 rounded-lg text-xs font-bold text-slate-500 text-center">
                                                             {service.unit_sell}
-                                                        </button>
-                                                     </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="md:hidden text-[9px] font-bold text-slate-400 uppercase">Số lượng</label>
+                                                    <input 
+                                                        type="number" 
+                                                        min="0"
+                                                        value={item.qty || ''}
+                                                        onChange={(e) => {
+                                                            const newItems = [...bulkItems];
+                                                            newItems[index].qty = Number(e.target.value);
+                                                            setBulkItems(newItems);
+                                                        }}
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none font-bold text-slate-800 text-center"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Conversion Result */}
+                                            <div className="md:col-span-2 flex items-center md:justify-end text-xs">
+                                                {item.qty > 0 && item.mode === 'buy_unit' && service.conversion_factor && service.conversion_factor > 1 ? (
+                                                    <div className="bg-emerald-50 px-2 py-1 rounded-md text-emerald-600 font-bold">
+                                                        = {item.qty * service.conversion_factor} {service.unit_sell}
+                                                    </div>
                                                 ) : (
-                                                    <span className="text-slate-500 font-medium pl-2">{service.unit_sell}</span>
+                                                    <div className="md:hidden h-px w-full" />
                                                 )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input 
-                                                    type="number" 
-                                                    min="0"
-                                                    value={item.qty || ''}
-                                                    onChange={(e) => {
-                                                        const newItems = [...bulkItems];
-                                                        newItems[index].qty = Number(e.target.value);
-                                                        setBulkItems(newItems);
-                                                    }}
-                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none font-bold text-slate-800"
-                                                    placeholder="0"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-400 text-xs">
-                                                {item.qty > 0 && item.mode === 'buy_unit' && service.conversion_factor && service.conversion_factor > 1 && (
-                                                    <span>= <strong className="text-emerald-600">{item.qty * service.conversion_factor}</strong> {service.unit_sell}</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
                 </div>
 
                 <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">

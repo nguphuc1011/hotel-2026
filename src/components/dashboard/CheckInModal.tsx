@@ -15,6 +15,8 @@ import { serviceService, Service } from '@/services/serviceService';
 import { settingsService, RoomCategory } from '@/services/settingsService';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
+import { securityService, SecurityAction } from '@/services/securityService';
+import PinValidationModal from '@/components/shared/PinValidationModal';
 
 interface CheckInModalProps {
   isOpen: boolean;
@@ -72,26 +74,58 @@ function Switch({ checked, onCheckedChange, label }: { checked: boolean, onCheck
 
 // Hook for Long Press
 function useLongPress(
-    onLongPress: () => void, 
-    onClick: () => void, 
-    { shouldPreventDefault = true, delay = 500 } = {}
+    onLongPress: (e: React.MouseEvent | React.TouchEvent) => void,
+    onClick: () => void,
+    { shouldPreventDefault = true, delay = 300 } = {}
 ) {
     const [longPressTriggered, setLongPressTriggered] = useState(false);
     const timeout = useRef<NodeJS.Timeout | null>(null);
     const target = useRef<EventTarget | null>(null);
     const lastTouchTime = useRef<number>(0);
+    
+    // Swipe detection refs
+    const startX = useRef<number>(0);
+    const startY = useRef<number>(0);
+    const isSwiping = useRef<boolean>(false);
 
     const start = (event: React.MouseEvent | React.TouchEvent) => {
         if (event.type === 'mousedown' && Date.now() - lastTouchTime.current < 500) return;
-        if (event.type === 'touchstart') lastTouchTime.current = Date.now();
+        
+        // Reset swipe state
+        isSwiping.current = false;
+        
+        if (event.type === 'touchstart') {
+            lastTouchTime.current = Date.now();
+            const touch = (event as React.TouchEvent).touches[0];
+            startX.current = touch.clientX;
+            startY.current = touch.clientY;
+        }
 
         if (shouldPreventDefault && event.target) {
             target.current = event.target;
         }
         timeout.current = setTimeout(() => {
-            onLongPress();
-            setLongPressTriggered(true);
+            if (!isSwiping.current) { // Only trigger long press if not swiping
+                onLongPress(event);
+                setLongPressTriggered(true);
+            }
         }, delay);
+    };
+
+    const move = (event: React.TouchEvent) => {
+        if (isSwiping.current) return;
+        
+        const touch = event.touches[0];
+        const diffX = Math.abs(touch.clientX - startX.current);
+        const diffY = Math.abs(touch.clientY - startY.current);
+        
+        // If moved more than 10px, consider it a swipe
+        if (diffX > 10 || diffY > 10) {
+            isSwiping.current = true;
+            if (timeout.current) {
+                clearTimeout(timeout.current);
+            }
+        }
     };
 
     const clear = (event: React.MouseEvent | React.TouchEvent, shouldTriggerClick = true) => {
@@ -101,16 +135,24 @@ function useLongPress(
         if (timeout.current) {
             clearTimeout(timeout.current);
         }
-        if (shouldTriggerClick && !longPressTriggered) {
+        
+        // Only click if:
+        // 1. Should trigger click (mouse leave passes false)
+        // 2. Long press wasn't triggered
+        // 3. User didn't swipe/scroll
+        if (shouldTriggerClick && !longPressTriggered && !isSwiping.current) {
             onClick();
         }
+        
         setLongPressTriggered(false);
+        isSwiping.current = false;
         target.current = null;
     };
 
     return {
         onMouseDown: (e: React.MouseEvent) => start(e),
         onTouchStart: (e: React.TouchEvent) => start(e),
+        onTouchMove: (e: React.TouchEvent) => move(e),
         onMouseUp: (e: React.MouseEvent) => clear(e),
         onMouseLeave: (e: React.MouseEvent) => clear(e, false),
         onTouchEnd: (e: React.TouchEvent) => clear(e)
@@ -178,6 +220,10 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
   const [isSearching, setIsSearching] = useState(false);
   const [deposit, setDeposit] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Security State
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
   
   // New State
   const [source, setSource] = useState('direct');
@@ -335,7 +381,38 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
       });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (verifiedStaff?: { id: string, name: string }) => {
+        // --- Security Checks ---
+        if (!verifiedStaff) {
+            // Check if any sensitive action is being performed
+            if (isCustomPrice) {
+                const requiresPin = await securityService.checkActionRequiresPin('checkin_custom_price');
+                if (requiresPin) {
+                    setSecurityAction('checkin_custom_price');
+                    setIsPinModalOpen(true);
+                    return;
+                }
+            }
+
+            if (selectedCustomer && selectedCustomer.balance < 0) {
+                const requiresPin = await securityService.checkActionRequiresPin('checkin_debt_allow');
+                if (requiresPin) {
+                    setSecurityAction('checkin_debt_allow');
+                    setIsPinModalOpen(true);
+                    return;
+                }
+            }
+
+            if (isExtraPeople && (extraAdults > 0 || extraChildren > 0)) {
+                const requiresPin = await securityService.checkActionRequiresPin('checkin_override_surcharge');
+                if (requiresPin) {
+                    setSecurityAction('checkin_override_surcharge');
+                    setIsPinModalOpen(true);
+                    return;
+                }
+            }
+        }
+
         setIsSubmitting(true);
         try {
             let finalCustomerId = selectedCustomer?.id;
@@ -353,7 +430,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                 }
             }
 
-            if (selectedCustomer && selectedCustomer.balance < 0) {
+            if (selectedCustomer && selectedCustomer.balance < 0 && !verifiedStaff) {
                 const debt = Math.abs(selectedCustomer.balance);
                 const confirmed = await confirmDialog({
                     title: 'Cảnh báo nợ cũ',
@@ -385,6 +462,8 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                     quantity: s.quantity,
                     price: s.service.price
                 })),
+                verified_by_staff_id: verifiedStaff?.id,
+                verified_by_staff_name: verifiedStaff?.name
             };
             
             await onCheckIn(payload);
@@ -763,6 +842,15 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                 </button>
             </div>
 
+            <PinValidationModal
+                isOpen={isPinModalOpen}
+                onClose={() => setIsPinModalOpen(false)}
+                onSuccess={(staffId, staffName) => {
+                    setIsPinModalOpen(false);
+                    handleSubmit({ id: staffId, name: staffName });
+                }}
+                action={securityAction || 'checkin_custom_price'}
+            />
             </div>
         </div>,
         document.body

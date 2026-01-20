@@ -23,6 +23,8 @@ import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 import { telegramService } from '@/services/telegramService';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { securityService, SecurityAction } from '@/services/securityService';
+import PinValidationModal from '@/components/shared/PinValidationModal';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -45,6 +47,10 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Security states
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
 
   // Calculate dynamic totals
   const baseTotal = totalReceivable - (bill.custom_surcharge || 0) + (bill.discount_amount || 0);
@@ -143,11 +149,44 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
     );
   }
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (verifiedStaff?: { id: string, name: string }) => {
     // Validate: If debt, require notes
     if (isDebt && !notes.trim()) {
         setError('Vui lòng ghi chú lý do nợ (Ví dụ: Khách quen, Thiếu tiền mặt...)');
         return;
+    }
+
+    // --- Security Checks ---
+    if (!verifiedStaff) {
+      // 1. Check Discount
+      if (discount > 0) {
+        const requiresPin = await securityService.checkActionRequiresPin('checkout_discount');
+        if (requiresPin) {
+          setSecurityAction('checkout_discount');
+          setIsPinModalOpen(true);
+          return;
+        }
+      }
+
+      // 2. Check Custom Surcharge
+      if (surcharge > 0 && surcharge !== (bill.custom_surcharge || 0)) {
+        const requiresPin = await securityService.checkActionRequiresPin('checkout_custom_surcharge');
+        if (requiresPin) {
+          setSecurityAction('checkout_custom_surcharge');
+          setIsPinModalOpen(true);
+          return;
+        }
+      }
+
+      // 3. Check Debt
+      if (isDebt) {
+        const requiresPin = await securityService.checkActionRequiresPin('checkout_mark_as_debt');
+        if (requiresPin) {
+          setSecurityAction('checkout_mark_as_debt');
+          setIsPinModalOpen(true);
+          return;
+        }
+      }
     }
 
     setIsProcessing(true);
@@ -159,7 +198,10 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
         amountPaid,
         discount,
         surcharge,
-        notes
+        notes,
+        // Thêm thông tin nhân viên xác thực nếu có
+        verified_by_staff_id: verifiedStaff?.id,
+        verified_by_staff_name: verifiedStaff?.name
       });
 
       if (result.success) {
@@ -388,6 +430,16 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
           </button>
         </div>
       </div>
+
+      <PinValidationModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        onSuccess={(staffId, staffName) => {
+          setIsPinModalOpen(false);
+          handleCheckout({ id: staffId, name: staffName });
+        }}
+        action={securityAction || 'checkout_discount'}
+      />
     </div>,
     document.body
   );

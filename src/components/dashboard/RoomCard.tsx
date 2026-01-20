@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, memo } from 'react';
 import { 
   Sun, 
   Moon, 
@@ -9,43 +9,26 @@ import {
   Wrench, 
   AlertTriangle, 
   StickyNote,
-  LucideIcon
+  LucideIcon,
+  Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DashboardRoom, BookingType } from '@/types/dashboard';
-import { format, differenceInMinutes, differenceInDays } from 'date-fns';
+import { DashboardRoom } from '@/types/dashboard';
+import { format } from 'date-fns';
+import LiveTimer from './LiveTimer';
 
 interface RoomCardProps {
   room: DashboardRoom;
   onClick: (room: DashboardRoom) => void;
-  virtualTime?: string | null;
 }
 
-const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, virtualTime }) => {
-  const [now, setNow] = useState(new Date());
-
-  // Update "now" every minute to keep duration real-time, or use virtualTime
-  useEffect(() => {
-    if (virtualTime) {
-      const vDate = new Date(virtualTime);
-      if (!isNaN(vDate.getTime())) {
-        setNow(vDate);
-      }
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setNow(new Date());
-    }, 60000);
-    return () => clearInterval(timer);
-  }, [virtualTime]);
-
+const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
   // Determine display properties based on status and booking
   const display = useMemo(() => {
     let bgColor = 'bg-[#155e75]'; // Default: Available (Xanh Teal)
     let textColor = 'text-white';
     let Icon: LucideIcon = Sun;
-    let statusText = 'Sẵn sàng';
+    let statusText: React.ReactNode = 'Sẵn sàng';
     let subText = 'Trống';
     let isFlashing = false;
 
@@ -77,12 +60,13 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, virtualTime }) => {
           textColor = 'text-black';
           Icon = Clock;
           
-          if (isValidDate) {
-            // Format hh:mm duration
-            const diffMin = Math.max(0, differenceInMinutes(now, checkIn));
-            const h = Math.floor(diffMin / 60);
-            const m = diffMin % 60;
-            statusText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          if (isValidDate && check_in_at) {
+             statusText = (
+               <div className="flex items-center gap-1.5">
+                 <Clock size={16} className="animate-pulse" />
+                 <LiveTimer checkInAt={check_in_at} mode="hourly" />
+               </div>
+             );
           } else {
             statusText = '--:--';
           }
@@ -92,11 +76,13 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, virtualTime }) => {
           bgColor = 'bg-[#1e40af]'; // Daily/Overnight (Xanh Dương)
           Icon = booking_type === 'daily' ? Sun : Moon;
           
-          if (isValidDate) {
-            // Format number of days
-            // Using calendar days difference + 1 to match "nights" logic in billing engine
-            const diffDays = Math.max(1, differenceInDays(now, checkIn));
-            statusText = `${diffDays} ngày`;
+          if (isValidDate && check_in_at) {
+             statusText = (
+               <div className="flex items-center gap-1.5">
+                 <Calendar size={16} />
+                 <LiveTimer checkInAt={check_in_at} mode={booking_type} />
+               </div>
+             );
           } else {
             statusText = '--- ngày';
           }
@@ -105,7 +91,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, virtualTime }) => {
     }
 
     return { bgColor, textColor, Icon, statusText, subText, isFlashing };
-  }, [room, now]);
+  }, [room]);
 
   const { bgColor, textColor, Icon, statusText, subText, isFlashing } = display;
 
@@ -129,7 +115,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, virtualTime }) => {
       onClick={() => onClick(room)}
       className={cn(
         "relative overflow-hidden group cursor-pointer transition-all duration-300",
-        "h-[200px] md:h-[256px] rounded-[2rem] shadow-lg hover:shadow-2xl",
+        "h-[230px] md:h-[256px] rounded-[2rem] shadow-lg hover:shadow-2xl",
         "hover:scale-[1.02]", // Prompt requirement
         bgColor,
         textColor,
@@ -223,4 +209,4 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, virtualTime }) => {
   );
 };
 
-export default RoomCard;
+export default memo(RoomCard);

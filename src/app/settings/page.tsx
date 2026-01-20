@@ -31,79 +31,78 @@ export default function SettingsPage() {
             <p className="text-muted font-medium text-sm max-w-xs leading-relaxed">Thiết lập bảng giá, phụ thu và các chính sách giảm giá linh hoạt cho từng mùa vụ.</p>
           </div>
           <div className="flex items-center gap-2 font-black text-xs uppercase tracking-[0.2em] relative z-10 text-accent group-hover:gap-4 transition-all">
-            Chỉnh sửa ngay <ArrowUpRight size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+            <span>Truy cập</span>
+            <ChevronRight size={16} />
           </div>
-          <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all duration-1000" />
+          <div className="absolute right-[-20px] bottom-[-20px] w-64 h-64 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all duration-500" />
         </Link>
 
-        {/* Small Bento - Room Types */}
-        <Link href="/settings/categories" className="bento-card p-10 flex flex-col justify-between group cursor-pointer hover:bg-accent hover:text-white transition-all duration-500 active:scale-95">
-          <div className="w-14 h-14 bg-accent/5 group-hover:bg-white/10 rounded-[22px] flex items-center justify-center text-accent group-hover:text-white transition-colors">
-            <BedDouble size={28} />
-          </div>
-          <div>
-            <h3 className="text-2xl font-black mb-2">Hạng phòng</h3>
-            <p className="text-muted group-hover:text-white/60 text-xs font-bold uppercase tracking-widest">Cấu hình chi tiết</p>
-          </div>
-        </Link>
-
-        {/* Data & Security */}
-        <Link href="/customers" className="bento-card p-10 flex flex-col justify-between cursor-pointer active:scale-95 group hover:border-accent/20">
-          <div className="flex justify-between items-start">
-            <div className="w-14 h-14 bg-orange-50 rounded-[22px] flex items-center justify-center text-orange-500">
-              <Users size={28} />
+        {/* Categories Small */}
+        <Link href="/settings/categories" className="bento-card p-8 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+          <div className="relative z-10">
+            <div className="w-12 h-12 bg-orange-50 rounded-[18px] flex items-center justify-center mb-6 text-orange-500">
+              <BedDouble size={24} />
             </div>
-            <ChevronRight size={20} className="text-ghost group-hover:text-accent transition-colors" />
+            <h3 className="text-2xl font-black tracking-tight mb-2 text-main">Hạng phòng</h3>
+            <p className="text-muted font-medium text-xs leading-relaxed">Quản lý danh sách phòng và các hạng phòng.</p>
           </div>
-          <div>
-            <h3 className="text-2xl font-black mb-2">Khách hàng</h3>
-            <p className="text-muted text-xs font-bold uppercase tracking-widest">Quản lý hồ sơ & công nợ</p>
+          <div className="flex justify-end mt-4">
+            <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 group-hover:scale-110 transition-transform">
+              <ArrowUpRight size={20} />
+            </div>
           </div>
         </Link>
 
-        <div className="bento-card p-10 flex flex-col justify-between cursor-pointer active:scale-95 group hover:border-accent/20">
-          <div className="flex justify-between items-start">
-            <div className="w-14 h-14 bg-purple-50 rounded-[22px] flex items-center justify-center text-purple-500">
-              <ShieldCheck size={28} />
+        {/* Services Small */}
+        <Link href="/settings/services" className="bento-card p-8 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+          <div className="relative z-10">
+            <div className="w-12 h-12 bg-purple-50 rounded-[18px] flex items-center justify-center mb-6 text-purple-500">
+              <Users size={24} />
             </div>
-            <ChevronRight size={20} className="text-ghost group-hover:text-accent transition-colors" />
+            <h3 className="text-2xl font-black tracking-tight mb-2 text-main">Dịch vụ</h3>
+            <p className="text-muted font-medium text-xs leading-relaxed">Menu đồ ăn, nước uống và quản lý kho.</p>
           </div>
-          <div>
-            <h3 className="text-2xl font-black mb-2">Bảo mật</h3>
-            <p className="text-muted text-xs font-bold uppercase tracking-widest">Phân quyền hệ thống</p>
-          </div>
-        </div>
-
-        {/* System & Info */}
-        <div className="bento-card p-10 flex flex-col justify-between cursor-pointer active:scale-95 group hover:border-accent/20">
-          <div className="flex justify-between items-start">
-            <div className="w-14 h-14 bg-red-50 rounded-[22px] flex items-center justify-center text-red-500">
-              <Bell size={28} />
+          <div className="flex justify-end mt-4">
+            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
+              <ArrowUpRight size={20} />
             </div>
-            <ChevronRight size={20} className="text-ghost group-hover:text-accent transition-colors" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-black mb-2">Thông báo</h3>
-            <p className="text-muted text-xs font-bold uppercase tracking-widest">Email & SMS</p>
-          </div>
-        </div>
-
-        {/* Services */}
-        <Link href="/settings/services" className="bento-card p-10 flex flex-col justify-between cursor-pointer active:scale-95 group hover:border-accent/20">
-          <div className="flex justify-between items-start">
-            <div className="w-14 h-14 bg-orange-50 rounded-[22px] flex items-center justify-center text-orange-500">
-              <DollarSign size={28} /> {/* Using DollarSign as placeholder, ideally Coffee icon if imported */}
-            </div>
-            <ChevronRight size={20} className="text-ghost group-hover:text-accent transition-colors" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-black mb-2">Dịch vụ</h3>
-            <p className="text-muted text-xs font-bold uppercase tracking-widest">Menu đồ ăn uống</p>
           </div>
         </Link>
 
-        {/* Full width Bento Footer */}
-        <div className="md:col-span-3 bento-card p-8 flex items-center justify-between bg-white/50 backdrop-blur-sm border border-black/[0.03]">
+        {/* Cash Flow Categories - New */}
+        <Link href="/settings/cash-flow" className="bento-card p-8 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+          <div className="relative z-10">
+            <div className="w-12 h-12 bg-emerald-50 rounded-[18px] flex items-center justify-center mb-6 text-emerald-500">
+              <DollarSign size={24} />
+            </div>
+            <h3 className="text-2xl font-black tracking-tight mb-2 text-main">Danh mục Thu Chi</h3>
+            <p className="text-muted font-medium text-xs leading-relaxed">Quản lý các loại khoản thu và chi phí.</p>
+          </div>
+          <div className="flex justify-end mt-4">
+            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+              <ArrowUpRight size={20} />
+            </div>
+          </div>
+        </Link>
+
+        {/* Staff & Security - NEW */}
+        <Link href="/settings/staff" className="bento-card p-8 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+          <div className="relative z-10">
+            <div className="w-12 h-12 bg-rose-50 rounded-[18px] flex items-center justify-center mb-6 text-rose-500">
+              <ShieldCheck size={24} />
+            </div>
+            <h3 className="text-2xl font-black tracking-tight mb-2 text-main">Nhân viên & Bảo mật</h3>
+            <p className="text-muted font-medium text-xs leading-relaxed">Quản lý tài khoản và cấu hình mã PIN.</p>
+          </div>
+          <div className="flex justify-end mt-4">
+            <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 group-hover:scale-110 transition-transform">
+              <ArrowUpRight size={20} />
+            </div>
+          </div>
+        </Link>
+
+        {/* System Info Wide */}
+        <div className="md:col-span-3 bento-card p-8 bg-white/50 border-accent/5 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-ghost">
               <Info size={24} />

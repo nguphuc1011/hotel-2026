@@ -14,6 +14,9 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { toast } from 'sonner';
 
+import { securityService, SecurityAction } from '@/services/securityService';
+import PinValidationModal from '@/components/shared/PinValidationModal';
+
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
@@ -23,6 +26,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'transactions' | 'bookings' | 'notes'>('transactions');
+
+  // Security states
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
 
   // Transaction Modal
   const [showTransModal, setShowTransModal] = useState(false);
@@ -71,12 +78,22 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     loadData();
   }, [id]);
 
-  const handleTransaction = async () => {
+  const handleTransaction = async (verifiedStaff?: { id: string, name: string }) => {
     if (!customer) return;
     const amountVal = parseFloat(transForm.amount.replace(/[^0-9]/g, ''));
     if (!amountVal || amountVal <= 0) {
       toast.error('Vui lòng nhập số tiền hợp lệ');
       return;
+    }
+
+    // --- Security Checks ---
+    if (!verifiedStaff && transForm.type === 'refund') {
+      const requiresPin = await securityService.checkActionRequiresPin('checkout_refund');
+      if (requiresPin) {
+        setSecurityAction('checkout_refund');
+        setIsPinModalOpen(true);
+        return;
+      }
     }
 
     // Calculate signed amount based on type
@@ -493,11 +510,11 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 onClick={() => setShowEditModal(false)}
                 className="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors"
               >
-                Hủy bỏ
+                Hủy
               </button>
               <button 
                 onClick={handleUpdate}
-                className="px-6 py-3 rounded-xl font-bold bg-accent text-white shadow-lg shadow-accent/20 hover:bg-accent/90 transition-colors"
+                className="px-6 py-3 rounded-xl font-bold bg-main text-white shadow-lg shadow-main/20 hover:bg-main/90 transition-colors"
               >
                 Lưu thay đổi
               </button>
@@ -505,6 +522,24 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       )}
+
+      {/* Security PIN Modal */}
+      <PinValidationModal
+        isOpen={isPinModalOpen}
+        onClose={() => {
+          setIsPinModalOpen(false);
+          setSecurityAction(null);
+        }}
+        onSuccess={(verifiedStaff) => {
+          setIsPinModalOpen(false);
+          setSecurityAction(null);
+          
+          if (securityAction === 'checkout_refund') {
+            handleTransaction(verifiedStaff);
+          }
+        }}
+        action={securityAction || 'access_settings'}
+      />
     </div>
   );
 }

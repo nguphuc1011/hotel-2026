@@ -1,6 +1,21 @@
 
 import { supabase } from '@/lib/supabase';
 
+// Helper to safely format errors for logging
+const formatError = (err: any) => {
+    if (!err) return 'Unknown error (null/undefined)';
+    if (typeof err === 'object') {
+        try {
+            // Handle native Error objects and Supabase error objects
+            const plain = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+            return JSON.stringify(plain, null, 2);
+        } catch (e) {
+            return String(err);
+        }
+    }
+    return String(err);
+};
+
 export interface Service {
   id: string;
   name: string;
@@ -102,35 +117,47 @@ export const serviceService = {
       }
   },
 
-  async importInventory(serviceId: string, quantity: number, costPrice?: number, notes?: string) {
+  async importInventory(serviceId: string, quantity: number, totalAmount: number, notes?: string) {
     try {
-        const { data, error } = await supabase.rpc('import_inventory', {
+        // Construct payload dynamically to rely on DB defaults for optional fields
+        const payload: any = {
             p_service_id: serviceId,
-            p_quantity: quantity,
-            p_cost_price: costPrice,
-            p_notes: notes
-        });
+            p_qty_buy: quantity,
+            p_total_amount: totalAmount,
+        };
+        if (notes) payload.p_notes = notes;
+        
+        // Explicitly logging payload for debugging
+        console.log('Import Inventory Payload:', payload);
+
+        // Debug Auth before call
+        const { data: debugAuth } = await supabase.rpc('debug_auth');
+        console.log('Debug Auth Check:', debugAuth);
+
+        const { data, error } = await supabase.rpc('import_inventory', payload);
 
         if (error) throw error;
         return data;
-    } catch (err) {
-        console.error('Error importing inventory:', err);
+    } catch (err: any) {
+        console.error('Error importing inventory:', formatError(err));
         return null;
     }
   },
 
   async adjustInventory(serviceId: string, newQuantity: number, notes?: string) {
     try {
-        const { data, error } = await supabase.rpc('adjust_inventory', {
+        const payload: any = {
             p_service_id: serviceId,
-            p_new_quantity: newQuantity,
-            p_notes: notes
-        });
+            p_new_quantity: newQuantity
+        };
+        if (notes) payload.p_notes = notes;
+
+        const { data, error } = await supabase.rpc('adjust_inventory', payload);
 
         if (error) throw error;
         return data;
-    } catch (err) {
-        console.error('Error adjusting inventory:', err);
+    } catch (err: any) {
+        console.error('Error adjusting inventory:', formatError(err));
         return null;
     }
   },

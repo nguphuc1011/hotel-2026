@@ -1,74 +1,125 @@
-BẢN MÔ TẢ CHI TIẾT LOGIC TÍNH TIỀN KHÁCH SẠN (PHIÊN BẢN HIẾN CHƯƠNG GẮN MÃ DB)
-Mọi phép tính tiền trong hệ thống đều phải tuân thủ nghiêm ngặt 5 bước dưới đây, dựa trên các nút gạt và thông số đã cài đặt.
+# BẢN MÔ TẢ CHI TIẾT LOGIC TÍNH TIỀN HỆ THỐNG (DỰA TRÊN DATABASE THỰC)
 
-BƯỚC 1: BỘ LỌC ÂN HẠN (GRACE PERIOD)
-Mục đích: Xác định xem khách có thực sự bị tính thêm tiền hay không.
+Tài liệu này mô tả chi tiết quy trình tính toán hóa đơn (Billing Engine) của hệ thống, được trích xuất trực tiếp từ các hàm lưu trữ (Stored Procedures) trong PostgreSQL: `calculate_booking_bill`, `fn_calculate_room_charge`, `fn_calculate_surcharge`, v.v.
 
-Trước khi bắt đầu tính bất kỳ loại tiền nào (Tiền giờ tiếp theo hay Tiền phụ thu), hệ thống phải kiểm tra Nút gạt Ân hạn:
+---
 
-Khi nhận phòng: Nếu nút gạt "Ân hạn nhận" (settings.grace_in_enabled) đang Bật, hệ thống sẽ lấy số phút cài đặt (settings.grace_minutes) (ví dụ 15 phút). Nếu khách vào sớm hơn giờ quy định (settings.check_in_time) nhưng vẫn trong vòng 15 phút đó, hệ thống coi như khách vào Đúng giờ.
+## I. CÁC THÔNG SỐ CẤU HÌNH HỆ THỐNG (SETTINGS)
 
-Khi trả phòng: Nếu nút gạt "Ân hạn trả" (settings.grace_out_enabled) đang Bật, hệ thống cho phép khách trả muộn hơn giờ quy định (settings.check_out_time hoặc settings.overnight_checkout_time) một khoảng thời gian bằng số phút cài đặt (settings.grace_minutes). Nếu khách ra trong khoảng này, hệ thống coi như khách trả Đúng giờ.
+Hệ thống hoạt động dựa trên các "Nút gạt" và "Mốc thời gian" trong bảng `public.settings` (key = 'config'):
 
-Lưu ý: Nếu các nút gạt này (settings.grace_in_enabled, settings.grace_out_enabled) Tắt, chỉ cần lố 1 phút là hệ thống bắt đầu tính tiền ngay lập tức.
+### 1. Nhóm Ân hạn (Grace Period)
+- **Ân hạn nhận (`grace_in_enabled`)**: Cho phép khách nhận phòng sớm mà không tính thêm tiền/ngày.
+- **Ân hạn trả (`grace_out_enabled`)**: Cho phép khách trả phòng muộn mà không tính thêm tiền/phụ phí.
+- **Số phút ân hạn (`grace_minutes`)**: Khoảng thời gian miễn phí (Ví dụ: 15 phút).
 
-BƯỚC 2: TÍNH TIỀN PHÒNG GỐC (BASE PRICE)
-A. Đối với khách thuê GIỜ:
-Gói đầu: Khách phải trả trọn gói số tiền "Giá giờ đầu" (room_categories.price_hourly) cho dù ở ít hơn "Số giờ gói đầu" (settings.base_hourly_limit) đã cài đặt.
+### 2. Nhóm Thuê giờ
+- **Đơn vị giờ (`hourly_unit`)**: Mặc định 60 phút/block.
+- **Số giờ gói đầu (`base_hourly_limit`)**: Số giờ tối thiểu tính tiền gói đầu (thường là 1 hoặc 2 giờ).
+- **Chặn trần giá ngày (`hourly_ceiling_enabled`)**: Nếu bật, tổng tiền giờ sẽ không vượt quá X% giá ngày.
+- **Tỉ lệ chặn trần (`hourly_ceiling_percent`)**: Mặc định 100% (Tiền giờ tối đa bằng giá ngày).
 
-Tính giờ tiếp theo: * Sau khi hết gói đầu và hết thời gian ân hạn, hệ thống bắt đầu tính tiền theo từng khối (Block).
+### 3. Nhóm Thuê ngày & Qua đêm
+- **Giờ nhận chuẩn (`check_in_time`)**: Mặc định 14:00.
+- **Giờ trả chuẩn (`check_out_time`)**: Mặc định 12:00.
+- **Giờ trả qua đêm (`overnight_checkout_time`)**: Giờ trả cố định cho khách thuê qua đêm (thường là 12:00).
+- **Khung giờ Qua đêm (`overnight_start_time` - `overnight_end_time`)**: Ví dụ từ 22:00 đến 06:00 sáng hôm sau.
 
-Độ dài mỗi khối do Bệ Hạ cài đặt (settings.hourly_unit) (ví dụ mỗi khối 60 phút).
+### 4. Nhóm Tự động chuyển đổi & Phụ thu
+- **Tự động chuyển Qua đêm (`auto_overnight_switch`)**: Nếu khách nhận phòng trong khung giờ qua đêm, hệ thống tự động áp dụng giá Qua đêm thay vì giá Giờ/Ngày.
+- **Tự động tính Ngày (Sớm) (`auto_full_day_early`)**: Nếu nhận phòng trước mốc `full_day_early_before` (mặc định 05:00), tính thêm 1 ngày phòng.
+- **Tự động tính Ngày (Muộn) (`auto_full_day_late`)**: Nếu trả phòng sau mốc `full_day_late_after` (mặc định 18:00), tính thêm 1 ngày phòng.
+- **Tự động tính phụ phí (`auto_surcharge_enabled`)**: Bật/Tắt tính tiền Nhận sớm/Trả muộn.
 
-Quy tắc làm tròn: Chỉ cần khách chớm bước sang khối mới 1 phút, hệ thống sẽ tính tiền trọn cả khối đó (room_categories.price_next_hour) (không tính lẻ theo phút).
+---
 
-Điểm chặn: Tổng tiền thuê giờ sẽ tăng dần nhưng không bao giờ được vượt quá Giá Ngày (room_categories.price_daily). Nếu tính ra tiền giờ cao hơn giá ngày, hệ thống tự động chốt lấy Giá Ngày.
+## II. QUY TRÌNH TÍNH TOÁN CHI TIẾT (5 BƯỚC)
 
-B. Đối với khách thuê QUA ĐÊM:
-Hệ thống chỉ áp dụng giá này khi Nút gạt Qua đêm (room_categories.overnight_enabled) của hạng phòng đó đang Bật và giờ vào nằm đúng khung giờ quy định (settings.overnight_start đến settings.overnight_end).
+Hệ thống tính toán theo thứ tự ưu tiên từ phòng -> phụ thu -> người thêm -> dịch vụ -> thuế/phí.
 
-Giá phòng là một con số cố định (Giá Qua Đêm) (room_categories.price_overnight).
+### BƯỚC 1: TÍNH TIỀN PHÒNG CHÍNH (`fn_calculate_room_charge`)
 
-C. Đối với khách thuê NGÀY & NHIỀU NGÀY:
-Hệ thống tính tiền theo từng chu kỳ ngày (từ giờ nhận hôm nay đến giờ trả hôm sau).
+#### 1.1. Thuê theo Giờ (`hourly`)
+- **Gói đầu**: Tính tròn số tiền `price_hourly` cho `base_hourly_limit` giờ đầu tiên.
+- **Giờ tiếp theo**: 
+  - Sau khi hết gói đầu + thời gian ân hạn (`grace_minutes`), mỗi block lẻ (dù chỉ 1 phút) sẽ được làm tròn lên 1 block (`hourly_unit`) và tính tiền theo giá `price_next_hour`.
+  - **Chống vượt trần**: Nếu `hourly_ceiling_enabled` bật, tổng tiền giờ nếu vượt quá `price_daily * percent` sẽ tự động chuyển sang tính theo giá Ngày.
 
-Khi nào cộng thêm ngày mới? Hệ thống sẽ không tự động cộng ngày vào lúc 12:00 trưa. Thay vào đó, nó sẽ đợi đến khi khách trả phòng. Nếu khách trả muộn quá mốc 100% (settings.full_day_late_after, ví dụ 18:00) và không nằm trong ân hạn trả (settings.grace_out_enabled + settings.grace_minutes), hệ thống sẽ cộng thêm 1 ngày tiền phòng (room_categories.price_daily).
+#### 1.2. Thuê Qua đêm (`overnight`)
+- **Điều kiện**: Hạng phòng phải bật `overnight_enabled`.
+- **Cơ chế**:
+  - Nếu `auto_overnight_switch` bật và giờ nhận nằm trong khung (`overnight_start` - `overnight_end`), hệ thống áp dụng giá `price_overnight`.
+  - Số đêm được tính bằng cách lấy (Ngày trả - Ngày nhận). Tối thiểu tính 1 đêm.
+  - Nếu nhận phòng ngoài khung giờ qua đêm, hệ thống sẽ tự động chuyển sang tính giá Ngày (`price_daily`).
 
-BƯỚC 3: TÍNH PHỤ THU (NHẬN SỚM / TRẢ MUỘN)
-Mục đích: Thu thêm tiền khi khách chiếm dụng phòng ngoài giờ quy định.
+#### 1.3. Thuê theo Ngày (`daily`)
+- **Số ngày gốc**: (Ngày trả - Ngày nhận). Tối thiểu 1 ngày.
+- **Cộng thêm ngày (Sớm/Muộn)**:
+  - **Nhận sớm**: Nếu `auto_full_day_early` bật và giờ nhận < `full_day_early_before` (05:00) -> Cộng thêm 1 ngày tiền phòng. (Áp dụng ân hạn nhận nếu có).
+  - **Trả muộn**: Nếu `auto_full_day_late` bật và giờ trả > `full_day_late_after` (18:00) -> Cộng thêm 1 ngày tiền phòng. (Áp dụng ân hạn trả nếu có).
 
-Logic này chỉ chạy nếu nút gạt "Tự động tính phụ phí" (settings.auto_surcharge_enabled) đang Bật. Hệ thống có hai cách tính dựa trên Nút gạt Chế độ phụ thu (room_categories.surcharge_mode):
+---
 
-Cách 1: Tính theo PHẦN TRĂM (%)
-Hệ thống lấy Giờ thực tế của khách đối chiếu với danh sách các mốc thời gian trong cài đặt (settings.surcharge_rules):
+### BƯỚC 2: TÍNH PHỤ THU SỚM/MUỘN (`fn_calculate_surcharge`)
 
-Ví dụ: Khách trả muộn rơi vào khung "12:00 - 15:00" có mức thu 30%. Hệ thống sẽ lấy: Giá Ngày (room_categories.price_daily) x 30% để ra tiền phụ thu.
+*Lưu ý: Không áp dụng phụ thu cho loại hình thuê Giờ.*
 
-Cách 2: Tính theo SỐ TIỀN CỨNG (Số tiền/Giờ)
-Hệ thống tính xem khách đã lố bao nhiêu tiếng so với giờ quy định:
+Dựa trên `surcharge_mode` tại Hạng phòng, hệ thống chọn 1 trong 2 cách:
 
-Lấy số phút lố trừ đi số phút ân hạn (settings.grace_minutes).
+#### 2.1. Cách 1: Tính theo Số tiền cố định (`amount`)
+- Tính số phút chênh lệch so với giờ chuẩn (`check_in_time` / `check_out_time` / `overnight_checkout_time`).
+- Trừ đi số phút ân hạn (`grace_minutes`).
+- Làm tròn lên theo giờ (ví dụ lố 61 phút tính là 2 giờ).
+- Tiền phụ thu = Số giờ lố x `hourly_surcharge_amount`.
 
-Lấy số phút còn lại chia cho 60 để ra số giờ. Luôn làm tròn lên (ví dụ lố 1 tiếng 10 phút tính là 2 tiếng).
+#### 2.2. Cách 2: Tính theo Phần trăm (`percent`)
+- Hệ thống quét danh sách `surcharge_rules` (JSON) để tìm khung thời gian tương ứng.
+- **Trả muộn (Late)**: Tìm rule loại 'Late' có `from_minute` < phút_lố <= `to_minute`.
+- **Nhận sớm (Early)**: Tìm rule loại 'Early' tương tự.
+- Tiền phụ thu = `price_daily` x `% quy định`.
 
-Lấy số giờ đó nhân với số tiền cài đặt tại hạng phòng (room_categories.hourly_surcharge_amount) (ví dụ 50.000đ/giờ).
+*Quy tắc loại trừ: Nếu khách đã bị cộng thêm 1 ngày phòng ở Bước 1 (do quá mốc 05:00 hoặc 18:00), hệ thống sẽ không tính thêm phụ thu ở Bước 2 nữa.*
 
-Quy tắc loại trừ (chống tính 2 lần):
-- Thuê ngày: Nếu giờ trả thực tế vượt mốc 100% (settings.full_day_late_after) và không trong ân hạn, Base Ngày sẽ cộng thêm 1 ngày và Phụ thu Trả Muộn = 0.
-- Thuê ngày: Nếu chưa vượt mốc 100%, chỉ tính Phụ thu Trả Muộn theo chế độ (amount/percent) và luật trong settings.surcharge_rules.
-- Thuê qua đêm: dùng settings.overnight_checkout_time làm giờ chuẩn để xét phụ thu trễ; áp dụng ân hạn trả nếu bật.
-- Thuê giờ: không áp dụng phụ thu sớm/trễ.
+---
 
-BƯỚC 4: TIỀN DỊCH VỤ VÀ CHIẾT KHẤU
-Cộng toàn bộ tiền nước uống, đồ ăn mà khách đã dùng (bookings.services_used liên kết với services.price).
+### BƯỚC 3: PHỤ THU THÊM NGƯỜI (`fn_calculate_extra_person_charge`)
+- **Điều kiện**: `extra_person_enabled` phải bật ở cả Cấu hình hệ thống và Hạng phòng.
+- **Cơ chế**:
+  - Tính số người lớn vượt quá `max_adults` x `price_extra_adult`.
+  - Tính số trẻ em vượt quá `max_children` x `price_extra_child`.
 
-Trừ đi số tiền giảm giá hoặc phần trăm giảm giá nếu có (bookings.discount_amount).
+---
 
-BƯỚC 5: THUẾ VAT VÀ PHÍ DỊCH VỤ (BƯỚC CUỐI)
-Hệ thống kiểm tra các nút gạt ở Tab Tiện ích để quyết định:
+### BƯỚC 4: TIỀN DỊCH VỤ (SERVICES)
+- Tổng hợp từ bảng `booking_services`: `Số lượng` x `Giá tại thời điểm gọi đồ`.
 
-Phí dịch vụ: Nếu nút gạt Bật (settings.service_fee_enabled), hệ thống lấy tổng tiền vừa tính ở trên nhân với tỉ lệ % (settings.service_fee_percent) (ví dụ 1.5%). Nếu Tắt, bỏ qua bước này.
+---
 
-Thuế VAT: Nếu nút gạt Bật (settings.vat_enabled), hệ thống lấy tổng tiền (bao gồm cả phí dịch vụ) nhân với tỉ lệ % (settings.vat_percent) (ví dụ 5%). Nếu Tắt, bỏ qua bước này.
+### BƯỚC 5: ĐIỀU CHỈNH CUỐI & THUẾ/PHÍ (`fn_calculate_bill_adjustments`)
 
-Công nợ & Tiền cọc: Cuối cùng, hệ thống lấy tổng số tiền trên trừ đi tiền khách đã đặt cọc (bookings.deposit_amount) và cộng thêm số nợ cũ (nếu có) (customers.balance) để ra con số cuối cùng khách phải trả.
+#### 5.1. Giảm giá & Phụ phí thủ công
+- **Giảm giá (`discount_amount`)**: Trừ trực tiếp vào tổng tiền.
+- **Phụ phí cộng thêm (`custom_surcharge`)**: Cộng trực tiếp (Dành cho các khoản phí phát sinh khác).
+
+#### 5.2. Phí phục vụ (SVC)
+- Nếu `service_fee_enabled` bật: `(Tổng sau giảm giá) * service_fee_percent`.
+
+#### 5.3. Thuế VAT
+- Nếu `vat_enabled` bật: `(Tổng sau giảm giá + Phí phục vụ) * vat_percent`.
+
+---
+
+## III. TỔNG KẾT CÔNG THỨC CUỐI CÙNG
+
+```text
+Tổng cộng = (Tiền phòng + Phụ thu Sớm/Muộn + Phụ thu người + Tiền dịch vụ) 
+           - Giảm giá 
+           + Phụ phí thủ công
+           + Phí phục vụ (nếu có)
+           + Thuế VAT (nếu có)
+
+Số tiền cần thanh toán = Tổng cộng - Tiền đặt cọc (deposit_amount)
+```
+
+---
+*Ghi chú: Mọi mốc thời gian đều được xử lý theo múi giờ `Asia/Ho_Chi_Minh`.*

@@ -9,6 +9,8 @@ import PaymentModal from './PaymentModal';
 import BillBreakdown from './BillBreakdown';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
+import { securityService, SecurityAction } from '@/services/securityService';
+import PinValidationModal from '@/components/shared/PinValidationModal';
 
 interface RoomFolioModalProps {
   isOpen: boolean;
@@ -16,7 +18,6 @@ interface RoomFolioModalProps {
   room: Room;
   booking: Booking;
   onUpdate: () => void;
-  virtualTime?: string | null;
 }
 
 // Hook for Long Press
@@ -92,7 +93,7 @@ function useLongPress(
     };
 }
 
-export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate, virtualTime }: RoomFolioModalProps) {
+export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate }: RoomFolioModalProps) {
   const { confirm: confirmDialog, alert } = useGlobalDialog();
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -115,7 +116,12 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Modal Component for Audit Trail
+  // Security State
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ type: string, data?: any } | null>(null);
+
+  // Load Initial DataModal Component for Audit Trail
   const AuditTrailModal = () => {
     if (!showAuditTrail || !bill) return null;
     return createPortal(
@@ -166,12 +172,12 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       loadBill();
       loadServices();
     }
-  }, [isOpen, booking, virtualTime]);
+  }, [isOpen, booking]);
 
   const loadBill = async () => {
     setIsLoading(true);
     try {
-      const data = await bookingService.calculateBill(booking.id, virtualTime || undefined);
+      const data = await bookingService.calculateBill(booking.id);
       setBill(data);
     } catch (error) {
       console.error('Error loading bill:', error);
@@ -205,9 +211,20 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       setPendingServices(prev => [...prev, newItem]);
   };
 
-  const handleSaveServices = async () => {
+  const handleSaveServices = async (verifiedStaff?: { id: string, name: string }) => {
       if (pendingServices.length === 0) return;
       
+      // Security Check
+      if (!verifiedStaff) {
+          const requiresPin = await securityService.checkActionRequiresPin('folio_add_service');
+          if (requiresPin) {
+              setSecurityAction('folio_add_service');
+              setPendingAction({ type: 'SAVE_SERVICES' });
+              setIsPinModalOpen(true);
+              return;
+          }
+      }
+
       setIsSaving(true);
       try {
           // Process sequentially to ensure order
@@ -217,15 +234,17 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           
           setPendingServices([]);
           await Promise.all([loadServices(), loadBill()]);
+          toast.success("Đã cập nhật dịch vụ");
       } catch (error) {
           console.error("Failed to save services", error);
           toast.error("Lỗi khi lưu dịch vụ");
       } finally {
           setIsSaving(false);
+          setPendingAction(null);
       }
   };
 
-  const handleRemoveService = async (serviceId: string) => {
+  const handleRemoveService = async (serviceId: string, verifiedStaff?: { id: string, name: string }) => {
       // Check if it's in pending list first
       const pendingIndex = pendingServices.findIndex(item => item.service_id === serviceId);
       if (pendingIndex !== -1) {
@@ -242,14 +261,28 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       const itemToRemove = bookingServices.find(item => item.service_id === serviceId);
       if (!itemToRemove) return;
 
+      // Security Check for DB removal
+      if (!verifiedStaff) {
+          const requiresPin = await securityService.checkActionRequiresPin('folio_remove_service');
+          if (requiresPin) {
+              setSecurityAction('folio_remove_service');
+              setPendingAction({ type: 'REMOVE_SERVICE', data: serviceId });
+              setIsPinModalOpen(true);
+              return;
+          }
+      }
+
       setProcessingServiceId(serviceId);
       try {
           await serviceService.removeServiceFromBooking(itemToRemove.id);
           await Promise.all([loadServices(), loadBill()]);
+          toast.success("Đã xóa dịch vụ");
       } catch (error) {
           console.error("Failed to remove service", error);
+          toast.error("Lỗi khi xóa dịch vụ");
       } finally {
           setProcessingServiceId(null);
+          setPendingAction(null);
       }
   };
 
@@ -264,7 +297,18 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       return pendingQty;
   };
 
-  const handleCancelBooking = async () => {
+  const handleCancelBooking = async (verifiedStaff?: { id: string, name: string }) => {
+    // Security Check
+    if (!verifiedStaff) {
+      const requiresPin = await securityService.checkActionRequiresPin('checkout_void_bill');
+      if (requiresPin) {
+        setSecurityAction('checkout_void_bill');
+        setPendingAction({ type: 'CANCEL_BOOKING' });
+        setIsPinModalOpen(true);
+        return;
+      }
+    }
+
     const confirmed = await confirmDialog({
       title: 'Huỷ phòng',
       message: "Bạn có chắc chắn muốn huỷ phòng này không? Hành động này không thể hoàn tác.",
@@ -274,12 +318,13 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     });
 
     if (!confirmed) {
+      setPendingAction(null);
       return;
     }
 
     setIsLoading(true);
     try {
-      await bookingService.cancelBooking(booking.id);
+      await bookingService.cancelBooking(booking.id, verifiedStaff);
       onUpdate(); // Refresh dashboard
       onClose(); // Close modal
       toast.success("Huỷ phòng thành công");
@@ -288,7 +333,24 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       toast.error("Lỗi khi huỷ phòng");
     } finally {
       setIsLoading(false);
+      setPendingAction(null);
     }
+  };
+
+  const handleChangeRoom = async (verifiedStaff?: { id: string, name: string }) => {
+      // Security Check
+      if (!verifiedStaff) {
+          const requiresPin = await securityService.checkActionRequiresPin('folio_change_room');
+          if (requiresPin) {
+              setSecurityAction('folio_change_room');
+              setPendingAction({ type: 'CHANGE_ROOM' });
+              setIsPinModalOpen(true);
+              return;
+          }
+      }
+
+      toast.info("Tính năng đổi phòng đang được phát triển");
+      setPendingAction(null);
   };
 
   const filteredServices = availableServices.filter(s => 
@@ -315,7 +377,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4">
             {/* Quick Actions - Scrollable */}
             <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-6">
-                <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => {}} />
+                <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={handleChangeRoom} />
                 <QuickActionButton icon={Edit3} label="Sửa giờ" onClick={() => {}} />
                 <QuickActionButton icon={DollarSign} label="Nạp tiền" onClick={() => {}} />
                 <QuickActionButton icon={Printer} label="In phiếu" onClick={() => {}} />
@@ -608,6 +670,27 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 }}
             />
         )}
+
+        <PinValidationModal
+            isOpen={isPinModalOpen}
+            onClose={() => {
+                setIsPinModalOpen(false);
+                setPendingAction(null);
+            }}
+            onSuccess={(staffId, staffName) => {
+                setIsPinModalOpen(false);
+                if (pendingAction?.type === 'SAVE_SERVICES') {
+                    handleSaveServices({ id: staffId, name: staffName });
+                } else if (pendingAction?.type === 'REMOVE_SERVICE') {
+                    handleRemoveService(pendingAction.data, { id: staffId, name: staffName });
+                } else if (pendingAction?.type === 'CHANGE_ROOM') {
+                    handleChangeRoom({ id: staffId, name: staffName });
+                } else if (pendingAction?.type === 'CANCEL_BOOKING') {
+                    handleCancelBooking({ id: staffId, name: staffName });
+                }
+            }}
+            action={securityAction || 'folio_add_service'}
+        />
       </div>
     </div>,
     document.body

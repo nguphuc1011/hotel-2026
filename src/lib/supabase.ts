@@ -12,4 +12,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.log('Supabase client initialized with URL:', supabaseUrl.substring(0, 20) + '...');
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});

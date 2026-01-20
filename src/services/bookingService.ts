@@ -116,6 +116,7 @@ export const bookingService = {
     discount: number;
     surcharge: number;
     notes: string;
+    verifiedStaff?: { id: string, name: string };
   }): Promise<{ success: boolean; message: string; bill?: any }> {
     try {
       const { data, error } = await supabase.rpc('process_checkout', {
@@ -124,7 +125,9 @@ export const bookingService = {
         p_amount_paid: params.amountPaid,
         p_discount: params.discount,
         p_surcharge: params.surcharge,
-        p_notes: params.notes
+        p_notes: params.notes,
+        p_verified_by_staff_id: params.verifiedStaff?.id || null,
+        p_verified_by_staff_name: params.verifiedStaff?.name || null
       });
 
       if (error) {
@@ -152,6 +155,7 @@ export const bookingService = {
     custom_price?: number;
     custom_price_reason?: string;
     source?: string;
+    verifiedStaff?: { id: string, name: string };
   }) {
     try {
       const servicesPayload = (data.services || []).map((s) => ({
@@ -173,6 +177,8 @@ export const bookingService = {
         p_custom_price: data.custom_price ?? null,
         p_custom_price_reason: data.custom_price_reason ?? null,
         p_source: data.source || 'direct',
+        p_verified_by_staff_id: data.verifiedStaff?.id || null,
+        p_verified_by_staff_name: data.verifiedStaff?.name || null
       });
 
       if (error) throw error;
@@ -183,7 +189,7 @@ export const bookingService = {
     }
   },
 
-  async cancelBooking(bookingId: string) {
+  async cancelBooking(bookingId: string, verifiedStaff?: { id: string, name: string }) {
     try {
       // 1. Get booking info to know the room
       const { data: booking, error: getError } = await supabase
@@ -197,7 +203,11 @@ export const bookingService = {
       // 2. Update booking status
       const { error: updateBookingError } = await supabase
         .from('bookings')
-        .update({ status: 'cancelled' })
+        .update({ 
+          status: 'cancelled',
+          verified_by_staff_id: verifiedStaff?.id || null,
+          verified_by_staff_name: verifiedStaff?.name || null
+        })
         .eq('id', bookingId);
 
       if (updateBookingError) throw updateBookingError;

@@ -1,11 +1,13 @@
 'use client';
 
+import React from 'react';
 import { 
   LayoutDashboard, 
   ClipboardList, 
   Settings as SettingsIcon,
   LogOut,
-  Users
+  Users,
+  Wallet
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -22,9 +24,10 @@ export default function RootLayout({
   const pathname = usePathname();
 
   const navItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Sơ đồ', href: '/' },
-    { icon: <ClipboardList size={20} />, label: 'Báo cáo', href: '/reports' },
-    { icon: <SettingsIcon size={20} />, label: 'Cài Đặt - Quản lý', href: '/settings' },
+    { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: '/' },
+    { icon: <Wallet size={24} />, label: 'Thu Chi', href: '/cash-flow' },
+    { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: '/reports' },
+    { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: '/settings' },
   ];
 
   return (
@@ -73,29 +76,118 @@ export default function RootLayout({
           </div>
         </main>
 
-        {/* Contrast Overlay under Mobile Nav */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-black/12 via-black/6 to-transparent pointer-events-none z-40" />
+        {/* Contrast Overlay under Mobile Nav - Subtle Blur Gradient */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white/90 via-white/50 to-transparent pointer-events-none z-40" />
 
-        {/* Mobile Bottom Nav - Updated Glassmorphism */}
-        <nav className="md:hidden fixed bottom-6 left-4 right-4 h-20 bg-white/90 backdrop-blur-3xl border border-slate-300/80 rounded-[40px] shadow-[0_30px_70px_-10px_rgba(0,0,0,0.3)] z-50 flex justify-around items-center px-6 ring-1 ring-white/50 inset">
-          {navItems.map((item) => (
-            <Link 
-              key={item.href} 
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center gap-1 transition-all duration-500",
-                pathname === item.href ? "text-accent scale-110" : "text-muted"
-              )}
-            >
-              <div className={cn(
-                "p-2.5 rounded-2xl transition-all",
-                pathname === item.href ? "bg-accent text-white shadow-lg shadow-accent/20" : "bg-transparent"
-              )}>
-                {item.icon}
-              </div>
-              <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
-            </Link>
-          ))}
+        {/* Mobile Bottom Nav - Curved Cutout with Floating Center Button */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-24 pointer-events-none flex flex-col justify-end">
+          
+          {/* Main Bar Background with SVG Curve */}
+          <div className="relative w-full h-[70px] pointer-events-auto flex items-end justify-between px-4 pb-2">
+            
+            {/* Background Layer using SVG for smooth curve */}
+            <div className="absolute inset-0 flex items-end drop-shadow-[0_-15px_25px_rgba(0,0,0,0.15)] -z-10">
+              <div className="flex-1 h-full bg-white rounded-tl-[24px]" />
+              <svg width="170" height="70" viewBox="0 0 170 70" fill="none" xmlns="http://www.w3.org/2000/svg" className="block shrink-0">
+                <path d="M 0 0 H 35 Q 45 0 45 10 A 40 40 0 0 0 125 10 Q 125 0 135 0 H 170 V 70 H 0 Z" fill="white"/>
+              </svg>
+              <div className="flex-1 h-full bg-white rounded-tr-[24px]" />
+            </div>
+
+            {/* Left Items */}
+            <div className="flex-1 flex justify-evenly items-center h-full pb-1">
+              <Link 
+                href={navItems[1].href}
+                className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+              >
+                <div className={cn(
+                  "p-2 rounded-2xl transition-all duration-300",
+                  pathname === navItems[1].href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {React.cloneElement(navItems[1].icon as React.ReactElement, { 
+                    size: 24,
+                    strokeWidth: pathname === navItems[1].href ? 2.5 : 2 
+                  })}
+                </div>
+                <span className={cn(
+                  "text-[10px] font-bold transition-colors duration-300",
+                  pathname === navItems[1].href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {navItems[1].label}
+                </span>
+              </Link>
+
+              <Link 
+                href={navItems[2].href}
+                className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+              >
+                <div className={cn(
+                  "p-2 rounded-2xl transition-all duration-300",
+                  pathname === navItems[2].href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {React.cloneElement(navItems[2].icon as React.ReactElement, { 
+                    size: 24,
+                    strokeWidth: pathname === navItems[2].href ? 2.5 : 2 
+                  })}
+                </div>
+                <span className={cn(
+                  "text-[10px] font-bold transition-colors duration-300",
+                  pathname === navItems[2].href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {navItems[2].label}
+                </span>
+              </Link>
+            </div>
+
+            {/* Spacer for Center Button */}
+            <div className="w-20" /> 
+
+            {/* Right Items */}
+            <div className="flex-1 flex justify-evenly items-center h-full pb-1">
+              <Link 
+                href={navItems[3].href}
+                className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+              >
+                <div className={cn(
+                  "p-2 rounded-2xl transition-all duration-300",
+                  pathname === navItems[3].href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {React.cloneElement(navItems[3].icon as React.ReactElement, { 
+                    size: 24,
+                    strokeWidth: pathname === navItems[3].href ? 2.5 : 2 
+                  })}
+                </div>
+                <span className={cn(
+                  "text-[10px] font-bold transition-colors duration-300",
+                  pathname === navItems[3].href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {navItems[3].label}
+                </span>
+              </Link>
+
+              {/* Placeholder for symmetry or future item */}
+              <div className="w-12 opacity-0 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Center Floating Button (Sơ đồ) - Positioned in the cutout */}
+          <div className="absolute bottom-[25px] left-1/2 -translate-x-1/2 pointer-events-auto">
+             <Link 
+               href={navItems[0].href}
+               className={cn(
+                 "flex items-center justify-center w-[64px] h-[64px] rounded-full shadow-[0_8px_20px_rgba(0,122,255,0.3)] transition-all duration-300 active:scale-95 group",
+                 pathname === navItems[0].href 
+                   ? "bg-[#007AFF] text-white" 
+                   : "bg-white text-slate-400 border border-slate-100"
+               )}
+             >
+               {React.cloneElement(navItems[0].icon as React.ReactElement, { 
+                  size: 28,
+                  strokeWidth: 2.5,
+                  className: "group-hover:scale-110 transition-transform"
+               })}
+             </Link>
+          </div>
         </nav>
         
         <Toaster position="top-right" richColors toastOptions={{

@@ -33,10 +33,6 @@ export default function DashboardPage() {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [isFolioOpen, setIsFolioOpen] = useState(false);
 
-  // Virtual Time State
-  const [isVirtualEnabled, setIsVirtualEnabled] = useState(false);
-  const [virtualTime, setVirtualTime] = useState(new Date().toISOString());
-
   // Fetch initial data
   const fetchData = async () => {
     try {
@@ -69,8 +65,7 @@ export default function DashboardPage() {
       const activeBookings = await Promise.all((bookingsData || []).map(async (b) => {
         try {
           const { data: billData } = await supabase.rpc('calculate_booking_bill', { 
-            p_booking_id: b.id,
-            p_now_override: isVirtualEnabled ? virtualTime : null
+            p_booking_id: b.id
           });
           return { 
             ...b, 
@@ -162,28 +157,11 @@ export default function DashboardPage() {
       })
       .subscribe();
 
-    // Interval to update "minutes ago" or timers every minute
-    const interval = setInterval(() => {
-       // If virtual time is NOT enabled, we just trigger re-render
-       // If virtual time IS enabled, we might want to increment it, 
-       // but for testing usually static is better or manually controlled.
-       setRooms(prev => [...prev]); 
-    }, 60000);
-
     return () => {
       supabase.removeChannel(roomsChannel);
       supabase.removeChannel(bookingsChannel);
-      clearInterval(interval);
     };
-  }, [isVirtualEnabled, virtualTime]);
-
-  // Handle virtual time toggle
-  const handleVirtualToggle = (enabled: boolean) => {
-    setIsVirtualEnabled(enabled);
-    if (enabled) {
-      setVirtualTime(new Date().toISOString());
-    }
-  };
+  }, []);
 
   // Filtering Logic
   const filteredRooms = useMemo(() => {
@@ -299,10 +277,6 @@ export default function DashboardPage() {
           counts={counts}
           filters={filters}
           onToggle={handleToggleFilter}
-          isVirtualEnabled={isVirtualEnabled}
-          virtualTime={virtualTime}
-          onVirtualToggle={handleVirtualToggle}
-          onVirtualTimeChange={setVirtualTime}
         />
 
         {loading ? (
@@ -316,7 +290,6 @@ export default function DashboardPage() {
                 key={room.id} 
                 room={room} 
                 onClick={handleRoomClick} 
-                virtualTime={isVirtualEnabled ? virtualTime : null}
               />
             ))}
           </div>
@@ -344,7 +317,6 @@ export default function DashboardPage() {
             room={selectedRoom}
             booking={selectedRoom.current_booking}
             onUpdate={fetchData}
-            virtualTime={isVirtualEnabled ? virtualTime : null}
           />
         )}
     </div>

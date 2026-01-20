@@ -212,14 +212,17 @@ export const customerService = {
     customerId: string, 
     amount: number, 
     type: 'payment' | 'charge' | 'adjustment' | 'refund', 
-    description: string
+    description: string,
+    verifiedStaff?: { id: string, name: string }
   ) {
     try {
       const { data, error } = await supabase.rpc('adjust_customer_balance', {
         p_customer_id: customerId,
         p_amount: amount,
         p_type: type,
-        p_description: description
+        p_description: description,
+        p_verified_by_staff_id: verifiedStaff?.id || null,
+        p_verified_by_staff_name: verifiedStaff?.name || null
       });
 
       if (error) throw error;
