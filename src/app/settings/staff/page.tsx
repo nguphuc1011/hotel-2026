@@ -42,6 +42,7 @@ export default function StaffSettingsPage() {
   // Modals State
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isSelfChangePinModalOpen, setIsSelfChangePinModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [staffFormData, setStaffFormData] = useState({
     username: '',
@@ -51,6 +52,12 @@ export default function StaffSettingsPage() {
   });
   const [pinFormData, setPinFormData] = useState({
     pin: '',
+    confirmPin: ''
+  });
+  const [selfChangePinFormData, setSelfChangePinFormData] = useState({
+    staffId: '',
+    oldPin: '',
+    newPin: '',
     confirmPin: ''
   });
 
@@ -154,8 +161,8 @@ export default function StaffSettingsPage() {
 
   const handleSavePin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinFormData.pin.length < 4) {
-      toast.error('Mã PIN phải có ít nhất 4 số');
+    if (pinFormData.pin.length !== 4) {
+      toast.error('Mã PIN phải có đúng 4 số');
       return;
     }
     if (pinFormData.pin !== pinFormData.confirmPin) {
@@ -181,6 +188,53 @@ export default function StaffSettingsPage() {
     }
   };
 
+  const handleSelfChangePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selfChangePinFormData.staffId) {
+      toast.error('Vui lòng chọn nhân viên');
+      return;
+    }
+    if (selfChangePinFormData.newPin.length !== 4) {
+      toast.error('Mã PIN mới phải có đúng 4 số');
+      return;
+    }
+    if (selfChangePinFormData.newPin !== selfChangePinFormData.confirmPin) {
+      toast.error('Mã PIN xác nhận không khớp');
+      return;
+    }
+
+    try {
+      // 1. Verify Old PIN
+      const { data: isValid, error: verifyError } = await supabase.rpc('fn_verify_staff_pin', {
+        p_staff_id: selfChangePinFormData.staffId,
+        p_pin_hash: selfChangePinFormData.oldPin
+      });
+
+      if (verifyError) throw verifyError;
+      if (!isValid) {
+        toast.error('Mã PIN cũ không chính xác');
+        return;
+      }
+
+      // 2. Set New PIN
+      const { data, error } = await supabase.rpc('fn_manage_staff', {
+        p_action: 'SET_PIN',
+        p_id: selfChangePinFormData.staffId,
+        p_pin_hash: selfChangePinFormData.newPin
+      });
+
+      if (error) throw error;
+      if (data && !data.success) throw new Error(data.message);
+
+      toast.success('Đổi mã PIN thành công');
+      setIsSelfChangePinModalOpen(false);
+      setSelfChangePinFormData({ staffId: '', oldPin: '', newPin: '', confirmPin: '' });
+      fetchData();
+    } catch (error: any) {
+      toast.error('Lỗi: ' + error.message);
+    }
+  };
+
   const securityCategories = [
     { id: 'checkin', name: 'Nhận phòng', color: 'text-blue-500' },
     { id: 'folio', name: 'Dịch vụ', color: 'text-purple-500' },
@@ -199,6 +253,7 @@ export default function StaffSettingsPage() {
     'folio_edit_service': 'Sửa số lượng/đơn giá dịch vụ',
     'folio_change_room': 'Đổi phòng',
     'checkout_discount': 'Áp dụng giảm giá (Discount)',
+    'checkout_payment': 'Xác nhận thanh toán thường (Tiền mặt/CK)',
     'checkout_custom_surcharge': 'Thêm phụ thu thủ công',
     'checkout_mark_as_debt': 'Xác nhận khách nợ (Ghi sổ)',
     'checkout_refund': 'Hoàn tiền mặt cho khách',
@@ -222,19 +277,28 @@ export default function StaffSettingsPage() {
           </h1>
         </div>
 
-        <div className="flex bg-gray-100 p-1 rounded-2xl">
-          <button 
-            onClick={() => setActiveTab('staff')}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'staff' ? 'bg-white text-accent shadow-sm' : 'text-muted hover:text-main'}`}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsSelfChangePinModalOpen(true)}
+            className="hidden md:flex px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all shadow-sm"
           >
-            Tài khoản
+            Đổi PIN Cá Nhân
           </button>
-          <button 
-            onClick={() => setActiveTab('security')}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'security' ? 'bg-white text-accent shadow-sm' : 'text-muted hover:text-main'}`}
-          >
-            Nút gạt bảo mật
-          </button>
+
+          <div className="flex bg-gray-100 p-1 rounded-2xl">
+            <button 
+              onClick={() => setActiveTab('staff')}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'staff' ? 'bg-white text-accent shadow-sm' : 'text-muted hover:text-main'}`}
+            >
+              Tài khoản
+            </button>
+            <button 
+              onClick={() => setActiveTab('security')}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'security' ? 'bg-white text-accent shadow-sm' : 'text-muted hover:text-main'}`}
+            >
+              Nút gạt bảo mật
+            </button>
+          </div>
         </div>
       </div>
 
@@ -411,12 +475,14 @@ export default function StaffSettingsPage() {
               
               <form onSubmit={handleSavePin} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Mã PIN mới (4-6 số)</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Mã PIN mới (4 số)</label>
                   <input
-                    type="password"
+                    type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    maxLength={6}
+                    maxLength={4}
+                    autoComplete="off"
+                    style={{ WebkitTextSecurity: 'disc' }}
                     value={pinFormData.pin}
                     onChange={(e) => setPinFormData({ ...pinFormData, pin: e.target.value.replace(/\D/g, '') })}
                     className="w-full h-16 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-2xl font-black tracking-[0.5em] outline-none transition-all"
@@ -426,10 +492,12 @@ export default function StaffSettingsPage() {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Xác nhận mã PIN</label>
                   <input
-                    type="password"
+                    type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    maxLength={6}
+                    maxLength={4}
+                    autoComplete="off"
+                    style={{ WebkitTextSecurity: 'disc' }}
                     value={pinFormData.confirmPin}
                     onChange={(e) => setPinFormData({ ...pinFormData, confirmPin: e.target.value.replace(/\D/g, '') })}
                     className="w-full h-16 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-2xl font-black tracking-[0.5em] outline-none transition-all"
@@ -438,7 +506,88 @@ export default function StaffSettingsPage() {
                 </div>
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={() => setIsPinModalOpen(false)} className="flex-1 h-14 bg-gray-100 text-muted rounded-2xl font-black uppercase tracking-widest">Hủy</button>
-                  <button type="submit" className="flex-1 h-14 bg-accent text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-accent/20">Xác nhận</button>
+                  <button type="submit" className="flex-1 h-14 bg-accent text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-accent/20">Lưu</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Self Change PIN */}
+      {isSelfChangePinModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8">
+              <h3 className="text-2xl font-black tracking-tight text-main mb-2 uppercase italic">Đổi PIN Cá Nhân</h3>
+              <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-8">Dành cho nhân viên tự thay đổi</p>
+              
+              <form onSubmit={handleSelfChangePin} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Nhân viên</label>
+                  <select
+                    value={selfChangePinFormData.staffId}
+                    onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, staffId: e.target.value })}
+                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none transition-all"
+                  >
+                    <option value="">-- Chọn nhân viên --</option>
+                    {staffList.filter(s => s.is_active).map(s => (
+                      <option key={s.id} value={s.id}>{s.full_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Mã PIN cũ</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    autoComplete="off"
+                    style={{ WebkitTextSecurity: 'disc' }}
+                    value={selfChangePinFormData.oldPin}
+                    onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, oldPin: e.target.value.replace(/\D/g, '') })}
+                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all"
+                    placeholder="••••"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Mã PIN mới (4 số)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    autoComplete="off"
+                    style={{ WebkitTextSecurity: 'disc' }}
+                    value={selfChangePinFormData.newPin}
+                    onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, newPin: e.target.value.replace(/\D/g, '') })}
+                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all"
+                    placeholder="••••"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Xác nhận PIN mới</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    autoComplete="off"
+                    style={{ WebkitTextSecurity: 'disc' }}
+                    value={selfChangePinFormData.confirmPin}
+                    onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, confirmPin: e.target.value.replace(/\D/g, '') })}
+                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all"
+                    placeholder="••••"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setIsSelfChangePinModalOpen(false)} className="flex-1 h-14 bg-gray-100 text-muted rounded-2xl font-black uppercase tracking-widest">Hủy</button>
+                  <button type="submit" className="flex-1 h-14 bg-accent text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-accent/20">Lưu</button>
                 </div>
               </form>
             </div>

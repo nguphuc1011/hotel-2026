@@ -94,7 +94,7 @@ export const bookingService = {
           
           total_amount: data.total_amount,
           discount_amount: data.discount_amount,
-          final_amount: data.total_amount - data.discount_amount,
+          final_amount: data.total_amount,
           
           deposit_amount: data.deposit_amount,
           amount_to_pay: data.amount_to_pay,
@@ -126,8 +126,7 @@ export const bookingService = {
         p_discount: params.discount,
         p_surcharge: params.surcharge,
         p_notes: params.notes,
-        p_verified_by_staff_id: params.verifiedStaff?.id || null,
-        p_verified_by_staff_name: params.verifiedStaff?.name || null
+        p_staff_id: params.verifiedStaff?.id || null
       });
 
       if (error) {
@@ -177,8 +176,7 @@ export const bookingService = {
         p_custom_price: data.custom_price ?? null,
         p_custom_price_reason: data.custom_price_reason ?? null,
         p_source: data.source || 'direct',
-        p_verified_by_staff_id: data.verifiedStaff?.id || null,
-        p_verified_by_staff_name: data.verifiedStaff?.name || null
+        p_staff_id: data.verifiedStaff?.id || null
       });
 
       if (error) throw error;
@@ -189,45 +187,17 @@ export const bookingService = {
     }
   },
 
-  async cancelBooking(bookingId: string, verifiedStaff?: { id: string, name: string }) {
+  async cancelBooking(bookingId: string, verifiedStaff?: { id: string, name: string }, reason?: string) {
     try {
-      // 1. Get booking info to know the room
-      const { data: booking, error: getError } = await supabase
-        .from('bookings')
-        .select('room_id')
-        .eq('id', bookingId)
-        .single();
-      
-      if (getError) throw getError;
+      const { data, error } = await supabase.rpc('cancel_booking', {
+        p_booking_id: bookingId,
+        p_reason: reason || 'Khách hủy',
+        p_staff_id: verifiedStaff?.id || null
+      });
 
-      // 2. Update booking status
-      const { error: updateBookingError } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'cancelled',
-          verified_by_staff_id: verifiedStaff?.id || null,
-          verified_by_staff_name: verifiedStaff?.name || null
-        })
-        .eq('id', bookingId);
-
-      if (updateBookingError) throw updateBookingError;
-
-      // 3. Reset room status
-      if (booking?.room_id) {
-        const { error: updateRoomError } = await supabase
-          .from('rooms')
-          .update({ 
-            status: 'available',
-            current_booking_id: null,
-            last_status_change: new Date().toISOString()
-          })
-          .eq('id', booking.room_id);
-        
-        if (updateRoomError) throw updateRoomError;
-      }
-
-      return { success: true };
-    } catch (err) {
+      if (error) throw error;
+      return { success: true, message: 'Hủy phòng thành công' };
+    } catch (err: any) {
       console.error('Cancel booking error:', err);
       throw err;
     }

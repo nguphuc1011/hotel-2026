@@ -30,6 +30,7 @@ VALUES
     ('folio_edit_service', 'Sửa số lượng/đơn giá dịch vụ', true, 'folio'),
     ('folio_change_room', 'Đổi phòng', true, 'folio'),
     ('checkout_discount', 'Áp dụng giảm giá (Discount)', true, 'checkout'),
+    ('checkout_payment', 'Xác nhận thanh toán thường (Tiền mặt/CK)', true, 'checkout'),
     ('checkout_custom_surcharge', 'Thêm phụ thu thủ công', true, 'checkout'),
     ('checkout_mark_as_debt', 'Xác nhận khách nợ (Ghi sổ)', true, 'checkout'),
     ('checkout_refund', 'Hoàn tiền mặt cho khách', true, 'checkout'),
@@ -70,7 +71,7 @@ AS $$
 BEGIN
     UPDATE public.settings_security
     SET is_enabled = p_is_enabled,
-        updated_at = NOW()
+    updated_at = NOW()
     WHERE key = p_key;
     
     RETURN jsonb_build_object('success', true, 'message', 'Cập nhật cấu hình thành công');
@@ -115,6 +116,10 @@ BEGIN
         RETURN jsonb_build_object('success', true, 'message', 'Cập nhật nhân viên thành công');
         
     ELSIF p_action = 'SET_PIN' THEN
+        IF length(p_pin_hash) <> 4 THEN
+            RETURN jsonb_build_object('success', false, 'message', 'Mã PIN phải gồm đúng 4 chữ số');
+        END IF;
+
         UPDATE public.staff
         SET pin_hash = p_pin_hash
         WHERE id = p_id;
@@ -148,5 +153,96 @@ DECLARE
 BEGIN
     SELECT pin_hash INTO v_correct_hash FROM public.staff WHERE id = p_staff_id;
     RETURN v_correct_hash = p_pin_hash;
+END;
+$$;
+
+--------------------------------------------------------------------------------
+-- 4. Tự đổi PIN (Dành cho nhân viên)
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_change_own_pin(
+    p_staff_id uuid,
+    p_old_pin text,
+    p_new_pin text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_current_pin text;
+BEGIN
+    -- 1. Kiểm tra độ dài PIN mới (phải là 4 số)
+    IF length(p_new_pin) <> 4 THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Mã PIN mới phải gồm đúng 4 chữ số');
+    END IF;
+
+    -- 2. Lấy PIN hiện tại
+    SELECT pin_hash INTO v_current_pin
+    FROM public.staff
+    WHERE id = p_staff_id;
+
+    IF v_current_pin IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Nhân viên không tồn tại hoặc chưa có PIN');
+    END IF;
+
+    -- 3. Xác thực PIN cũ
+    IF v_current_pin <> p_old_pin THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Mã PIN cũ không chính xác');
+    END IF;
+
+    -- 4. Cập nhật PIN mới
+    UPDATE public.staff
+    SET pin_hash = p_new_pin
+    WHERE id = p_staff_id;
+
+    RETURN jsonb_build_object('success', true, 'message', 'Đổi mã PIN thành công');
+END;
+$$;
+
+--------------------------------------------------------------------------------
+-- 5. Đăng nhập nhân viên (Staff Login)
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_staff_login(
+    p_username text,
+    p_pin text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_staff record;
+BEGIN
+    -- 1. Tìm nhân viên theo username
+    SELECT id, username, full_name, role, is_active, pin_hash 
+    INTO v_staff
+    FROM public.staff 
+    WHERE username = p_username;
+
+    IF v_staff.id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Tên đăng nhập không tồn tại');
+    END IF;
+
+    IF v_staff.is_active = false THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Tài khoản đã bị khóa');
+    END IF;
+
+    -- 2. Kiểm tra PIN
+    -- Lưu ý: Ở đây so sánh trực tiếp, trong thực tế nên hash
+    IF v_staff.pin_hash IS NULL OR v_staff.pin_hash <> p_pin THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Mã PIN không chính xác');
+    END IF;
+
+    -- 3. Trả về thông tin nhân viên (trừ pin_hash)
+    RETURN jsonb_build_object(
+        'success', true, 
+        'message', 'Đăng nhập thành công',
+        'data', jsonb_build_object(
+            'id', v_staff.id,
+            'username', v_staff.username,
+            'full_name', v_staff.full_name,
+            'role', v_staff.role
+        )
+    );
 END;
 $$;

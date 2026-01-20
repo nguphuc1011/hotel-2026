@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Lock, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Lock, X, CheckCircle2, AlertCircle, User } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useAuth } from '@/providers/AuthProvider';
 
 interface PinValidationModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export default function PinValidationModal({
   actionName,
   description 
 }: PinValidationModalProps) {
+  const { user } = useAuth();
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,31 +37,40 @@ export default function PinValidationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin.length < 4) return;
+    if (pin.length !== 4) return;
+    
+    // Ensure we have a user context
+    if (!user?.id) {
+      setError('Không tìm thấy thông tin người dùng');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      // Xác thực mã PIN bằng cách tìm staff có pin_hash khớp
-      // Lưu ý: Trong thực tế nên dùng mã hóa/hash, ở đây làm theo yêu cầu đơn giản & trực quan
-      const { data: staff, error: verifyError } = await supabase
-        .from('staff')
-        .select('id, full_name')
-        .eq('pin_hash', pin)
-        .eq('is_active', true)
-        .single();
+      // Use RPC to verify PIN for CURRENT logged in staff
+      const { data: isValid, error: verifyError } = await supabase.rpc('fn_verify_staff_pin', {
+        p_staff_id: user.id,
+        p_pin_hash: pin
+      });
 
-      if (verifyError || !staff) {
-        setError('Mã PIN không chính xác hoặc tài khoản đã bị khóa');
+      if (verifyError) throw verifyError;
+
+      if (!isValid) {
+        setError('Mã PIN không chính xác');
         setPin('');
         return;
       }
 
-      toast.success(`Xác thực thành công: ${staff.full_name}`);
-      onSuccess(staff.id, staff.full_name);
+      toast.success(`Xác thực thành công: ${user.full_name || 'Nhân viên'}`);
+      onSuccess(user.id, user.full_name);
+      // Note: onClose will be called by parent if needed, or we can call it here
+      // But based on usage, parent usually handles onClose in onSuccess or separately
+      // We'll call onClose to be safe and consistent with previous behavior
       onClose();
     } catch (err: any) {
+      console.error(err);
       setError('Có lỗi xảy ra khi xác thực');
     } finally {
       setLoading(false);
@@ -99,15 +110,20 @@ export default function PinValidationModal({
             <div className="relative">
               <input
                 ref={inputRef}
-                type="password"
+                type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                placeholder="Nhập mã PIN (4-6 số)"
-                className="w-full h-16 bg-gray-50 border-2 border-transparent focus:border-accent focus:bg-white rounded-2xl px-6 text-center text-2xl font-black tracking-[0.5em] transition-all outline-none placeholder:text-xs placeholder:tracking-normal placeholder:font-bold placeholder:uppercase"
+                maxLength={4}
                 autoComplete="off"
+                style={{ WebkitTextSecurity: 'disc' }}
+                name="access_pin_code"
+                value={pin}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 4) setPin(val);
+                }}
+                className="w-full h-20 bg-gray-50 border-2 border-transparent focus:border-accent rounded-[24px] px-6 text-center text-4xl font-black tracking-[1em] outline-none transition-all shadow-inner text-main"
+                placeholder="••••"
               />
               {loading && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -124,7 +140,7 @@ export default function PinValidationModal({
 
             <button
               type="submit"
-              disabled={pin.length < 4 || loading}
+              disabled={pin.length !== 4 || loading}
               className="w-full h-14 bg-accent disabled:bg-gray-200 text-white rounded-2xl font-black uppercase tracking-widest transition-all active:scale-[0.98] flex items-center justify-center gap-3 shadow-lg shadow-accent/20"
             >
               <CheckCircle2 size={20} />

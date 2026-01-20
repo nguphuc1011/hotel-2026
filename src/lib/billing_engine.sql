@@ -759,6 +759,8 @@ CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid, p_no
 --------------------------------------------------------------------------------
 -- 8. CORE: PROCESS CHECKOUT
 --------------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.process_checkout(uuid, text, numeric, numeric, numeric, text, uuid, uuid, text);
+
 CREATE OR REPLACE FUNCTION public.process_checkout(
     p_booking_id uuid, 
     p_payment_method text, 
@@ -809,17 +811,34 @@ BEGIN
     -- 3. Update Room Status
     UPDATE public.rooms SET status = 'dirty', updated_at = now() WHERE id = v_room_id;
 
-    -- 4. Record Ledger Entries
+    -- 4. Record Cash Flow (Dòng tiền)
     BEGIN
-        INSERT INTO public.ledger (booking_id, customer_id, type, category, amount, description, staff_id, payment_method_code)
-        VALUES (p_booking_id, v_customer_id, 'REVENUE', 'ROOM', (v_bill->>'room_charge')::numeric, 'Tiền phòng', v_staff_id, p_payment_method);
-        
         IF p_amount_paid > 0 THEN
-            INSERT INTO public.ledger (booking_id, customer_id, type, category, amount, description, staff_id, payment_method_code)
-            VALUES (p_booking_id, v_customer_id, 'PAYMENT', 'ROOM', p_amount_paid, 'Khách thanh toán checkout', v_staff_id, p_payment_method);
+            INSERT INTO public.cash_flow (
+                flow_type, 
+                category, 
+                amount, 
+                description, 
+                created_by, 
+                ref_id, 
+                is_auto, 
+                occurred_at
+            )
+            VALUES (
+                'IN', 
+                'Tiền phòng', 
+                p_amount_paid, 
+                'Thanh toán checkout phòng ' || COALESCE(v_bill->>'room_name', '???') || ' - ' || COALESCE(v_bill->>'customer_name', 'Khách lẻ'), 
+                v_staff_id, 
+                p_booking_id, 
+                true, 
+                now()
+            );
         END IF;
     EXCEPTION WHEN OTHERS THEN 
-        -- Ignore ledger errors for now
+        -- Log error to audit_logs instead of silent fail
+        INSERT INTO public.audit_logs (booking_id, customer_id, room_id, staff_id, total_amount, explanation)
+        VALUES (p_booking_id, v_customer_id, v_room_id, v_staff_id, 0, to_jsonb(ARRAY['Lỗi ghi nhận dòng tiền: ' || SQLERRM]));
     END;
 
     -- 5. Update Customer Balance

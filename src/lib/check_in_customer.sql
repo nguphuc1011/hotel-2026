@@ -4,7 +4,7 @@
 
 -- Drop any ambiguous versions first
 DROP FUNCTION IF EXISTS public.check_in_customer(uuid, text, uuid, numeric, jsonb, text, integer, integer, text, numeric, text, text);
-DROP FUNCTION IF EXISTS public.check_in_customer(uuid, text, uuid, text, text, text, text, timestamp with time zone, numeric, text, jsonb, integer, integer, text, numeric, text, text, uuid);
+DROP FUNCTION IF EXISTS public.check_in_customer(uuid, text, uuid, numeric, jsonb, text, integer, integer, text, numeric, text, text, uuid, text);
 
 CREATE OR REPLACE FUNCTION public.check_in_customer(
     p_room_id uuid,
@@ -18,7 +18,8 @@ CREATE OR REPLACE FUNCTION public.check_in_customer(
     p_notes text DEFAULT NULL,
     p_custom_price numeric DEFAULT NULL,
     p_custom_price_reason text DEFAULT NULL,
-    p_source text DEFAULT 'direct'
+    p_source text DEFAULT 'direct',
+    p_staff_id uuid DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -27,9 +28,12 @@ AS $$
 DECLARE
     v_booking_id uuid;
     v_customer_id uuid;
+    v_staff_id uuid;
     v_room_status text;
     v_check_in_at timestamptz := now();
 BEGIN
+    v_staff_id := COALESCE(p_staff_id, auth.uid());
+
     SELECT status INTO v_room_status FROM public.rooms WHERE id = p_room_id;
     IF NOT FOUND THEN
         RETURN jsonb_build_object('success', false, 'message', 'Lỗi: Phòng không tồn tại.');
@@ -61,7 +65,8 @@ BEGIN
         extra_children,
         custom_price,
         custom_price_reason,
-        source
+        source,
+        verified_by_staff_id
     ) VALUES (
         p_room_id,
         v_customer_id,
@@ -75,7 +80,8 @@ BEGIN
         p_extra_children,
         p_custom_price,
         p_custom_price_reason,
-        p_source
+        p_source,
+        v_staff_id
     ) RETURNING id INTO v_booking_id;
 
     UPDATE public.rooms
@@ -84,6 +90,30 @@ BEGIN
         current_booking_id = v_booking_id,
         last_status_change = v_check_in_at
     WHERE id = p_room_id;
+
+    -- Log Cash Flow for Deposit (if any)
+    IF p_deposit > 0 THEN
+        INSERT INTO public.cash_flow (
+            flow_type, 
+            category, 
+            amount, 
+            description, 
+            created_by, 
+            ref_id, 
+            is_auto, 
+            occurred_at
+        )
+        VALUES (
+            'IN', 
+            'Tiền cọc', 
+            p_deposit, 
+            'Tiền cọc phòng ' || (SELECT room_number FROM public.rooms WHERE id = p_room_id), 
+            v_staff_id, 
+            v_booking_id, 
+            true, 
+            now()
+        );
+    END IF;
 
     RETURN jsonb_build_object(
         'success', true,

@@ -8,12 +8,13 @@
 
 ### 1.1. Đăng nhập 2 lớp (Double-Lock Entry)
 - **Username:** Định danh duy nhất do Admin cấp (Biết ai là ai).
-- **Mã PIN:** Dãy 4-6 số do nhân viên tự quản lý (Chứng minh đúng là người đó).
+- **Mã PIN:** Dãy 4 số BẮT BUỘC do nhân viên tự quản lý (Chứng minh đúng là người đó).
 
 ### 1.2. Ba trạng thái vận hành mã PIN
 - **Mở cổng (Activation):** Nhập Username + PIN để bắt đầu ca và mở "Két tiền ảo".
 - **Khóa phiên (Auto-Lock):** Sau 60s không thao tác, màn hình tự khóa. 
 - **Ký tên giao dịch (Transaction Signature):** Mọi hành động nhạy cảm đều bắt buộc nhập PIN.
+- **Tự quản trị (Self-Service):** Nhân viên có quyền tự đổi mã PIN của mình (yêu cầu nhập đúng PIN cũ).
 
 ### 1.3. Bằng chứng thép (Ironclad Audit Trail)
 *Quy tắc: "Mọi thay đổi đều phải có tên người chịu trách nhiệm"*

@@ -187,6 +187,17 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
           return;
         }
       }
+
+      // 4. Check Standard Payment (If no other checks triggered or as a final gate)
+      // Note: If debt check passed (or wasn't debt), we still check standard payment if enabled
+      if (!isDebt) {
+        const requiresPin = await securityService.checkActionRequiresPin('checkout_payment');
+        if (requiresPin) {
+          setSecurityAction('checkout_payment');
+          setIsPinModalOpen(true);
+          return;
+        }
+      }
     }
 
     setIsProcessing(true);
