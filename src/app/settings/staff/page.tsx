@@ -482,10 +482,9 @@ export default function StaffSettingsPage() {
                     pattern="[0-9]*"
                     maxLength={4}
                     autoComplete="off"
-                    style={{ WebkitTextSecurity: 'disc' }}
                     value={pinFormData.pin}
                     onChange={(e) => setPinFormData({ ...pinFormData, pin: e.target.value.replace(/\D/g, '') })}
-                    className="w-full h-16 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-2xl font-black tracking-[0.5em] outline-none transition-all"
+                    className="w-full h-16 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-2xl font-black tracking-[0.5em] outline-none transition-all mask-disc"
                     placeholder="••••"
                   />
                 </div>
@@ -497,10 +496,9 @@ export default function StaffSettingsPage() {
                     pattern="[0-9]*"
                     maxLength={4}
                     autoComplete="off"
-                    style={{ WebkitTextSecurity: 'disc' }}
                     value={pinFormData.confirmPin}
                     onChange={(e) => setPinFormData({ ...pinFormData, confirmPin: e.target.value.replace(/\D/g, '') })}
-                    className="w-full h-16 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-2xl font-black tracking-[0.5em] outline-none transition-all"
+                    className="w-full h-16 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-2xl font-black tracking-[0.5em] outline-none transition-all mask-disc"
                     placeholder="••••"
                   />
                 </div>
