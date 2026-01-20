@@ -100,6 +100,11 @@ body {
   animation: flash-red 2s infinite;
 }
 
+/* Security */
+.mask-disc {
+  -webkit-text-security: disc;
+}
+
 @keyframes shine {
   from { transform: translateX(-100%); }
   to { transform: translateX(100%); }

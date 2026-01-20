@@ -58,11 +58,10 @@ export default function LoginPage() {
                   type="text"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-accent rounded-2xl font-bold text-slate-800 outline-none transition-all"
+                  className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-accent rounded-2xl font-bold text-slate-800 outline-none transition-all mask-disc"
                   placeholder="Nhập mã PIN..."
                   maxLength={4}
                   autoComplete="off"
-                  style={{ WebkitTextSecurity: 'disc' }}
                 />
               </div>
             </div>

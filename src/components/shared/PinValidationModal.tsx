@@ -115,14 +115,13 @@ export default function PinValidationModal({
                 pattern="[0-9]*"
                 maxLength={4}
                 autoComplete="off"
-                style={{ WebkitTextSecurity: 'disc' }}
                 name="access_pin_code"
                 value={pin}
                 onChange={(e) => {
                   const val = e.target.value.replace(/\D/g, '');
                   if (val.length <= 4) setPin(val);
                 }}
-                className="w-full h-20 bg-gray-50 border-2 border-transparent focus:border-accent rounded-[24px] px-6 text-center text-4xl font-black tracking-[1em] outline-none transition-all shadow-inner text-main"
+                className="w-full h-20 bg-gray-50 border-2 border-transparent focus:border-accent rounded-[24px] px-6 text-center text-4xl font-black tracking-[1em] outline-none transition-all shadow-inner text-main mask-disc"
                 placeholder="••••"
               />
               {loading && (

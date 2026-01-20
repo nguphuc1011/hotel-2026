@@ -545,10 +545,9 @@ export default function StaffSettingsPage() {
                     pattern="[0-9]*"
                     maxLength={4}
                     autoComplete="off"
-                    style={{ WebkitTextSecurity: 'disc' }}
                     value={selfChangePinFormData.oldPin}
                     onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, oldPin: e.target.value.replace(/\D/g, '') })}
-                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all"
+                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all mask-disc"
                     placeholder="••••"
                   />
                 </div>
@@ -561,10 +560,9 @@ export default function StaffSettingsPage() {
                     pattern="[0-9]*"
                     maxLength={4}
                     autoComplete="off"
-                    style={{ WebkitTextSecurity: 'disc' }}
                     value={selfChangePinFormData.newPin}
                     onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, newPin: e.target.value.replace(/\D/g, '') })}
-                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all"
+                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all mask-disc"
                     placeholder="••••"
                   />
                 </div>
@@ -577,10 +575,9 @@ export default function StaffSettingsPage() {
                     pattern="[0-9]*"
                     maxLength={4}
                     autoComplete="off"
-                    style={{ WebkitTextSecurity: 'disc' }}
                     value={selfChangePinFormData.confirmPin}
                     onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, confirmPin: e.target.value.replace(/\D/g, '') })}
-                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all"
+                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 text-center text-xl font-black tracking-[0.5em] outline-none transition-all mask-disc"
                     placeholder="••••"
                   />
                 </div>
