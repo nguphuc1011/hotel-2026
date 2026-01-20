@@ -13,6 +13,7 @@ export type SecurityAction =
   | 'checkout_mark_as_debt'
   | 'checkout_refund'
   | 'checkout_void_bill'
+  | 'checkout_payment'
   | 'finance_manual_cash_out'
   | 'finance_create_income'
   | 'inventory_adjust'
