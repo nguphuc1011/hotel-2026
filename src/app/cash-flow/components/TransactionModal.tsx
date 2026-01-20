@@ -65,9 +65,9 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
           return;
         }
       } else {
-        const requiresPin = await securityService.checkActionRequiresPin('finance_create_expense');
+        const requiresPin = await securityService.checkActionRequiresPin('finance_manual_cash_out');
         if (requiresPin) {
-          setSecurityAction('finance_create_expense');
+          setSecurityAction('finance_manual_cash_out');
           setIsPinModalOpen(true);
           return;
         }
@@ -226,12 +226,12 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
             setIsPinModalOpen(false);
             setSecurityAction(null);
           }}
-          onSuccess={(verifiedStaff) => {
+          onSuccess={(staffId, staffName) => {
             setIsPinModalOpen(false);
             setSecurityAction(null);
-            handleSubmit(undefined, verifiedStaff);
+            handleSubmit(undefined, { id: staffId, name: staffName });
           }}
-          action={securityAction || 'access_settings'}
+          actionName={securityAction || 'access_settings'}
         />
       </div>
     </div>

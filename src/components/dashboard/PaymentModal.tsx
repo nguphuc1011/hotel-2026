@@ -199,9 +199,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
         discount,
         surcharge,
         notes,
-        // Thêm thông tin nhân viên xác thực nếu có
-        verified_by_staff_id: verifiedStaff?.id,
-        verified_by_staff_name: verifiedStaff?.name
+        verifiedStaff: verifiedStaff
       });
 
       if (result.success) {
@@ -405,7 +403,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
         {/* --- FOOTER --- */}
         <div className="p-8 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
           <button
-            onClick={handleCheckout}
+            onClick={() => handleCheckout()}
             disabled={isProcessing}
             className={cn(
               "w-full h-16 rounded-[24px] font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98]",
@@ -438,7 +436,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
           setIsPinModalOpen(false);
           handleCheckout({ id: staffId, name: staffName });
         }}
-        action={securityAction || 'checkout_discount'}
+        actionName={securityAction || 'checkout_discount'}
       />
     </div>,
     document.body

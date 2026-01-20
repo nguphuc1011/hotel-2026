@@ -631,7 +631,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                         HỦY
                     </button>
                     <button 
-                        onClick={handleSaveServices}
+                        onClick={() => handleSaveServices()}
                         disabled={isSaving}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-14 rounded-[28px] font-bold text-lg shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 animate-pulse"
                     >
@@ -689,7 +689,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                     handleCancelBooking({ id: staffId, name: staffName });
                 }
             }}
-            action={securityAction || 'folio_add_service'}
+            actionName={securityAction || 'folio_add_service'}
         />
       </div>
     </div>,

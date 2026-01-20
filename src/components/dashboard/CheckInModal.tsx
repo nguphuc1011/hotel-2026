@@ -849,7 +849,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                     setIsPinModalOpen(false);
                     handleSubmit({ id: staffId, name: staffName });
                 }}
-                action={securityAction || 'checkin_custom_price'}
+                actionName={securityAction || 'checkin_custom_price'}
             />
             </div>
         </div>,

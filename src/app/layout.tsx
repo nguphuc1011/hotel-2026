@@ -104,7 +104,7 @@ export default function RootLayout({
                   "p-2 rounded-2xl transition-all duration-300",
                   pathname === navItems[1].href ? "text-[#007AFF]" : "text-slate-400"
                 )}>
-                  {React.cloneElement(navItems[1].icon as React.ReactElement, { 
+                  {React.cloneElement(navItems[1].icon as any, { 
                     size: 24,
                     strokeWidth: pathname === navItems[1].href ? 2.5 : 2 
                   })}
@@ -125,7 +125,7 @@ export default function RootLayout({
                   "p-2 rounded-2xl transition-all duration-300",
                   pathname === navItems[2].href ? "text-[#007AFF]" : "text-slate-400"
                 )}>
-                  {React.cloneElement(navItems[2].icon as React.ReactElement, { 
+                  {React.cloneElement(navItems[2].icon as any, { 
                     size: 24,
                     strokeWidth: pathname === navItems[2].href ? 2.5 : 2 
                   })}
@@ -152,7 +152,7 @@ export default function RootLayout({
                   "p-2 rounded-2xl transition-all duration-300",
                   pathname === navItems[3].href ? "text-[#007AFF]" : "text-slate-400"
                 )}>
-                  {React.cloneElement(navItems[3].icon as React.ReactElement, { 
+                  {React.cloneElement(navItems[3].icon as any, { 
                     size: 24,
                     strokeWidth: pathname === navItems[3].href ? 2.5 : 2 
                   })}
@@ -181,7 +181,7 @@ export default function RootLayout({
                    : "bg-white text-slate-400 border border-slate-100"
                )}
              >
-               {React.cloneElement(navItems[0].icon as React.ReactElement, { 
+               {React.cloneElement(navItems[0].icon as any, { 
                   size: 28,
                   strokeWidth: 2.5,
                   className: "group-hover:scale-110 transition-transform"

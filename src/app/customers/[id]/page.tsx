@@ -425,7 +425,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 Hủy
               </button>
               <button 
-                onClick={handleTransaction}
+                onClick={() => handleTransaction()}
                 className="px-6 py-3 rounded-xl font-bold bg-accent text-white shadow-lg shadow-accent/20 hover:bg-accent/90 transition-colors"
               >
                 Xác nhận
@@ -530,15 +530,15 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           setIsPinModalOpen(false);
           setSecurityAction(null);
         }}
-        onSuccess={(verifiedStaff) => {
+        onSuccess={(staffId, staffName) => {
           setIsPinModalOpen(false);
           setSecurityAction(null);
           
           if (securityAction === 'checkout_refund') {
-            handleTransaction(verifiedStaff);
+            handleTransaction({ id: staffId, name: staffName });
           }
         }}
-        action={securityAction || 'access_settings'}
+        actionName={securityAction || 'access_settings'}
       />
     </div>
   );

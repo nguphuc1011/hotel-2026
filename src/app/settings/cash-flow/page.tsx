@@ -97,10 +97,10 @@ export default function CashFlowSettingsPage() {
 
     const confirmed = await confirmDialog({
       title: 'Xóa danh mục?',
-      description: `Bạn có chắc muốn xóa danh mục "${cat.name}"?`,
-      confirmText: 'Xóa',
-      cancelText: 'Hủy',
-      variant: 'danger'
+      message: `Bạn có chắc muốn xóa danh mục "${cat.name}"?`,
+      confirmLabel: 'Xóa',
+      cancelLabel: 'Hủy',
+      destructive: true
     });
 
     if (!confirmed) return;

@@ -14,6 +14,7 @@ export type SecurityAction =
   | 'checkout_refund'
   | 'checkout_void_bill'
   | 'finance_manual_cash_out'
+  | 'finance_create_income'
   | 'inventory_adjust'
   | 'finance_manage_category'
   | 'finance_delete_transaction';
