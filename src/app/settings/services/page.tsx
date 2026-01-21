@@ -48,6 +48,11 @@ export default function ServicesPage() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   
+  // PIN Validation State
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(null);
+  const [pinActionName, setPinActionName] = useState('');
+  
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [logs, setLogs] = useState<InventoryLog[]>([]);
 
