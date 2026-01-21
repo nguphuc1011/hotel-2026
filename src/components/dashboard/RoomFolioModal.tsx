@@ -116,6 +116,8 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // --- Search for PaymentModal usage ---
+
   // Security State
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);

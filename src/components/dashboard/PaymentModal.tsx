@@ -37,7 +37,8 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
   const [mounted, setMounted] = useState(false);
   const customerBalance = bill.customer_balance ?? 0;
   const oldDebt = customerBalance < 0 ? Math.abs(customerBalance) : 0;
-  const totalReceivable = bill.amount_to_pay;
+  // Tự động cộng nợ cũ vào tổng cộng cần thu
+  const totalReceivable = bill.amount_to_pay + oldDebt;
 
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'TRANSFER' | 'CARD'>('CASH');
   const [amountPaid, setAmountPaid] = useState<number>(totalReceivable);
@@ -74,11 +75,11 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
 
   // Update amountPaid if bill changes
   useEffect(() => {
-    const nextTotal = bill.amount_to_pay;
+    const nextTotal = bill.amount_to_pay + oldDebt;
     setAmountPaid(nextTotal);
     setDiscount(bill.discount_amount || 0);
     setSurcharge(bill.custom_surcharge || 0);
-  }, [bill]);
+  }, [bill, oldDebt]);
 
   if (!isOpen || !mounted) return null;
 
@@ -266,6 +267,18 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
                 <span className="text-xl ml-1 text-slate-400">đ</span>
               </span>
             </div>
+            
+            {oldDebt > 0 && (
+              <div className="flex justify-between items-center p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-white">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-bold text-amber-800">Bao gồm nợ cũ:</span>
+                </div>
+                <span className="font-black text-amber-900">{oldDebt.toLocaleString()}đ</span>
+              </div>
+            )}
             
             <div className="h-px bg-slate-50" />
             

@@ -6,7 +6,8 @@ import {
   ClipboardList, 
   Settings as SettingsIcon,
   LogOut,
-  Wallet
+  Wallet,
+  Users
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -28,6 +29,7 @@ export default function AppShell({
 
   const navItems = [
     { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: '/' },
+    { icon: <Users size={24} />, label: 'Khách hàng', href: '/customers' },
     { icon: <Wallet size={24} />, label: 'Thu Chi', href: '/cash-flow' },
     { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: '/reports' },
     { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: '/settings' },
@@ -168,8 +170,26 @@ export default function AppShell({
               </span>
             </Link>
 
-            {/* Placeholder for symmetry or future item */}
-            <div className="w-12 opacity-0 pointer-events-none" />
+            <Link 
+              href={navItems[4].href}
+              className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+            >
+              <div className={cn(
+                "p-2 rounded-2xl transition-all duration-300",
+                pathname === navItems[4].href ? "text-[#007AFF]" : "text-slate-400"
+              )}>
+                {React.cloneElement(navItems[4].icon as any, { 
+                  size: 24,
+                  strokeWidth: pathname === navItems[4].href ? 2.5 : 2 
+                })}
+              </div>
+              <span className={cn(
+                "text-[10px] font-bold transition-colors duration-300",
+                pathname === navItems[4].href ? "text-[#007AFF]" : "text-slate-400"
+              )}>
+                {navItems[4].label}
+              </span>
+            </Link>
           </div>
         </div>
 

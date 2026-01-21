@@ -352,8 +352,53 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             )}
             
             {activeTab === 'bookings' && (
-              <div className="p-12 text-center text-muted font-medium">
-                Tính năng đang phát triển...
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-white/40">
+                      <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-muted">Phòng</th>
+                      <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-muted">Thời gian đến</th>
+                      <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-muted">Thời gian đi</th>
+                      <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-muted">Trạng thái</th>
+                      <th className="px-6 py-4 text-right text-xs font-black uppercase tracking-wider text-muted">Tổng tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {bookings.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-12 text-muted">Chưa có lịch sử thuê phòng nào</td>
+                      </tr>
+                    ) : (
+                      bookings.map((bk) => (
+                        <tr key={bk.id} className="hover:bg-white/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-accent">Phòng {bk.room?.room_number || '---'}</div>
+                            <div className="text-[10px] text-muted font-medium">{bk.rental_type === 'hourly' ? 'Theo giờ' : bk.rental_type === 'daily' ? 'Theo ngày' : 'Qua đêm'}</div>
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-600">
+                            {bk.check_in_actual ? format(new Date(bk.check_in_actual), 'HH:mm dd/MM/yyyy') : '---'}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-600">
+                            {bk.check_out_actual ? format(new Date(bk.check_out_actual), 'HH:mm dd/MM/yyyy') : 'Chưa trả phòng'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={cn(
+                              "inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold",
+                              bk.status === 'checked_in' ? "bg-blue-100 text-blue-700" :
+                              bk.status === 'checked_out' ? "bg-green-100 text-green-700" :
+                              "bg-gray-100 text-gray-700"
+                            )}>
+                              {bk.status === 'checked_in' ? 'Đang ở' : bk.status === 'checked_out' ? 'Đã trả phòng' : bk.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right font-black text-main">
+                            {bk.total_amount ? formatCurrency(bk.total_amount) : '---'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

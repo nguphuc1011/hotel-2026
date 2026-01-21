@@ -63,6 +63,7 @@ export default function ServicesPage() {
 
   // Bulk Import State
   const [bulkItems, setBulkItems] = useState<{id: string, qty: number, mode: 'buy_unit' | 'sell_unit'}[]>([]);
+  const [securitySettings, setSecuritySettings] = useState<Record<string, boolean>>({});
 
   // Fetch Services
   const fetchServices = async () => {
@@ -76,8 +77,14 @@ export default function ServicesPage() {
     setIsLoading(false);
   };
 
+  const fetchSecuritySettings = async () => {
+    const { data } = await supabase.rpc('fn_get_security_settings');
+    if (data) setSecuritySettings(data);
+  };
+
   useEffect(() => {
     fetchServices();
+    fetchSecuritySettings();
   }, []);
 
   // Handlers
@@ -124,7 +131,7 @@ export default function ServicesPage() {
     toast.success(`Đã ${!service.is_active ? 'hiện' : 'ẩn'} dịch vụ thành công`);
   };
 
-  const handleImport = async () => {
+  const executeImport = async () => {
     if (!selectedService || inventoryForm.quantity <= 0) return;
 
     // We now use p_qty_buy and p_total_amount directly
@@ -175,7 +182,19 @@ export default function ServicesPage() {
     toast.success('Đã nhập kho thành công');
   };
 
-  const handleBulkImport = async () => {
+  const handleImport = async () => {
+    if (!selectedService || inventoryForm.quantity <= 0) return;
+
+    if (securitySettings['inventory_import']) {
+        setPendingAction(() => executeImport);
+        setPinActionName('Xác nhận nhập kho');
+        setIsPinModalOpen(true);
+    } else {
+        await executeImport();
+    }
+  };
+
+  const executeBulkImport = async () => {
     const itemsToImport = bulkItems.filter(i => i.qty > 0);
     if (itemsToImport.length === 0) {
         toast.error('Chưa nhập số lượng cho món nào cả!');
@@ -210,6 +229,22 @@ export default function ServicesPage() {
     setBulkItems([]);
     fetchServices();
     toast.success('Đã nhập kho thành công!');
+  };
+
+  const handleBulkImport = async () => {
+      const itemsToImport = bulkItems.filter(i => i.qty > 0);
+      if (itemsToImport.length === 0) {
+          toast.error('Chưa nhập số lượng cho món nào cả!');
+          return;
+      }
+
+      if (securitySettings['inventory_import']) {
+          setPendingAction(() => executeBulkImport);
+          setPinActionName('Xác nhận nhập kho hàng loạt');
+          setIsPinModalOpen(true);
+      } else {
+          await executeBulkImport();
+      }
   };
 
   const handleAdjust = async () => {

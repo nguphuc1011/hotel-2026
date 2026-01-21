@@ -260,6 +260,7 @@ export default function StaffSettingsPage() {
     'checkout_void_bill': 'Hủy hóa đơn đã thanh toán',
     'finance_manual_cash_out': 'Chi tiền mặt từ két',
     'inventory_adjust': 'Điều chỉnh kho (Hư hỏng/mất)',
+    'inventory_import': 'Nhập kho hàng hóa',
     'finance_delete_transaction': 'Xóa lịch sử thu chi'
   };
 

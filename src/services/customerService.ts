@@ -167,19 +167,50 @@ export const customerService = {
 
   async getCustomerBookings(customerId: string) {
     try {
-      const { data, error } = await supabase
+      if (!customerId || customerId === 'undefined') return [];
+      
+      // Basic UUID validation to prevent Postgres errors
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(customerId)) {
+        console.warn('Invalid customerId for bookings fetch:', customerId);
+        return [];
+      }
+      
+      // 1. Fetch bookings
+      const { data: bookings, error } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          room:rooms(room_number)
-        `)
+        .select('*')
         .eq('customer_id', customerId)
-        .order('check_in_at', { ascending: false });
+        .order('check_in_actual', { ascending: false });
 
       if (error) throw error;
-      return data;
-    } catch (err) {
-      console.error('Error fetching customer bookings:', err);
+      if (!bookings || bookings.length === 0) return [];
+
+      // 2. Fetch room details manually to avoid join issues
+      const roomIds = Array.from(new Set(bookings.map(b => b.room_id).filter(Boolean)));
+      if (roomIds.length > 0) {
+        const { data: rooms, error: roomError } = await supabase
+          .from('rooms')
+          .select('id, room_number')
+          .in('id', roomIds);
+        
+        if (!roomError && rooms) {
+          // 3. Merge data
+          return bookings.map(b => ({
+            ...b,
+            room: rooms.find(r => r.id === b.room_id)
+          }));
+        }
+      }
+
+      return bookings;
+    } catch (err: any) {
+      console.error('Error fetching customer bookings:', {
+        message: err.message,
+        details: err.details,
+        hint: err.hint,
+        code: err.code
+      });
       return [];
     }
   },

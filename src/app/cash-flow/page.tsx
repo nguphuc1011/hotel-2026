@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Filter, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Trash2 } from 'lucide-react';
+import { Plus, Filter, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { cashFlowService, CashFlowTransaction, CashFlowStats } from '@/services/cashFlowService';
 import TransactionModal from './components/TransactionModal';
 import CashFlowStatsCards from './components/CashFlowStats';
+import BookingHistoryModal from './components/BookingHistoryModal';
 
 export default function CashFlowPage() {
   const [stats, setStats] = useState<CashFlowStats>({
@@ -18,6 +19,10 @@ export default function CashFlowPage() {
   const [transactions, setTransactions] = useState<CashFlowTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [historyModal, setHistoryModal] = useState<{ open: boolean; bookingId: string | null }>({
+    open: false,
+    bookingId: null
+  });
   
   // Filter state
   const [dateRange, setDateRange] = useState({
@@ -223,15 +228,26 @@ export default function CashFlowPage() {
                       {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
                     </td>
                     <td className="p-4 text-center">
-                        {!tx.is_auto && (
-                            <button 
-                                onClick={() => handleDelete(tx.id)}
-                                className="text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                title="Xóa"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        )}
+                        <div className="flex items-center justify-center gap-2">
+                            {tx.ref_id && (tx.category === 'Tiền phòng' || tx.category === 'ROOM') && (
+                                <button 
+                                    onClick={() => setHistoryModal({ open: true, bookingId: tx.ref_id })}
+                                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Xem chi tiết hóa đơn"
+                                >
+                                    <Eye size={16} />
+                                </button>
+                            )}
+                            {!tx.is_auto && (
+                                <button 
+                                    onClick={() => handleDelete(tx.id)}
+                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Xóa"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            )}
+                        </div>
                     </td>
                   </tr>
                 ))
@@ -246,6 +262,14 @@ export default function CashFlowPage() {
         onClose={() => setIsModalOpen(false)} 
         onSuccess={fetchData} 
       />
+
+      {historyModal.bookingId && (
+        <BookingHistoryModal
+          isOpen={historyModal.open}
+          onClose={() => setHistoryModal({ open: false, bookingId: null })}
+          bookingId={historyModal.bookingId}
+        />
+      )}
     </div>
   );
 }
