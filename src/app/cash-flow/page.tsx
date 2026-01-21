@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Filter, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Trash2, Eye } from 'lucide-react';
+import { Plus, Filter, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Trash2, Eye, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cashFlowService, CashFlowTransaction, CashFlowStats } from '@/services/cashFlowService';
 import TransactionModal from './components/TransactionModal';
@@ -176,84 +176,90 @@ export default function CashFlowPage() {
       )}
 
       {/* Transaction List */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+      <div className="space-y-3">
+        <div className="flex justify-between items-center px-2">
             <h3 className="text-lg font-bold text-gray-900">Lịch sử giao dịch</h3>
             <span className="text-sm text-gray-500">{transactions.length} bản ghi</span>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-500 text-sm uppercase">
-              <tr>
-                <th className="p-4 font-medium">Thời gian</th>
-                <th className="p-4 font-medium">Loại</th>
-                <th className="p-4 font-medium">Danh mục</th>
-                <th className="p-4 font-medium">Diễn giải</th>
-                <th className="p-4 font-medium text-right">Số tiền</th>
-                <th className="p-4 font-medium text-center">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                    <td colSpan={6} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td>
-                </tr>
-              ) : transactions.length === 0 ? (
-                <tr>
-                    <td colSpan={6} className="p-8 text-center text-gray-500">Chưa có giao dịch nào trong khoảng thời gian này.</td>
-                </tr>
-              ) : (
-                transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="p-4 text-gray-900 whitespace-nowrap text-sm">
-                        {formatDate(tx.occurred_at)}
-                    </td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        tx.flow_type === 'IN' 
-                          ? 'bg-green-50 text-green-700 border border-green-200' 
-                          : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}>
-                        {tx.flow_type === 'IN' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                        {tx.flow_type === 'IN' ? 'Thu' : 'Chi'}
+        <div className="space-y-3">
+          {loading ? (
+            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Đang tải dữ liệu...</div>
+          ) : transactions.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Chưa có giao dịch nào trong khoảng thời gian này.</div>
+          ) : (
+            transactions.map((tx) => {
+              const dateObj = new Date(tx.occurred_at);
+              const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+              const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+              
+              // Viết tắt thông minh (Điều 6)
+              const smartDescription = (tx.description || tx.category || '')
+                .replace(/Phòng/g, 'P')
+                .replace(/Dịch vụ/g, 'DV');
+
+              return (
+                <div 
+                  key={tx.id} 
+                  onClick={() => tx.ref_id && (tx.category === 'Tiền phòng' || tx.category === 'ROOM') && setHistoryModal({ open: true, bookingId: tx.ref_id })}
+                  className="bg-white rounded-xl border border-gray-100 shadow-sm hover:border-purple-200 transition-all group cursor-pointer overflow-hidden flex items-center h-[72px]"
+                >
+                  {/* Cột Chỉ số Thời gian (Side-Badge Time Capsule) */}
+                  <div className="flex items-center h-full">
+                    <div className={`w-[18px] h-full flex flex-col items-center justify-center text-white ${tx.flow_type === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                      {tx.flow_type === 'IN' ? <ArrowUp size={14} strokeWidth={3} /> : <ArrowDown size={14} strokeWidth={3} />}
+                    </div>
+                    <div className="px-3 flex flex-col justify-center min-w-[70px] border-r border-gray-50 h-full bg-gray-50/50">
+                      <span className="text-[13px] font-black text-black leading-none mb-1">{timeStr}</span>
+                      <span className="text-[9px] font-bold text-gray-400 leading-none">{dateStr}</span>
+                    </div>
+                  </div>
+
+                  {/* Nội dung Giao dịch (Content Info) */}
+                  <div className="flex-1 px-4 min-w-0">
+                    <p className="text-[13px] font-bold text-slate-700 line-clamp-1">
+                      {smartDescription}
+                    </p>
+                    {tx.is_auto && (
+                      <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-blue-100 w-fit mt-1 block">
+                        Hệ thống
                       </span>
-                    </td>
-                    <td className="p-4 text-gray-900 font-medium">{tx.category}</td>
-                    <td className="p-4 text-gray-500 text-sm max-w-xs truncate" title={tx.description || ''}>
-                        {tx.description || '-'}
-                        {tx.is_auto && <span className="ml-2 text-[10px] bg-blue-50 text-blue-600 px-1 rounded border border-blue-100">AUTO</span>}
-                    </td>
-                    <td className={`p-4 text-right font-bold ${tx.flow_type === 'IN' ? 'text-green-600' : 'text-red-600'}`}>
-                      {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
-                    </td>
-                    <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            {tx.ref_id && (tx.category === 'Tiền phòng' || tx.category === 'ROOM') && (
-                                <button 
-                                    onClick={() => setHistoryModal({ open: true, bookingId: tx.ref_id })}
-                                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                    title="Xem chi tiết hóa đơn"
-                                >
-                                    <Eye size={16} />
-                                </button>
-                            )}
-                            {!tx.is_auto && (
-                                <button 
-                                    onClick={() => handleDelete(tx.id)}
-                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Xóa"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            )}
-                        </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    )}
+                  </div>
+
+                  {/* Con số Tài chính & Huy hiệu Phương thức (Amount & Method) */}
+                  <div className="px-4 text-right flex flex-col justify-center">
+                    <div className="relative inline-block">
+                      <span className={`text-[16px] font-black tracking-tighter leading-none ${tx.flow_type === 'IN' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount).replace('₫', '').trim()}
+                      </span>
+                      {/* Huy hiệu Phương thức (Superscript Badge) */}
+                      {tx.payment_method_code && (
+                        <span className={`absolute -top-3 -right-2 text-[6px] font-black px-1 py-0.5 rounded shadow-sm uppercase ${
+                          tx.payment_method_code === 'cash' || tx.payment_method_code === 'TM' 
+                            ? 'bg-amber-100 text-amber-700 border border-amber-200' 
+                            : tx.payment_method_code === 'transfer' || tx.payment_method_code === 'CK'
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                            : 'bg-purple-100 text-purple-700 border border-purple-200'
+                        }`}>
+                          {tx.payment_method_code === 'cash' || tx.payment_method_code === 'TM' ? 'TM' : 
+                           tx.payment_method_code === 'transfer' || tx.payment_method_code === 'CK' ? 'CK' : 'POS'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest mt-1">
+                      {tx.verified_by_staff_name || 'SYSTEM'}
+                    </span>
+                  </div>
+
+                  {/* Chỉ báo Chi tiết (Detail Indicator) */}
+                  <div className="pr-3 pl-1">
+                    <ChevronRight size={18} className="text-slate-200 group-hover:text-purple-400 transition-colors" />
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

@@ -11,6 +11,8 @@ export interface CashFlowTransaction {
   created_by: string;
   ref_id: string | null;
   is_auto: boolean;
+  payment_method_code?: string;
+  verified_by_staff_name?: string;
 }
 
 export interface CashFlowStats {
@@ -96,7 +98,39 @@ export const cashFlowService = {
     const { data, error, count } = await query.range(from, to);
 
     if (error) throw error;
-    return { data: data as CashFlowTransaction[], count };
+
+    // Enhance data with payment method from bookings (Workaround for read-only DB)
+    const transactions = data as CashFlowTransaction[];
+    const bookingIds = transactions
+      .filter(tx => tx.ref_id && (tx.category === 'Tiền phòng' || tx.category === 'ROOM'))
+      .map(tx => tx.ref_id) as string[];
+
+    if (bookingIds.length > 0) {
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('id, payment_method')
+        .in('id', bookingIds);
+
+      if (bookings) {
+        const bookingMap = new Map(bookings.map(b => [b.id, b.payment_method]));
+        transactions.forEach(tx => {
+          if (tx.ref_id && bookingMap.has(tx.ref_id)) {
+            tx.payment_method_code = bookingMap.get(tx.ref_id);
+          } else if (tx.category === 'Tiền phòng') {
+            tx.payment_method_code = 'cash'; // Default for room if not found
+          }
+        });
+      }
+    }
+
+    // Default for manual entries if not set
+    transactions.forEach(tx => {
+      if (!tx.payment_method_code) {
+        tx.payment_method_code = 'cash'; // Fallback to TM
+      }
+    });
+
+    return { data: transactions, count };
   },
 
   // Gọi RPC lấy thống kê (Backend Calculation - Rule 8)
