@@ -27,6 +27,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/AuthProvider';
+import PinValidationModal from '@/components/shared/PinValidationModal';
 
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
@@ -1090,6 +1091,21 @@ export default function ServicesPage() {
         </div>
       )}
 
+      {/* PIN Validation Modal */}
+      <PinValidationModal
+        isOpen={isPinModalOpen}
+        onClose={() => {
+            setIsPinModalOpen(false);
+            setPendingAction(null);
+        }}
+        onSuccess={async () => {
+            if (pendingAction) {
+                await pendingAction();
+            }
+            setPendingAction(null);
+        }}
+        actionName={pinActionName}
+      />
     </div>
   );
 }
