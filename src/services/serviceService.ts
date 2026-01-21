@@ -117,18 +117,19 @@ export const serviceService = {
       }
   },
 
-  async importInventory(serviceId: string, quantity: number, totalAmount: number, notes?: string) {
-    try {
-        // Construct payload dynamically to rely on DB defaults for optional fields
-        const payload: any = {
-            p_service_id: serviceId,
-            p_qty_buy: quantity,
-            p_total_amount: totalAmount,
-        };
-        if (notes) payload.p_notes = notes;
-        
-        // Explicitly logging payload for debugging
-        console.log('Import Inventory Payload:', payload);
+  async importInventory(serviceId: string, quantity: number, totalAmount: number, notes?: string, staffId?: string) {
+        try {
+            // Construct payload dynamically to rely on DB defaults for optional fields
+            const payload: any = {
+                p_service_id: serviceId,
+                p_qty_buy: quantity,
+                p_total_amount: totalAmount,
+            };
+            if (notes) payload.p_notes = notes;
+            if (staffId) payload.p_staff_id = staffId;
+            
+            // Explicitly logging payload for debugging
+            console.log('Import Inventory Payload:', payload);
 
         // Debug Auth before call
         const { data: debugAuth } = await supabase.rpc('debug_auth');

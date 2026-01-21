@@ -26,10 +26,12 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/providers/AuthProvider';
 
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
 export default function ServicesPage() {
+  const { user } = useAuth();
   const { confirm: confirmDialog } = useGlobalDialog();
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,7 +162,7 @@ export default function ServicesPage() {
         finalQtyBuy = qtyBuy / (selectedService.conversion_factor || 1);
     }
 
-    await serviceService.importInventory(selectedService.id, finalQtyBuy, totalAmount, note);
+    await serviceService.importInventory(selectedService.id, finalQtyBuy, totalAmount, note, user?.id);
     setIsImportModalOpen(false);
     setInventoryForm({ quantity: 0, cost: 0, notes: '' });
     fetchServices();
@@ -194,7 +196,7 @@ export default function ServicesPage() {
             finalQtyBuy = item.qty / (service.conversion_factor || 1);
         }
 
-        await serviceService.importInventory(service.id, finalQtyBuy, 0, note);
+        await serviceService.importInventory(service.id, finalQtyBuy, 0, note, user?.id);
     });
 
     await Promise.all(promises);
