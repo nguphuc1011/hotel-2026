@@ -36,6 +36,13 @@ export interface CashFlowCategory {
   is_active: boolean;
 }
 
+export interface Wallet {
+  id: string;
+  name: string;
+  balance: number;
+  updated_at: string;
+}
+
 export const cashFlowService = {
   // --- Wallet Management ---
   async getWallets() {
