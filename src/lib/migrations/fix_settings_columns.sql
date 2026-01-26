@@ -1,14 +1,14 @@
 -- Migration to add missing flat columns to settings table
 -- and migrate data from JSON 'value' column
 
--- 1. Add Columns
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS check_in_time time DEFAULT '14:00:00';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS check_out_time time DEFAULT '12:00:00';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overnight_start_time time DEFAULT '22:00:00';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overnight_end_time time DEFAULT '06:00:00';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overnight_checkout_time time DEFAULT '10:00:00';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS full_day_early_before time DEFAULT '06:00:00';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS full_day_late_after time DEFAULT '18:00:00';
+-- 1. Add Columns (No hardcoded defaults as per OWNER'S COMMAND)
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS check_in_time time;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS check_out_time time;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overnight_start_time time;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overnight_end_time time;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overnight_checkout_time time;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS full_day_early_before time;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS full_day_late_after time;
 
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS auto_surcharge_enabled boolean DEFAULT false;
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS extra_person_enabled boolean DEFAULT false;
@@ -42,12 +42,12 @@ BEGIN
     IF v_config IS NOT NULL THEN
         UPDATE public.settings
         SET
-            check_in_time = COALESCE((v_config->>'check_in_time')::time, (v_config->>'check_in')::time, '14:00:00'),
-            check_out_time = COALESCE((v_config->>'check_out_time')::time, (v_config->>'check_out')::time, '12:00:00'),
-            overnight_start_time = COALESCE((v_config->'overnight'->>'start')::time, '22:00:00'),
-            overnight_end_time = COALESCE((v_config->'overnight'->>'end')::time, '06:00:00'),
+            check_in_time = COALESCE((v_config->>'check_in_time')::time, (v_config->>'check_in')::time),
+            check_out_time = COALESCE((v_config->>'check_out_time')::time, (v_config->>'check_out')::time),
+            overnight_start_time = (v_config->'overnight'->>'start')::time,
+            overnight_end_time = (v_config->'overnight'->>'end')::time,
             
-            grace_minutes = COALESCE((v_config->>'grace_minutes')::int, 15),
+            grace_minutes = (v_config->>'grace_minutes')::int,
             grace_in_enabled = COALESCE((v_config->>'grace_in_enabled')::boolean, (v_config->>'initial_grace_enabled')::boolean, true),
             grace_out_enabled = COALESCE((v_config->>'grace_out_enabled')::boolean, (v_config->>'late_grace_enabled')::boolean, true),
             

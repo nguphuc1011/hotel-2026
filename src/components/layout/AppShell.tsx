@@ -7,7 +7,8 @@ import {
   Settings as SettingsIcon,
   LogOut,
   Wallet,
-  Users
+  Users,
+  Clock
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -30,6 +31,7 @@ export default function AppShell({
   const navItems = [
     { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: '/' },
     { icon: <Users size={24} />, label: 'Khách hàng', href: '/customers' },
+    { icon: <Clock size={24} />, label: 'Giao ca', href: '/shifts' },
     { icon: <Wallet size={24} />, label: 'Thu Chi', href: '/cash-flow' },
     { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: '/reports' },
     { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: '/settings' },

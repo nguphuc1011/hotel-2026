@@ -11,7 +11,7 @@ async function inspectAll() {
   console.log('--- Inspecting All Possible Financial Tables ---');
   
   // Try to list all tables or check common names
-  const tables = ['customer_transactions', 'ledger', 'transactions', 'shifts', 'expenses'];
+  const tables = ['customer_transactions', 'cash_flow', 'transactions', 'shifts', 'expenses'];
   
   for (const table of tables) {
     const { data, error } = await supabase

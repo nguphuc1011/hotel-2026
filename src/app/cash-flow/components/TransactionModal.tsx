@@ -8,6 +8,7 @@ import { securityService, SecurityAction } from '@/services/securityService';
 import PinValidationModal from '@/components/shared/PinValidationModal';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { cn } from '@/lib/utils';
+import { toLocalISOString, parseLocalISO, getNow } from '@/lib/dateUtils';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -23,7 +24,8 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
     category: '',
     amount: 0,
     description: '',
-    occurred_at: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+    // YYYY-MM-DD (Local Time)
+    occurred_at: toLocalISOString(),
   });
 
   // Security states
@@ -76,9 +78,19 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
 
     setLoading(true);
     try {
+      // Logic: Nếu chọn ngày hôm nay thì tự động gắn thêm giờ phút hiện tại
+      // Để giao dịch mới nhất luôn nổi lên đầu danh sách
+      let submitDate = parseLocalISO(formData.occurred_at);
+      const now = getNow();
+      const todayStr = toLocalISOString(now);
+
+      if (formData.occurred_at === todayStr) {
+        submitDate = now; // Use current time
+      }
+
       await cashFlowService.createTransaction({
         ...formData,
-        occurred_at: new Date(formData.occurred_at),
+        occurred_at: submitDate,
         verifiedStaff: verifiedStaff
       });
       toast.success('Tạo phiếu thành công');
@@ -90,7 +102,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
         category: '',
         amount: 0,
         description: '',
-        occurred_at: new Date().toISOString().split('T')[0],
+        occurred_at: toLocalISOString(),
       });
     } catch (error) {
       console.error(error);

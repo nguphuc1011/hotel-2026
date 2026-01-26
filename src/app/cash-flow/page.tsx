@@ -3,10 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Filter, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Trash2, Eye, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { cashFlowService, CashFlowTransaction, CashFlowStats } from '@/services/cashFlowService';
+import { supabase } from '@/lib/supabase';
+import { cashFlowService, CashFlowTransaction, CashFlowStats, Wallet } from '@/services/cashFlowService';
 import TransactionModal from './components/TransactionModal';
-import CashFlowStatsCards from './components/CashFlowStats';
+import WalletCards from './components/WalletCards';
+import OwnerDebtSection from './components/OwnerDebtSection';
 import BookingHistoryModal from './components/BookingHistoryModal';
+import { toLocalISOString, parseLocalISO, getEndOfDay } from '@/lib/dateUtils';
 
 export default function CashFlowPage() {
   const [stats, setStats] = useState<CashFlowStats>({
@@ -17,6 +20,8 @@ export default function CashFlowPage() {
     chart_data: []
   });
   const [transactions, setTransactions] = useState<CashFlowTransaction[]>([]);
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [historyModal, setHistoryModal] = useState<{ open: boolean; bookingId: string | null }>({
@@ -27,35 +32,66 @@ export default function CashFlowPage() {
   // Filter state
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // Đầu tháng
-    end: new Date() // Hôm nay
+    end: new Date(new Date().setHours(23, 59, 59, 999)) // Cuối ngày hôm nay
   });
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
+  const [paymentMethod, setPaymentMethod] = useState<'ALL' | 'cash' | 'transfer' | 'credit_card'>('ALL');
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       // Fetch Stats
       const statsData = await cashFlowService.getStats(dateRange.start, dateRange.end);
       setStats(statsData);
 
+      // Fetch Wallets
+      const walletsData = await cashFlowService.getWallets();
+      setWallets(walletsData);
+
       // Fetch List
       const { data } = await cashFlowService.getTransactions(1, 100, {
         startDate: dateRange.start,
         endDate: dateRange.end,
-        type: typeFilter === 'ALL' ? undefined : typeFilter
+        type: typeFilter === 'ALL' ? undefined : typeFilter,
+        paymentMethod: paymentMethod === 'ALL' ? undefined : paymentMethod
       });
       setTransactions(data);
     } catch (error) {
       console.error(error);
-      toast.error('Không thể tải dữ liệu thu chi');
+      if (!isBackground) toast.error('Không thể tải dữ liệu thu chi');
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchData();
-  }, [dateRange, typeFilter]);
+    
+    // Subscribe to Realtime changes
+    const channel = supabase
+      .channel('cash-flow-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cash_flow' },
+        (payload) => {
+          console.log('Realtime update:', payload);
+          fetchData(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'wallets' },
+        (payload) => {
+           // Wallet balance update
+           fetchData(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [dateRange, typeFilter, paymentMethod]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Bạn có chắc muốn xóa giao dịch này?')) return;
@@ -104,15 +140,20 @@ export default function CashFlowPage() {
         
         <input 
           type="date" 
-          value={dateRange.start.toISOString().split('T')[0]}
-          onChange={(e) => setDateRange(prev => ({ ...prev, start: new Date(e.target.value) }))}
+          value={toLocalISOString(dateRange.start)}
+          onChange={(e) => setDateRange(prev => ({ ...prev, start: parseLocalISO(e.target.value) }))}
           className="bg-white border border-gray-200 text-gray-900 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
         />
         <span className="text-gray-400">-</span>
         <input 
           type="date" 
-          value={dateRange.end.toISOString().split('T')[0]}
-          onChange={(e) => setDateRange(prev => ({ ...prev, end: new Date(e.target.value) }))}
+          value={toLocalISOString(dateRange.end)}
+          onChange={(e) => {
+            const date = parseLocalISO(e.target.value);
+            // End of day
+            const endOfDay = getEndOfDay(date);
+            setDateRange(prev => ({ ...prev, end: endOfDay }));
+          }}
           className="bg-white border border-gray-200 text-gray-900 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
         />
 
@@ -138,10 +179,37 @@ export default function CashFlowPage() {
                 Chi
             </button>
         </div>
+
+        <div className="h-6 w-px bg-gray-200 mx-2 hidden md:block" />
+
+        <select
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value as any)}
+            className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none h-[38px]"
+        >
+            <option value="ALL">Tất cả HTTT</option>
+            <option value="cash">Tiền mặt</option>
+            <option value="transfer">Chuyển khoản</option>
+            <option value="credit_card">Thẻ tín dụng</option>
+        </select>
       </div>
 
-      {/* Stats Cards */}
-      <CashFlowStatsCards stats={stats} loading={loading} />
+      {/* Wallets Dashboard */}
+      <WalletCards 
+        wallets={wallets} 
+        loading={loading} 
+        selectedWalletId={selectedWalletId}
+        onSelectWallet={(id) => {
+          setSelectedWalletId(id);
+          if (id) {
+            setPaymentMethod('ALL');
+            setTypeFilter('ALL');
+          }
+        }}
+      />
+
+      {/* Owner Debt Section (Sổ Nợ Ngoài) */}
+      <OwnerDebtSection onUpdate={fetchData} />
 
       {/* Simple Chart Bar (CSS only) */}
       {!loading && stats.chart_data.length > 0 && (
@@ -236,14 +304,14 @@ export default function CashFlowPage() {
                       {/* Huy hiệu Phương thức (Superscript Badge) */}
                       {tx.payment_method_code && (
                         <span className={`absolute -top-3 -right-2 text-[6px] font-black px-1 py-0.5 rounded shadow-sm uppercase ${
-                          tx.payment_method_code === 'cash' || tx.payment_method_code === 'TM' 
+                          tx.payment_method_code.toLowerCase() === 'cash' || tx.payment_method_code.toLowerCase() === 'tm' 
                             ? 'bg-amber-100 text-amber-700 border border-amber-200' 
-                            : tx.payment_method_code === 'transfer' || tx.payment_method_code === 'CK'
+                            : tx.payment_method_code.toLowerCase() === 'transfer' || tx.payment_method_code.toLowerCase() === 'ck'
                             ? 'bg-blue-100 text-blue-700 border border-blue-200'
                             : 'bg-purple-100 text-purple-700 border border-purple-200'
                         }`}>
-                          {tx.payment_method_code === 'cash' || tx.payment_method_code === 'TM' ? 'TM' : 
-                           tx.payment_method_code === 'transfer' || tx.payment_method_code === 'CK' ? 'CK' : 'POS'}
+                          {tx.payment_method_code.toLowerCase() === 'cash' || tx.payment_method_code.toLowerCase() === 'tm' ? 'TM' : 
+                           tx.payment_method_code.toLowerCase() === 'transfer' || tx.payment_method_code.toLowerCase() === 'ck' ? 'CK' : 'POS'}
                         </span>
                       )}
                     </div>

@@ -102,22 +102,21 @@ DECLARE
 BEGIN
     -- 1. Load settings from COLUMNS
     SELECT 
-        COALESCE(grace_in_enabled, false),
-        COALESCE(grace_out_enabled, false),
-        COALESCE(grace_minutes, 0),
-        COALESCE(hourly_unit, 60),
-        COALESCE(base_hourly_limit, 1),
-        COALESCE(hourly_ceiling_enabled, true), -- Default to true as per request
-        COALESCE(hourly_ceiling_percent, 100),
-        COALESCE(overnight_start_time, '22:00:00'::time),
-        COALESCE(overnight_end_time, '06:00:00'::time),
-        COALESCE(check_out_time, '12:00:00'::time),
-        COALESCE(full_day_late_after, '18:00:00'::time),
-        COALESCE(full_day_early_before, '05:00:00'::time),
-        -- Default to true/false if columns don't exist yet (handled by COALESCE)
-        COALESCE(auto_overnight_switch, false),
-        COALESCE(auto_full_day_early, true),
-        COALESCE(auto_full_day_late, true)
+        grace_in_enabled,
+        grace_out_enabled,
+        grace_minutes,
+        hourly_unit,
+        base_hourly_limit,
+        hourly_ceiling_enabled,
+        hourly_ceiling_percent,
+        overnight_start_time,
+        overnight_end_time,
+        check_out_time,
+        full_day_late_after,
+        night_audit_time,
+        auto_overnight_switch,
+        auto_full_day_early,
+        auto_full_day_late
     INTO 
         v_grace_in_enabled, v_grace_out_enabled, v_grace_minutes,
         v_hourly_unit, v_base_block_count, v_ceiling_enabled,
@@ -125,7 +124,20 @@ BEGIN
         v_std_check_out, v_full_day_cutoff, v_full_day_early_cutoff,
         v_auto_overnight_switch, v_auto_full_day_early, v_auto_full_day_late
     FROM public.settings WHERE key = 'config' LIMIT 1;
+
+    -- [HỢP NHẤT] Mốc vào sớm tính thêm 1 ngày chính là mốc Night Audit
+    IF v_full_day_early_cutoff IS NULL THEN
+        v_full_day_early_cutoff := '04:00:00'::time;
+    END IF;
     
+    -- 1.1. Validate Settings (CƯỞNG CHẾ: Không dùng thông số cứng)
+    IF v_std_check_out IS NULL OR v_overnight_start IS NULL OR v_overnight_end IS NULL OR v_hourly_unit IS NULL THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'message', 'LỖI CẤU HÌNH: Bệ hạ chưa thiết lập đầy đủ các thông số (Check-out, Qua đêm, Block giờ...) trong Cài đặt. Không thể tính tiền.'
+        );
+    END IF;
+
     -- 2. Load prices from room_categories
     SELECT 
         price_hourly, price_next_hour, price_daily, price_overnight,
@@ -153,8 +165,7 @@ BEGIN
         END IF;
     END IF;
 
-    IF v_hourly_unit IS NULL THEN v_hourly_unit := 60; END IF; 
-    IF v_base_block_count IS NULL THEN v_base_block_count := 1; END IF;
+    -- v_hourly_unit và v_base_block_count đã được load từ settings/category
 
     v_duration_minutes := FLOOR(EXTRACT(EPOCH FROM (p_check_out - p_check_in)) / 60);
     v_check_in_time := (p_check_in AT TIME ZONE v_tz)::time;
@@ -247,7 +258,7 @@ BEGIN
             v_early_min numeric;
             v_std_check_in time;
         BEGIN
-           SELECT COALESCE(check_in_time, '14:00:00'::time) INTO v_std_check_in FROM public.settings WHERE key = 'config' LIMIT 1;
+           SELECT COALESCE(check_in_time, NULL) INTO v_std_check_in FROM public.settings WHERE key = 'config' LIMIT 1;
 
            v_days := ((p_check_out AT TIME ZONE v_tz)::date - (p_check_in AT TIME ZONE v_tz)::date);
            
@@ -271,11 +282,11 @@ BEGIN
            v_check_in_time_only := (p_check_in AT TIME ZONE v_tz)::time;
            v_early_min := FLOOR(EXTRACT(EPOCH FROM (v_std_check_in - v_check_in_time_only)) / 60);
 
-           -- [Gạt] Vào trước mốc giờ sớm tự động tính thêm 1 ngày
+           -- [Gạt] Vào trước mốc Night Audit tự động tính thêm 1 ngày
            IF v_auto_full_day_early AND (v_check_in_time_only < v_full_day_early_cutoff) THEN
                IF NOT (v_grace_in_enabled AND v_early_min <= v_grace_minutes) THEN
                    v_days := v_days + 1;
-                   v_explanations := array_append(v_explanations, format('Nhận phòng lúc %s (trước %s): Tính thêm 1 ngày phòng', to_char(p_check_in AT TIME ZONE v_tz, 'HH24:MI DD/MM'), to_char(v_full_day_early_cutoff, 'HH24:MI')));
+                   v_explanations := array_append(v_explanations, format('Nhận phòng lúc %s (trước mốc Night Audit %s): Tính thêm 1 ngày phòng', to_char(p_check_in AT TIME ZONE v_tz, 'HH24:MI DD/MM'), to_char(v_full_day_early_cutoff, 'HH24:MI')));
                ELSE
                    v_explanations := array_append(v_explanations, format('Nhận sớm %s phút (trong mức miễn phí %s phút): Không tính thêm ngày', ROUND(v_early_min,0), v_grace_minutes));
                END IF;
@@ -352,16 +363,16 @@ BEGIN
     END IF;
 
     SELECT 
-        COALESCE(check_in_time, '14:00:00'::time),
-        COALESCE(check_out_time, '12:00:00'::time),
-        COALESCE(overnight_checkout_time, '12:00:00'::time),
-        COALESCE(full_day_late_after, '18:00:00'::time),
-        COALESCE(full_day_early_before, '05:00:00'::time),
-        COALESCE(grace_minutes, 0),
-        COALESCE(grace_in_enabled, false),
-        COALESCE(grace_out_enabled, false),
-        COALESCE(surcharge_rules, '[]'::jsonb),
-        COALESCE(auto_surcharge_enabled, false)
+        check_in_time,
+        check_out_time,
+        overnight_checkout_time,
+        full_day_late_after,
+        night_audit_time,
+        grace_minutes,
+        grace_in_enabled,
+        grace_out_enabled,
+        surcharge_rules,
+        auto_surcharge_enabled
     INTO 
         v_std_check_in, v_std_check_out, v_overnight_checkout_time, 
         v_full_day_cutoff, v_full_day_early_cutoff, v_grace_minutes, 
@@ -369,9 +380,14 @@ BEGIN
         v_auto_surcharge_enabled
     FROM public.settings WHERE key = 'config' LIMIT 1;
     
+    -- Validate Settings
+    IF v_std_check_in IS NULL OR v_std_check_out IS NULL THEN
+         RETURN jsonb_build_object('amount', 0, 'success', false, 'explanation', ARRAY['LỖI CẤU HÌNH: Thiếu mốc giờ Check-in/Check-out chuẩn.']);
+    END IF;
+    
     SELECT 
-        price_daily, COALESCE(hourly_surcharge_amount, 0), COALESCE(surcharge_mode, 'percent'),
-        COALESCE(surcharge_rules, v_surcharge_rules), COALESCE(auto_surcharge_enabled, v_auto_surcharge_enabled)
+        price_daily, hourly_surcharge_amount, surcharge_mode,
+        surcharge_rules, auto_surcharge_enabled
     INTO 
         v_price_daily, v_hourly_surcharge_rate, v_surcharge_mode,
         v_surcharge_rules, v_auto_surcharge_enabled
@@ -760,6 +776,7 @@ CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid, p_no
 -- 8. CORE: PROCESS CHECKOUT
 --------------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.process_checkout(uuid, text, numeric, numeric, numeric, text, uuid, uuid, text);
+DROP FUNCTION IF EXISTS public.process_checkout(uuid, text, numeric, numeric, numeric, text, uuid);
 
 CREATE OR REPLACE FUNCTION public.process_checkout(
     p_booking_id uuid, 
@@ -772,6 +789,7 @@ CREATE OR REPLACE FUNCTION public.process_checkout(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
     v_booking record;
@@ -822,7 +840,8 @@ BEGIN
                 created_by, 
                 ref_id, 
                 is_auto, 
-                occurred_at
+                occurred_at,
+                payment_method_code
             )
             VALUES (
                 'IN', 
@@ -832,7 +851,8 @@ BEGIN
                 v_staff_id, 
                 p_booking_id, 
                 true, 
-                now()
+                now(),
+                lower(p_payment_method)
             );
         END IF;
     EXCEPTION WHEN OTHERS THEN 

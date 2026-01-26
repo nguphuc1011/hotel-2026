@@ -176,7 +176,8 @@ export const bookingService = {
         p_custom_price: data.custom_price ?? null,
         p_custom_price_reason: data.custom_price_reason ?? null,
         p_source: data.source || 'direct',
-        p_staff_id: data.verifiedStaff?.id || null
+        p_verified_by_staff_id: data.verifiedStaff?.id || null,
+        p_verified_by_staff_name: data.verifiedStaff?.name || null
       });
 
       if (error) throw error;
@@ -191,8 +192,8 @@ export const bookingService = {
     try {
       const { data, error } = await supabase.rpc('cancel_booking', {
         p_booking_id: bookingId,
-        p_reason: reason || 'Khách hủy',
-        p_staff_id: verifiedStaff?.id || null
+        p_verified_by_staff_id: verifiedStaff?.id || null,
+        p_verified_by_staff_name: verifiedStaff?.name || null
       });
 
       if (error) throw error;

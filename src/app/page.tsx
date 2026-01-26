@@ -13,10 +13,15 @@ import RoomFolioModal from '@/components/dashboard/RoomFolioModal';
 import { differenceInMinutes } from 'date-fns';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
+import { cashFlowService, Wallet } from '@/services/cashFlowService';
+import WalletCards from '@/app/cash-flow/components/WalletCards';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [rooms, setRooms] = useState<DashboardRoom[]>([]);
+  const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState(true);
   
   // New Filter State

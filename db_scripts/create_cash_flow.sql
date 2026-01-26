@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS public.cash_flow (
     created_at timestamptz DEFAULT now(),
     created_by uuid REFERENCES auth.users(id), -- Người tạo phiếu
     ref_id uuid, -- ID tham chiếu (Booking ID, Import ID...)
-    is_auto boolean DEFAULT false -- True nếu là giao dịch tự động sinh ra từ hệ thống
+    is_auto boolean DEFAULT false, -- True nếu là giao dịch tự động sinh ra từ hệ thống
+    updated_at timestamptz DEFAULT now()
 );
 
 -- Index cho tìm kiếm nhanh

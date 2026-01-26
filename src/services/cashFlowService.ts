@@ -37,7 +37,16 @@ export interface CashFlowCategory {
 }
 
 export const cashFlowService = {
-  // ... existing methods ...
+  // --- Wallet Management ---
+  async getWallets() {
+    const { data, error } = await supabase
+      .from('wallets')
+      .select('*')
+      .order('id');
+      
+    if (error) throw error;
+    return data as Wallet[];
+  },
 
   // --- Category Management ---
   async getCategories(type?: 'IN' | 'OUT') {
@@ -75,6 +84,8 @@ export const cashFlowService = {
       type?: 'IN' | 'OUT'; 
       startDate?: Date; 
       endDate?: Date;
+      paymentMethod?: string;
+      walletId?: string;
     }
   ) {
     let query = supabase
@@ -82,8 +93,16 @@ export const cashFlowService = {
       .select('*', { count: 'exact' })
       .order('occurred_at', { ascending: false });
 
+    if (filters?.walletId) {
+      query = query.eq('wallet_id', filters.walletId);
+    }
+    
     if (filters?.type) {
       query = query.eq('flow_type', filters.type);
+    }
+    if (filters?.paymentMethod) {
+      // Only filter by DB column for performance. Old records with NULL won't show.
+      query = query.eq('payment_method_code', filters.paymentMethod);
     }
     if (filters?.startDate) {
       query = query.gte('occurred_at', filters.startDate.toISOString());
@@ -99,10 +118,10 @@ export const cashFlowService = {
 
     if (error) throw error;
 
-    // Enhance data with payment method from bookings (Workaround for read-only DB)
+    // Enhance data with payment method from bookings (Backfill for old records)
     const transactions = data as CashFlowTransaction[];
     const bookingIds = transactions
-      .filter(tx => tx.ref_id && (tx.category === 'Tiền phòng' || tx.category === 'ROOM'))
+      .filter(tx => !tx.payment_method_code && tx.ref_id && (tx.category === 'Tiền phòng' || tx.category === 'ROOM'))
       .map(tx => tx.ref_id) as string[];
 
     if (bookingIds.length > 0) {
@@ -114,9 +133,10 @@ export const cashFlowService = {
       if (bookings) {
         const bookingMap = new Map(bookings.map(b => [b.id, b.payment_method]));
         transactions.forEach(tx => {
-          if (tx.ref_id && bookingMap.has(tx.ref_id)) {
+          // Only fill if missing
+          if (!tx.payment_method_code && tx.ref_id && bookingMap.has(tx.ref_id)) {
             tx.payment_method_code = bookingMap.get(tx.ref_id);
-          } else if (tx.category === 'Tiền phòng') {
+          } else if (!tx.payment_method_code && tx.category === 'Tiền phòng') {
             tx.payment_method_code = 'cash'; // Default for room if not found
           }
         });
@@ -161,6 +181,50 @@ export const cashFlowService = {
       p_occurred_at: payload.occurred_at.toISOString(),
       p_verified_by_staff_id: payload.verifiedStaff?.id || null,
       p_verified_by_staff_name: payload.verifiedStaff?.name || null
+    });
+
+    if (error) throw error;
+    return data;
+  },
+
+  // --- Owner Debt Management (Sổ Nợ Ngoài) ---
+  async getExternalPayables() {
+    const { data, error } = await supabase
+      .from('external_payables')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data;
+  },
+
+  async createOwnerExpense(payload: {
+    amount: number;
+    description: string;
+    creditorName?: string;
+    evidenceUrl: string;
+  }) {
+    const { data, error } = await supabase.rpc('record_owner_expense', {
+      p_amount: payload.amount,
+      p_description: payload.description,
+      p_creditor_name: payload.creditorName || 'Chủ đầu tư',
+      p_evidence_url: payload.evidenceUrl
+    });
+
+    if (error) throw error;
+    return data;
+  },
+
+  async repayOwnerDebt(payload: {
+    payableId: string;
+    paymentMethod: 'cash' | 'transfer';
+    pin: string;
+  }) {
+    const { data, error } = await supabase.rpc('repay_owner_debt', {
+      p_payable_id: payload.payableId,
+      p_payment_method: payload.paymentMethod,
+      p_pin: payload.pin
     });
 
     if (error) throw error;

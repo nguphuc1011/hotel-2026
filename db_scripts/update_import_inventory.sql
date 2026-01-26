@@ -26,7 +26,6 @@ DECLARE
   v_qty_sell integer;
   v_unit_cost numeric;
 
-  v_ledger_id uuid;
   v_service_name text;
 BEGIN
   -- 3.1. Xác định người thực hiện + role
@@ -109,28 +108,6 @@ BEGIN
     v_new_cost := v_unit_cost;
   END IF;
 
-  -- 3.5. Ghi ledger (Hệ thống cũ - Giữ để tương thích)
-  INSERT INTO public.ledger (
-    shift_id, staff_id, type, category, amount,
-    payment_method_code, description, meta
-  ) VALUES (
-    p_shift_id,
-    v_staff_id,
-    'EXPENSE',
-    'Inventory',
-    p_total_amount,
-    p_payment_method_code,
-    COALESCE(p_notes, 'Nhập kho: ' || v_service_name),
-    jsonb_build_object(
-      'service_id', p_service_id,
-      'qty_buy', p_qty_buy,
-      'conversion_factor', v_conversion_factor,
-      'qty_sell', v_qty_sell,
-      'unit_cost', v_unit_cost
-    )
-  )
-  RETURNING id INTO v_ledger_id;
-
   -- 3.6. Ghi CASH FLOW (Hệ thống mới)
   IF p_total_amount > 0 THEN
     INSERT INTO public.cash_flow (
@@ -140,7 +117,6 @@ BEGIN
         description, 
         occurred_at, 
         created_by, 
-        ref_id, 
         is_auto
     )
     VALUES (
@@ -150,7 +126,6 @@ BEGIN
         'Nhập kho: ' || v_service_name || ' (SL: ' || p_qty_buy || ')', 
         now(), 
         v_staff_id, 
-        v_ledger_id, 
         true
     );
   END IF;
@@ -170,7 +145,6 @@ BEGIN
     'IMPORT',
     v_qty_sell,
     jsonb_build_object(
-      'ledger_id', v_ledger_id,
       'staff_id', v_staff_id,
       'shift_id', p_shift_id,
       'payment_method_code', p_payment_method_code,
@@ -190,7 +164,6 @@ BEGIN
   RETURN json_build_object(
     'status', 'success',
     'service_id', p_service_id,
-    'ledger_id', v_ledger_id,
     'qty_sell', v_qty_sell,
     'new_stock', v_new_stock,
     'new_cost_price', v_new_cost

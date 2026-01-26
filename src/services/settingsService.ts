@@ -15,6 +15,7 @@ export interface Settings {
   overnight_start_time: string;
   overnight_end_time: string;
   overnight_checkout_time: string;
+  night_audit_time: string;
   
   // Mốc tự động tính thêm ngày
   full_day_early_before: string;
@@ -102,35 +103,36 @@ export const settingsService = {
       // Map Flat DB columns to Settings interface
       return {
         key: 'config',
-        check_in_time: val.check_in_time || '14:00:00',
-        check_out_time: val.check_out_time || '12:00:00',
-        overnight_start_time: val.overnight_start_time || '22:00:00',
-        overnight_end_time: val.overnight_end_time || '06:00:00',
-        overnight_checkout_time: val.overnight_checkout_time || '10:00:00',
+        check_in_time: val.check_in_time || '',
+        check_out_time: val.check_out_time || '',
+        overnight_start_time: val.overnight_start_time || '',
+        overnight_end_time: val.overnight_end_time || '',
+        overnight_checkout_time: val.overnight_checkout_time || '',
+        night_audit_time: val.night_audit_time || '04:00:00',
         
-        full_day_early_before: val.full_day_early_before || '06:00:00',
-        full_day_late_after: val.full_day_late_after || '18:00:00',
+        full_day_early_before: val.full_day_early_before || '',
+        full_day_late_after: val.full_day_late_after || '',
         
-        auto_surcharge_enabled: val.auto_surcharge_enabled ?? false,
-        auto_overnight_switch: val.auto_overnight_switch ?? false,
-        auto_full_day_early: val.auto_full_day_early ?? true,
-        auto_full_day_late: val.auto_full_day_late ?? true,
-        extra_person_enabled: val.extra_person_enabled ?? false,
-        extra_person_method: val.extra_person_method || 'percent',
+        auto_surcharge_enabled: val.auto_surcharge_enabled,
+        auto_overnight_switch: val.auto_overnight_switch,
+        auto_full_day_early: val.auto_full_day_early,
+        auto_full_day_late: val.auto_full_day_late,
+        extra_person_enabled: val.extra_person_enabled,
+        extra_person_method: val.extra_person_method,
         
-        grace_in_enabled: val.grace_in_enabled ?? true,
-        grace_out_enabled: val.grace_out_enabled ?? true,
-        grace_minutes: val.grace_minutes || 0,
+        grace_in_enabled: val.grace_in_enabled,
+        grace_out_enabled: val.grace_out_enabled,
+        grace_minutes: val.grace_minutes,
         
-        vat_enabled: val.vat_enabled ?? false,
-        service_fee_enabled: val.service_fee_enabled ?? false,
-        vat_percent: val.vat_percent || 0,
-        service_fee_percent: val.service_fee_percent || 0,
+        vat_enabled: val.vat_enabled,
+        service_fee_enabled: val.service_fee_enabled,
+        vat_percent: val.vat_percent,
+        service_fee_percent: val.service_fee_percent,
         
-        hourly_unit: val.hourly_unit || 60,
-        base_hourly_limit: val.base_hourly_limit || 1,
-        hourly_ceiling_enabled: val.hourly_ceiling_enabled ?? false,
-        hourly_ceiling_percent: val.hourly_ceiling_percent || 100,
+        hourly_unit: val.hourly_unit,
+        base_hourly_limit: val.base_hourly_limit,
+        hourly_ceiling_enabled: val.hourly_ceiling_enabled,
+        hourly_ceiling_percent: val.hourly_ceiling_percent,
         surcharge_rules: val.surcharge_rules || [],
         auto_deduct_inventory: val.auto_deduct_inventory ?? true,
         allow_manual_price_override: true,
@@ -153,6 +155,7 @@ export const settingsService = {
         overnight_start_time: settings.overnight_start_time,
         overnight_end_time: settings.overnight_end_time,
         overnight_checkout_time: settings.overnight_checkout_time,
+        night_audit_time: settings.night_audit_time,
         
         full_day_early_before: settings.full_day_early_before,
         full_day_late_after: settings.full_day_late_after,

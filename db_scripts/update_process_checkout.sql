@@ -53,19 +53,6 @@ BEGIN
     -- 3. Update Room Status
     UPDATE public.rooms SET status = 'dirty', updated_at = now() WHERE id = v_room_id;
 
-    -- 4. Record Ledger Entries (Old System - Keep for backward compatibility)
-    BEGIN
-        INSERT INTO public.ledger (booking_id, customer_id, type, category, amount, description, staff_id, payment_method_code)
-        VALUES (p_booking_id, v_customer_id, 'REVENUE', 'ROOM', (v_bill->>'room_charge')::numeric, 'Tiền phòng', v_staff_id, p_payment_method);
-        
-        IF p_amount_paid > 0 THEN
-            INSERT INTO public.ledger (booking_id, customer_id, type, category, amount, description, staff_id, payment_method_code)
-            VALUES (p_booking_id, v_customer_id, 'PAYMENT', 'ROOM', p_amount_paid, 'Khách thanh toán checkout', v_staff_id, p_payment_method);
-        END IF;
-    EXCEPTION WHEN OTHERS THEN 
-        -- Ignore ledger errors
-    END;
-
     -- 5. INSERT INTO CASH FLOW (New System)
     IF p_amount_paid > 0 THEN
         INSERT INTO public.cash_flow (

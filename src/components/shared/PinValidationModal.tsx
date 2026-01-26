@@ -9,7 +9,7 @@ import { useAuth } from '@/providers/AuthProvider';
 interface PinValidationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (staffId: string, staffName: string) => void;
+  onSuccess: (staffId: string, staffName: string, pin: string) => void;
   actionName: string;
   description?: string;
 }
@@ -64,7 +64,7 @@ export default function PinValidationModal({
       }
 
       toast.success(`Xác thực thành công: ${user.full_name || 'Nhân viên'}`);
-      onSuccess(user.id, user.full_name);
+      onSuccess(user.id, user.full_name, pin);
       // Note: onClose will be called by parent if needed, or we can call it here
       // But based on usage, parent usually handles onClose in onSuccess or separately
       // We'll call onClose to be safe and consistent with previous behavior

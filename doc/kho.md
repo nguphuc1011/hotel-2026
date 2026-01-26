@@ -1,4 +1,4 @@
-# BÁO CÁO HỆ THỐNG QUẢN LÝ KHO VÀ DÒNG TIỀN (INVENTORY & LEDGER)
+# BÁO CÁO HỆ THỐNG QUẢN LÝ KHO VÀ DÒNG TIỀN (INVENTORY & CASH FLOW)
 
 Hệ thống được thiết kế để quản lý chặt chẽ hàng hóa, chống thất thoát và tự động hóa việc tính toán lãi lỗ dựa trên nguyên tắc **Dòng tiền đi kèm Hàng hóa**.
 
@@ -22,14 +22,14 @@ Lưu lại mọi biến động kho, không bao giờ xóa.
 - `unit_cost`: Giá vốn tại thời điểm ghi log.
 - `total_value`: Tổng giá trị biến động (`quantity * unit_cost`).
 - `balance_before / after`: Số dư kho trước và sau khi biến động.
-- `reference_id`: ID tham chiếu (liên kết tới `ledger_id` khi nhập hàng hoặc `booking_id` khi bán hàng).
+- `reference_id`: ID tham chiếu (liên kết tới `cash_flow_id` khi nhập hàng hoặc `booking_id` khi bán hàng).
 
-### C. Bảng `ledger` (Sổ cái dòng tiền)
+### C. Bảng `cash_flow` (Dòng tiền)
 Mọi giao dịch mua hàng phải được ghi nhận tại đây để đối soát.
-- `type`: `EXPENSE` (Chi phí nhập hàng).
-- `category`: `Inventory`.
+- `flow_type`: `OUT` (Chi phí nhập hàng).
+- `category`: `Nhập hàng`.
 - `amount`: Tổng số tiền chi ra.
-- `meta`: Lưu thông tin chi tiết lô hàng (`service_id`, `qty_buy`, `unit_cost`).
+- `description`: Lưu thông tin chi tiết lô hàng.
 
 ---
 
@@ -61,19 +61,19 @@ Mọi giao dịch mua hàng phải được ghi nhận tại đây để đối 
 2. Chọn hàng hóa, chọn đơn vị "Thùng", nhập số lượng và **Tổng số tiền thanh toán**.
 3. Hệ thống thực hiện 3 việc đồng thời:
     - Cập nhật `stock` và `cost_price` trong bảng `services`.
-    - Tạo 1 phiếu chi `EXPENSE` trong `ledger` (Dòng tiền thực chi).
+    - Tạo 1 phiếu chi `OUT` trong `cash_flow` (Dòng tiền thực chi).
     - Tạo 1 dòng nhật ký trong `inventory_logs` (Biến động hàng hóa).
 
 ### Bước 2: Bán hàng (Sale)
 1. Khi thêm dịch vụ vào phòng (Folio), hệ thống tự động trừ `stock`.
 2. Ghi nhật ký `SALE` vào `inventory_logs` kèm theo giá vốn tại thời điểm đó.
-3. Tiền bán hàng sẽ nằm trong `booking_bill`, khi khách thanh toán sẽ được ghi nhận vào `ledger` dưới dạng `INCOME`.
+3. Tiền bán hàng sẽ nằm trong `booking_bill`, khi khách thanh toán sẽ được ghi nhận vào `cash_flow` dưới dạng `INCOME` (hoặc `IN` trong hệ thống mới).
 
 ### Bước 3: Báo cáo Lãi/Lỗ (P&L)
-- **Doanh thu:** Tổng `INCOME` từ việc bán dịch vụ.
+- **Doanh thu:** Tổng tiền thu từ việc bán dịch vụ.
 - **Giá vốn (COGS):** Tổng `total_value` của các log loại `SALE` trong kỳ.
 - **Lợi nhuận gộp:** `Doanh thu - Giá vốn`.
-- **Dòng tiền thực tế:** Đối soát giữa tổng tiền chi nhập hàng trong `ledger` và tiền mặt thực tế tại quầy.
+- **Dòng tiền thực tế:** Đối soát giữa tổng tiền chi nhập hàng trong `cash_flow` và tiền mặt thực tế tại quầy.
 
 ---
 
@@ -93,7 +93,7 @@ Mọi giao dịch mua hàng phải được ghi nhận tại đây để đối 
   1. Quy đổi số lượng nhập ra đơn vị bán lẻ.
   2. Tính lại giá vốn bình quân (WAC).
   3. Cộng tồn kho.
-  4. Ghi nhận chi phí vào bảng `ledger`.
+  4. Ghi nhận chi phí vào bảng `cash_flow`.
   5. Ghi nhật ký vào `inventory_logs`.
 
 ### B. `register_service_usage` (Xuất bán)

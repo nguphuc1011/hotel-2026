@@ -27,7 +27,8 @@ Hệ thống hoạt động dựa trên các "Nút gạt" và "Mốc thời gian
 
 ### 4. Nhóm Tự động chuyển đổi & Phụ thu
 - **Tự động chuyển Qua đêm (`auto_overnight_switch`)**: Nếu khách nhận phòng trong khung giờ qua đêm, hệ thống tự động áp dụng giá Qua đêm thay vì giá Giờ/Ngày.
-- **Tự động tính Ngày (Sớm) (`auto_full_day_early`)**: Nếu nhận phòng trước mốc `full_day_early_before` (mặc định 05:00), tính thêm 1 ngày phòng.
+- **Mốc Night Audit (`night_audit_time`)**: Mốc giờ hệ thống chốt sổ ngày cũ và bắt đầu ngày mới (Mặc định 04:00). Mốc này cũng được dùng để xác định tính thêm ngày khi vào sớm.
+- **Tự động tính Ngày (Sớm) (`auto_full_day_early`)**: Nếu nhận phòng trước mốc `night_audit_time` (04:00), tính thêm 1 ngày phòng.
 - **Tự động tính Ngày (Muộn) (`auto_full_day_late`)**: Nếu trả phòng sau mốc `full_day_late_after` (mặc định 18:00), tính thêm 1 ngày phòng.
 - **Tự động tính phụ phí (`auto_surcharge_enabled`)**: Bật/Tắt tính tiền Nhận sớm/Trả muộn.
 
@@ -55,7 +56,7 @@ Hệ thống tính toán theo thứ tự ưu tiên từ phòng -> phụ thu -> n
 #### 1.3. Thuê theo Ngày (`daily`)
 - **Số ngày gốc**: (Ngày trả - Ngày nhận). Tối thiểu 1 ngày.
 - **Cộng thêm ngày (Sớm/Muộn)**:
-  - **Nhận sớm**: Nếu `auto_full_day_early` bật và giờ nhận < `full_day_early_before` (05:00) -> Cộng thêm 1 ngày tiền phòng. (Áp dụng ân hạn nhận nếu có).
+  - **Nhận sớm**: Nếu `auto_full_day_early` bật và giờ nhận < `night_audit_time` (04:00) -> Cộng thêm 1 ngày tiền phòng. (Áp dụng ân hạn nhận nếu có).
   - **Trả muộn**: Nếu `auto_full_day_late` bật và giờ trả > `full_day_late_after` (18:00) -> Cộng thêm 1 ngày tiền phòng. (Áp dụng ân hạn trả nếu có).
 
 ---

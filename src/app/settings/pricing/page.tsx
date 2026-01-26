@@ -49,7 +49,8 @@ export default function PricingPage() {
           overnight_start_time: '22:00',
           overnight_end_time: '08:00',
           overnight_checkout_time: '10:00',
-          full_day_early_before: '05:00',
+          night_audit_time: '04:00',
+          full_day_early_before: '04:00',
           full_day_late_after: '18:00',
           auto_surcharge_enabled: true,
           auto_overnight_switch: false,
@@ -82,6 +83,7 @@ export default function PricingPage() {
       finalSettings.overnight_start_time = formatTime(finalSettings.overnight_start_time);
       finalSettings.overnight_end_time = formatTime(finalSettings.overnight_end_time);
       finalSettings.overnight_checkout_time = formatTime(finalSettings.overnight_checkout_time);
+      finalSettings.night_audit_time = formatTime(finalSettings.night_audit_time);
       finalSettings.full_day_early_before = formatTime(finalSettings.full_day_early_before);
       finalSettings.full_day_late_after = formatTime(finalSettings.full_day_late_after);
       
@@ -108,7 +110,8 @@ export default function PricingPage() {
       settingsToSave.overnight_start_time = ensureSeconds(settingsToSave.overnight_start_time);
       settingsToSave.overnight_end_time = ensureSeconds(settingsToSave.overnight_end_time);
       settingsToSave.overnight_checkout_time = ensureSeconds(settingsToSave.overnight_checkout_time);
-      settingsToSave.full_day_early_before = ensureSeconds(settingsToSave.full_day_early_before);
+      settingsToSave.night_audit_time = ensureSeconds(settingsToSave.night_audit_time);
+      settingsToSave.full_day_early_before = ensureSeconds(settingsToSave.night_audit_time); // Sync both for compatibility
       settingsToSave.full_day_late_after = ensureSeconds(settingsToSave.full_day_late_after);
 
       await Promise.all([
@@ -291,16 +294,16 @@ export default function PricingPage() {
                       <h3 className="text-[18px] font-bold">Tự động tính thêm ngày</h3>
                     </div>
                     <div className="divide-y divide-black/5">
-                      <div className="px-6 py-4 flex justify-between items-center">
+                      <div className="px-6 py-4 flex justify-between items-center bg-blue-50/20">
                         <div className="flex flex-col">
-                          <span className="text-[17px] text-[#1D1D1F]">Đến sớm tính thêm ngày</span>
-                          <span className="text-[13px] text-gray-500">Trước mốc này sẽ tự động tính thêm 1 ngày</span>
+                          <span className="text-[17px] text-[#1D1D1F] font-bold">Mốc Night Audit (Chốt ngày)</span>
+                          <span className="text-[13px] text-gray-500">Mốc giờ hệ thống tự động chốt sổ và tính thêm ngày nếu vào sớm</span>
                         </div>
                         <input 
                           type="time" 
-                          value={settings.full_day_early_before} 
-                          onChange={(e) => setSettings({...settings, full_day_early_before: e.target.value})}
-                          className="font-bold text-[17px] bg-black/5 px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                          value={settings.night_audit_time} 
+                          onChange={(e) => setSettings({...settings, night_audit_time: e.target.value})}
+                          className="font-bold text-[17px] bg-black/5 px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         />
                       </div>
                       <div className="px-6 py-4 flex justify-between items-center bg-red-50/30">

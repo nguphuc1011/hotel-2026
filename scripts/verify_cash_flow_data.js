@@ -17,16 +17,23 @@ async function run() {
     const resCount = await client.query('SELECT count(*) FROM cash_flow');
     console.log(`Total rows in cash_flow: ${resCount.rows[0].count}`);
 
-    // 2. List last 5 rows
+    // 2. List last 5 rows with Payment Method
     const resRows = await client.query(`
-        SELECT id, flow_type, amount, description, occurred_at, created_by 
+        SELECT id, flow_type, amount, description, occurred_at, created_by, payment_method_code
         FROM cash_flow 
         ORDER BY occurred_at DESC 
         LIMIT 5
     `);
     console.log('Last 5 transactions:');
     resRows.rows.forEach(r => {
-        console.log(`[${r.occurred_at.toISOString()}] ${r.flow_type} ${r.amount} - ${r.description} (User: ${r.created_by})`);
+        console.log(`[${r.occurred_at.toISOString()}] ${r.flow_type} ${r.amount} - ${r.description} (Method: ${r.payment_method_code})`);
+    });
+
+    // 2b. Check Wallets Balance
+    console.log('\n--- Current Wallet Balances ---');
+    const resWallets = await client.query('SELECT * FROM wallets ORDER BY id');
+    resWallets.rows.forEach(w => {
+        console.log(`${w.id}: ${w.balance}`);
     });
 
     // 3. Check RLS policies
