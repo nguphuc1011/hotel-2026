@@ -248,15 +248,15 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
             </div>
           </div>
           <button 
-            onClick={onClose} 
-            className="w-12 h-12 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-[18px] transition-all active:scale-90 group"
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center transition-all"
           >
-            <X className="w-6 h-6 text-slate-400 group-hover:text-slate-600" />
+            <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
 
         {/* --- BODY --- */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-slate-50/50">
           
           {/* 1. BILL BREAKDOWN CARD */}
           <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 space-y-6">

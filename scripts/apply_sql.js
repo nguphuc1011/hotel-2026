@@ -18,6 +18,11 @@ async function run() {
     console.log('--- Applying SQL from check_in_customer.sql ---');
     await client.query(checkInSql);
 
+    const cashFlowPath = path.join(__dirname, '../db_scripts/create_cash_flow.sql');
+    const cashFlowSql = fs.readFileSync(cashFlowPath, 'utf8');
+    console.log('--- Applying SQL from create_cash_flow.sql ---');
+    await client.query(cashFlowSql);
+
     const sqlPath = path.join(__dirname, '../src/lib/billing_engine.sql');
     const sql = fs.readFileSync(sqlPath, 'utf8');
     

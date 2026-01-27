@@ -24,8 +24,9 @@ CREATE OR REPLACE FUNCTION public.fn_create_cash_flow(
     p_amount numeric,
     p_description text,
     p_occurred_at timestamptz DEFAULT now(),
-    p_ref_id uuid DEFAULT NULL,
-    p_is_auto boolean DEFAULT false
+    p_verified_by_staff_id uuid DEFAULT NULL,
+    p_verified_by_staff_name text DEFAULT NULL,
+    p_payment_method_code text DEFAULT 'cash'
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -34,8 +35,28 @@ AS $$
 DECLARE
     v_new_id uuid;
 BEGIN
-    INSERT INTO public.cash_flow (flow_type, category, amount, description, occurred_at, ref_id, is_auto, created_by)
-    VALUES (p_flow_type, p_category, p_amount, p_description, p_occurred_at, p_ref_id, p_is_auto, auth.uid())
+    INSERT INTO public.cash_flow (
+        flow_type, 
+        category, 
+        amount, 
+        description, 
+        occurred_at, 
+        created_by, 
+        verified_by_staff_id, 
+        verified_by_staff_name,
+        payment_method_code
+    )
+    VALUES (
+        p_flow_type, 
+        p_category, 
+        p_amount, 
+        p_description || COALESCE(' (NV: ' || p_verified_by_staff_name || ')', ''), 
+        p_occurred_at, 
+        COALESCE(p_verified_by_staff_id, auth.uid()),
+        p_verified_by_staff_id,
+        p_verified_by_staff_name,
+        p_payment_method_code
+    )
     RETURNING id INTO v_new_id;
 
     RETURN jsonb_build_object(

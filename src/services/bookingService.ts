@@ -146,6 +146,7 @@ export const bookingService = {
     rental_type: 'hourly' | 'daily' | 'overnight';
     customer_id?: string;
     deposit?: number;
+    payment_method?: string;
     services?: { id: string; quantity: number; price: number }[];
     customer_name?: string;
     extra_adults?: number;
@@ -168,6 +169,7 @@ export const bookingService = {
         p_rental_type: data.rental_type,
         p_customer_id: data.customer_id || null,
         p_deposit: data.deposit || 0,
+        p_payment_method: data.payment_method || 'cash',
         p_services: servicesPayload,
         p_customer_name: data.customer_name || null,
         p_extra_adults: data.extra_adults || 0,

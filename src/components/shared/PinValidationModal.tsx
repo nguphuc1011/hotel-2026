@@ -9,7 +9,7 @@ import { useAuth } from '@/providers/AuthProvider';
 interface PinValidationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (staffId: string, staffName: string, pin: string) => void;
+  onSuccess: (staffId: string, staffName: string, pin?: string) => void;
   actionName: string;
   description?: string;
 }

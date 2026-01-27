@@ -354,19 +354,7 @@ export default function OwnerDebtSection({ onUpdate }: OwnerDebtSectionProps) {
         isOpen={isPinModalOpen}
         onClose={() => setIsPinModalOpen(false)}
         onSuccess={async (staffId, staffName, pin) => {
-          // IMPORTANT: Need to update PinValidationModal to pass pin back
-          // Assuming we updated it or use a workaround.
-          // Since I can't guarantee PinValidationModal update in this single file write,
-          // I will fetch the PIN from the modal if possible, but I can't.
-          // 
-          // WORKAROUND: For this specific file, I'll trust the validation for now 
-          // BUT this breaks the RPC contract requiring `p_pin`.
-          // 
-          // So I MUST update PinValidationModal. I'll do that in the next tool call.
-          // Here I assume `pin` is passed.
-          
           if (!pin) {
-             // Fallback if modal not updated yet (should not happen if I update both)
              toast.error('Lỗi hệ thống: Không lấy được mã PIN');
              return;
           }

@@ -24,6 +24,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
     category: '',
     amount: 0,
     description: '',
+    payment_method_code: 'cash',
     // YYYY-MM-DD (Local Time)
     occurred_at: toLocalISOString(),
   });
@@ -102,6 +103,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
         category: '',
         amount: 0,
         description: '',
+        payment_method_code: 'cash',
         occurred_at: toLocalISOString(),
       });
     } catch (error) {
@@ -195,6 +197,37 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
                   Chưa có danh mục. Vui lòng thêm trong Cài đặt.
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Payment Method */}
+          <div className="space-y-2">
+            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Phương thức thanh toán <span className="text-rose-500">*</span></label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, payment_method_code: 'cash' })}
+                className={cn(
+                  "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all",
+                  formData.payment_method_code === 'cash'
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                TIỀN MẶT
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, payment_method_code: 'bank' })}
+                className={cn(
+                  "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all",
+                  formData.payment_method_code === 'bank'
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                CHUYỂN KHOẢN
+              </button>
             </div>
           </div>
 

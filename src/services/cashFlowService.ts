@@ -178,6 +178,7 @@ export const cashFlowService = {
     amount: number;
     description: string;
     occurred_at: Date;
+    payment_method_code?: string;
     verifiedStaff?: { id: string, name: string };
   }) {
     const { data, error } = await supabase.rpc('fn_create_cash_flow', {
@@ -187,7 +188,8 @@ export const cashFlowService = {
       p_description: payload.description,
       p_occurred_at: payload.occurred_at.toISOString(),
       p_verified_by_staff_id: payload.verifiedStaff?.id || null,
-      p_verified_by_staff_name: payload.verifiedStaff?.name || null
+      p_verified_by_staff_name: payload.verifiedStaff?.name || null,
+      p_payment_method_code: payload.payment_method_code || 'cash'
     });
 
     if (error) throw error;

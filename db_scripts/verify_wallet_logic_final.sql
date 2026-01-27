@@ -1,6 +1,118 @@
--- CHECK-IN CUSTOMER RPC
--- Created: 2026-01-12
--- Updated: 2026-01-15 (Resolved ambiguity, fixed room status logic)
+-- FIX: WALLET LOGIC FINAL (STRICT CASH/BANK ROUTING)
+-- Date: 2026-01-27
+-- Author: Trae (AI Assistant)
+-- Purpose: Ensure Deposit via Transfer goes to BANK, Cash goes to CASH.
+
+-- ==========================================================
+-- PART 1: RESET TRIGGERS & FUNCTIONS
+-- ==========================================================
+
+DROP TRIGGER IF EXISTS tr_update_wallets ON public.cash_flow;
+DROP FUNCTION IF EXISTS public.trg_update_wallets();
+
+-- ==========================================================
+-- PART 2: THE 5-FUND TRIGGER (LOGIC CORE)
+-- ==========================================================
+CREATE OR REPLACE FUNCTION public.trg_update_wallets()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+    v_amount numeric;
+    v_sign integer;
+    v_payment_method text;
+BEGIN
+    v_amount := COALESCE(NEW.amount, 0);
+    v_payment_method := lower(COALESCE(NEW.payment_method_code, 'cash')); -- Normalize & Default
+    
+    -- Determine Sign based on Flow Type
+    IF NEW.flow_type = 'IN' THEN
+        v_sign := 1;
+    ELSE
+        v_sign := -1;
+    END IF;
+
+    -- ==========================================================
+    -- 1. LOGIC FOR "TIỀN CỌC" (DEPOSIT IN)
+    -- ==========================================================
+    IF NEW.category = 'Tiền cọc' THEN
+        -- Physical Wallet Routing
+        IF v_payment_method = 'cash' THEN
+            UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'CASH';
+        ELSE
+            -- Bank, Transfer, QR, Card... -> All go to BANK
+            UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'BANK';
+        END IF;
+
+        -- Logical Wallet: ESCROW (Always tracks deposits as Liability)
+        UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'ESCROW';
+        
+        RETURN NEW;
+    END IF;
+
+    -- ==========================================================
+    -- 2. LOGIC FOR "GHI NỢ" (CREDIT CHARGE)
+    -- ==========================================================
+    IF v_payment_method = 'credit' THEN
+        -- Only affects RECEIVABLE (Increases Debt)
+        UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'RECEIVABLE';
+        RETURN NEW;
+    END IF;
+
+    -- ==========================================================
+    -- 3. LOGIC FOR "CHUYỂN CỌC" (DEPOSIT TRANSFER)
+    -- ==========================================================
+    IF v_payment_method = 'deposit_transfer' THEN
+        -- Escrow decreases (Liability reduced)
+        UPDATE public.wallets SET balance = balance - v_amount, updated_at = now() WHERE id = 'ESCROW';
+        -- Revenue increases (Realized income)
+        UPDATE public.wallets SET balance = balance + v_amount, updated_at = now() WHERE id = 'REVENUE';
+        -- Receivable decreases (Debt paid by deposit)
+        UPDATE public.wallets SET balance = balance - v_amount, updated_at = now() WHERE id = 'RECEIVABLE';
+        RETURN NEW;
+    END IF;
+
+    -- ==========================================================
+    -- 4. STANDARD PAYMENTS & EXPENSES
+    -- ==========================================================
+    
+    -- A. Physical Wallet Routing
+    IF v_payment_method = 'owner_equity' THEN
+         -- Owner pays from pocket -> No change in CASH/BANK
+         NULL; 
+    ELSIF v_payment_method = 'cash' THEN
+        UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'CASH';
+    ELSE
+        -- Bank, Transfer...
+        UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'BANK';
+    END IF;
+
+    -- B. Logical Wallet Routing (Revenue/P&L)
+    IF NEW.category NOT IN ('Trả nợ', 'Điều chỉnh', 'Nạp vốn') THEN
+         UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'REVENUE';
+    END IF;
+    
+    -- C. Receivable Reduction (For IN flows that are payments)
+    IF NEW.flow_type = 'IN' AND NEW.category NOT IN ('Nạp vốn', 'Tiền cọc') THEN
+         UPDATE public.wallets SET balance = balance - v_amount, updated_at = now() WHERE id = 'RECEIVABLE';
+    END IF;
+
+    RETURN NEW;
+END;
+$function$;
+
+-- ==========================================================
+-- PART 3: RE-APPLY TRIGGER
+-- ==========================================================
+CREATE TRIGGER tr_update_wallets
+    AFTER INSERT OR UPDATE OR DELETE ON public.cash_flow
+    FOR EACH ROW
+    EXECUTE FUNCTION public.trg_update_wallets();
+
+-- ==========================================================
+-- PART 4: UPDATE CHECK-IN RPC (To ensure it passes payment_method)
+-- ==========================================================
 
 -- Drop any ambiguous versions first
 DROP FUNCTION IF EXISTS public.check_in_customer(uuid, text, uuid, numeric, jsonb, text, integer, integer, text, numeric, text, text);

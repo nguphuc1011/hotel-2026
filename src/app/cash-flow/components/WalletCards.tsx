@@ -116,7 +116,7 @@ export default function WalletCards({ wallets, loading, selectedWalletId, onSele
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />
         ))}
@@ -125,7 +125,7 @@ export default function WalletCards({ wallets, loading, selectedWalletId, onSele
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
       {wallets.map((wallet) => {
         const isSelected = selectedWalletId === wallet.id;
         const colorClass = getWalletColor(wallet.id);

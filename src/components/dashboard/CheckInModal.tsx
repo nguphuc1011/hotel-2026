@@ -219,6 +219,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [deposit, setDeposit] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Security State
@@ -451,6 +452,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                 customer_id: finalCustomerId,
                 customer_name: !finalCustomerId ? searchTerm : undefined, 
                 deposit,
+                payment_method: paymentMethod,
                 extra_adults: isExtraPeople ? extraAdults : 0,
                 extra_children: isExtraPeople ? extraChildren : 0,
                 notes,
@@ -801,22 +803,56 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                 </div>
 
                 {/* 7. PREPAYMENT */}
-                <div className="bg-white rounded-[40px] shadow-sm p-6 flex flex-col gap-3">
-                    <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Thanh toán trước (Cọc)</span>
-                    <div className="flex gap-2">
-                        <MoneyInput
-                            value={deposit}
-                            onChange={setDeposit}
-                            className="flex-1 py-4 px-4 bg-slate-50 rounded-[24px] font-bold text-xl text-slate-800 focus:ring-2 focus:ring-blue-500 border-none outline-none transition-all"
-                            placeholder="0"
-                        />
-                        <button
-                            onClick={() => setDeposit(totalAmount)}
-                            className="px-4 bg-blue-50 text-blue-600 font-bold rounded-[24px] hover:bg-blue-100 transition-colors text-xs uppercase tracking-wide"
-                        >
-                            Full Cọc
-                        </button>
+                <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4">
+                    <div className="flex flex-col gap-3">
+                        <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Thanh toán trước (Cọc)</span>
+                        <div className="flex gap-2">
+                            <MoneyInput
+                                value={deposit}
+                                onChange={setDeposit}
+                                className="flex-1 py-4 px-4 bg-slate-50 rounded-[24px] font-bold text-xl text-slate-800 focus:ring-2 focus:ring-blue-500 border-none outline-none transition-all"
+                                placeholder="0"
+                            />
+                            <button
+                                onClick={() => setDeposit(totalAmount)}
+                                className="px-4 bg-blue-50 text-blue-600 font-bold rounded-[24px] hover:bg-blue-100 transition-colors text-xs uppercase tracking-wide"
+                            >
+                                Full Cọc
+                            </button>
+                        </div>
                     </div>
+
+                    {deposit > 0 && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phương thức thanh toán cọc</span>
+                            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod('cash')}
+                                    className={cn(
+                                        "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all",
+                                        paymentMethod === 'cash'
+                                            ? "bg-white text-slate-900 shadow-sm"
+                                            : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    TIỀN MẶT
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod('bank')}
+                                    className={cn(
+                                        "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all",
+                                        paymentMethod === 'bank'
+                                            ? "bg-white text-slate-900 shadow-sm"
+                                            : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    CHUYỂN KHOẢN
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Notes textarea */}
