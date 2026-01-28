@@ -69,7 +69,7 @@ export default function ProfitCharts({ kpis, onDrillDown }: ProfitChartsProps) {
                 outerRadius={100}
                 paddingAngle={5}
                 dataKey="value"
-                onClick={(data) => onDrillDown(data.name)}
+                onClick={(data) => onDrillDown(data.name || '')}
                 cursor="pointer"
               >
                 {pieData.map((entry, index) => (
@@ -120,7 +120,7 @@ export default function ProfitCharts({ kpis, onDrillDown }: ProfitChartsProps) {
                 dataKey="value" 
                 stackId="a" 
                 radius={[4, 4, 4, 4]} 
-                onClick={(data) => onDrillDown(data.name)}
+                onClick={(data) => onDrillDown(data.name || '')}
                 cursor="pointer"
               >
                 {waterfallData.map((entry, index) => (
