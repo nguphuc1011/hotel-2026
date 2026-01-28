@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/AuthProvider';
 import PinValidationModal from '@/components/shared/PinValidationModal';
+import { formatMoney } from '@/utils/format';
 
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
@@ -94,6 +95,12 @@ export default function ServicesPage() {
       return;
     }
 
+    // Rule: Không được để giá vốn <= 0 khi quản lý tồn kho
+    if (editingService.track_inventory && (editingService.cost_price || 0) <= 0) {
+        toast.error('Giá vốn phải lớn hơn 0 khi quản lý tồn kho!');
+        return;
+    }
+
     const payload = {
         ...editingService,
         unit: editingService.unit_sell // Sync unit for backward compatibility
@@ -134,48 +141,81 @@ export default function ServicesPage() {
   const executeImport = async () => {
     if (!selectedService || inventoryForm.quantity <= 0) return;
 
-    // We now use p_qty_buy and p_total_amount directly
-    // The RPC will handle conversion if needed
     const qtyBuy = inventoryForm.quantity;
-    const totalAmount = inventoryForm.cost;
+    const totalAmount = Math.round(inventoryForm.cost);
     let note = inventoryForm.notes;
 
+    // Calculate actual quantity in sell units
+    let finalQtyBuy = qtyBuy;
     if (importMode === 'buy_unit') {
+        finalQtyBuy = qtyBuy * (selectedService.conversion_factor || 1);
         note = `${inventoryForm.notes} (Nhập theo ${selectedService.unit_buy})`;
     } else {
         note = `${inventoryForm.notes} (Nhập theo ${selectedService.unit_sell})`;
-        // If importing by sell unit, but RPC expects qty_buy (which usually means the larger unit),
-        // we might need to handle this. But wait, if importMode is 'sell_unit', 
-        // we can either pass it as qty_buy = quantity and conversion_factor = 1,
-        // OR we just pass it and let the RPC know.
-        
-        // Actually, let's keep it simple: if importMode is sell_unit, we pass it as is.
-        // If importMode is buy_unit, the RPC will multiply by conversion_factor.
-        // WAIT: My RPC logic says: v_qty_sell := p_qty_buy * v_conversion_factor;
-        // This means p_qty_buy ALWAYS gets multiplied.
-        // So if user selects 'sell_unit', we should pass qtyBuy = quantity / conversion_factor? 
-        // No, that's confusing.
-        
-        // Let's modify the RPC to be smarter, OR handle it here.
-        // Let's handle it here: always pass the quantity as "sell units" to the RPC, 
-        // and tell the RPC that conversion_factor is 1 for this call? 
-        // No, the RPC fetches conversion_factor from the DB.
     }
 
-    // RE-DESIGNED LOGIC: 
-    // If user imports by 'sell_unit', we pass qtyBuy = quantity / conversion_factor so that 
-    // (quantity / conversion_factor) * conversion_factor = quantity.
-    // BUT that's prone to rounding.
+    // --- LOGIC CẢNH BÁO LỆCH GIÁ ---
+    if (totalAmount > 0) {
+        const newUnitCost = Math.round(totalAmount / finalQtyBuy);
+        const currentCost = Number(selectedService.cost_price) || 0;
+        
+        // Nếu giá cũ = 0 hoặc lệch > 30%
+        const isZeroCost = currentCost === 0;
+        const isDeviation = currentCost > 0 && Math.abs(newUnitCost - currentCost) / currentCost > 0.3;
+
+        if (isZeroCost || isDeviation) {
+            const message = isZeroCost 
+                ? `Cảnh báo: Giá vốn hiện tại đang là 0đ (không hợp lệ). Giá nhập mới là ${formatMoney(newUnitCost)}.\nBạn có muốn CẬP NHẬT lại giá vốn gốc theo giá mới này không?`
+                : `Cảnh báo lệch giá: Giá nhập mới (${formatMoney(newUnitCost)}) lệch nhiều so với giá vốn hiện tại (${formatMoney(currentCost)}).\nBạn có muốn CẬP NHẬT lại giá vốn gốc theo giá mới này không?`;
+
+            const shouldUpdateCost = await confirmDialog({
+                title: 'Phát hiện lệch giá vốn',
+                message: message,
+                type: 'confirm' // Chúng ta tạm dùng confirm dialog, OK = Có update, Cancel = Không update (nhập bình thường)
+            });
+
+            if (shouldUpdateCost) {
+                // Cập nhật giá vốn gốc trước khi nhập hàng
+                // Việc này sẽ giúp WAC tính toán lại dựa trên giá mới (coi như tồn kho cũ cũng có giá này)
+                await serviceService.updateService(selectedService.id, { 
+                    cost_price: newUnitCost 
+                });
+                toast.success('Đã cập nhật giá vốn gốc!');
+                
+                // Cập nhật lại state local để UI hiển thị đúng nếu cần
+                selectedService.cost_price = newUnitCost; 
+            }
+        }
+    }
+    // --------------------------------
+
+    // Lưu ý: Logic importInventory của RPC sẽ dùng cost_price mới nhất trong DB (vừa update ở trên) làm v_old_cost
+    // Nếu update cost thì: v_new_cost = ((old_stock * new_cost) + new_amount) / new_stock = new_cost (xấp xỉ)
+    // Như vậy là đúng ý định "Reset Cost"
+
+    // Logic cũ tính finalQtyBuy sai ở đoạn importMode === 'sell_unit' (dòng 175 logic cũ chia cho conversion_factor)
+    // Thực tế RPC importInventory nhận vào p_qty_buy. 
+    // Nếu logic RPC là: v_qty_sell := p_qty_buy * v_conversion_factor;
+    // Thì khi import theo 'sell_unit', ta phải truyền vào: qty / conversion_factor.
     
-    // BETTER: I will update the RPC to take an optional p_is_sell_unit boolean.
-    // Or just calculate here.
+    // Tuy nhiên, để an toàn và nhất quán với logic cũ (dù logic cũ có vẻ hơi rắc rối), ta sẽ giữ nguyên cách tính finalQtyBuy để pass vào RPC
+    // Logic cũ:
+    // if (importMode === 'sell_unit') { finalQtyBuy = qtyBuy / (selectedService.conversion_factor || 1); }
+    // Nhưng ở trên ta đã tính finalQtyBuy = qtyBuy * conversion (cho buy_unit) hoặc qtyBuy (cho sell_unit) -> ĐÂY LÀ LOGIC CỦA FE ĐỂ TÍNH GIÁ.
     
-    let finalQtyBuy = qtyBuy;
+    // ĐỂ KHỚP VỚI RPC (vốn nhân conversion_factor):
+    // Ta cần truyền vào con số sao cho khi nhân conversion_factor nó ra đúng số lượng bán.
+    // - Nếu Buy Unit (Thùng): Truyền 1 thùng -> RPC nhân 24 -> 24 chai. OK. (Pass qtyBuy gốc)
+    // - Nếu Sell Unit (Chai): Truyền 1 chai -> RPC nhân 24 -> 24 chai ??? SAI.
+    //   RPC mong đợi input là "Đơn vị mua" (thường là Thùng).
+    //   Nên nếu nhập theo Chai, ta phải chia cho 24.
+    
+    let quantityToPassToRPC = qtyBuy;
     if (importMode === 'sell_unit') {
-        finalQtyBuy = qtyBuy / (selectedService.conversion_factor || 1);
+        quantityToPassToRPC = qtyBuy / (selectedService.conversion_factor || 1);
     }
 
-    await serviceService.importInventory(selectedService.id, finalQtyBuy, totalAmount, note, user?.id);
+    await serviceService.importInventory(selectedService.id, quantityToPassToRPC, totalAmount, note, user?.id);
     setIsImportModalOpen(false);
     setInventoryForm({ quantity: 0, cost: 0, notes: '' });
     fetchServices();
@@ -379,7 +419,7 @@ export default function ServicesPage() {
                     {/* Right: Price & Stock */}
                     <div className="flex flex-col items-end gap-1 min-w-fit">
                        <div className="font-black text-slate-900 text-[16px] md:text-lg">
-                         {service.price.toLocaleString()}đ
+                         {formatMoney(service.price)}
                        </div>
                        
                        {service.track_inventory && (
@@ -408,7 +448,7 @@ export default function ServicesPage() {
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div>
                         <h3 className="text-xl font-black text-slate-800">{selectedService.name}</h3>
-                        <p className="text-sm font-bold text-slate-500">{selectedService.price.toLocaleString()}đ / {selectedService.unit_sell}</p>
+                        <p className="text-sm font-bold text-slate-500">{formatMoney(selectedService.price)} / {selectedService.unit_sell}</p>
                     </div>
                     <button onClick={() => setIsControlModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                         <X className="w-6 h-6 text-slate-400" />
@@ -737,7 +777,7 @@ export default function ServicesPage() {
                                     <span className="text-sm font-black text-slate-400 uppercase">{importMode === 'buy_unit' ? selectedService.unit_buy : selectedService.unit_sell}</span>
                                     {importMode === 'buy_unit' && selectedService.conversion_factor && selectedService.conversion_factor > 1 && (
                                         <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
-                                            = {((inventoryForm.quantity || 0) * selectedService.conversion_factor).toLocaleString()} {selectedService.unit_sell}
+                                            = {((inventoryForm.quantity || 0) * (selectedService.conversion_factor || 1)).toLocaleString('vi-VN')} {selectedService.unit_sell}
                                         </span>
                                     )}
                                 </div>
@@ -763,7 +803,7 @@ export default function ServicesPage() {
                                 <div className="flex justify-between items-center px-2">
                                     <span className="text-xs font-bold text-slate-400 italic">Giá vốn dự kiến:</span>
                                     <span className="text-sm font-black text-slate-600">
-                                        {(inventoryForm.cost / (importMode === 'buy_unit' ? (inventoryForm.quantity * (selectedService.conversion_factor || 1)) : inventoryForm.quantity)).toLocaleString()}đ / {selectedService.unit_sell}
+                                        {formatMoney(inventoryForm.cost / (importMode === 'buy_unit' ? (inventoryForm.quantity * (selectedService.conversion_factor || 1)) : inventoryForm.quantity))} / {selectedService.unit_sell}
                                     </span>
                                 </div>
                             )}

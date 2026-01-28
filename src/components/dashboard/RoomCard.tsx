@@ -17,6 +17,8 @@ import { DashboardRoom } from '@/types/dashboard';
 import { format } from 'date-fns';
 import LiveTimer from './LiveTimer';
 
+import { formatMoney } from '@/utils/format';
+
 interface RoomCardProps {
   room: DashboardRoom;
   onClick: (room: DashboardRoom) => void;
@@ -102,10 +104,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
       : (room.status === 'available' ? room.price_daily : null);
 
     if (amount !== undefined && amount !== null) {
-      return new Intl.NumberFormat('vi-VN', { 
-        style: 'decimal', 
-        minimumFractionDigits: 0 
-      }).format(amount) + ' ₫';
+      return formatMoney(amount);
     }
     return null;
   }, [room.status, room.current_booking, room.price_daily]);

@@ -17,6 +17,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatMoney } from '@/utils/format';
 import { BookingBill, bookingService } from '@/services/bookingService';
 import BillBreakdown from './BillBreakdown';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
@@ -48,6 +49,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRefundConfirmed, setIsRefundConfirmed] = useState(false);
 
   // Security states
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -67,7 +69,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
   // Auto-fill debt reason
   useEffect(() => {
     if (isDebt && !notes) {
-      setNotes(`Khách nợ lại ${Math.abs(balanceDiff).toLocaleString()}đ`);
+      setNotes(`Khách nợ lại ${formatMoney(Math.abs(balanceDiff))}đ`);
     } else if (!isDebt && notes.startsWith('Khách nợ lại')) {
       setNotes('');
     }
@@ -102,11 +104,11 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
               
               <div className="flex justify-between items-center">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Tổng cộng</span>
-                <span className="font-black text-slate-900 text-xl tracking-tight">{currentTotal.toLocaleString()}đ</span>
+                <span className="font-black text-slate-900 text-xl tracking-tight">{formatMoney(currentTotal)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Khách trả</span>
-                <span className="font-black text-blue-600 text-xl tracking-tight">{amountPaid.toLocaleString()}đ</span>
+                <span className="font-black text-blue-600 text-xl tracking-tight">{formatMoney(amountPaid)}</span>
               </div>
               
               <div className="h-px bg-slate-200" />
@@ -114,12 +116,12 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
               {balanceDiff < 0 ? (
                 <div className="flex justify-between items-center p-4 bg-rose-500 text-white rounded-2xl shadow-lg shadow-rose-100">
                   <span className="font-black text-[10px] uppercase tracking-widest opacity-80">Ghi nợ</span>
-                  <span className="font-black text-2xl tracking-tight">{Math.abs(balanceDiff).toLocaleString()}đ</span>
+                  <span className="font-black text-2xl tracking-tight">{formatMoney(Math.abs(balanceDiff))}</span>
                 </div>
               ) : balanceDiff > 0 ? (
                 <div className="flex justify-between items-center p-4 bg-emerald-500 text-white rounded-2xl shadow-lg shadow-emerald-100">
                   <span className="font-black text-[10px] uppercase tracking-widest opacity-80">Tiền thừa</span>
-                  <span className="font-black text-2xl tracking-tight">{balanceDiff.toLocaleString()}đ</span>
+                  <span className="font-black text-2xl tracking-tight">{formatMoney(balanceDiff)}</span>
                 </div>
               ) : (
                 <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-lg shadow-slate-100 text-center">
@@ -154,6 +156,12 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
     // Validate: If debt, require notes
     if (isDebt && !notes.trim()) {
         setError('Vui lòng ghi chú lý do nợ (Ví dụ: Khách quen, Thiếu tiền mặt...)');
+        return;
+    }
+
+    // Validate: If refund (excess payment), require confirmation
+    if (balanceDiff > 0 && !isRefundConfirmed) {
+        setError('Vui lòng xác nhận đã hoàn trả tiền thừa cho khách!');
         return;
     }
 
@@ -263,8 +271,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
             <div className="flex justify-between items-end">
               <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">Tổng cộng cần thu</span>
               <span className="text-4xl font-black text-slate-900 tracking-tighter">
-                {currentTotal.toLocaleString()}
-                <span className="text-xl ml-1 text-slate-400">đ</span>
+                {formatMoney(currentTotal)}
               </span>
             </div>
             
@@ -276,7 +283,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
                   </div>
                   <span className="text-sm font-bold text-amber-800">Bao gồm nợ cũ:</span>
                 </div>
-                <span className="font-black text-amber-900">{oldDebt.toLocaleString()}đ</span>
+                <span className="font-black text-amber-900">{formatMoney(oldDebt)}</span>
               </div>
             )}
             
@@ -357,15 +364,34 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Trạng thái</p>
                   <p className="text-sm font-bold">
                     {balanceDiff === 0 ? 'Thanh toán đủ' : 
-                     balanceDiff > 0 ? 'Tiền thừa trả khách' : 
+                     balanceDiff > 0 ? 'Tiền thừa trả lại khách' : 
                      'Khách còn thiếu (Ghi nợ)'}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-black tracking-tight">{Math.abs(balanceDiff).toLocaleString()}đ</p>
+                <p className="text-2xl font-black tracking-tight">{formatMoney(Math.abs(balanceDiff))}</p>
               </div>
             </div>
+
+            {/* REFUND CONFIRMATION (MẬT LỆNH) */}
+            {balanceDiff > 0 && (
+              <div className="bg-emerald-50 border-2 border-emerald-100 p-4 rounded-[24px] flex items-start gap-4 animate-in fade-in slide-in-from-top-2">
+                <div className="pt-1">
+                  <input 
+                    type="checkbox" 
+                    id="confirmRefund"
+                    checked={isRefundConfirmed}
+                    onChange={(e) => setIsRefundConfirmed(e.target.checked)}
+                    className="w-6 h-6 rounded-lg border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                </div>
+                <label htmlFor="confirmRefund" className="text-sm text-emerald-900 font-medium cursor-pointer select-none leading-relaxed">
+                  Tôi xác nhận đã hoàn trả <span className="font-black text-emerald-600">{formatMoney(balanceDiff)}</span> tiền thừa cho khách.
+                  <span className="block text-xs text-emerald-600/70 font-normal mt-1">*Bắt buộc xác nhận trước khi hoàn tất.</span>
+                </label>
+              </div>
+            )}
 
             {/* SECONDARY INPUTS */}
             <div className="grid grid-cols-2 gap-4">

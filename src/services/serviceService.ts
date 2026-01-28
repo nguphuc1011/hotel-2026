@@ -124,9 +124,10 @@ export const serviceService = {
                 p_service_id: serviceId,
                 p_qty_buy: quantity,
                 p_total_amount: totalAmount,
+                p_payment_method_code: 'cash'
             };
             if (notes) payload.p_notes = notes;
-            if (staffId) payload.p_staff_id = staffId;
+            if (staffId) payload.p_verified_by_staff_id = staffId;
             
             // Explicitly logging payload for debugging
             console.log('Import Inventory Payload:', payload);
@@ -302,6 +303,21 @@ export const serviceService = {
       return true;
     } catch (err) {
       console.error('Error removing service from booking:', err);
+      return false;
+    }
+  },
+
+  async updateBookingServiceQuantity(id: string, quantity: number) {
+    try {
+      const { error } = await supabase
+        .from('booking_services')
+        .update({ quantity: quantity })
+        .eq('id', id);
+      
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating booking service quantity:', err);
       return false;
     }
   }

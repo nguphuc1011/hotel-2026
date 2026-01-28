@@ -30,6 +30,7 @@ DROP FUNCTION IF EXISTS public.fn_calculate_surcharge_v2(text, timestamptz, time
 CREATE OR REPLACE FUNCTION public.fn_format_money_vi(p_amount numeric) 
 RETURNS text AS $$
 BEGIN
+    IF p_amount IS NULL THEN RETURN '0'; END IF;
     RETURN replace(to_char(p_amount, 'FM999,999,999,999'), ',', '.');
 END;
 $$ LANGUAGE plpgsql;
@@ -140,8 +141,13 @@ BEGIN
 
     -- 2. Load prices from room_categories
     SELECT 
-        price_hourly, price_next_hour, price_daily, price_overnight,
-        overnight_enabled, hourly_unit, base_hourly_limit
+        COALESCE(price_hourly, 0), 
+        COALESCE(price_next_hour, 0), 
+        COALESCE(price_daily, 0), 
+        COALESCE(price_overnight, 0),
+        COALESCE(overnight_enabled, false), 
+        COALESCE(hourly_unit, 60), 
+        COALESCE(base_hourly_limit, 1)
     INTO 
         v_price_hourly, v_price_next, v_price_daily, v_price_overnight,
         v_overnight_enabled, v_hourly_unit, v_base_block_count
@@ -149,7 +155,8 @@ BEGIN
     WHERE id = p_room_cat_id;
 
     -- 3. Load Custom Price from Booking
-    SELECT custom_price INTO v_custom_price FROM public.bookings WHERE id = p_booking_id;
+    SELECT COALESCE(custom_price, 0) INTO v_custom_price FROM public.bookings WHERE id = p_booking_id;
+    v_custom_price := COALESCE(v_custom_price, 0);
     
     -- Apply Overrides (Priority: Custom Price > Category Price)
     IF v_custom_price > 0 THEN
@@ -216,17 +223,34 @@ BEGIN
         
         IF v_duration_minutes > v_first_block_min THEN
             v_remaining_min := v_duration_minutes - v_first_block_min;
-            -- Hourly Late Grace
-            IF v_grace_out_enabled AND v_remaining_min <= v_grace_minutes THEN
-                v_explanations := array_append(v_explanations, format('Quá giờ %s phút (trong mức miễn phí %s phút): Không tính thêm tiền', ROUND(v_remaining_min,0), v_grace_minutes));
-                v_remaining_min := 0;
-            END IF;
+            -- [LOGIC MỚI] Khoan hồng từng Block (Grace per Block)
+            -- Nguyên tắc: Tính số block trọn vẹn + Xử lý phần dư của block cuối cùng
             
-            IF v_remaining_min > 0 THEN
-                v_next_blocks := CEIL(v_remaining_min / v_hourly_unit);
+            DECLARE
+                v_remainder_min numeric;
+            BEGIN
+                -- Tính số block trọn vẹn (ví dụ: 65 phút / 60 = 1 block trọn)
+                v_next_blocks := FLOOR(v_remaining_min / v_hourly_unit);
+                
+                -- Tính phần dư (ví dụ: 65 % 60 = 5 phút)
+                v_remainder_min := MOD(v_remaining_min, v_hourly_unit);
+                
+                IF v_remainder_min > 0 THEN
+                    -- Nếu phần dư > ân hạn -> Tính thêm 1 block
+                    IF (NOT v_grace_out_enabled) OR (v_remainder_min > v_grace_minutes) THEN
+                        v_next_blocks := v_next_blocks + 1;
+                        v_explanations := array_append(v_explanations, format('Block lẻ %s phút (> %s phút ân hạn) -> Tính tròn 1 block', ROUND(v_remainder_min, 0), v_grace_minutes));
+                    ELSE
+                        -- Nếu phần dư <= ân hạn -> Miễn phí block này
+                        v_explanations := array_append(v_explanations, format('Block lẻ %s phút (<= %s phút ân hạn) -> Miễn phí', ROUND(v_remainder_min, 0), v_grace_minutes));
+                    END IF;
+                END IF;
+            END;
+
+            IF v_next_blocks > 0 THEN
                 v_total_charge := v_total_charge + (v_next_blocks * v_price_next);
-                v_explanations := array_append(v_explanations, format('Quá giờ %s phút (vượt mức miễn phí %s phút): Tính thêm %s block lẻ x %sđ = %sđ', 
-                    ROUND(v_remaining_min,0), v_grace_minutes, v_next_blocks, public.fn_format_money_vi(v_price_next), public.fn_format_money_vi(v_next_blocks * v_price_next)));
+                v_explanations := array_append(v_explanations, format('Tổng tính thêm: %s block x %sđ = %sđ', 
+                    v_next_blocks, public.fn_format_money_vi(v_price_next), public.fn_format_money_vi(v_next_blocks * v_price_next)));
             END IF;
         END IF;
         
@@ -701,74 +725,74 @@ CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid, p_no
      v_duration_minutes := MOD(v_duration_minutes::int, 60);
  
      -- 1. Room Charge
-    v_room_res := public.fn_calculate_room_charge(p_booking_id, v_booking.check_in_actual, v_check_out, v_booking.rental_type, v_room_cat_id);
-    v_audit_trail := v_audit_trail || ARRAY(SELECT jsonb_array_elements_text(v_room_res->'explanation'));
+   v_room_res := public.fn_calculate_room_charge(p_booking_id, v_booking.check_in_actual, v_check_out, v_booking.rental_type, v_room_cat_id);
+   v_audit_trail := v_audit_trail || ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v_room_res->'explanation') = 'array' THEN v_room_res->'explanation' ELSE '[]'::jsonb END) AS x);
+   
+   -- 2. Early/Late Surcharge
+   -- [FIX] Use actual rental type (in case it switched from Hourly -> Daily)
+   v_surcharge_res := public.fn_calculate_surcharge(v_booking.check_in_actual, v_check_out, v_room_cat_id, COALESCE(v_room_res->>'rental_type_actual', v_booking.rental_type));
+   v_audit_trail := v_audit_trail || ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v_surcharge_res->'explanation') = 'array' THEN v_surcharge_res->'explanation' ELSE '[]'::jsonb END) AS x);
     
-    -- 2. Early/Late Surcharge
-    -- [FIX] Use actual rental type (in case it switched from Hourly -> Daily)
-    v_surcharge_res := public.fn_calculate_surcharge(v_booking.check_in_actual, v_check_out, v_room_cat_id, v_room_res->>'rental_type_actual');
-    v_audit_trail := v_audit_trail || ARRAY(SELECT jsonb_array_elements_text(v_surcharge_res->'explanation'));
-     
-     -- 3. Extra Person
-     v_extra_person_res := public.fn_calculate_extra_person_charge(p_booking_id);
-     v_audit_trail := v_audit_trail || ARRAY(SELECT jsonb_array_elements_text(v_extra_person_res->'explanation'));
- 
-     -- 4. Services
-     SELECT 
-         COALESCE(SUM(quantity * price_at_time), 0),
-         COALESCE(jsonb_agg(jsonb_build_object('name', s.name, 'quantity', bs.quantity, 'price', bs.price_at_time, 'total', bs.quantity * bs.price_at_time)), '[]'::jsonb)
-     INTO v_service_total, v_service_items
-     FROM public.booking_services bs
-     JOIN public.services s ON bs.service_id = s.id
-     WHERE bs.booking_id = p_booking_id;
- 
-     IF v_service_total > 0 THEN
-         v_audit_trail := array_append(v_audit_trail, format('Dịch vụ: %s', v_service_total));
-     END IF;
- 
-     v_total_amount := (v_room_res->>'amount')::numeric + 
-                       (v_surcharge_res->>'amount')::numeric + 
-                       (v_extra_person_res->>'amount')::numeric + 
-                       v_service_total;
- 
-     -- 5. VAT, SVC, Discounts
-     v_adj_res := public.fn_calculate_bill_adjustments(
-         v_total_amount, 
-         COALESCE(v_booking.discount_amount, 0), 
-         COALESCE(v_booking.custom_surcharge, 0)
-     );
-     v_audit_trail := v_audit_trail || ARRAY(SELECT jsonb_array_elements_text(v_adj_res->'explanation'));
- 
-     RETURN jsonb_build_object(
-         'success', true,
-         'booking_id', p_booking_id,
-         'room_name', v_booking.room_name,
-         'customer_name', COALESCE(v_booking.cust_name, 'Khách lẻ'),
-         'rental_type', v_booking.rental_type,
-         'rental_type_actual', (v_room_res->>'rental_type_actual'),
-         'check_in_at', v_booking.check_in_actual,
-         'check_out_at', v_check_out,
-         'duration_hours', v_duration_hours,
-         'duration_minutes', v_duration_minutes,
-         
-         'room_charge', (v_room_res->>'amount')::numeric,
-         'surcharge_amount', (v_surcharge_res->>'amount')::numeric,
-         'extra_person_charge', (v_extra_person_res->>'amount')::numeric,
-         'service_total', v_service_total,
-         'service_items', v_service_items,
-         
-         'sub_total', v_total_amount,
-         'discount_amount', COALESCE(v_booking.discount_amount, 0),
-         'custom_surcharge', COALESCE(v_booking.custom_surcharge, 0),
-         'service_fee_amount', (v_adj_res->>'service_fee')::numeric,
-         'vat_amount', (v_adj_res->>'vat_amount')::numeric,
-         
-         'total_amount', (v_adj_res->>'final_amount')::numeric,
-         'deposit_amount', v_deposit,
-         'amount_to_pay', (v_adj_res->>'final_amount')::numeric - v_deposit,
-         'customer_balance', v_customer_balance,
-         'explanation', v_audit_trail
-     );
+    -- 3. Extra Person
+    v_extra_person_res := public.fn_calculate_extra_person_charge(p_booking_id);
+    v_audit_trail := v_audit_trail || ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v_extra_person_res->'explanation') = 'array' THEN v_extra_person_res->'explanation' ELSE '[]'::jsonb END) AS x);
+
+    -- 4. Services
+    SELECT 
+        COALESCE(SUM(quantity * price_at_time), 0),
+        COALESCE(jsonb_agg(jsonb_build_object('name', s.name, 'quantity', bs.quantity, 'price', bs.price_at_time, 'total', bs.quantity * bs.price_at_time)), '[]'::jsonb)
+    INTO v_service_total, v_service_items
+    FROM public.booking_services bs
+    JOIN public.services s ON bs.service_id = s.id
+    WHERE bs.booking_id = p_booking_id;
+
+    IF v_service_total > 0 THEN
+        v_audit_trail := array_append(v_audit_trail, format('Dịch vụ: %s', public.fn_format_money_vi(v_service_total)));
+    END IF;
+
+    v_total_amount := COALESCE((v_room_res->>'amount')::numeric, 0) + 
+                      COALESCE((v_surcharge_res->>'amount')::numeric, 0) + 
+                      COALESCE((v_extra_person_res->>'amount')::numeric, 0) + 
+                      v_service_total;
+
+    -- 5. VAT, SVC, Discounts
+    v_adj_res := public.fn_calculate_bill_adjustments(
+        v_total_amount, 
+        COALESCE(v_booking.discount_amount, 0), 
+        COALESCE(v_booking.custom_surcharge, 0)
+    );
+    v_audit_trail := v_audit_trail || ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v_adj_res->'explanation') = 'array' THEN v_adj_res->'explanation' ELSE '[]'::jsonb END) AS x);
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'booking_id', p_booking_id,
+        'room_name', v_booking.room_name,
+        'customer_name', COALESCE(v_booking.cust_name, 'Khách lẻ'),
+        'rental_type', v_booking.rental_type,
+        'rental_type_actual', COALESCE(v_room_res->>'rental_type_actual', v_booking.rental_type),
+        'check_in_at', v_booking.check_in_actual,
+        'check_out_at', v_check_out,
+        'duration_hours', v_duration_hours,
+        'duration_minutes', v_duration_minutes,
+        
+        'room_charge', COALESCE((v_room_res->>'amount')::numeric, 0),
+        'surcharge_amount', COALESCE((v_surcharge_res->>'amount')::numeric, 0),
+        'extra_person_charge', COALESCE((v_extra_person_res->>'amount')::numeric, 0),
+        'service_total', v_service_total,
+        'service_items', v_service_items,
+        
+        'sub_total', v_total_amount,
+        'discount_amount', COALESCE(v_booking.discount_amount, 0),
+        'custom_surcharge', COALESCE(v_booking.custom_surcharge, 0),
+        'service_fee_amount', COALESCE((v_adj_res->>'service_fee')::numeric, 0),
+        'vat_amount', COALESCE((v_adj_res->>'vat_amount')::numeric, 0),
+        
+        'total_amount', COALESCE((v_adj_res->>'final_amount')::numeric, 0),
+        'deposit_amount', v_deposit,
+        'amount_to_pay', COALESCE((v_adj_res->>'final_amount')::numeric, 0) - v_deposit,
+        'customer_balance', v_customer_balance,
+        'explanation', v_audit_trail
+    );
  END;
  $$;
 

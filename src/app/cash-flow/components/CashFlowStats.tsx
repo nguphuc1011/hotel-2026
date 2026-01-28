@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp } from 'lucide-react';
+import { formatMoney } from '@/utils/format';
 
 interface StatsProps {
   stats: {
@@ -14,10 +15,6 @@ interface StatsProps {
 }
 
 export default function CashFlowStats({ stats, loading }: StatsProps) {
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-  };
-
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

@@ -9,10 +9,24 @@ setlocal enabledelayedexpansion
 for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set datetime=%%I
 set timestamp=%datetime:~0,4%-%datetime:~4,2%-%datetime:~6,2%_%datetime:~8,2%-%datetime:~10,2%
 set backup_dir=C:\1hotel2_backups
-set filename=1hotel2_full_backup_%timestamp%
 
 echo ---------------------------------------------------------
-echo DANG KHOI TAO QUA TRINH SAO LUU...
+echo [ BUOC 1: DAT TEN BAN SAO LUU ]
+echo ---------------------------------------------------------
+set /p user_tag="[?] Nhap ten/ghi chu cho ban backup nay (Enter de bo qua): "
+
+if "!user_tag!"=="" (
+    set filename=1hotel2_full_backup_%timestamp%
+) else (
+    set filename=1hotel2_!user_tag!_%timestamp%
+)
+
+echo.
+echo [*] Ten file se la: !filename!
+echo.
+
+echo ---------------------------------------------------------
+echo [ BUOC 2: DANG KHOI TAO QUA TRINH SAO LUU... ]
 echo ---------------------------------------------------------
 
 :: 2. Tạo thư mục lưu trữ nếu chưa có

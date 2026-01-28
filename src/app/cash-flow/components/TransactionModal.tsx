@@ -114,7 +114,9 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
     }
   };
 
-  const filteredCategories = categories.filter(c => c.type === formData.flow_type);
+  const filteredCategories = categories.filter(c => 
+    c.type === formData.flow_type && !c.is_system
+  );
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">

@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatMoney } from '@/utils/format';
 import { Room, Booking } from '@/types/dashboard';
 import { bookingService, BookingBill } from '@/services/bookingService';
 import { serviceService, Service, BookingServiceItem } from '@/services/serviceService';
 import PaymentModal from './PaymentModal';
 import BillBreakdown from './BillBreakdown';
+import CancellationPenaltyModal from './CancellationPenaltyModal';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 import { securityService, SecurityAction } from '@/services/securityService';
@@ -113,6 +115,8 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [pendingServices, setPendingServices] = useState<BookingServiceItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPenaltyModal, setShowPenaltyModal] = useState(false);
+  const [cancellationStaff, setCancellationStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -276,9 +280,14 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
       setProcessingServiceId(serviceId);
       try {
-          await serviceService.removeServiceFromBooking(itemToRemove.id);
+          if (itemToRemove.quantity > 1) {
+              await serviceService.updateBookingServiceQuantity(itemToRemove.id, itemToRemove.quantity - 1);
+              toast.success("Đã giảm số lượng");
+          } else {
+              await serviceService.removeServiceFromBooking(itemToRemove.id);
+              toast.success("Đã xóa dịch vụ");
+          }
           await Promise.all([loadServices(), loadBill()]);
-          toast.success("Đã xóa dịch vụ");
       } catch (error) {
           console.error("Failed to remove service", error);
           toast.error("Lỗi khi xóa dịch vụ");
@@ -311,30 +320,35 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       }
     }
 
-    const confirmed = await confirmDialog({
-      title: 'Huỷ phòng',
-      message: "Bạn có chắc chắn muốn huỷ phòng này không? Hành động này không thể hoàn tác.",
-      type: 'error',
-      confirmLabel: 'Huỷ phòng',
-      destructive: true
-    });
+    // Save staff for the next step (Penalty Modal)
+    setCancellationStaff(verifiedStaff);
+    setShowPenaltyModal(true);
+  };
 
-    if (!confirmed) {
-      setPendingAction(null);
-      return;
-    }
-
+  const handleConfirmCancelWithPenalty = async (penaltyAmount: number, paymentMethod: string) => {
     setIsLoading(true);
     try {
-      await bookingService.cancelBooking(booking.id, verifiedStaff);
-      onUpdate(); // Refresh dashboard
-      onClose(); // Close modal
-      toast.success("Huỷ phòng thành công");
-    } catch (error) {
+      const result = await bookingService.cancelBooking(
+        booking.id, 
+        cancellationStaff,
+        penaltyAmount,
+        paymentMethod
+      );
+
+      if (result.success) {
+        onUpdate(); // Refresh dashboard
+        onClose(); // Close folio
+        toast.success(result.message || "Huỷ phòng thành công");
+      } else {
+        toast.error(result.message || "Lỗi khi huỷ phòng");
+      }
+    } catch (error: any) {
       console.error("Cancel failed", error);
-      toast.error("Lỗi khi huỷ phòng");
+      toast.error(error.message || "Lỗi khi huỷ phòng");
     } finally {
       setIsLoading(false);
+      setShowPenaltyModal(false);
+      setCancellationStaff(undefined);
       setPendingAction(null);
     }
   };
@@ -406,8 +420,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
                     <div className="flex justify-center items-center gap-3 mb-6 h-10">
                         <div className="text-4xl font-bold tracking-tight flex items-center h-full">
-                            {bill ? amountToPayWithDebt.toLocaleString() : '---'}
-                            <span className="text-2xl font-medium text-blue-200 ml-1">đ</span>
+                            {bill ? formatMoney(amountToPayWithDebt) : '---'}
                         </div>
                         <button 
                             onClick={(e) => {
@@ -550,7 +563,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                             <div className="flex items-center gap-2 font-medium text-blue-600">
                                 <span>{pendingServices.length} món</span>
                                 <span>•</span>
-                                <span>{pendingServices.reduce((sum, item) => sum + (item.quantity * item.price_at_time), 0).toLocaleString()}đ</span>
+                                <span>{formatMoney(pendingServices.reduce((sum, item) => sum + (item.quantity * item.price_at_time), 0))}</span>
                             </div>
                         </>
                     )}
@@ -586,7 +599,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                         </div>
                                     </div>
                                     <div className="font-bold text-blue-600">
-                                        {item.total_price.toLocaleString()}đ
+                                        {formatMoney(item.total_price)}
                                     </div>
                                 </div>
                             ))}
@@ -600,18 +613,28 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                 acc[item.service_id].total_price += item.quantity * item.price_at_time;
                                 return acc;
                             }, {} as Record<string, BookingServiceItem>)).map((item) => (
-                                <div key={item.service_id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div key={item.service_id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-sm">
                                             {item.quantity}x
                                         </div>
                                         <div>
                                             <div className="font-medium text-slate-900">{item.service?.name}</div>
-                                            <div className="text-xs text-slate-500">{item.price_at_time.toLocaleString()}đ</div>
+                                            <div className="text-xs text-slate-500">{formatMoney(item.price_at_time)}</div>
                                         </div>
                                     </div>
-                                    <div className="font-bold text-slate-700">
-                                        {item.total_price.toLocaleString()}đ
+                                    <div className="flex items-center gap-3">
+                                        <div className="font-bold text-slate-700">
+                                            {formatMoney(item.total_price)}
+                                        </div>
+                                        <button 
+                                            onClick={() => handleRemoveService(item.service_id)}
+                                            disabled={!!processingServiceId}
+                                            className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors active:scale-90"
+                                            title="Giảm số lượng / Xóa"
+                                        >
+                                            <Minus className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -661,6 +684,14 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
         </div>
 
         <AuditTrailModal />
+        <CancellationPenaltyModal 
+          isOpen={showPenaltyModal}
+          onClose={() => setShowPenaltyModal(false)}
+          roomName={room.name}
+          customerName={bill?.customer_name || 'Khách lẻ'}
+          onConfirm={handleConfirmCancelWithPenalty}
+          isLoading={isLoading}
+        />
         {bill && (
             <PaymentModal 
                 isOpen={showPaymentModal}

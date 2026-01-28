@@ -9,19 +9,20 @@ import {
   UserMinus, 
   TrendingUp,
   Wallet,
-  ArrowUpRight,
-  ArrowDownRight
+  RefreshCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatMoney } from '@/utils/format';
 
 interface WalletCardsProps {
   wallets: WalletType[];
   loading: boolean;
   selectedWalletId: string | null;
   onSelectWallet: (id: string | null) => void;
+  onRefresh?: () => void;
 }
 
-export default function WalletCards({ wallets, loading, selectedWalletId, onSelectWallet }: WalletCardsProps) {
+export default function WalletCards({ wallets, loading, selectedWalletId, onSelectWallet, onRefresh }: WalletCardsProps) {
   const [changes, setChanges] = useState<Record<string, { diff: number }>>({});
   const prevBalancesRef = useRef<Record<string, number>>({});
   const isMounted = useRef(false);
@@ -84,13 +85,15 @@ export default function WalletCards({ wallets, loading, selectedWalletId, onSele
       setChanges(currentTransactionChanges);
       localStorage.setItem('wallet_last_changes', JSON.stringify(currentTransactionChanges));
       localStorage.setItem('wallet_prev_balances', JSON.stringify(prevBalancesRef.current));
+    } else {
+       // Sync balances if empty
+       if (Object.keys(prevBalancesRef.current).length === 0) {
+          wallets.forEach(w => prevBalancesRef.current[w.id] = w.balance);
+          localStorage.setItem('wallet_prev_balances', JSON.stringify(prevBalancesRef.current));
+       }
     }
   }, [wallets, loading]); // Remove changes from dependency to avoid loop, we merge inside if needed but here we construct new object
 
-
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-  };
 
   const getWalletIcon = (id: string) => {
     switch (id) {
@@ -125,73 +128,78 @@ export default function WalletCards({ wallets, loading, selectedWalletId, onSele
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-      {wallets.map((wallet) => {
-        const isSelected = selectedWalletId === wallet.id;
-        const colorClass = getWalletColor(wallet.id);
-        
-        return (
-          <div 
-            key={wallet.id}
-            onClick={() => onSelectWallet(isSelected ? null : wallet.id)}
-            className={cn(
-              "cursor-pointer relative overflow-hidden transition-all duration-200",
-              "p-4 rounded-xl border-2 hover:shadow-md",
-              isSelected 
-                ? `ring-2 ring-offset-2 ring-blue-500 ${colorClass}` 
-                : "bg-white border-gray-100 hover:border-gray-200"
-            )}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className={cn(
-                "p-2 rounded-lg",
-                isSelected ? "bg-white/50" : "bg-gray-50 text-gray-500"
-              )}>
-                {getWalletIcon(wallet.id)}
-              </div>
-              {isSelected && (
-                <div className="px-2 py-1 bg-white/50 rounded text-[10px] font-bold uppercase tracking-wider">
-                  Đang xem
-                </div>
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        {wallets.map((wallet) => {
+          const isSelected = selectedWalletId === wallet.id;
+          const colorClass = getWalletColor(wallet.id);
+          
+          return (
+            <div 
+              key={wallet.id}
+              onClick={() => onSelectWallet(isSelected ? null : wallet.id)}
+              className={cn(
+                "cursor-pointer relative overflow-hidden transition-all duration-200 group",
+                "p-4 rounded-xl border-2 hover:shadow-md",
+                isSelected 
+                  ? `ring-2 ring-offset-2 ring-blue-500 ${colorClass}` 
+                  : "bg-white border-gray-100 hover:border-gray-200"
               )}
-            </div>
-            
-            <div>
-              <p className={cn(
-                "text-sm font-medium mb-1",
-                isSelected ? "opacity-80" : "text-gray-500"
-              )}>
-                {wallet.name}
-              </p>
-              <div className="flex flex-wrap items-baseline gap-2">
-                <h3 className={cn(
-                  "text-xl font-bold truncate",
-                  isSelected ? "" : "text-gray-900"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className={cn(
+                  "p-2 rounded-lg",
+                  isSelected ? "bg-white/50" : "bg-gray-50 text-gray-500"
                 )}>
-                  {formatMoney(wallet.balance)}
-                </h3>
+                  {getWalletIcon(wallet.id)}
+                </div>
                 
-                {/* Diff Indicator - Side by Side */}
-                {changes[wallet.id] && (
-                  <div className={cn(
-                      "text-xs font-bold flex items-center px-1.5 py-0.5 rounded-md animate-in fade-in slide-in-from-left-1 duration-300",
-                      changes[wallet.id].diff > 0 
-                        ? "text-emerald-700 bg-emerald-100/80" 
-                        : "text-rose-700 bg-rose-100/80"
+                <div className="flex items-center gap-2">
+                  {isSelected && (
+                    <div className="px-2 py-1 bg-white/50 rounded text-[10px] font-bold uppercase tracking-wider">
+                      Đang xem
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <p className={cn(
+                  "text-sm font-medium mb-1",
+                  isSelected ? "opacity-80" : "text-gray-500"
+                )}>
+                  {wallet.name}
+                </p>
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <h3 className={cn(
+                    "text-xl font-bold truncate",
+                    isSelected ? "" : "text-gray-900"
                   )}>
-                      {changes[wallet.id].diff > 0 ? '+' : ''}{formatMoney(changes[wallet.id].diff)}
-                  </div>
-                )}
+                    {formatMoney(wallet.balance)}
+                  </h3>
+                  
+                  {/* Diff Indicator - Side by Side */}
+                  {changes[wallet.id] && (
+                    <div className={cn(
+                        "text-xs font-bold flex items-center px-1.5 py-0.5 rounded-md animate-in fade-in slide-in-from-left-1 duration-300",
+                        changes[wallet.id].diff > 0 
+                          ? "text-emerald-700 bg-emerald-100/80" 
+                          : "text-rose-700 bg-rose-100/80"
+                    )}>
+                        {changes[wallet.id].diff > 0 ? '+' : ''}{formatMoney(changes[wallet.id].diff)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Background decoration */}
+              <div className="absolute -bottom-4 -right-4 opacity-5 pointer-events-none transform rotate-12 scale-150">
+                 {getWalletIcon(wallet.id)}
               </div>
             </div>
-
-            {/* Background decoration */}
-            <div className="absolute -bottom-4 -right-4 opacity-5 pointer-events-none transform rotate-12 scale-150">
-               {getWalletIcon(wallet.id)}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </>
   );
 }

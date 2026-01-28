@@ -11,6 +11,7 @@ import { customerService, Customer } from '@/services/customerService';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
+import { formatMoney } from '@/utils/format';
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -83,10 +84,6 @@ export default function CustomersPage() {
     } else {
       toast.error(res.message);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
   return (
@@ -216,7 +213,7 @@ export default function CustomersPage() {
                         "font-black text-base",
                         cust.balance > 0 ? "text-green-600" : cust.balance < 0 ? "text-red-600" : "text-gray-400"
                       )}>
-                        {formatCurrency(cust.balance)}
+                        {formatMoney(cust.balance)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">

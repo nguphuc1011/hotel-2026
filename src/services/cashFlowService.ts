@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { useWalletNotificationStore } from '@/stores/walletNotificationStore';
 
 export interface CashFlowTransaction {
   id: string;
@@ -34,6 +35,7 @@ export interface CashFlowCategory {
   description: string | null;
   is_system: boolean;
   is_active: boolean;
+  is_revenue: boolean;
 }
 
 export interface Wallet {
@@ -70,13 +72,15 @@ export const cashFlowService = {
     name?: string;
     type?: 'IN' | 'OUT';
     description?: string;
+    is_revenue?: boolean;
   }) {
     const { data, error } = await supabase.rpc('fn_manage_cash_flow_category', {
       p_action: action,
       p_id: payload.id || null,
       p_name: payload.name || null,
       p_type: payload.type || null,
-      p_description: payload.description || null
+      p_description: payload.description || null,
+      p_is_revenue: payload.is_revenue !== undefined ? payload.is_revenue : true
     });
 
     if (error) throw error;
@@ -93,6 +97,8 @@ export const cashFlowService = {
       endDate?: Date;
       paymentMethod?: string;
       walletId?: string;
+      excludeCategory?: string[];
+      excludePaymentMethod?: string[]; // New filter
     }
   ) {
     let query = supabase
@@ -106,6 +112,12 @@ export const cashFlowService = {
     
     if (filters?.type) {
       query = query.eq('flow_type', filters.type);
+    }
+    if (filters?.excludeCategory && filters.excludeCategory.length > 0) {
+      query = query.not('category', 'in', filters.excludeCategory);
+    }
+    if (filters?.excludePaymentMethod && filters.excludePaymentMethod.length > 0) {
+      query = query.not('payment_method_code', 'in', filters.excludePaymentMethod);
     }
     if (filters?.paymentMethod) {
       // Only filter by DB column for performance. Old records with NULL won't show.
@@ -193,6 +205,12 @@ export const cashFlowService = {
     });
 
     if (error) throw error;
+
+    // Trigger notification if wallet_changes exists
+    if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
+      useWalletNotificationStore.getState().showNotification(data.wallet_changes);
+    }
+
     return data;
   },
 
@@ -237,17 +255,28 @@ export const cashFlowService = {
     });
 
     if (error) throw error;
+
+    // Trigger notification if wallet_changes exists
+    if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
+      useWalletNotificationStore.getState().showNotification(data.wallet_changes);
+    }
+
     return data;
   },
 
   // Xóa giao dịch (chỉ cho phép xóa thủ công)
   async deleteTransaction(id: string) {
-    const { error } = await supabase
-      .from('cash_flow')
-      .delete()
-      .eq('id', id)
-      .eq('is_auto', false); // Không cho xóa giao dịch tự động
+    const { data, error } = await supabase.rpc('fn_delete_cash_flow', {
+      p_id: id
+    });
 
     if (error) throw error;
+
+    // Trigger notification if wallet_changes exists
+    if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
+      useWalletNotificationStore.getState().showNotification(data.wallet_changes);
+    }
+
+    return data;
   }
 };

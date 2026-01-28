@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { bookingService, BookingBill } from '@/services/bookingService';
 import { cn } from '@/lib/utils';
 import BillBreakdown from '@/components/dashboard/BillBreakdown';
+import { formatMoney } from '@/utils/format';
 import { format } from 'date-fns';
 
 interface BookingHistoryModalProps {
@@ -144,7 +145,7 @@ export default function BookingHistoryModal({ isOpen, onClose, bookingId }: Book
                     </div>
                   </div>
                   <div className="text-4xl font-black tracking-tighter mb-2">
-                    {bill.final_amount.toLocaleString()}đ
+                    {formatMoney(bill.final_amount)}
                   </div>
                   
                   {showDetails && (
@@ -175,12 +176,12 @@ export default function BookingHistoryModal({ isOpen, onClose, bookingId }: Book
                           <div>
                             <div className="font-bold text-slate-900">{item.service?.name}</div>
                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                              {item.price_at_time.toLocaleString()}đ
+                              {formatMoney(item.price_at_time)}
                             </div>
                           </div>
                         </div>
                         <div className="font-black text-slate-700 text-lg">
-                          {(item.quantity * item.price_at_time).toLocaleString()}đ
+                          {formatMoney(item.quantity * item.price_at_time)}
                         </div>
                       </div>
                     ))

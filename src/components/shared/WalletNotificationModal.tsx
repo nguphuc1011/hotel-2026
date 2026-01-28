@@ -3,38 +3,38 @@
 import React, { useEffect, useState } from 'react';
 import { X, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useWalletNotificationStore } from '@/stores/walletNotificationStore';
+import { formatMoney } from '@/utils/format';
 
-export interface WalletChange {
-  walletName: string;
-  diff: number;
-  newBalance: number;
-  timestamp: number;
-}
-
-interface WalletNotificationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  changes: WalletChange[];
-}
-
-export default function WalletNotificationModal({ isOpen, onClose, changes }: WalletNotificationModalProps) {
+export default function WalletNotificationModal() {
+  const { isOpen, changes, closeNotification } = useWalletNotificationStore();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setVisible(true);
+    } else {
+      setVisible(false);
     }
   }, [isOpen]);
 
   const handleClose = () => {
     setVisible(false);
-    setTimeout(onClose, 300); // Wait for animation
+    setTimeout(closeNotification, 300); // Wait for animation
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !visible) return null;
 
-  const formatMoney = (amount: number) => 
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  const getWalletDisplayName = (name: string) => {
+    const mapping: Record<string, string> = {
+      'CASH': 'Tiền mặt',
+      'BANK': 'Ngân hàng',
+      'ESCROW': 'Tiền cọc',
+      'REVENUE': 'Doanh thu',
+      'RECEIVABLE': 'Công nợ khách'
+    };
+    return mapping[name.toUpperCase()] || name;
+  };
 
   return (
     <div className={cn(
@@ -69,7 +69,7 @@ export default function WalletNotificationModal({ isOpen, onClose, changes }: Wa
             const isIncrease = change.diff > 0;
             return (
               <div 
-                key={`${change.walletName}-${change.timestamp}-${index}`}
+                key={`${change.walletName}-${index}`}
                 className="flex items-center justify-between p-3 bg-gray-50/80 rounded-xl border border-gray-100"
               >
                 <div className="flex items-center gap-3">
@@ -80,8 +80,13 @@ export default function WalletNotificationModal({ isOpen, onClose, changes }: Wa
                     {isIncrease ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{change.walletName}</p>
-                    <p className="font-bold text-gray-900">{formatMoney(change.newBalance)}</p>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      {getWalletDisplayName(change.walletName)}
+                    </p>
+                    {/* Only show balance if available, otherwise just diff */}
+                    {change.newBalance !== undefined && (
+                         <p className="font-bold text-gray-900">{formatMoney(change.newBalance)}</p>
+                    )}
                   </div>
                 </div>
                 <div className={cn(
@@ -98,7 +103,7 @@ export default function WalletNotificationModal({ isOpen, onClose, changes }: Wa
         <div className="mt-4 pt-2 relative z-10">
           <button 
             onClick={handleClose}
-            className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all active:scale-95 shadow-lg shadow-gray-200"
+            className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-all shadow-lg shadow-gray-900/20 active:scale-95"
           >
             Đóng
           </button>

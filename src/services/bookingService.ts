@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { useWalletNotificationStore } from '@/stores/walletNotificationStore';
 
 // Helper function to format duration
 function formatDuration(hours: number | undefined | null, minutes: number | undefined | null): string {
@@ -126,12 +127,17 @@ export const bookingService = {
         p_discount: params.discount,
         p_surcharge: params.surcharge,
         p_notes: params.notes,
-        p_staff_id: params.verifiedStaff?.id || null
+        p_verified_by_staff_id: params.verifiedStaff?.id || null
       });
 
       if (error) {
         console.error('Checkout RPC Error:', JSON.stringify(error, null, 2));
         throw error;
+      }
+
+      // Trigger notification if wallet_changes exists
+      if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
+        useWalletNotificationStore.getState().showNotification(data.wallet_changes);
       }
 
       return data;
@@ -183,6 +189,12 @@ export const bookingService = {
       });
 
       if (error) throw error;
+
+      // Trigger notification if wallet_changes exists
+      if (result && result.wallet_changes && Array.isArray(result.wallet_changes) && result.wallet_changes.length > 0) {
+        useWalletNotificationStore.getState().showNotification(result.wallet_changes);
+      }
+
       return result;
     } catch (err) {
       console.error('Check-in error:', err);
@@ -190,16 +202,18 @@ export const bookingService = {
     }
   },
 
-  async cancelBooking(bookingId: string, verifiedStaff?: { id: string, name: string }, reason?: string) {
+  async cancelBooking(bookingId: string, verifiedStaff?: { id: string, name: string }, penaltyAmount: number = 0, penaltyPaymentMethod: string = 'cash') {
     try {
       const { data, error } = await supabase.rpc('cancel_booking', {
         p_booking_id: bookingId,
         p_verified_by_staff_id: verifiedStaff?.id || null,
-        p_verified_by_staff_name: verifiedStaff?.name || null
+        p_verified_by_staff_name: verifiedStaff?.name || null,
+        p_penalty_amount: penaltyAmount,
+        p_penalty_payment_method: penaltyPaymentMethod
       });
 
       if (error) throw error;
-      return { success: true, message: 'Hủy phòng thành công' };
+      return data;
     } catch (err: any) {
       console.error('Cancel booking error:', err);
       throw err;

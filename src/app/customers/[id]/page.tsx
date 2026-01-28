@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 import { securityService, SecurityAction } from '@/services/securityService';
 import PinValidationModal from '@/components/shared/PinValidationModal';
 
+import { formatMoney } from '@/utils/format';
+
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
@@ -36,7 +38,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const [transForm, setTransForm] = useState({
     amount: '',
     type: 'payment' as 'payment' | 'charge' | 'refund' | 'adjustment',
-    description: ''
+    description: '',
+    payment_method: 'cash'
   });
 
   // Edit Modal
@@ -109,21 +112,23 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       customer.id,
       finalAmount,
       transForm.type,
-      transForm.description || getTypeLabel(transForm.type)
+      transForm.description || getTypeLabel(transForm.type),
+      verifiedStaff,
+      transForm.payment_method
     );
 
     if (res.success) {
       setShowTransModal(false);
-      setTransForm({ amount: '', type: 'payment', description: '' });
+      setTransForm({ amount: '', type: 'payment', description: '', payment_method: 'cash' });
       loadData(); // Reload all
       
       const newBalance = res.new_balance;
       if (newBalance < 0) {
-        toast.warning(`Giao dịch thành công. Số dư hiện tại: ${newBalance.toLocaleString()}đ (Khách còn nợ)`);
+        toast.warning(`Giao dịch thành công. Số dư hiện tại: ${formatMoney(newBalance)} (Khách còn nợ)`);
       } else if (newBalance === 0 && customer.balance < 0) {
         toast.success('Giao dịch thành công. Khách đã trả hết nợ!');
       } else {
-        toast.success(`Giao dịch thành công. Số dư hiện tại: ${newBalance.toLocaleString()}đ`);
+        toast.success(`Giao dịch thành công. Số dư hiện tại: ${formatMoney(newBalance)}`);
       }
     } else {
       toast.error('Lỗi: ' + res.message);
@@ -155,10 +160,6 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       case 'adjustment': return 'Điều chỉnh số dư';
       default: return type;
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
   if (loading) return <div className="p-10 text-center text-muted font-bold">Đang tải hồ sơ...</div>;
@@ -206,7 +207,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                   "text-3xl font-black tracking-tight",
                   customer.balance >= 0 ? "text-green-600" : "text-red-600"
                 )}>
-                  {formatCurrency(customer.balance)}
+                  {formatMoney(customer.balance)}
                 </div>
                 <div className="text-xs text-gray-400 mt-2 font-medium">
                   {customer.balance < 0 ? 'Khách đang nợ tiền' : 'Số dư khả dụng'}
@@ -337,11 +338,11 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                               tx.amount > 0 ? "text-green-600" : "text-red-600"
                             )}>
                               {tx.amount > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                              {formatCurrency(Math.abs(tx.amount))}
+                              {formatMoney(Math.abs(tx.amount))}
                             </div>
                           </td>
                           <td className="px-6 py-4 text-right text-sm font-bold text-gray-600">
-                            {formatCurrency(tx.balance_after)}
+                            {formatMoney(tx.balance_after)}
                           </td>
                         </tr>
                       ))
@@ -392,7 +393,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                             </span>
                           </td>
                           <td className="px-6 py-4 text-right font-black text-main">
-                            {bk.total_amount ? formatCurrency(bk.total_amount) : '---'}
+                            {bk.total_amount ? formatMoney(bk.total_amount) : '---'}
                           </td>
                         </tr>
                       ))
@@ -450,6 +451,37 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                   autoFocus
                 />
               </div>
+
+              {/* Payment Method Selector */}
+              {transForm.type !== 'charge' && (
+                <div>
+                  <label className="block text-xs font-bold text-muted uppercase mb-1">Hình thức thanh toán</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setTransForm({...transForm, payment_method: 'cash'})}
+                      className={cn(
+                        "p-3 rounded-xl border font-bold text-sm flex items-center justify-center gap-2 transition-all",
+                        transForm.payment_method === 'cash' 
+                          ? "border-accent bg-accent/10 text-accent" 
+                          : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                      )}
+                    >
+                      <DollarSign size={16} /> Tiền mặt
+                    </button>
+                    <button
+                      onClick={() => setTransForm({...transForm, payment_method: 'bank'})}
+                      className={cn(
+                        "p-3 rounded-xl border font-bold text-sm flex items-center justify-center gap-2 transition-all",
+                        transForm.payment_method === 'bank' 
+                          ? "border-blue-500 bg-blue-50 text-blue-600" 
+                          : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                      )}
+                    >
+                      <CreditCard size={16} /> Chuyển khoản
+                    </button>
+                  </div>
+                </div>
+              )}
               
               <div>
                 <label className="block text-xs font-bold text-muted uppercase mb-1">Nội dung</label>

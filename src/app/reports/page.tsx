@@ -1,77 +1,272 @@
 'use client';
 
-import { 
-  BarChart3, 
-  TrendingUp, 
-  ArrowUpRight,
-  PieChart,
-  Activity
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { reportService, ReportTopItem, ReportCategoryData } from '@/services/reportService';
+import { Calendar, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import ReportKPIs from '@/components/report/ReportKPIs';
+import ProfitCharts from '@/components/report/ProfitCharts';
+import TopItemsTable from '@/components/report/TopItemsTable';
+import SmartAlerts from '@/components/report/SmartAlerts';
+import DrillDownModal from '@/components/report/DrillDownModal';
+import { toast } from 'sonner';
+import { getEndOfDay } from '@/lib/dateUtils'; // Assuming this exists, or I'll define local helpers
+
+// Helper for date formatting
+const formatDate = (date: Date) => {
+    return date.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+};
 
 export default function ReportsPage() {
+  const [dateRange, setDateRange] = useState(() => {
+    const now = new Date();
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+    };
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<{
+    kpis: { revenue: number; cogs: number; opex: number; net_profit: number };
+    revenueBreakdown: ReportCategoryData[];
+    expenseBreakdown: ReportCategoryData[];
+    topItems: ReportTopItem[];
+    raw: { cashFlow: any[]; services: any[] };
+  } | null>(null);
+
+  // Drill Down State
+  const [drillModal, setDrillModal] = useState<{
+    open: boolean;
+    title: string;
+    items: any[];
+    total: number;
+  }>({
+    open: false,
+    title: '',
+    items: [],
+    total: 0
+  });
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const result = await reportService.getReportData(dateRange.start, dateRange.end);
+      setData(result);
+    } catch (error) {
+      console.error(error);
+      toast.error('Không thể tải dữ liệu báo cáo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [dateRange]);
+
+  const handleMonthChange = (delta: number) => {
+    const newStart = new Date(dateRange.start);
+    newStart.setMonth(newStart.getMonth() + delta);
+    const newEnd = new Date(newStart.getFullYear(), newStart.getMonth() + 1, 0, 23, 59, 59);
+    setDateRange({ start: newStart, end: newEnd });
+  };
+
+  const handleDrillDown = (segment: string) => {
+    if (!data) return;
+
+    let items: any[] = [];
+    let title = '';
+    let total = 0;
+
+    const normalize = (str: string) => str.toLowerCase().trim();
+    const seg = normalize(segment);
+
+    if (seg === 'revenue' || seg === 'doanh thu' || seg === 'tổng thu nhập') {
+        title = 'Chi tiết Doanh thu';
+        items = data.raw.cashFlow
+            .filter(tx => tx.flow_type === 'IN' && tx.is_revenue)
+            .map(tx => ({
+                category: tx.category,
+                amount: Number(tx.amount),
+                flow_type: 'IN',
+                description: tx.description,
+                occurred_at: tx.occurred_at,
+                creator: tx.creator?.full_name || 'Hệ thống',
+                ref_id: tx.ref_id,
+                ref_type: 'booking' // Assuming most revenue is booking
+            }));
+        total = items.reduce((sum, item) => sum + item.amount, 0);
+
+    } else if (seg === 'costs' || seg === 'tổng chi phí') {
+        title = 'Chi tiết Tổng chi phí';
+        // OpEx (Apply Normalize Filter)
+        const opexItems = data.raw.cashFlow
+            .filter(tx => {
+                if (tx.flow_type !== 'OUT') return false;
+                const catLower = (tx.category || '').toLowerCase();
+                const isImport = ['nhập hàng', 'nhap_hang'].includes(catLower);
+                const isRoomCharge = ['tiền phòng', 'tien_phong'].includes(catLower);
+                return !isImport && !isRoomCharge;
+            })
+            .map(tx => ({
+                category: tx.category,
+                amount: Number(tx.amount),
+                flow_type: 'OUT',
+                description: tx.description,
+                occurred_at: tx.occurred_at,
+                creator: tx.creator?.full_name || 'Hệ thống',
+                ref_id: tx.ref_id,
+                ref_type: 'expense'
+            }));
+        
+        // COGS
+        const cogsItems = data.raw.services.map(s => ({
+            category: 'Giá vốn',
+            amount: (s.quantity || 0) * (Number(s.cost_price_at_time) || Number((s.service as any)?.cost_price) || 0), // Fallback cost
+            flow_type: 'OUT',
+            description: `Giá vốn: ${s.service?.name} (x${s.quantity}) - Phòng ${s.booking?.room?.room_number || 'Unknown'}`,
+            occurred_at: s.created_at,
+            creator: 'Hệ thống', // COGS is auto
+            ref_id: s.booking?.id, // Link to booking
+            ref_type: 'booking'
+        }));
+
+        items = [...opexItems, ...cogsItems];
+        total = items.reduce((sum, item) => sum + item.amount, 0);
+
+    } else if (seg === 'chi phí vận hành' || seg === 'vận hành') {
+        title = 'Chi tiết Chi phí Vận hành';
+        items = data.raw.cashFlow
+            .filter(tx => {
+                if (tx.flow_type !== 'OUT') return false;
+                const catLower = (tx.category || '').toLowerCase();
+                const isImport = ['nhập hàng', 'nhap_hang'].includes(catLower);
+                const isRoomCharge = ['tiền phòng', 'tien_phong'].includes(catLower);
+                return !isImport && !isRoomCharge;
+            })
+            .map(tx => ({
+                category: tx.category,
+                amount: Number(tx.amount),
+                flow_type: 'OUT',
+                description: tx.description,
+                occurred_at: tx.occurred_at,
+                creator: tx.creator?.full_name || 'Hệ thống',
+                ref_id: tx.ref_id,
+                ref_type: 'expense'
+            }));
+        total = items.reduce((sum, item) => sum + item.amount, 0);
+
+    } else if (seg === 'giá vốn hàng bán' || seg === 'giá vốn') {
+        title = 'Chi tiết Giá vốn hàng bán';
+        items = data.raw.services.map(s => ({
+            category: 'Giá vốn',
+            amount: (s.quantity || 0) * (Number(s.cost_price_at_time) || Number((s.service as any)?.cost_price) || 0), // Fallback cost
+            flow_type: 'OUT',
+            description: `Giá vốn: ${s.service?.name} (x${s.quantity}) - Phòng ${s.booking?.room?.room_number || 'Unknown'}`,
+            occurred_at: s.created_at,
+            creator: 'Hệ thống',
+            ref_id: s.booking?.id,
+            ref_type: 'booking'
+        }));
+        total = items.reduce((sum, item) => sum + item.amount, 0);
+
+    } else if (seg === 'lợi nhuận ròng' || seg === 'lợi nhuận' || seg === 'profit') {
+        // No drill down for profit yet, or maybe show simple message
+        return;
+    } else {
+        // Try to match specific category
+        title = `Chi tiết: ${segment}`;
+        items = data.raw.cashFlow
+            .filter(tx => tx.category === segment)
+            .map(tx => ({
+                category: tx.category,
+                amount: Number(tx.amount),
+                flow_type: tx.flow_type,
+                description: tx.description,
+                occurred_at: tx.occurred_at,
+                creator: tx.creator?.full_name || 'Hệ thống',
+                ref_id: tx.ref_id,
+                ref_type: tx.flow_type === 'IN' ? 'booking' : 'expense'
+            }));
+        total = items.reduce((sum, item) => sum + item.amount, 0);
+    }
+
+    // Sort by date desc
+    items.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
+
+    setDrillModal({
+        open: true,
+        title,
+        items,
+        total,
+        averages: data.averages
+    });
+  };
+
   return (
-    <div className="p-8 md:p-16 max-w-7xl mx-auto pb-32 md:pb-16">
-      <header className="mb-16">
-        <h1 className="text-5xl font-black-italic tracking-tighter uppercase italic text-accent">Báo cáo</h1>
-        <p className="text-muted font-bold text-sm tracking-tight mt-4 uppercase tracking-[0.1em]">Phân tích hiệu suất & Doanh thu</p>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-        {/* Key Metrics */}
-        <div className="bento-card p-10 flex flex-col justify-between min-h-[240px] bg-white border-accent/10 active:scale-95 transition-all group">
-          <div className="flex justify-between items-start">
-            <div className="w-14 h-14 bg-accent/5 rounded-[22px] flex items-center justify-center text-accent">
-              <TrendingUp size={28} />
-            </div>
-            <span className="text-xs font-black text-green-500 uppercase tracking-widest">+12.5%</span>
-          </div>
-          <div>
-            <p className="text-muted font-black text-[10px] uppercase tracking-[0.2em] mb-2">Doanh thu tháng</p>
-            <h3 className="text-4xl font-black tracking-tighter italic text-main group-hover:text-accent transition-colors">420.5M</h3>
-          </div>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-32">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
+        <div>
+            <h1 className="text-4xl md:text-5xl font-black-italic tracking-tighter uppercase italic text-slate-800">
+                Bức tranh tài chính
+            </h1>
+            <p className="text-slate-400 font-bold text-sm tracking-tight mt-2 uppercase tracking-[0.1em]">
+                Theo dõi sức khỏe dòng tiền & Lợi nhuận
+            </p>
         </div>
 
-        <div className="bento-card p-10 flex flex-col justify-between min-h-[240px] bg-white active:scale-95 transition-all group hover:border-accent/20">
-          <div className="flex justify-between items-start">
-            <div className="w-14 h-14 bg-accent/5 rounded-[22px] flex items-center justify-center text-accent">
-              <PieChart size={28} />
+        {/* Date Filter */}
+        <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+            <button 
+                onClick={() => handleMonthChange(-1)}
+                className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+            >
+                <ChevronLeft size={20} />
+            </button>
+            <div className="flex items-center gap-2 px-2 min-w-[140px] justify-center">
+                <Calendar size={16} className="text-blue-600" />
+                <span className="font-bold text-slate-700 uppercase tracking-wide text-sm">
+                    {formatDate(dateRange.start)}
+                </span>
             </div>
-            <ArrowUpRight size={20} className="text-ghost group-hover:text-accent transition-colors" />
-          </div>
-          <div>
-            <p className="text-muted font-black text-[10px] uppercase tracking-[0.2em] mb-2">Tỷ lệ lấp đầy</p>
-            <h3 className="text-4xl font-black tracking-tighter text-main group-hover:text-accent transition-colors">78.2%</h3>
-          </div>
-        </div>
-
-        <div className="md:col-span-2 bento-card p-10 flex flex-col justify-center items-center text-center border border-dashed border-accent/20 bg-transparent shadow-none">
-          <div className="w-20 h-20 bg-accent/5 rounded-full flex items-center justify-center mb-6">
-            <Activity size={32} className="text-accent/20" />
-          </div>
-          <h3 className="text-2xl font-black-italic uppercase italic tracking-tighter text-ghost">Sắp ra mắt</h3>
-          <p className="text-muted text-sm font-bold mt-4 max-w-xs leading-relaxed uppercase tracking-tight">
-            Hệ thống biểu đồ tương tác và báo cáo chi tiết đang được tinh chỉnh.
-          </p>
-        </div>
-
-        {/* Large Bento Chart Placeholder */}
-        <div className="md:col-span-4 bento-card p-16 bg-white flex flex-col justify-center items-center min-h-[450px] border-accent/5">
-          <div className="relative">
-            <BarChart3 size={80} className="text-accent/5 mb-8" />
-            <div className="absolute inset-0 flex items-center justify-center">
-               <div className="w-1 h-12 bg-accent/10 rounded-full mx-1 animate-pulse" />
-               <div className="w-1 h-20 bg-accent/10 rounded-full mx-1 animate-pulse delay-75" />
-               <div className="w-1 h-16 bg-accent/10 rounded-full mx-1 animate-pulse delay-150" />
-            </div>
-          </div>
-          <p className="text-ghost font-black text-[11px] uppercase tracking-[0.3em] mt-8">Advanced Analytics Engine</p>
-          <div className="mt-12 flex gap-4">
-            <div className="h-1.5 w-32 bg-accent/5 rounded-full overflow-hidden">
-              <div className="h-full w-1/3 bg-accent/20 rounded-full" />
-            </div>
-          </div>
+            <button 
+                onClick={() => handleMonthChange(1)}
+                className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+            >
+                <ChevronRight size={20} />
+            </button>
         </div>
       </div>
+
+      {loading || !data ? (
+          <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+      ) : (
+          <div className="space-y-8">
+              {/* 1. KPIs */}
+              <ReportKPIs data={data.kpis} onDrillDown={handleDrillDown} />
+
+              {/* 2. Charts */}
+              <ProfitCharts kpis={data.kpis} onDrillDown={handleDrillDown} />
+
+              {/* 3. Bottom Grid: Top Items & Alerts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <TopItemsTable items={data.topItems} />
+                  <SmartAlerts kpis={data.kpis} topItem={data.topItems[0]} />
+              </div>
+          </div>
+      )}
+
+      {/* Drill Down Modal */}
+      <DrillDownModal 
+        isOpen={drillModal.open}
+        onClose={() => setDrillModal(prev => ({ ...prev, open: false }))}
+        title={drillModal.title}
+        items={drillModal.items}
+        totalAmount={drillModal.total}
+      />
     </div>
   );
 }

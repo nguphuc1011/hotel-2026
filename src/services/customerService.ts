@@ -244,7 +244,8 @@ export const customerService = {
     amount: number, 
     type: 'payment' | 'charge' | 'adjustment' | 'refund', 
     description: string,
-    verifiedStaff?: { id: string, name: string }
+    verifiedStaff?: { id: string, name: string },
+    paymentMethod: string = 'cash'
   ) {
     try {
       const { data, error } = await supabase.rpc('adjust_customer_balance', {
@@ -253,14 +254,15 @@ export const customerService = {
         p_type: type,
         p_description: description,
         p_verified_by_staff_id: verifiedStaff?.id || null,
-        p_verified_by_staff_name: verifiedStaff?.name || null
+        p_verified_by_staff_name: verifiedStaff?.name || null,
+        p_payment_method: paymentMethod
       });
 
       if (error) throw error;
       return data; // { success, new_balance, message }
-    } catch (err) {
-      console.error('Error adjusting balance:', err);
-      return { success: false, message: 'Lỗi hệ thống' };
+    } catch (err: any) {
+      console.error('Error adjusting balance:', err.message || err);
+      return { success: false, message: err.message || 'Lỗi hệ thống' };
     }
   },
 

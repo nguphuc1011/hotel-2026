@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageSquare, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BookingBill } from '@/services/bookingService';
+import { formatMoney } from '@/utils/format';
 
 interface BillBreakdownProps {
   bill: BookingBill;
@@ -47,7 +48,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
     // 3. Fallback for auto-switch or missing formula
     if (details.length === 0 && (bill.rental_type === 'daily' || bill.rental_type === 'overnight')) {
          const unit = bill.rental_type === 'overnight' ? 'đêm' : 'ngày';
-         details.push(`1 ${unit} x ${bill.room_charge.toLocaleString()}đ`);
+         details.push(`1 ${unit} x ${formatMoney(bill.room_charge)}`);
     }
 
     return details;
@@ -70,7 +71,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
                 )}
             </div>
             <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
-              {bill.room_charge.toLocaleString()}đ
+              {formatMoney(bill.room_charge)}
             </span>
           </div>
         </div>
@@ -80,7 +81,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
             <div className="flex justify-between items-center">
                 <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Dịch vụ</span>
                 <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
-                {bill.service_total.toLocaleString()}đ
+                {formatMoney(bill.service_total)}
                 </span>
             </div>
           </div>
@@ -91,7 +92,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
             <div className="flex justify-between items-center">
                 <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Phụ thu</span>
                 <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
-                {bill.surcharge_total.toLocaleString()}đ
+                {formatMoney(bill.surcharge_total)}
                 </span>
             </div>
             {/* Extract Surcharge Details */}
@@ -111,7 +112,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
           <div className="flex justify-between items-center">
             <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Phụ phí khác</span>
             <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
-              {bill.custom_surcharge.toLocaleString()}đ
+              {formatMoney(bill.custom_surcharge)}
             </span>
           </div>
         )}
@@ -122,7 +123,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
               <div className="flex justify-between items-center mb-1">
                 <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Phí phục vụ</span>
                 <span className={cn("font-black", isDark ? "text-white" : "text-slate-900")}>
-                  {bill.service_fee_amount.toLocaleString()}đ
+                  {formatMoney(bill.service_fee_amount)}
                 </span>
               </div>
             )}
@@ -130,7 +131,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
               <div className="flex justify-between items-center">
                 <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Thuế VAT</span>
                 <span className={cn("font-black", isDark ? "text-white" : "text-slate-900")}>
-                  {bill.vat_amount.toLocaleString()}đ
+                  {formatMoney(bill.vat_amount)}
                 </span>
               </div>
             )}
@@ -144,7 +145,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
               <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-rose-200" : "text-rose-500")}>Nợ cũ</span>
             </div>
             <span className={cn("font-black", isDark ? "text-rose-200" : "text-rose-600")}>
-              {Math.abs(customerBalance).toLocaleString()}đ
+              {formatMoney(Math.abs(customerBalance))}
             </span>
           </div>
         )}
@@ -153,7 +154,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
           <div className={cn("pt-2 border-t flex justify-between items-center", borderColor)}>
             <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-rose-200" : "text-rose-500")}>Giảm giá</span>
             <span className={cn("font-black", isDark ? "text-rose-200" : "text-rose-600")}>
-              -{bill.discount_amount.toLocaleString()}đ
+              -{formatMoney(bill.discount_amount)}
             </span>
           </div>
         )}
@@ -162,7 +163,7 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
           <div className={cn("pt-2 border-t flex justify-between items-center", borderColor)}>
             <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-blue-300" : "text-blue-500")}>Đã cọc</span>
             <span className={cn("font-black", isDark ? "text-blue-300" : "text-blue-600")}>
-              -{bill.deposit_amount.toLocaleString()}đ
+              -{formatMoney(bill.deposit_amount)}
             </span>
           </div>
         )}

@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { formatMoney } from '@/utils/format';
 
 export default function ShiftPage() {
   const { user } = useAuth();
@@ -130,12 +131,12 @@ export default function ShiftPage() {
                   {closeResult.variance === 0 ? "Chốt ca hoàn hảo!" : "Có chênh lệch tiền mặt"}
                 </h3>
                 <p className="text-slate-600 font-medium">
-                  Hệ thống ghi nhận: <span className="font-bold">{closeResult.system_cash.toLocaleString()} đ</span>
+                  Hệ thống ghi nhận: <span className="font-bold">{formatMoney(closeResult.system_cash)}</span>
                   <br />
                   Chênh lệch: <span className={cn(
                     "font-bold",
                     closeResult.variance > 0 ? "text-green-600" : "text-red-600"
-                  )}>{closeResult.variance > 0 ? '+' : ''}{closeResult.variance.toLocaleString()} đ</span>
+                  )}>{closeResult.variance > 0 ? '+' : ''}{formatMoney(closeResult.variance)}</span>
                 </p>
                 <button 
                   onClick={() => setCloseResult(null)}
@@ -204,7 +205,7 @@ export default function ShiftPage() {
                 </div>
                 
                 <h2 className="text-4xl font-black text-slate-900 mb-1">
-                  {currentShift.start_cash.toLocaleString()} <span className="text-lg text-slate-400 font-medium">đ</span>
+                  {formatMoney(currentShift.start_cash)}
                 </h2>
                 <p className="text-slate-500 font-bold">Số dư đầu ca</p>
               </div>

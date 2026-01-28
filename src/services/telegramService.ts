@@ -33,18 +33,18 @@ export const telegramService = {
 
   formatCheckoutMessage(bill: any, amountPaid: number, balanceDiff: number, notes: string) {
     const status = balanceDiff < 0 ? '🔴 KHÁCH NỢ LẠI' : balanceDiff > 0 ? '🟢 CÓ TIỀN THỪA' : '🔵 THANH TOÁN ĐỦ';
-    const amountStr = Math.abs(balanceDiff).toLocaleString();
+    const amountStr = formatMoney(Math.abs(balanceDiff));
     
     return `
 <b>🛎 THÔNG BÁO CHECK-OUT</b>
 -------------------------
 🏠 <b>Phòng:</b> ${bill.room_number}
 👤 <b>Khách hàng:</b> ${bill.customer_name}
-💰 <b>Tổng bill:</b> ${(bill.amount_to_pay || 0).toLocaleString()}đ
-💵 <b>Khách trả:</b> ${amountPaid.toLocaleString()}đ
+💰 <b>Tổng bill:</b> ${formatMoney(bill.amount_to_pay || 0)}
+💵 <b>Khách trả:</b> ${formatMoney(amountPaid)}
 -------------------------
 📌 <b>Trạng thái:</b> ${status}
-💸 <b>Số tiền:</b> ${amountStr}đ
+💸 <b>Số tiền:</b> ${amountStr}
 📝 <b>Ghi chú:</b> ${notes || 'Không có'}
 -------------------------
 🕒 <i>${new Date().toLocaleString('vi-VN')}</i>

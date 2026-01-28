@@ -6,13 +6,17 @@ import { toast } from 'sonner';
 import { cashFlowService } from '@/services/cashFlowService';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { useAuth } from '@/providers/AuthProvider';
+import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import PinValidationModal from '@/components/shared/PinValidationModal';
 
 interface OwnerDebtSectionProps {
   onUpdate: () => void;
 }
 
+import { formatMoney } from '@/utils/format';
+
 export default function OwnerDebtSection({ onUpdate }: OwnerDebtSectionProps) {
+  const { confirm: confirmDialog } = useGlobalDialog();
   const { user } = useAuth();
   const [debts, setDebts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,10 +144,6 @@ export default function OwnerDebtSection({ onUpdate }: OwnerDebtSectionProps) {
     } catch (error) {
        // ...
     }
-  };
-
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
   const totalDebt = debts.reduce((sum, d) => sum + parseFloat(d.amount), 0);

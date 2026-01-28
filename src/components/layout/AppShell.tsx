@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/AuthProvider';
-import WalletNotificationListener from '@/components/shared/WalletNotificationListener';
+import WalletNotificationModal from '@/components/shared/WalletNotificationModal';
 
 export default function AppShell({
   children,
@@ -40,7 +40,7 @@ export default function AppShell({
 
   return (
     <>
-      <WalletNotificationListener />
+      <WalletNotificationModal />
       {/* PC Sidebar - Airy Glassmorphism */}
       <aside className="hidden md:flex flex-col w-72 h-screen glass border-r border-white/40 z-50">
         <div className="p-10">

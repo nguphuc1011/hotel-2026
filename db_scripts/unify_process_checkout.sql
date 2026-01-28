@@ -1,13 +1,7 @@
--- FIX: UNIFY process_checkout AND REMOVE DUPLICATES
--- This script merges the best logic from all versions and aligns with Frontend parameters.
+-- NHẤT THỐNG RPC: PROCESS_CHECKOUT (Phiên bản chuẩn hỗ trợ Kế toán thành tích & Wallet Notification)
+-- Điều 4: Nhất thống Mật lệnh - Chỉ tồn tại MỘT hàm duy nhất.
+-- Điều 8: Bộ não nằm ở Backend - Xử lý toàn bộ logic tính toán và dòng tiền.
 
--- 1. DROP ALL OLD VERSIONS to eliminate redundancy
--- Version with p_staff_id (OID 31443)
-DROP FUNCTION IF EXISTS public.process_checkout(uuid, text, numeric, numeric, numeric, text, uuid);
--- Version with p_verified_by_staff_id and p_verified_by_staff_name (OID 31366)
-DROP FUNCTION IF EXISTS public.process_checkout(uuid, text, numeric, numeric, numeric, text, uuid, text);
-
--- 2. CREATE THE UNIFIED VERSION
 CREATE OR REPLACE FUNCTION public.process_checkout(
     p_booking_id uuid, 
     p_payment_method text, 
@@ -15,7 +9,8 @@ CREATE OR REPLACE FUNCTION public.process_checkout(
     p_discount numeric, 
     p_surcharge numeric, 
     p_notes text, 
-    p_verified_by_staff_id uuid DEFAULT NULL::uuid
+    p_verified_by_staff_id uuid DEFAULT NULL::uuid,
+    p_verified_by_staff_name text DEFAULT NULL::text
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -25,124 +20,105 @@ DECLARE
     v_booking record;
     v_bill jsonb;
     v_staff_id uuid;
-    v_staff_role text;
+    v_staff_name text;
     v_room_id uuid;
+    v_room_name text;
     v_customer_id uuid;
     v_total_amount numeric;
     v_deposit numeric;
-    v_room_name text;
-    v_creator_id uuid;
-    v_already_charged numeric;
-    v_diff numeric;
+    v_wallet_changes jsonb := '[]'::jsonb;
+    v_pm_code text;
 BEGIN
-    v_creator_id := auth.uid();
-    v_staff_id := COALESCE(p_verified_by_staff_id, v_creator_id);
-    
-    -- 0. Security Check: Validate Staff Role for Discount
-    IF COALESCE(p_discount, 0) > 0 THEN
-        SELECT role INTO v_staff_role FROM public.staff WHERE id = v_staff_id;
-        IF v_staff_role IS NULL OR v_staff_role NOT IN ('admin', 'manager') THEN
-             RETURN jsonb_build_object('success', false, 'message', 'Chỉ Quản lý mới có quyền giảm giá!');
-        END IF;
-    END IF;
+    -- Identify Staff
+    v_staff_id := COALESCE(p_verified_by_staff_id, auth.uid());
+    SELECT full_name INTO v_staff_name FROM public.staff WHERE id = v_staff_id;
+    v_pm_code := lower(COALESCE(p_payment_method, 'cash'));
 
-    -- Get basic info
-    SELECT room_id, customer_id INTO v_room_id, v_customer_id 
-    FROM public.bookings 
+    -- Get Booking Info
+    SELECT room_id, customer_id INTO v_room_id, v_customer_id
+    FROM public.bookings
     WHERE id = p_booking_id;
     
-    IF v_room_id IS NULL THEN 
-        RETURN jsonb_build_object('success', false, 'message', 'Không tìm thấy booking'); 
+    IF v_room_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Không tìm thấy booking');
     END IF;
 
-    -- 1. Update Booking
-    UPDATE public.bookings SET 
+    -- Get Room Name for description
+    SELECT room_number INTO v_room_name FROM public.rooms WHERE id = v_room_id;
+
+    -- 1. Cập nhật Booking
+    UPDATE public.bookings 
+    SET 
         discount_amount = COALESCE(p_discount, 0),
         custom_surcharge = COALESCE(p_surcharge, 0),
         check_out_actual = now(),
         status = 'completed',
         payment_method = p_payment_method,
         notes = COALESCE(notes, '') || E'\n[Checkout] ' || COALESCE(p_notes, ''),
-        verified_by_staff_id = v_staff_id
+        verified_by_staff_id = v_staff_id,
+        verified_by_staff_name = COALESCE(p_verified_by_staff_name, v_staff_name)
     WHERE id = p_booking_id;
 
-    -- 2. Calculate Final Bill (Source of Truth)
+    -- 2. Tính toán hóa đơn cuối cùng
     v_bill := public.calculate_booking_bill(p_booking_id);
     v_total_amount := (v_bill->>'total_amount')::numeric;
     v_deposit := (v_bill->>'deposit_amount')::numeric;
-    v_room_name := v_bill->>'room_name';
 
-    -- 3. Update Room Status
+    -- 3. Cập nhật trạng thái phòng
     UPDATE public.rooms SET status = 'dirty', updated_at = now() WHERE id = v_room_id;
 
-    -- 4. ADJUST DEBT (Logic V5: Khai thác - Ghi nợ - Tất toán)
-    -- So sánh tổng bill thực tế với những gì ĐÃ ghi nợ vào Quỹ Công Nợ (credit)
-    SELECT COALESCE(SUM(amount), 0) INTO v_already_charged 
-    FROM public.cash_flow 
-    WHERE ref_id = p_booking_id 
-      AND payment_method_code = 'credit'
-      AND flow_type = 'IN';
-
-    -- Tính chênh lệch (Phụ thu, giờ lố, dịch vụ phát sinh thêm...)
-    v_diff := v_total_amount - v_already_charged;
-
-    IF v_diff > 0 THEN
-        -- Ghi nợ thêm
-        INSERT INTO public.cash_flow (
-            flow_type, category, amount, description, occurred_at, 
-            created_by, verified_by_staff_id, ref_id, is_auto, payment_method_code
-        ) VALUES (
-            'IN', 'Tiền phòng', v_diff, 
-            'Phụ thu tất toán (Chênh lệch) ' || COALESCE(v_room_name, ''), 
-            now(), v_creator_id, v_staff_id, p_booking_id, true, 'credit'
-        );
-    ELSIF v_diff < 0 THEN
-        -- Giảm nợ (Nếu có giảm giá hoặc tính thừa)
-        INSERT INTO public.cash_flow (
-            flow_type, category, amount, description, occurred_at, 
-            created_by, verified_by_staff_id, ref_id, is_auto, payment_method_code
-        ) VALUES (
-            'OUT', 'Điều chỉnh', ABS(v_diff), 
-            'Hoàn nợ thừa ' || COALESCE(v_room_name, ''), 
-            now(), v_creator_id, v_staff_id, p_booking_id, true, 'credit'
-        );
-    END IF;
-
-    -- 5. RECORD DEPOSIT TRANSFER (Nếu có tiền cọc)
-    IF v_deposit > 0 THEN
-        INSERT INTO public.cash_flow (
-            flow_type, category, amount, description, occurred_at, 
-            created_by, verified_by_staff_id, ref_id, is_auto, payment_method_code
-        ) VALUES (
-            'IN', 'Chuyển cọc', v_deposit, 
-            'Chuyển cọc tất toán ' || COALESCE(v_room_name, ''), 
-            now(), v_creator_id, v_staff_id, p_booking_id, true, 'deposit_transfer'
-        );
-    END IF;
-
-    -- 6. RECORD PAYMENT (Thanh toán thực tế)
+    -- 4. GHI NHẬN DÒNG TIỀN (Thanh toán thực tế)
     IF p_amount_paid > 0 THEN
         INSERT INTO public.cash_flow (
-            flow_type, category, amount, description, occurred_at, 
-            created_by, verified_by_staff_id, ref_id, is_auto, payment_method_code
+            flow_type, category, amount, description, created_by, verified_by_staff_id, 
+            verified_by_staff_name, ref_id, is_auto, payment_method_code, occurred_at
         ) VALUES (
-            'IN', 'Thanh toán', p_amount_paid, 
-            'Thanh toán phòng ' || COALESCE(v_room_name, ''), 
-            now(), v_creator_id, v_staff_id, p_booking_id, true, p_payment_method
+            'IN', 'Tiền phòng', p_amount_paid, 
+            'Thanh toán phòng ' || COALESCE(v_room_name, '') || ' (Checkout)', 
+            auth.uid(), v_staff_id, COALESCE(p_verified_by_staff_name, v_staff_name), p_booking_id, true, v_pm_code, now()
         );
+
+        -- Wallet Changes for Notification (Accrual: Cash up, Receivable down, Revenue unchanged)
+        IF v_pm_code IN ('cash', 'tien mat', 'tiền mặt') THEN
+            v_wallet_changes := v_wallet_changes || jsonb_build_object('walletName', 'CASH', 'diff', p_amount_paid);
+        ELSE
+            v_wallet_changes := v_wallet_changes || jsonb_build_object('walletName', 'BANK', 'diff', p_amount_paid);
+        END IF;
+        v_wallet_changes := v_wallet_changes || jsonb_build_object('walletName', 'RECEIVABLE', 'diff', -p_amount_paid);
     END IF;
 
-    -- 7. Update Customer Balance (Legacy support)
+    -- 5. XỬ LÝ CHUYỂN CỌC (Kết chuyển Escrow sang Receivable)
+    IF v_deposit > 0 THEN
+        INSERT INTO public.cash_flow (
+            flow_type, category, amount, description, created_by, verified_by_staff_id, 
+            verified_by_staff_name, ref_id, is_auto, payment_method_code, occurred_at
+        ) VALUES (
+            'IN', 'Tiền phòng', v_deposit, 
+            'Kết chuyển tiền cọc vào tiền phòng (Phòng ' || COALESCE(v_room_name, '') || ')', 
+            auth.uid(), v_staff_id, COALESCE(p_verified_by_staff_name, v_staff_name), p_booking_id, true, 'deposit_transfer', now()
+        );
+
+        -- Wallet Changes for Notification (Accrual: Escrow down, Receivable down, Revenue unchanged)
+        v_wallet_changes := v_wallet_changes || jsonb_build_object('walletName', 'ESCROW', 'diff', -v_deposit);
+        v_wallet_changes := v_wallet_changes || jsonb_build_object('walletName', 'RECEIVABLE', 'diff', -v_deposit);
+    END IF;
+
+    -- 6. Cập nhật số dư khách hàng (nếu có)
     IF v_customer_id IS NOT NULL THEN
-        UPDATE public.customers SET balance = COALESCE(balance, 0) + p_amount_paid - (v_total_amount - v_deposit), updated_at = now() WHERE id = v_customer_id;
+        UPDATE public.customers 
+        SET balance = COALESCE(balance, 0) + p_amount_paid - (v_total_amount - v_deposit), updated_at = now()
+        WHERE id = v_customer_id;
     END IF;
 
-    -- 8. Audit Logs
+    -- 7. Ghi Audit Log
     INSERT INTO public.audit_logs (booking_id, customer_id, room_id, staff_id, total_amount, explanation)
     VALUES (p_booking_id, v_customer_id, v_room_id, v_staff_id, v_total_amount, v_bill->'explanation');
-    
-    UPDATE public.bookings SET billing_audit_trail = v_bill->'explanation' WHERE id = p_booking_id;
 
-    RETURN jsonb_build_object('success', true, 'message', 'Check-out thành công', 'bill', v_bill);
+    RETURN jsonb_build_object(
+        'success', true, 
+        'message', 'Check-out thành công', 
+        'bill', v_bill,
+        'wallet_changes', v_wallet_changes
+    );
 END;
 $function$;

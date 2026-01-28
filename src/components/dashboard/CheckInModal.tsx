@@ -9,6 +9,7 @@ import {
     Briefcase, AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatMoney } from '@/utils/format';
 import { Room } from '@/types/dashboard';
 import { customerService, Customer } from '@/services/customerService';
 import { serviceService, Service } from '@/services/serviceService';
@@ -202,7 +203,7 @@ function ServiceCard({ service, quantity, onAdd, onRemove }: {
                     {service.name}
                 </h4>
                 <div className={cn("font-bold text-sm", quantity > 0 ? "text-slate-600" : "text-slate-400")}>
-                    {service.price.toLocaleString()}đ
+                    {formatMoney(service.price)}
                 </div>
                 <p className="text-xs text-slate-400">{service.unit_sell || service.unit}</p>
             </div>
@@ -432,13 +433,13 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
             }
 
             if (selectedCustomer && selectedCustomer.balance < 0 && !verifiedStaff) {
-                const debt = Math.abs(selectedCustomer.balance);
-                const confirmed = await confirmDialog({
-                    title: 'Cảnh báo nợ cũ',
-                    message: `Khách ${selectedCustomer.full_name} đang nợ ${debt.toLocaleString()}đ.\nKhoản nợ này sẽ được cộng vào công nợ phòng và thanh toán khi trả phòng.\n\nLễ tân đã thông báo rõ cho khách và vẫn muốn nhận phòng?`,
-                    confirmLabel: 'ĐÃ THÔNG BÁO, VẪN NHẬN PHÒNG',
-                    type: 'confirm'
-                });
+                    const debt = Math.abs(selectedCustomer.balance);
+                    const confirmed = await confirmDialog({
+                        title: 'Cảnh báo nợ cũ',
+                        message: `Khách ${selectedCustomer.full_name} đang nợ ${formatMoney(debt)}.\nKhoản nợ này sẽ được cộng vào công nợ phòng và thanh toán khi trả phòng.\n\nLễ tân đã thông báo rõ cho khách và vẫn muốn nhận phòng?`,
+                        confirmLabel: 'ĐÃ THÔNG BÁO, VẪN NHẬN PHÒNG',
+                        type: 'confirm'
+                    });
 
                 if (!confirmed) {
                     setIsSubmitting(false);
@@ -774,31 +775,31 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                     <div className="space-y-3 text-sm">
                         <div className="flex justify-between text-slate-600">
                             <span>Tiền phòng</span>
-                            <span className="font-mono font-medium">{finalRoomPrice.toLocaleString()}</span>
+                            <span className="font-mono font-medium">{formatMoney(finalRoomPrice)}</span>
                         </div>
                         {servicesTotal > 0 && (
                             <div className="flex justify-between text-slate-600">
                                 <span>Dịch vụ</span>
-                                <span className="font-mono font-medium">{servicesTotal.toLocaleString()}</span>
+                                <span className="font-mono font-medium">{formatMoney(servicesTotal)}</span>
                             </div>
                         )}
                         {surchargeTotal > 0 && (
                             <div className="flex justify-between text-slate-600">
                                 <span>Phụ thu thêm người</span>
-                                <span className="font-mono font-medium">{surchargeTotal.toLocaleString()}</span>
+                                <span className="font-mono font-medium">{formatMoney(surchargeTotal)}</span>
                             </div>
                         )}
                         {debt > 0 && (
                             <div className="flex justify-between text-rose-500 font-medium">
                                 <span>Nợ cũ</span>
-                                <span className="font-mono">{debt.toLocaleString()}</span>
+                                <span className="font-mono">{formatMoney(debt)}</span>
                             </div>
                         )}
                     </div>
 
                     <div className="border-t border-dashed border-slate-200 pt-4 flex justify-between items-center">
                         <span className="font-bold text-slate-800">Tổng cộng</span>
-                        <span className="font-bold text-2xl text-blue-700 font-mono tracking-tight">{totalAmount.toLocaleString()}</span>
+                        <span className="font-bold text-2xl text-blue-700 font-mono tracking-tight">{formatMoney(totalAmount)}</span>
                     </div>
                 </div>
 

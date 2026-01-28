@@ -9,16 +9,11 @@ import TransactionModal from './components/TransactionModal';
 import WalletCards from './components/WalletCards';
 import OwnerDebtSection from './components/OwnerDebtSection';
 import BookingHistoryModal from './components/BookingHistoryModal';
+import CashFlowStatsComponent from './components/CashFlowStats';
 import { toLocalISOString, parseLocalISO, getEndOfDay } from '@/lib/dateUtils';
+import { formatMoney } from '@/utils/format';
 
 export default function CashFlowPage() {
-  const [stats, setStats] = useState<CashFlowStats>({
-    total_in: 0,
-    total_out: 0,
-    net_income: 0,
-    current_balance: 0,
-    chart_data: []
-  });
   const [transactions, setTransactions] = useState<CashFlowTransaction[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -40,10 +35,6 @@ export default function CashFlowPage() {
   const fetchData = async (isBackground = false) => {
     if (!isBackground) setLoading(true);
     try {
-      // Fetch Stats
-      const statsData = await cashFlowService.getStats(dateRange.start, dateRange.end);
-      setStats(statsData);
-
       // Fetch Wallets
       const walletsData = await cashFlowService.getWallets();
       setWallets(walletsData);
@@ -53,7 +44,7 @@ export default function CashFlowPage() {
         startDate: dateRange.start,
         endDate: dateRange.end,
         type: typeFilter === 'ALL' ? undefined : typeFilter,
-        paymentMethod: paymentMethod === 'ALL' ? undefined : paymentMethod
+        paymentMethod: paymentMethod === 'ALL' ? undefined : paymentMethod,
       });
       setTransactions(data);
     } catch (error) {
@@ -102,10 +93,6 @@ export default function CashFlowPage() {
     } catch (error) {
       toast.error('Không thể xóa giao dịch (Có thể là giao dịch tự động)');
     }
-  };
-
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
@@ -194,7 +181,6 @@ export default function CashFlowPage() {
         </select>
       </div>
 
-      {/* Wallets Dashboard */}
       <WalletCards 
         wallets={wallets} 
         loading={loading} 
@@ -208,40 +194,7 @@ export default function CashFlowPage() {
         }}
       />
 
-      {/* Owner Debt Section (Sổ Nợ Ngoài) */}
       <OwnerDebtSection onUpdate={fetchData} />
-
-      {/* Simple Chart Bar (CSS only) */}
-      {!loading && stats.chart_data.length > 0 && (
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Filter size={18} /> Biểu đồ dòng tiền theo ngày
-            </h3>
-            <div className="flex items-end gap-2 h-40 overflow-x-auto pb-2 scrollbar-hide">
-                {stats.chart_data.map((day, idx) => {
-                    const maxVal = Math.max(...stats.chart_data.map(d => Math.max(d.total_in, d.total_out)));
-                    const hIn = maxVal ? (day.total_in / maxVal) * 100 : 0;
-                    const hOut = maxVal ? (day.total_out / maxVal) * 100 : 0;
-                    return (
-                        <div key={idx} className="flex flex-col items-center gap-1 min-w-[40px] group relative">
-                             <div className="flex gap-1 items-end h-full w-full justify-center">
-                                <div style={{ height: `${hIn}%` }} className="w-3 bg-green-500 rounded-t-sm opacity-80 group-hover:opacity-100 transition-all" />
-                                <div style={{ height: `${hOut}%` }} className="w-3 bg-red-500 rounded-t-sm opacity-80 group-hover:opacity-100 transition-all" />
-                             </div>
-                             <span className="text-[10px] text-gray-500 mt-1 truncate w-full text-center">
-                                {new Date(day.date).getDate()}/{new Date(day.date).getMonth()+1}
-                             </span>
-                             {/* Tooltip */}
-                             <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs p-2 rounded border border-gray-700 whitespace-nowrap z-10 shadow-lg">
-                                <div className="text-green-400">Thu: {formatMoney(day.total_in)}</div>
-                                <div className="text-red-400">Chi: {formatMoney(day.total_out)}</div>
-                             </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-      )}
 
       {/* Transaction List */}
       <div className="space-y-3">
@@ -274,7 +227,11 @@ export default function CashFlowPage() {
                 >
                   {/* Cột Chỉ số Thời gian (Side-Badge Time Capsule) */}
                   <div className="flex items-center h-full">
-                    <div className={`w-[18px] h-full flex flex-col items-center justify-center text-white ${tx.flow_type === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                    <div className={`w-[18px] h-full flex flex-col items-center justify-center text-white ${
+                      tx.flow_type === 'OUT' ? 'bg-rose-500' :
+                      tx.payment_method_code === 'credit' ? 'bg-blue-500' : 
+                      'bg-emerald-500'
+                    }`}>
                       {tx.flow_type === 'IN' ? <ArrowUp size={14} strokeWidth={3} /> : <ArrowDown size={14} strokeWidth={3} />}
                     </div>
                     <div className="px-3 flex flex-col justify-center min-w-[70px] border-r border-gray-50 h-full bg-gray-50/50">
@@ -298,20 +255,24 @@ export default function CashFlowPage() {
                   {/* Con số Tài chính & Huy hiệu Phương thức (Amount & Method) */}
                   <div className="px-4 text-right flex flex-col justify-center">
                     <div className="relative inline-block">
-                      <span className={`text-[16px] font-black tracking-tighter leading-none ${tx.flow_type === 'IN' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      <span className={`text-[16px] font-black tracking-tighter leading-none ${
+                        tx.flow_type === 'OUT' ? 'text-rose-500' :
+                        tx.payment_method_code === 'credit' ? 'text-blue-500' : 
+                        'text-emerald-500'
+                      }`}>
                         {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount).replace('₫', '').trim()}
                       </span>
                       {/* Huy hiệu Phương thức (Superscript Badge) */}
                       {tx.payment_method_code && (
                         <span className={`absolute -top-3 -right-2 text-[6px] font-black px-1 py-0.5 rounded shadow-sm uppercase ${
-                          tx.payment_method_code.toLowerCase() === 'cash' || tx.payment_method_code.toLowerCase() === 'tm' 
-                            ? 'bg-amber-100 text-amber-700 border border-amber-200' 
-                            : tx.payment_method_code.toLowerCase() === 'transfer' || tx.payment_method_code.toLowerCase() === 'ck'
+                          tx.payment_method_code.toLowerCase() === 'credit'
                             ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                            : (tx.payment_method_code.toLowerCase() === 'cash' || tx.payment_method_code.toLowerCase() === 'tm') 
+                            ? 'bg-amber-100 text-amber-700 border border-amber-200' 
                             : 'bg-purple-100 text-purple-700 border border-purple-200'
                         }`}>
-                          {tx.payment_method_code.toLowerCase() === 'cash' || tx.payment_method_code.toLowerCase() === 'tm' ? 'TM' : 
-                           tx.payment_method_code.toLowerCase() === 'transfer' || tx.payment_method_code.toLowerCase() === 'ck' ? 'CK' : 'POS'}
+                          {tx.payment_method_code.toLowerCase() === 'credit' ? 'NỢ' :
+                           (tx.payment_method_code.toLowerCase() === 'cash' || tx.payment_method_code.toLowerCase() === 'tm') ? 'TM' : 'CK'}
                         </span>
                       )}
                     </div>
