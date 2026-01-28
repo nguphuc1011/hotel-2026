@@ -32,6 +32,7 @@ export default function ReportsPage() {
     expenseBreakdown: ReportCategoryData[];
     topItems: ReportTopItem[];
     raw: { cashFlow: any[]; services: any[] };
+    averages?: Record<string, number>;
   } | null>(null);
 
   // Drill Down State
@@ -40,6 +41,7 @@ export default function ReportsPage() {
     title: string;
     items: any[];
     total: number;
+    averages?: Record<string, number>;
   }>({
     open: false,
     title: '',
@@ -266,6 +268,7 @@ export default function ReportsPage() {
         title={drillModal.title}
         items={drillModal.items}
         totalAmount={drillModal.total}
+        averages={drillModal.averages}
       />
     </div>
   );
