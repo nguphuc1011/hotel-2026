@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { formatMoney } from '@/utils/format';
 
 export const telegramService = {
   async sendMessage(text: string) {
