@@ -11,9 +11,10 @@ interface MoneyInputProps {
   placeholder?: string;
   centered?: boolean;
   disabled?: boolean;
+  autoFocus?: boolean;
 }
 
-export function MoneyInput({ value, onChange, label, className, inputClassName, placeholder = "0", centered, disabled }: MoneyInputProps) {
+export function MoneyInput({ value, onChange, label, className, inputClassName, placeholder = "0", centered, disabled, autoFocus }: MoneyInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const shortValue = Math.floor(value / 1000);
   const displayValue = shortValue === 0 ? '' : new Intl.NumberFormat('vi-VN').format(shortValue);
@@ -35,6 +36,7 @@ export function MoneyInput({ value, onChange, label, className, inputClassName, 
               value={displayValue} 
               placeholder={placeholder}
               disabled={disabled}
+              autoFocus={autoFocus}
               onChange={(e) => {
                 const raw = e.target.value.replace(/\D/g, '');
                 const num = parseInt(raw) || 0;
