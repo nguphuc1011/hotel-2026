@@ -221,17 +221,6 @@ export const cashFlowService = {
     return { data: transactions, count };
   },
 
-  // --- External Payables (Nợ ngoài) ---
-  async getExternalPayables() {
-    const { data, error } = await supabase
-      .from('external_payables')
-      .select('*')
-      .eq('status', 'active')
-      .order('amount', { ascending: false }); // High debt first
-      
-    if (error) throw error;
-    return data;
-  },
 
   // Gọi RPC lấy thống kê (Backend Calculation - Rule 8)
   async getStats(fromDate: Date, toDate: Date): Promise<CashFlowStats> {
