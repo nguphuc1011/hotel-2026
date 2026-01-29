@@ -1,294 +1,118 @@
-
 const { Client } = require('pg');
 require('dotenv').config({ path: '.env.local' });
 
+const client = new Client({
+  connectionString: process.env.DATABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+});
+
 const sql = `
-CREATE OR REPLACE FUNCTION calculate_booking_bill_v2(p_booking_id uuid)
-RETURNS jsonb
-LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.check_in_customer(p_room_id uuid, p_rental_type text, p_customer_id uuid DEFAULT NULL::uuid, p_deposit numeric DEFAULT 0, p_services jsonb DEFAULT '[]'::jsonb, p_customer_name text DEFAULT NULL::text, p_extra_adults integer DEFAULT 0, p_extra_children integer DEFAULT 0, p_notes text DEFAULT NULL::text, p_custom_price numeric DEFAULT NULL::numeric, p_custom_price_reason text DEFAULT NULL::text, p_source text DEFAULT 'direct'::text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_payment_method text DEFAULT 'cash'::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
 AS $function$
 DECLARE
-    -- Data Records
-    v_booking RECORD;
-    v_room_cat RECORD;
-    v_settings RECORD;
-    
-    -- Time Variables
-    v_check_in timestamptz;
-    v_check_out timestamptz;
-    v_now timestamptz := now();
-    v_duration interval;
-    v_duration_min numeric;
-    v_duration_text text;
-    v_billable_min numeric;
-    
-    -- Config Variables
-    v_grace_minutes int;
-    v_grace_in_enabled boolean;
-    v_grace_out_enabled boolean;
-    v_hourly_unit int;
-    v_base_block int;
-    v_vat_percent numeric;
-    v_service_fee_percent numeric;
-    v_std_check_in time;
-    v_std_check_out time;
-    v_hourly_ceiling_enabled boolean;
-    
-    -- Pricing Variables
-    v_room_price numeric := 0;
-    v_surcharge_amount numeric := 0;
-    v_early_surcharge numeric := 0;
-    v_late_surcharge numeric := 0;
-    v_service_total numeric := 0;
-    v_service_fee_val numeric := 0;
-    v_vat_val numeric := 0;
-    v_total_amount numeric := 0;
-    v_subtotal numeric := 0;
-    v_final_amount numeric := 0;
-    v_discount numeric := 0;
-    v_deposit numeric := 0;
-    v_customer_balance numeric := 0;
-    
-    -- Helpers
-    v_rule jsonb;
-    v_early_minutes numeric;
-    v_late_minutes numeric;
-    v_services jsonb;
-    v_extra_min numeric;
-    v_extra_blocks numeric;
-    v_base_price numeric;
-    v_next_price numeric;
-    v_daily_price numeric;
-    v_overnight_price numeric;
-    
-    -- Timezone (TODO: Load from settings)
-    v_timezone text := 'Asia/Ho_Chi_Minh';
-    
+    v_booking_id uuid;
+    v_customer_id uuid;
+    v_staff_id uuid;
+    v_staff_name text;
+    v_room_status text;
+    v_room_name text;
+    v_check_in_at timestamptz := now();
 BEGIN
-    -- 1. LOAD SETTINGS (Use key='config' or 'system_settings' fallback)
-    -- We assume 'config' is the active one used by Frontend
-    SELECT * INTO v_settings FROM settings WHERE key = 'config';
-    
-    IF v_settings.key IS NULL THEN
-        -- Fallback to system_settings if config not found
-        SELECT * INTO v_settings FROM settings WHERE key = 'system_settings';
+    -- Identify Staff
+    v_staff_id := COALESCE(p_verified_by_staff_id, auth.uid());
+    SELECT full_name INTO v_staff_name FROM public.staff WHERE id = v_staff_id;
+
+    -- Get Room Info
+    SELECT status, room_number INTO v_room_status, v_room_name FROM public.rooms WHERE id = p_room_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Lỗi: Phòng không tồn tại.');
+    END IF;
+    IF v_room_status NOT IN ('available', 'dirty') THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Phòng đang có khách hoặc chưa sẵn sàng.');
     END IF;
 
-    IF v_settings.key IS NULL THEN
-        -- Defaults
-        v_grace_minutes := 0;
-        v_hourly_unit := 60;
-        v_base_block := 1;
-        v_vat_percent := 0;
-        v_service_fee_percent := 0;
-        v_std_check_in := '14:00:00';
-        v_std_check_out := '12:00:00';
-        v_hourly_ceiling_enabled := false;
+    -- Handle Customer
+    IF p_customer_id IS NOT NULL THEN
+        v_customer_id := p_customer_id;
+    ELSIF p_customer_name IS NOT NULL THEN
+        INSERT INTO public.customers (full_name) VALUES (p_customer_name) RETURNING id INTO v_customer_id;
     ELSE
-        v_grace_minutes := COALESCE(v_settings.grace_minutes, 0);
-        v_grace_in_enabled := COALESCE(v_settings.grace_in_enabled, false);
-        v_grace_out_enabled := COALESCE(v_settings.grace_out_enabled, false);
-        v_hourly_unit := COALESCE(v_settings.hourly_unit, 60);
-        v_base_block := COALESCE(v_settings.base_hourly_limit, 1);
-        v_vat_percent := CASE WHEN v_settings.vat_enabled THEN COALESCE(v_settings.vat_percent, 0) ELSE 0 END;
-        v_service_fee_percent := CASE WHEN v_settings.service_fee_enabled THEN COALESCE(v_settings.service_fee_percent, 0) ELSE 0 END;
-        v_std_check_in := (v_settings.check_in_time)::time;
-        v_std_check_out := (v_settings.check_out_time)::time;
-        v_hourly_ceiling_enabled := COALESCE(v_settings.hourly_ceiling_enabled, false);
+        v_customer_id := NULL;
     END IF;
 
-    -- 2. LOAD BOOKING & CUSTOMER
-    SELECT 
-        b.*, 
-        c.full_name as customer_name,
-        r.room_number,
-        COALESCE(c.balance, 0) as customer_balance
-    INTO v_booking
-    FROM bookings b
-    LEFT JOIN customers c ON b.customer_id = c.id
-    LEFT JOIN rooms r ON b.room_id = r.id
-    WHERE b.id = p_booking_id;
+    -- 1. Create Booking
+    INSERT INTO public.bookings (
+        room_id, customer_id, rental_type, check_in_actual, deposit_amount, payment_method, 
+        status, notes, services_used, extra_adults, extra_children, 
+        custom_price, custom_price_reason, source, verified_by_staff_id, verified_by_staff_name
+    ) VALUES (
+        p_room_id, v_customer_id, p_rental_type, v_check_in_at, p_deposit, p_payment_method, 
+        'checked_in', p_notes, p_services, p_extra_adults, p_extra_children, 
+        p_custom_price, p_custom_price_reason, p_source, v_staff_id, COALESCE(p_verified_by_staff_name, v_staff_name)
+    ) RETURNING id INTO v_booking_id;
 
-    IF v_booking.id IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Booking not found');
-    END IF;
-    
-    v_customer_balance := v_booking.customer_balance;
-    v_deposit := COALESCE(v_booking.deposit_amount, 0);
-    v_discount := COALESCE(v_booking.discount_amount, 0);
+    -- 2. Update Room Status
+    UPDATE public.rooms SET status = 'occupied', current_booking_id = v_booking_id, last_status_change = v_check_in_at WHERE id = p_room_id;
 
-    -- 3. LOAD ROOM CATEGORY PRICES
-    SELECT * INTO v_room_cat
-    FROM room_categories rc
-    JOIN rooms r ON r.category_id = rc.id
-    WHERE r.id = v_booking.room_id;
+    -- 3. INITIAL ROOM CHARGE (Snapshot Principle)
+    -- [FIX] Use calculate_booking_bill to include all surcharges at check-in
+    DECLARE
+        v_full_bill jsonb;
+        v_initial_amount numeric;
+    BEGIN
+        v_full_bill := public.calculate_booking_bill(v_booking_id, v_check_in_at);
+        v_initial_amount := (v_full_bill->>'total_amount')::numeric;
 
-    -- 4. TIME CALCULATION
-    v_check_in := v_booking.check_in_actual;
-    v_check_out := COALESCE(v_booking.check_out_actual, v_now);
-    v_duration := v_check_out - v_check_in;
-    v_duration_min := EXTRACT(EPOCH FROM v_duration) / 60;
-    
-    -- Format duration text
-    v_duration_text := 
-        FLOOR(v_duration_min / 1440) || ' ngày ' || 
-        FLOOR((v_duration_min % 1440) / 60) || ' giờ ' || 
-        ROUND(v_duration_min % 60) || ' phút';
-
-    -- 5. ROOM CHARGE CALCULATION
-    -- Extract prices from flat columns
-    v_base_price := COALESCE(v_room_cat.price_hourly, 0);
-    v_next_price := COALESCE(v_room_cat.price_next_hour, 0);
-    v_daily_price := COALESCE(v_room_cat.price_daily, 0);
-    v_overnight_price := COALESCE(v_room_cat.price_overnight, 0);
-
-    IF v_booking.rental_type = 'daily' THEN
-        v_room_price := v_daily_price;
-        
-        -- Daily Calculation Logic (Simplified for now)
-        -- TODO: Handle multiple days
-        
-    ELSIF v_booking.rental_type = 'overnight' THEN
-        v_room_price := v_overnight_price;
-    ELSE
-        -- Hourly
-        v_room_price := v_base_price;
-        -- TODO: Hourly logic
-    END IF;
-
-    -- 6. SURCHARGE CALCULATION (Minutes Offset Logic)
-    
-    -- 6.1 Early Check-in
-    -- Calculate minutes early relative to standard check-in
-    -- Only relevant if check-in is BEFORE standard check-in on the same day (or previous?)
-    -- For simplicity: Extract time part
-    IF (v_check_in AT TIME ZONE v_timezone)::time < v_std_check_in THEN
-        v_early_minutes := EXTRACT(EPOCH FROM (v_std_check_in - (v_check_in AT TIME ZONE v_timezone)::time)) / 60;
-        
-        -- Apply Grace Period
-        IF v_grace_in_enabled AND v_early_minutes <= v_grace_minutes THEN
-             v_early_minutes := 0;
+        -- Hourly Room starts with 0 Debt (Snapshot Principle)
+        IF p_rental_type = 'hourly' THEN
+            v_initial_amount := 0;
         END IF;
-        
-        IF v_early_minutes > 0 THEN
-            -- Find matching rule: from_minute < early_minutes <= to_minute
-            SELECT * INTO v_rule
-            FROM jsonb_array_elements(v_settings.surcharge_rules) rule
-            WHERE (rule->>'type') = 'Early'
-              AND v_early_minutes > (rule->>'from_minute')::numeric
-              AND v_early_minutes <= (rule->>'to_minute')::numeric
-            ORDER BY (rule->>'to_minute')::numeric DESC
-            LIMIT 1;
-            
-            IF v_rule IS NOT NULL THEN
-                v_early_surcharge := v_daily_price * ((rule->>'percentage')::numeric / 100);
-            END IF;
+
+        IF v_initial_amount > 0 THEN
+            INSERT INTO public.cash_flow (
+                flow_type, category, amount, description, payment_method_code, 
+                created_by, verified_by_staff_id, verified_by_staff_name, ref_id, is_auto, occurred_at
+            )
+            VALUES (
+                'IN', 'Tiền phòng', v_initial_amount, 
+                format('Ghi nhận nợ tiền phòng (%s) lúc nhận phòng - Bao gồm phụ thu (nếu có)', p_rental_type), 
+                'credit', -- Increases Receivable & Revenue
+                auth.uid(), v_staff_id, COALESCE(p_verified_by_staff_name, v_staff_name), v_booking_id, true, now()
+            );
         END IF;
+    END;
+
+    -- 4. RECORD DEPOSIT
+    IF p_deposit > 0 THEN
+        INSERT INTO public.cash_flow (
+            flow_type, category, amount, description, payment_method_code, 
+            created_by, verified_by_staff_id, verified_by_staff_name, ref_id, is_auto, occurred_at
+        )
+        VALUES (
+            'IN', 'Tiền cọc', p_deposit, 
+            'Tiền cọc phòng ' || COALESCE(v_room_name, ''), 
+            p_payment_method, -- cash/bank
+            auth.uid(), v_staff_id, COALESCE(p_verified_by_staff_name, v_staff_name), v_booking_id, true, now()
+        );
     END IF;
 
-    -- 6.2 Late Check-out
-    -- Calculate minutes late relative to standard check-out
-    IF (v_check_out AT TIME ZONE v_timezone)::time > v_std_check_out THEN
-        v_late_minutes := EXTRACT(EPOCH FROM ((v_check_out AT TIME ZONE v_timezone)::time - v_std_check_out)) / 60;
-        
-        -- Apply Grace Period
-        IF v_grace_out_enabled AND v_late_minutes <= v_grace_minutes THEN
-            v_late_minutes := 0;
-        END IF;
-        
-        IF v_late_minutes > 0 THEN
-            -- Find matching rule: from_minute < late_minutes <= to_minute
-            SELECT * INTO v_rule
-            FROM jsonb_array_elements(v_settings.surcharge_rules) rule
-            WHERE (rule->>'type') = 'Late'
-              AND v_late_minutes > (rule->>'from_minute')::numeric
-              AND v_late_minutes <= (rule->>'to_minute')::numeric
-            ORDER BY (rule->>'to_minute')::numeric DESC
-            LIMIT 1;
-            
-            IF v_rule IS NOT NULL THEN
-                v_late_surcharge := v_daily_price * ((v_rule->>'percentage')::numeric / 100);
-            END IF;
-        END IF;
-    END IF;
-
-    -- 6.3 Custom Surcharge
-    v_surcharge_amount := v_early_surcharge + v_late_surcharge + COALESCE(v_booking.custom_surcharge, 0);
-
-    -- 7. SERVICES
-    -- Iterate services_used (jsonb array)
-    -- format: [{id, quantity, price, name}]
-    FOR v_rule IN SELECT * FROM jsonb_array_elements(COALESCE(v_booking.services_used, '[]'::jsonb))
-    LOOP
-        v_service_total := v_service_total + ((v_rule->>'quantity')::numeric * (v_rule->>'price')::numeric);
-    END LOOP;
-
-    -- 8. TOTALS
-    v_subtotal := v_room_price + v_surcharge_amount + v_service_total - v_discount;
-    
-    -- VAT & Service Fee
-    v_service_fee_val := v_subtotal * (v_service_fee_percent / 100);
-    v_vat_val := (v_subtotal + v_service_fee_val) * (v_vat_percent / 100);
-    
-    v_final_amount := v_subtotal + v_service_fee_val + v_vat_val;
-    
-    -- 9. RETURN
-    RETURN jsonb_build_object(
-        'success', true,
-        'booking_id', p_booking_id,
-        'room_number', v_booking.room_number,
-        'customer_name', v_booking.customer_name,
-        'check_in_at', v_check_in,
-        'check_out_at', v_check_out,
-        'duration_min', v_duration_min,
-        'duration_text', v_duration_text,
-        'rental_type', v_booking.rental_type,
-        
-        'base_price', v_daily_price, -- Assuming daily for now
-        'room_charge', v_room_price,
-        
-        'early_surcharge', v_early_surcharge,
-        'late_surcharge', v_late_surcharge,
-        'custom_surcharge', COALESCE(v_booking.custom_surcharge, 0),
-        'service_total', v_service_total,
-        'service_charges', COALESCE(v_booking.services_used, '[]'::jsonb),
-        'discount_amount', v_discount,
-        
-        'subtotal', v_subtotal,
-        'service_fee_percent', v_service_fee_percent,
-        'service_fee_amount', v_service_fee_val,
-        'vat_percent', v_vat_percent,
-        'vat_amount', v_vat_val,
-        
-        'total_final', v_final_amount,
-        'total_amount', v_final_amount, -- alias
-        'amount_to_pay', v_final_amount - v_deposit,
-        
-        -- Debt
-        'customer_balance', v_customer_balance,
-        'total_receivable', (v_final_amount - v_deposit) - v_customer_balance
-    );
+    RETURN jsonb_build_object('success', true, 'booking_id', v_booking_id);
 END;
 $function$;
 `;
 
-async function main() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
-  
+async function update() {
   try {
     await client.connect();
-    console.log('Connected to DB');
-    
     await client.query(sql);
-    console.log('RPC calculate_booking_bill_v2 updated successfully (Minutes Logic)');
-    
+    console.log('Successfully updated check_in_customer function.');
   } catch (err) {
-    console.error('Error updating RPC:', err);
+    console.error('Error updating function:', err);
   } finally {
     await client.end();
   }
 }
 
-main();
+update();

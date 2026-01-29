@@ -127,7 +127,7 @@ export const bookingService = {
         p_discount: params.discount,
         p_surcharge: params.surcharge,
         p_notes: params.notes,
-        p_verified_by_staff_id: params.verifiedStaff?.id || null
+        p_staff_id: params.verifiedStaff?.id || null
       });
 
       if (error) {

@@ -7,6 +7,7 @@ import {
   Settings as SettingsIcon,
   LogOut,
   Wallet,
+  Banknote,
   Users,
   Clock
 } from 'lucide-react';
@@ -31,6 +32,7 @@ export default function AppShell({
 
   const navItems = [
     { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: '/' },
+    { icon: <Banknote size={24} />, label: 'Tiền', href: '/tien' },
     { icon: <Users size={24} />, label: 'Khách hàng', href: '/customers' },
     { icon: <Clock size={24} />, label: 'Giao ca', href: '/shifts' },
     { icon: <Wallet size={24} />, label: 'Thu Chi', href: '/cash-flow' },

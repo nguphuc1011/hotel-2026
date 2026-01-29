@@ -50,9 +50,9 @@ export function MoneyInput({ value, onChange, label, className, inputClassName, 
             />
             {displayValue && (
                 <span className={cn(
-                    "font-bold text-[17px] text-[#1D1D1F] select-none pointer-events-none tabular-nums",
+                    "font-bold text-[17px] text-gray-400 select-none pointer-events-none tabular-nums",
                     inputClassName
-                )}></span>
+                )}>.000</span>
             )}
         </div>
       </div>

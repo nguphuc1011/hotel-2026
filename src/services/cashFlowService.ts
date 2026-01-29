@@ -14,6 +14,9 @@ export interface CashFlowTransaction {
   is_auto: boolean;
   payment_method_code?: string;
   verified_by_staff_name?: string;
+  customer_name?: string;
+  room_name?: string;
+  staff_name?: string;
 }
 
 export interface CashFlowStats {
@@ -117,7 +120,10 @@ export const cashFlowService = {
       query = query.not('category', 'in', filters.excludeCategory);
     }
     if (filters?.excludePaymentMethod && filters.excludePaymentMethod.length > 0) {
-      query = query.not('payment_method_code', 'in', filters.excludePaymentMethod);
+      // Use OR filter to include NULLs (which are likely old Cash/Transfer transactions)
+      // Syntax: payment_method_code.is.null,payment_method_code.not.in.(val1,val2)
+      const values = `(${filters.excludePaymentMethod.join(',')})`;
+      query = query.or(`payment_method_code.is.null,payment_method_code.not.in.${values}`);
     }
     if (filters?.paymentMethod) {
       // Only filter by DB column for performance. Old records with NULL won't show.
@@ -140,24 +146,66 @@ export const cashFlowService = {
     // Enhance data with payment method from bookings (Backfill for old records)
     const transactions = data as CashFlowTransaction[];
     const bookingIds = transactions
-      .filter(tx => !tx.payment_method_code && tx.ref_id && (tx.category === 'Tiền phòng' || tx.category === 'ROOM'))
+      .filter(tx => tx.ref_id && (
+        tx.category === 'Tiền phòng' || 
+        tx.category === 'Tiền cọc' || 
+        tx.category === 'ROOM' ||
+        tx.category === 'Thanh toán' ||
+        tx.category === 'Thanh toán tiền phòng'
+      ))
       .map(tx => tx.ref_id) as string[];
 
     if (bookingIds.length > 0) {
       const { data: bookings } = await supabase
         .from('bookings')
-        .select('id, payment_method')
+        .select(`
+          id, 
+          payment_method,
+          customer:customers(full_name),
+          room:rooms!bookings_room_id_fkey(room_number)
+        `)
         .in('id', bookingIds);
 
       if (bookings) {
-        const bookingMap = new Map(bookings.map(b => [b.id, b.payment_method]));
+        const bookingMap = new Map(bookings.map(b => [b.id, b]));
         transactions.forEach(tx => {
-          // Only fill if missing
-          if (!tx.payment_method_code && tx.ref_id && bookingMap.has(tx.ref_id)) {
-            tx.payment_method_code = bookingMap.get(tx.ref_id);
+          const booking = bookingMap.get(tx.ref_id!);
+          if (booking) {
+            // Backfill payment method if missing
+            if (!tx.payment_method_code) {
+              tx.payment_method_code = booking.payment_method;
+            }
+            
+            // Populate Customer & Room
+            tx.customer_name = booking.customer?.full_name;
+            
+            // Handle Room Name
+            const r = booking.room as any;
+            tx.room_name = r?.room_number || r?.name; 
           } else if (!tx.payment_method_code && tx.category === 'Tiền phòng') {
             tx.payment_method_code = 'cash'; // Default for room if not found
           }
+        });
+      }
+    }
+
+    // Fetch Staff Names for created_by (Fix "System" issue)
+    const userIds = [...new Set(transactions.map(tx => tx.created_by).filter(Boolean))];
+    if (userIds.length > 0) {
+      const { data: staffList } = await supabase
+        .from('staff')
+        .select('id, full_name')
+        .in('id', userIds);
+      
+      if (staffList) {
+        const staffMap = new Map(staffList.map(s => [s.id, s.full_name]));
+        transactions.forEach(tx => {
+           // Prefer verified name, then lookup creator name
+           if (tx.verified_by_staff_name) {
+             tx.staff_name = tx.verified_by_staff_name;
+           } else if (staffMap.has(tx.created_by)) {
+             tx.staff_name = staffMap.get(tx.created_by);
+           }
         });
       }
     }
@@ -172,6 +220,18 @@ export const cashFlowService = {
     return { data: transactions, count };
   },
 
+  // --- External Payables (Nợ ngoài) ---
+  async getExternalPayables() {
+    const { data, error } = await supabase
+      .from('external_payables')
+      .select('*')
+      .eq('status', 'active')
+      .order('amount', { ascending: false }); // High debt first
+      
+    if (error) throw error;
+    return data;
+  },
+
   // Gọi RPC lấy thống kê (Backend Calculation - Rule 8)
   async getStats(fromDate: Date, toDate: Date): Promise<CashFlowStats> {
     const { data, error } = await supabase.rpc('fn_get_cash_flow_stats', {
@@ -181,6 +241,58 @@ export const cashFlowService = {
 
     if (error) throw error;
     return data as CashFlowStats;
+  },
+
+  // Tính số dư ví tại một thời điểm nhất định (Rule: Opening Balance)
+  async getWalletBalanceAt(walletId: string, timestamp: Date): Promise<number> {
+    // 1. Lấy số dư hiện tại
+    const { data: wallet } = await supabase
+      .from('wallets')
+      .select('balance')
+      .eq('id', walletId)
+      .single();
+    
+    if (!wallet) return 0;
+
+    // 2. Lấy tổng biến động từ timestamp đến hiện tại
+    // Balance_at_T = Current_Balance - Sum(Transactions from T to Now)
+    
+    // FETCH RAW DATA (Include payment_method_code)
+    const { data: transactions } = await supabase
+      .from('cash_flow')
+      .select('amount, flow_type, wallet_id, payment_method_code, category')
+      .gt('occurred_at', timestamp.toISOString());
+
+    if (!transactions) return wallet.balance;
+
+    // 3. Filter in memory (Handle NULL wallet_id logic)
+    const filteredTxs = transactions.filter(tx => {
+      // Logic from fn_sync_wallets and MoneyPage
+      const method = (tx.payment_method_code || 'cash').toLowerCase();
+      
+      // Exclude virtual/credit flows
+      if (method === 'credit' || method === 'deposit_transfer') return false;
+
+      // Determine Target Wallet
+      let targetWallet = 'BANK';
+      if (method === 'cash' || method === 'tm') {
+        targetWallet = 'CASH';
+      }
+
+      // Check if this tx belongs to the requested wallet
+      // Priority: wallet_id (if set) > inferred from payment_method
+      if (tx.wallet_id) {
+        return tx.wallet_id === walletId;
+      } else {
+        return targetWallet === walletId;
+      }
+    });
+
+    const futureChange = filteredTxs.reduce((acc, tx) => {
+      return acc + (tx.flow_type === 'IN' ? tx.amount : -tx.amount);
+    }, 0);
+
+    return wallet.balance - futureChange;
   },
 
   // Gọi RPC tạo phiếu (Transaction safe)

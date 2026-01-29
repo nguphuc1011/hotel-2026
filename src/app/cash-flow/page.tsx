@@ -9,6 +9,9 @@ import TransactionModal from './components/TransactionModal';
 import WalletCards from './components/WalletCards';
 import OwnerDebtSection from './components/OwnerDebtSection';
 import BookingHistoryModal from './components/BookingHistoryModal';
+import CustomerDebtModal from './components/CustomerDebtModal';
+import ExternalDebtModal from './components/ExternalDebtModal';
+import { customerService } from '@/services/customerService';
 import CashFlowStatsComponent from './components/CashFlowStats';
 import { toLocalISOString, parseLocalISO, getEndOfDay } from '@/lib/dateUtils';
 import { formatMoney } from '@/utils/format';
@@ -19,6 +22,11 @@ export default function CashFlowPage() {
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCustomerDebtModalOpen, setIsCustomerDebtModalOpen] = useState(false);
+  const [isExternalDebtModalOpen, setIsExternalDebtModalOpen] = useState(false);
+  const [customerDebt, setCustomerDebt] = useState(0);
+  const [externalDebt, setExternalDebt] = useState(0);
+
   const [historyModal, setHistoryModal] = useState<{ open: boolean; bookingId: string | null }>({
     open: false,
     bookingId: null
@@ -38,6 +46,19 @@ export default function CashFlowPage() {
       // Fetch Wallets
       const walletsData = await cashFlowService.getWallets();
       setWallets(walletsData);
+
+      // Fetch Debt Info
+      try {
+        const debtors = await customerService.getDebtors();
+        const totalCustomerDebt = debtors.reduce((sum, d) => sum + Math.abs(d.balance), 0);
+        setCustomerDebt(totalCustomerDebt);
+
+        const payables = await cashFlowService.getExternalPayables();
+        const totalExternalDebt = (payables as any[]).reduce((sum, p) => sum + p.amount, 0);
+        setExternalDebt(totalExternalDebt);
+      } catch (err) {
+        console.error('Error fetching debt info:', err);
+      }
 
       // Fetch List
       const { data } = await cashFlowService.getTransactions(1, 100, {
@@ -192,6 +213,10 @@ export default function CashFlowPage() {
             setTypeFilter('ALL');
           }
         }}
+        customerDebt={customerDebt}
+        externalDebt={externalDebt}
+        onViewCustomerDebt={() => setIsCustomerDebtModalOpen(true)}
+        onViewExternalDebt={() => setIsExternalDebtModalOpen(true)}
       />
 
       <OwnerDebtSection onUpdate={fetchData} />
@@ -298,10 +323,20 @@ export default function CashFlowPage() {
         onSuccess={fetchData} 
       />
 
+      <CustomerDebtModal 
+        isOpen={isCustomerDebtModalOpen} 
+        onClose={() => setIsCustomerDebtModalOpen(false)} 
+      />
+
+      <ExternalDebtModal 
+        isOpen={isExternalDebtModalOpen} 
+        onClose={() => setIsExternalDebtModalOpen(false)} 
+      />
+
       {historyModal.bookingId && (
         <BookingHistoryModal
           isOpen={historyModal.open}
-          onClose={() => setHistoryModal({ open: false, bookingId: null })}
+          onClose={() => setHistoryModal({ ...historyModal, open: false })}
           bookingId={historyModal.bookingId}
         />
       )}

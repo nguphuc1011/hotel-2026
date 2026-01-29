@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/format';
 import { BookingBill, bookingService } from '@/services/bookingService';
+import { customerService } from '@/services/customerService';
 import BillBreakdown from './BillBreakdown';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
@@ -54,6 +55,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
   // Security states
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
+  const [walkInCustomerId, setWalkInCustomerId] = useState<string | null>(null);
 
   // Calculate dynamic totals
   const baseTotal = totalReceivable - (bill.custom_surcharge || 0) + (bill.discount_amount || 0);
@@ -64,6 +66,14 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
   // Hydration safety
   useEffect(() => {
     setMounted(true);
+    // Fetch Walk-in Customer ID
+    const fetchWalkInId = async () => {
+      const walkIn = await customerService.getOrCreateWalkInCustomer();
+      if (walkIn) {
+        setWalkInCustomerId(walkIn.id);
+      }
+    };
+    fetchWalkInId();
   }, []);
 
   // Auto-fill debt reason
@@ -156,6 +166,12 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
     // Validate: If debt, require notes
     if (isDebt && !notes.trim()) {
         setError('Vui lòng ghi chú lý do nợ (Ví dụ: Khách quen, Thiếu tiền mặt...)');
+        return;
+    }
+
+    // Validate: Block Walk-in Debt
+    if (isDebt && walkInCustomerId && bill.customer_id === walkInCustomerId) {
+        setError('KHÁCH VÃNG LAI KHÔNG ĐƯỢC PHÉP GHI NỢ. Vui lòng tạo hồ sơ khách hàng trước khi thanh toán.');
         return;
     }
 

@@ -286,5 +286,21 @@ export const customerService = {
       console.error('Error getting/creating walk-in customer:', err);
       return null;
     }
+  },
+
+  async getDebtors() {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .lt('balance', 0)
+        .order('balance', { ascending: true }); // Most debt first (negative numbers)
+        
+      if (error) throw error;
+      return data as Customer[];
+    } catch (err) {
+      console.error('Error fetching debtors:', err);
+      return [];
+    }
   }
 };

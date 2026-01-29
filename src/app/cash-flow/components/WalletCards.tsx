@@ -9,7 +9,9 @@ import {
   UserMinus, 
   TrendingUp,
   Wallet,
-  RefreshCcw
+  RefreshCcw,
+  Users,
+  FileWarning
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/format';
@@ -20,9 +22,23 @@ interface WalletCardsProps {
   selectedWalletId: string | null;
   onSelectWallet: (id: string | null) => void;
   onRefresh?: () => void;
+  customerDebt: number;
+  externalDebt: number;
+  onViewCustomerDebt: () => void;
+  onViewExternalDebt: () => void;
 }
 
-export default function WalletCards({ wallets, loading, selectedWalletId, onSelectWallet, onRefresh }: WalletCardsProps) {
+export default function WalletCards({ 
+  wallets, 
+  loading, 
+  selectedWalletId, 
+  onSelectWallet, 
+  onRefresh,
+  customerDebt,
+  externalDebt,
+  onViewCustomerDebt,
+  onViewExternalDebt
+}: WalletCardsProps) {
   const [changes, setChanges] = useState<Record<string, { diff: number }>>({});
   const prevBalancesRef = useRef<Record<string, number>>({});
   const isMounted = useRef(false);
@@ -199,6 +215,60 @@ export default function WalletCards({ wallets, loading, selectedWalletId, onSele
             </div>
           );
         })}
+
+        {/* Khách nợ Card */}
+        <div 
+          onClick={onViewCustomerDebt}
+          className="cursor-pointer relative overflow-hidden transition-all duration-200 group p-4 rounded-xl border-2 bg-rose-50 border-rose-100 hover:border-rose-200 hover:shadow-md"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="p-2 rounded-lg bg-rose-100 text-rose-600">
+              <Users size={24} />
+            </div>
+          </div>
+          
+          <div>
+            <p className="text-sm font-medium mb-1 text-rose-600/80">
+              Khách nợ
+            </p>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h3 className="text-xl font-bold truncate text-rose-700">
+                {formatMoney(Math.abs(customerDebt))}
+              </h3>
+            </div>
+          </div>
+
+          <div className="absolute -bottom-4 -right-4 opacity-10 pointer-events-none transform rotate-12 scale-150 text-rose-500">
+             <Users size={40} />
+          </div>
+        </div>
+
+        {/* Nợ ngoài Card */}
+        <div 
+          onClick={onViewExternalDebt}
+          className="cursor-pointer relative overflow-hidden transition-all duration-200 group p-4 rounded-xl border-2 bg-amber-50 border-amber-100 hover:border-amber-200 hover:shadow-md"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="p-2 rounded-lg bg-amber-100 text-amber-600">
+              <FileWarning size={24} />
+            </div>
+          </div>
+          
+          <div>
+            <p className="text-sm font-medium mb-1 text-amber-600/80">
+              Nợ ngoài
+            </p>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h3 className="text-xl font-bold truncate text-amber-700">
+                {formatMoney(externalDebt)}
+              </h3>
+            </div>
+          </div>
+
+          <div className="absolute -bottom-4 -right-4 opacity-10 pointer-events-none transform rotate-12 scale-150 text-amber-500">
+             <FileWarning size={40} />
+          </div>
+        </div>
       </div>
     </>
   );
