@@ -177,11 +177,12 @@ export const cashFlowService = {
             }
             
             // Populate Customer & Room
-            tx.customer_name = booking.customer?.full_name;
+            const c = booking.customer as any;
+            tx.customer_name = Array.isArray(c) ? c[0]?.full_name : c?.full_name;
             
             // Handle Room Name
             const r = booking.room as any;
-            tx.room_name = r?.room_number || r?.name; 
+            tx.room_name = Array.isArray(r) ? r[0]?.room_number : (r?.room_number || r?.name); 
           } else if (!tx.payment_method_code && tx.category === 'Tiền phòng') {
             tx.payment_method_code = 'cash'; // Default for room if not found
           }
