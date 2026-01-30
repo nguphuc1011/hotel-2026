@@ -995,23 +995,29 @@ function QuickActionButton({
     icon: Icon, 
     label, 
     onClick, 
-    variant = 'default' 
+    variant = 'default',
+    disabled = false
 }: { 
     icon: any, 
     label: string, 
     onClick: () => void,
-    variant?: 'default' | 'danger'
+    variant?: 'default' | 'danger',
+    disabled?: boolean
 }) {
     return (
         <div 
-            onClick={onClick}
-            className="group flex flex-col items-center gap-2 cursor-pointer flex-none min-w-[64px]"
+            onClick={() => !disabled && onClick()}
+            className={cn(
+                "group flex flex-col items-center gap-2 flex-none min-w-[64px]",
+                disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+            )}
         >
             <div className={cn(
                 "w-14 h-14 rounded-[28px] flex items-center justify-center transition-all duration-300 shadow-sm",
                 variant === 'danger' 
                     ? "bg-white text-rose-500 hover:bg-rose-50 hover:text-rose-600 hover:shadow-md"
-                    : "bg-white text-slate-400 hover:bg-white hover:text-blue-500 hover:shadow-md"
+                    : "bg-white text-slate-400 hover:bg-white hover:text-blue-500 hover:shadow-md",
+                disabled && "hover:bg-white hover:text-inherit hover:shadow-sm"
             )}>
                 <Icon className="w-6 h-6" strokeWidth={1.5} />
             </div>
