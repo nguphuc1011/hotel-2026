@@ -3,15 +3,29 @@ import { MessageSquare, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BookingBill } from '@/services/bookingService';
 import { formatMoney } from '@/utils/format';
+import { MoneyInput } from '@/components/ui/MoneyInput';
 
 interface BillBreakdownProps {
   bill: BookingBill;
   className?: string;
   isDark?: boolean;
   hideAuditLog?: boolean;
+  discount?: number;
+  onDiscountChange?: (val: number) => void;
+  surcharge?: number;
+  onSurchargeChange?: (val: number) => void;
 }
 
-export default function BillBreakdown({ bill, className, isDark = false, hideAuditLog = false }: BillBreakdownProps) {
+export default function BillBreakdown({ 
+  bill, 
+  className, 
+  isDark = false, 
+  hideAuditLog = false,
+  discount,
+  onDiscountChange,
+  surcharge,
+  onSurchargeChange
+}: BillBreakdownProps) {
   const customerBalance = bill.customer_balance ?? 0;
   const isCustomerInDebt = customerBalance < 0;
 
@@ -108,12 +122,22 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
           </div>
         )}
 
-        {bill.custom_surcharge > 0 && (
+        {(bill.custom_surcharge > 0 || surcharge !== undefined) && (
           <div className="flex justify-between items-center">
             <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Phụ phí khác</span>
-            <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
-              {formatMoney(bill.custom_surcharge)}
-            </span>
+            {onSurchargeChange ? (
+              <div className="w-32">
+                <MoneyInput
+                  value={surcharge ?? bill.custom_surcharge}
+                  onChange={onSurchargeChange}
+                  className="h-8 text-right font-black text-sm border-none bg-slate-50 focus:bg-slate-100 rounded-lg px-2"
+                />
+              </div>
+            ) : (
+              <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
+                {formatMoney(surcharge ?? bill.custom_surcharge)}
+              </span>
+            )}
           </div>
         )}
 
@@ -150,12 +174,22 @@ export default function BillBreakdown({ bill, className, isDark = false, hideAud
           </div>
         )}
 
-        {bill.discount_amount > 0 && (
+        {(bill.discount_amount > 0 || discount !== undefined) && (
           <div className={cn("pt-2 border-t flex justify-between items-center", borderColor)}>
             <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-rose-200" : "text-rose-500")}>Giảm giá</span>
-            <span className={cn("font-black", isDark ? "text-rose-200" : "text-rose-600")}>
-              -{formatMoney(bill.discount_amount)}
-            </span>
+            {onDiscountChange ? (
+              <div className="w-32">
+                <MoneyInput
+                  value={discount ?? bill.discount_amount}
+                  onChange={onDiscountChange}
+                  className="h-8 text-right font-black text-sm border-none bg-rose-50 focus:bg-rose-100 rounded-lg px-2 text-rose-600"
+                />
+              </div>
+            ) : (
+              <span className={cn("font-black", isDark ? "text-rose-200" : "text-rose-600")}>
+                -{formatMoney(discount ?? bill.discount_amount)}
+              </span>
+            )}
           </div>
         )}
 
