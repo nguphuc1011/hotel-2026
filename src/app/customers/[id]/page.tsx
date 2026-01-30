@@ -14,9 +14,6 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { toast } from 'sonner';
 
-import { securityService, SecurityAction } from '@/services/securityService';
-import PinValidationModal from '@/components/shared/PinValidationModal';
-
 import { useSecurity } from '@/hooks/useSecurity';
 import { formatMoney } from '@/utils/format';
 
@@ -598,23 +595,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      {/* Security PIN Modal */}
-      <PinValidationModal
-        isOpen={isPinModalOpen}
-        onClose={() => {
-          setIsPinModalOpen(false);
-          setSecurityAction(null);
-        }}
-        onSuccess={(staffId, staffName) => {
-          setIsPinModalOpen(false);
-          setSecurityAction(null);
-          
-          if (securityAction === 'checkout_refund') {
-            handleTransaction({ id: staffId, name: staffName });
-          }
-        }}
-        actionName={securityAction || 'access_settings'}
-      />
+      {/* Security Modals */}
+      {SecurityModals}
     </div>
   );
 }
