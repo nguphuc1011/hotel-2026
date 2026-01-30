@@ -23,7 +23,7 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   // Don't show shell on login page
   if (pathname === '/login') {
@@ -40,6 +40,13 @@ export default function AppShell({
     { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: '/settings' },
   ];
 
+  const visibleNavItems = navItems;
+
+  const homeItem = visibleNavItems.find(i => i.href === '/') || visibleNavItems[0];
+  const mobileItems = visibleNavItems.filter(i => i.href !== homeItem?.href).slice(0, 4);
+  const leftItems = mobileItems.slice(0, Math.ceil(mobileItems.length / 2));
+  const rightItems = mobileItems.slice(Math.ceil(mobileItems.length / 2));
+
   return (
     <>
       <WalletNotificationModal />
@@ -52,7 +59,7 @@ export default function AppShell({
         </div>
         
         <nav className="flex-1 px-6 space-y-2">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <Link 
               key={item.href} 
               href={item.href}
@@ -107,47 +114,29 @@ export default function AppShell({
 
           {/* Left Items */}
           <div className="flex-1 flex justify-evenly items-center h-full pb-1">
-            <Link 
-              href={navItems[1].href}
-              className="flex flex-col items-center justify-center active:scale-95 transition-transform"
-            >
-              <div className={cn(
-                "p-2 rounded-2xl transition-all duration-300",
-                pathname === navItems[1].href ? "text-[#007AFF]" : "text-slate-400"
-              )}>
-                {React.cloneElement(navItems[1].icon as any, { 
-                  size: 24,
-                  strokeWidth: pathname === navItems[1].href ? 2.5 : 2 
-                })}
-              </div>
-              <span className={cn(
-                "text-[10px] font-bold transition-colors duration-300",
-                pathname === navItems[1].href ? "text-[#007AFF]" : "text-slate-400"
-              )}>
-                {navItems[1].label}
-              </span>
-            </Link>
-
-            <Link 
-              href={navItems[2].href}
-              className="flex flex-col items-center justify-center active:scale-95 transition-transform"
-            >
-              <div className={cn(
-                "p-2 rounded-2xl transition-all duration-300",
-                pathname === navItems[2].href ? "text-[#007AFF]" : "text-slate-400"
-              )}>
-                {React.cloneElement(navItems[2].icon as any, { 
-                  size: 24,
-                  strokeWidth: pathname === navItems[2].href ? 2.5 : 2 
-                })}
-              </div>
-              <span className={cn(
-                "text-[10px] font-bold transition-colors duration-300",
-                pathname === navItems[2].href ? "text-[#007AFF]" : "text-slate-400"
-              )}>
-                {navItems[2].label}
-              </span>
-            </Link>
+            {leftItems.map((item) => (
+              <Link 
+                key={item.href}
+                href={item.href}
+                className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+              >
+                <div className={cn(
+                  "p-2 rounded-2xl transition-all duration-300",
+                  pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {React.cloneElement(item.icon as any, { 
+                    size: 24,
+                    strokeWidth: pathname === item.href ? 2.5 : 2 
+                  })}
+                </div>
+                <span className={cn(
+                  "text-[10px] font-bold transition-colors duration-300",
+                  pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {item.label}
+                </span>
+              </Link>
+            ))}
           </div>
 
           {/* Spacer for Center Button */}
@@ -155,67 +144,51 @@ export default function AppShell({
 
           {/* Right Items */}
           <div className="flex-1 flex justify-evenly items-center h-full pb-1">
-            <Link 
-              href={navItems[3].href}
-              className="flex flex-col items-center justify-center active:scale-95 transition-transform"
-            >
-              <div className={cn(
-                "p-2 rounded-2xl transition-all duration-300",
-                pathname === navItems[3].href ? "text-[#007AFF]" : "text-slate-400"
-              )}>
-                {React.cloneElement(navItems[3].icon as any, { 
-                  size: 24,
-                  strokeWidth: pathname === navItems[3].href ? 2.5 : 2 
-                })}
-              </div>
-              <span className={cn(
-                "text-[10px] font-bold transition-colors duration-300",
-                pathname === navItems[3].href ? "text-[#007AFF]" : "text-slate-400"
-              )}>
-                {navItems[3].label}
-              </span>
-            </Link>
-
-            <Link 
-              href={navItems[4].href}
-              className="flex flex-col items-center justify-center active:scale-95 transition-transform"
-            >
-              <div className={cn(
-                "p-2 rounded-2xl transition-all duration-300",
-                pathname === navItems[4].href ? "text-[#007AFF]" : "text-slate-400"
-              )}>
-                {React.cloneElement(navItems[4].icon as any, { 
-                  size: 24,
-                  strokeWidth: pathname === navItems[4].href ? 2.5 : 2 
-                })}
-              </div>
-              <span className={cn(
-                "text-[10px] font-bold transition-colors duration-300",
-                pathname === navItems[4].href ? "text-[#007AFF]" : "text-slate-400"
-              )}>
-                {navItems[4].label}
-              </span>
-            </Link>
+            {rightItems.map((item) => (
+              <Link 
+                key={item.href}
+                href={item.href}
+                className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+              >
+                <div className={cn(
+                  "p-2 rounded-2xl transition-all duration-300",
+                  pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {React.cloneElement(item.icon as any, { 
+                    size: 24,
+                    strokeWidth: pathname === item.href ? 2.5 : 2 
+                  })}
+                </div>
+                <span className={cn(
+                  "text-[10px] font-bold transition-colors duration-300",
+                  pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                )}>
+                  {item.label}
+                </span>
+              </Link>
+            ))}
           </div>
         </div>
 
         {/* Center Floating Button (Sơ đồ) - Positioned in the cutout */}
         <div className="absolute bottom-[25px] left-1/2 -translate-x-1/2 pointer-events-auto">
-           <Link 
-             href={navItems[0].href}
-             className={cn(
-               "flex items-center justify-center w-[64px] h-[64px] rounded-full shadow-[0_8px_20px_rgba(0,122,255,0.3)] transition-all duration-300 active:scale-95 group",
-               pathname === navItems[0].href 
-                 ? "bg-[#007AFF] text-white" 
-                 : "bg-white text-slate-400 border border-slate-100"
-             )}
-           >
-             {React.cloneElement(navItems[0].icon as any, { 
-                size: 28,
-                strokeWidth: 2.5,
-                className: "group-hover:scale-110 transition-transform"
-             })}
-           </Link>
+           {homeItem && (
+             <Link 
+               href={homeItem.href}
+               className={cn(
+                 "flex items-center justify-center w-[64px] h-[64px] rounded-full shadow-[0_8px_20px_rgba(0,122,255,0.3)] transition-all duration-300 active:scale-95 group",
+                 pathname === homeItem.href 
+                   ? "bg-[#007AFF] text-white" 
+                   : "bg-white text-slate-400 border border-slate-100"
+               )}
+             >
+               {React.cloneElement(homeItem.icon as any, { 
+                  size: 28,
+                  strokeWidth: 2.5,
+                  className: "group-hover:scale-110 transition-transform"
+               })}
+             </Link>
+           )}
         </div>
       </nav>
     </>

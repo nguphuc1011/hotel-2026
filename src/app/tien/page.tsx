@@ -15,13 +15,15 @@ import {
   History,
   FileText,
   Users,
-  FileWarning
+  FileWarning,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { customerService } from '@/services/customerService';
 import { cashFlowService, CashFlowTransaction, Wallet } from '@/services/cashFlowService';
 import TransactionModal from '../cash-flow/components/TransactionModal';
+import WalletAdjustmentModal from '../cash-flow/components/WalletAdjustmentModal';
 import BookingHistoryModal from '../cash-flow/components/BookingHistoryModal';
 import CustomerDebtModal from '../cash-flow/components/CustomerDebtModal';
 import ExternalDebtModal from '../cash-flow/components/ExternalDebtModal';
@@ -50,6 +52,7 @@ export default function MoneyPage() {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
   const [historyModal, setHistoryModal] = useState<{ open: boolean; bookingId: string | null }>({
     open: false,
     bookingId: null
@@ -229,7 +232,14 @@ export default function MoneyPage() {
             </p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 hidden md:flex">
+            <button 
+              onClick={() => setIsAdjustmentModalOpen(true)}
+              className="bg-white hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 border border-slate-200 active:scale-95 transition-all duration-300"
+            >
+              <AlertTriangle size={18} className="text-amber-500" />
+              <span>Điều chỉnh</span>
+            </button>
             <button 
               onClick={() => setIsModalOpen(true)}
               className="group bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-slate-200 active:scale-95 transition-all duration-300"
@@ -243,18 +253,18 @@ export default function MoneyPage() {
         </div>
 
         {/* --- BỘ LỌC BENTO --- */}
-        <div className="glass p-2 rounded-[24px] shadow-sm flex flex-col md:flex-row items-center gap-2 overflow-x-auto no-scrollbar">
-          {/* Quick Ranges */}
-          <div className="flex bg-slate-100/50 p-1.5 rounded-2xl shrink-0 gap-1">
+        <div className="flex flex-col md:flex-row gap-4 md:items-center">
+          {/* Quick Ranges - Mobile: Scrollable / Desktop: Grouped */}
+          <div className="bg-white p-1 rounded-2xl border border-slate-100 shadow-sm flex overflow-x-auto no-scrollbar snap-x">
             {QUICK_RANGES.map((r) => (
               <button
                 key={r.id}
                 onClick={() => handleRangeChange(r.id)}
                 className={cn(
-                  "px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 whitespace-nowrap",
+                  "flex-1 min-w-[90px] px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all duration-300 whitespace-nowrap snap-center",
                   rangeType === r.id 
-                    ? "bg-white text-slate-900 shadow-[0_2px_10px_rgba(0,0,0,0.05)] scale-100" 
-                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 scale-95 hover:scale-100"
+                    ? "bg-slate-900 text-white shadow-md shadow-slate-900/20" 
+                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
                 )}
               >
                 {r.label}
@@ -262,23 +272,21 @@ export default function MoneyPage() {
             ))}
           </div>
 
-          <div className="w-px h-8 bg-slate-200 hidden md:block mx-4"></div>
-
-          {/* Shift Filter */}
+          {/* Shift Filter - Only show for TODAY/YESTERDAY */}
           {(rangeType === 'TODAY' || rangeType === 'YESTERDAY') && (
-             <div className="flex items-center gap-2 shrink-0 overflow-x-auto p-1">
+             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0">
                {SHIFTS.map((s) => (
                  <button
                    key={s.id}
                    onClick={() => setShiftId(s.id)}
                    className={cn(
-                     "px-4 py-2.5 rounded-xl text-xs font-bold border transition-all duration-300 whitespace-nowrap flex items-center gap-2",
+                     "px-4 py-2.5 rounded-xl text-xs font-bold border transition-all duration-300 whitespace-nowrap flex items-center gap-2 flex-shrink-0",
                      shiftId === s.id 
-                       ? "bg-indigo-50 border-indigo-200 text-indigo-600 shadow-sm" 
-                       : "bg-transparent border-transparent text-slate-500 hover:bg-slate-50 hover:border-slate-200"
+                       ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20" 
+                       : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                    )}
                  >
-                   <Clock size={14} className={cn(shiftId === s.id ? "text-indigo-500" : "text-slate-400")} />
+                   <Clock size={14} className={cn(shiftId === s.id ? "text-white" : "text-slate-400")} />
                    {s.label}
                  </button>
                ))}
@@ -581,6 +589,21 @@ export default function MoneyPage() {
         onClose={() => setIsModalOpen(false)} 
         onSuccess={() => fetchData()} 
       />
+
+      <WalletAdjustmentModal 
+        isOpen={isAdjustmentModalOpen}
+        onClose={() => setIsAdjustmentModalOpen(false)}
+        onSuccess={() => fetchData()}
+        wallets={wallets}
+      />
+
+      {/* Floating Action Button for Mobile */}
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className="md:hidden fixed bottom-24 right-4 z-50 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl shadow-slate-900/30 flex items-center justify-center active:scale-90 transition-all duration-300 hover:bg-slate-800"
+      >
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
 
       <CustomerDebtModal 
         isOpen={isCustomerDebtModalOpen} 

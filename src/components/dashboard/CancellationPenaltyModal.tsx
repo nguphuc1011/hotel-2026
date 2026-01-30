@@ -11,7 +11,7 @@ interface CancellationPenaltyModalProps {
   onClose: () => void;
   roomName: string;
   customerName: string;
-  onConfirm: (penaltyAmount: number, paymentMethod: string) => void;
+  onConfirm: (penaltyAmount: number, paymentMethod: string, reason: string) => void;
   isLoading?: boolean;
 }
 
@@ -26,6 +26,7 @@ export default function CancellationPenaltyModal({
   const [hasPenalty, setHasPenalty] = useState<boolean | null>(null);
   const [penaltyAmount, setPenaltyAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
+  const [reason, setReason] = useState<string>('');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -34,16 +35,21 @@ export default function CancellationPenaltyModal({
         setHasPenalty(null);
         setPenaltyAmount(0);
         setPaymentMethod('cash');
+        setReason('');
     }
   }, [isOpen]);
 
   if (!isOpen || !mounted) return null;
 
   const handleConfirm = () => {
+    if (!reason.trim()) {
+        alert("Vui lòng nhập lý do hủy phòng!");
+        return;
+    }
     if (hasPenalty === true) {
-      onConfirm(penaltyAmount, paymentMethod);
+      onConfirm(penaltyAmount, paymentMethod, reason);
     } else {
-      onConfirm(0, 'cash');
+      onConfirm(0, 'cash', reason);
     }
   };
 
@@ -98,56 +104,71 @@ export default function CancellationPenaltyModal({
                 </button>
               </div>
             </div>
-          ) : hasPenalty === true ? (
-            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-              <div className="space-y-3">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Số tiền phạt (VNĐ)</label>
-                <MoneyInput 
-                  value={penaltyAmount}
-                  onChange={setPenaltyAmount}
-                  className="h-20 text-3xl font-black text-rose-600 border-2 border-slate-100 focus:border-rose-500 rounded-[24px] bg-slate-50"
-                  autoFocus
+          ) : (
+            <>
+              {hasPenalty === true ? (
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                  <div className="space-y-3">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Số tiền phạt (VNĐ)</label>
+                    <MoneyInput 
+                      value={penaltyAmount}
+                      onChange={setPenaltyAmount}
+                      className="h-20 text-3xl font-black text-rose-600 border-2 border-slate-100 focus:border-rose-500 rounded-[24px] bg-slate-50"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Hình thức thu</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setPaymentMethod('cash')}
+                        className={cn(
+                          "py-4 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold transition-all",
+                          paymentMethod === 'cash' 
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-lg shadow-emerald-100" 
+                            : "border-slate-100 text-slate-400 hover:border-slate-200"
+                        )}
+                      >
+                        <Banknote className="w-4 h-4" />
+                        Tiền mặt
+                      </button>
+                      <button
+                        onClick={() => setPaymentMethod('bank')}
+                        className={cn(
+                          "py-4 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold transition-all",
+                          paymentMethod === 'bank' 
+                            ? "border-blue-500 bg-blue-50 text-blue-700 shadow-lg shadow-blue-100" 
+                            : "border-slate-100 text-slate-400 hover:border-slate-200"
+                        )}
+                      >
+                        <Wallet className="w-4 h-4" />
+                        Chuyển khoản
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 animate-in slide-in-from-left-4 duration-300">
+                  <div className="w-16 h-16 bg-slate-900 text-white rounded-[20px] flex items-center justify-center mx-auto mb-3 shadow-xl shadow-slate-200">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
+                  <p className="text-lg font-bold text-slate-800">Xác nhận hủy phòng không phạt</p>
+                  <p className="text-sm text-slate-500 mt-1 font-medium italic">Hành động này sẽ đảo toàn bộ dòng tiền về 0.</p>
+                </div>
+              )}
+
+              {/* Reason Input */}
+              <div className="space-y-3 animate-in slide-in-from-bottom-4 duration-500">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Lý do hủy (Bắt buộc)</label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Nhập lý do hủy phòng..."
+                  className="w-full p-4 text-sm font-bold text-slate-700 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-slate-900 focus:outline-none resize-none h-24"
                 />
               </div>
-
-              <div className="space-y-3">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Hình thức thu</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setPaymentMethod('cash')}
-                    className={cn(
-                      "py-4 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold transition-all",
-                      paymentMethod === 'cash' 
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-lg shadow-emerald-100" 
-                        : "border-slate-100 text-slate-400 hover:border-slate-200"
-                    )}
-                  >
-                    <Banknote className="w-4 h-4" />
-                    Tiền mặt
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethod('bank')}
-                    className={cn(
-                      "py-4 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold transition-all",
-                      paymentMethod === 'bank' 
-                        ? "border-blue-500 bg-blue-50 text-blue-700 shadow-lg shadow-blue-100" 
-                        : "border-slate-100 text-slate-400 hover:border-slate-200"
-                    )}
-                  >
-                    <Wallet className="w-4 h-4" />
-                    Chuyển khoản
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 animate-in slide-in-from-left-4 duration-300">
-              <div className="w-20 h-20 bg-slate-900 text-white rounded-[24px] flex items-center justify-center mx-auto mb-4 shadow-xl shadow-slate-200">
-                <CheckCircle2 className="w-10 h-10" />
-              </div>
-              <p className="text-lg font-bold text-slate-800">Xác nhận hủy phòng không phạt</p>
-              <p className="text-sm text-slate-500 mt-2 font-medium italic">Hành động này sẽ đảo toàn bộ dòng tiền về 0.</p>
-            </div>
+            </>
           )}
         </div>
 

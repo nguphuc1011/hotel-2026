@@ -10,7 +10,8 @@ import {
   AlertTriangle, 
   StickyNote,
   LucideIcon,
-  Calendar
+  Calendar,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardRoom } from '@/types/dashboard';
@@ -148,11 +149,30 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
                 {room.category_name || 'STANDARD'}
               </span>
             </div>
+
+            {/* Pending Approval Indicator - Moved Here */}
+            {room.pending_approval && (
+              <div className={cn(
+                "mt-2 flex w-fit px-2 py-1 rounded-lg items-center gap-1.5 animate-pulse",
+                room.pending_approval.status === 'APPROVED' ? "bg-green-600 text-white" : "bg-yellow-400 text-black"
+              )}>
+                {room.pending_approval.status === 'APPROVED' ? (
+                  <ShieldCheck size={14} />
+                ) : (
+                  <Clock size={14} />
+                )}
+                <span className="text-[10px] font-bold uppercase tracking-wide">
+                  {room.pending_approval.status === 'APPROVED' ? 'ĐÃ DUYỆT' : 'Chờ duyệt'}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Icon Running In Effect */}
-          <div className="transform translate-x-2 opacity-80 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
-             <Icon size={32} strokeWidth={2.5} />
+          <div className="flex flex-col items-end gap-1">
+            {/* Icon Running In Effect */}
+            <div className="transform translate-x-2 opacity-80 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
+              <Icon size={32} strokeWidth={2.5} />
+            </div>
           </div>
         </div>
 

@@ -434,42 +434,49 @@ BEGIN
         v_check_out_time := (p_check_out AT TIME ZONE v_tz)::time;
 
         IF (v_check_out_time > v_target_checkout) THEN
-            v_late_min := EXTRACT(EPOCH FROM (v_check_out_time - v_target_checkout)) / 60;
-            
-            -- Ân hạn ra muộn cho ngày
-            IF v_grace_out_enabled AND v_late_min <= v_grace_minutes THEN
-                v_explanations := array_append(v_explanations, format('Trả muộn %s phút (trong mức miễn phí %s phút): Không tính phụ phí', FLOOR(v_late_min), v_grace_minutes));
-                v_late_min := 0;
+            -- [FIX] Daily rental on same day should NOT be charged Late Fee
+            -- (Because Daily rental entitlement usually lasts until next day 12:00)
+            IF p_rental_type = 'daily' AND ((p_check_out AT TIME ZONE v_tz)::date = (p_check_in AT TIME ZONE v_tz)::date) THEN
+                 v_explanations := array_append(v_explanations, 'Trả phòng trong ngày: Không tính phụ thu trả muộn');
+                 v_late_min := 0;
             ELSE
-                IF p_rental_type = 'daily' AND v_check_out_time > v_full_day_cutoff THEN
-                    v_late_amount := 0;
-                    v_explanations := array_append(v_explanations, format('Trả phòng lúc %s (sau %s): Đã cộng vào tiền phòng chính', to_char(p_check_out AT TIME ZONE v_tz, 'HH24:MI DD/MM'), to_char(v_full_day_cutoff, 'HH24:MI')));
-                ELSIF v_surcharge_mode = 'amount' THEN
-                    v_late_amount := CEIL(v_late_min / 60) * v_hourly_surcharge_rate;
-                    v_explanations := array_append(v_explanations, format('Trả muộn %s phút (vượt mức miễn phí %s phút): Phụ thu %s giờ x %sđ/giờ = %sđ', FLOOR(v_late_min), v_grace_minutes, CEIL(v_late_min/60), public.fn_format_money_vi(v_hourly_surcharge_rate), public.fn_format_money_vi(v_late_amount)));
+                v_late_min := EXTRACT(EPOCH FROM (v_check_out_time - v_target_checkout)) / 60;
+                
+                -- Ân hạn ra muộn cho ngày
+                IF v_grace_out_enabled AND v_late_min <= v_grace_minutes THEN
+                    v_explanations := array_append(v_explanations, format('Trả muộn %s phút (trong mức miễn phí %s phút): Không tính phụ phí', FLOOR(v_late_min), v_grace_minutes));
+                    v_late_min := 0;
                 ELSE
-                    IF v_surcharge_rules IS NOT NULL AND jsonb_typeof(v_surcharge_rules) = 'array' THEN
-                         FOR v_rule IN SELECT * FROM jsonb_array_elements(v_surcharge_rules)
-                         LOOP
-                            v_rule_type := v_rule->>'type';
-                            IF v_rule_type = 'Late' THEN
-                                v_rule_from_min := COALESCE((v_rule->>'from_minute')::int, 0);
-                                v_rule_to_min := COALESCE((v_rule->>'to_minute')::int, 0);
-                                v_rule_percent := (v_rule->>'percentage')::numeric;
-                                
-                                IF v_late_min > v_rule_from_min AND v_late_min <= v_rule_to_min THEN
-                                    v_late_amount := v_price_daily * (v_rule_percent / 100);
-                                    v_explanations := array_append(v_explanations, format('Trả muộn %s phút (Khung %s-%s phút): Phụ thu %s%% giá ngày = %sđ', FLOOR(v_late_min), v_rule_from_min, v_rule_to_min, v_rule_percent, public.fn_format_money_vi(v_late_amount)));
-                                    v_rule_matched := true;
-                                    EXIT;
+                    IF p_rental_type = 'daily' AND v_check_out_time > v_full_day_cutoff THEN
+                        v_late_amount := 0;
+                        v_explanations := array_append(v_explanations, format('Trả phòng lúc %s (sau %s): Đã cộng vào tiền phòng chính', to_char(p_check_out AT TIME ZONE v_tz, 'HH24:MI DD/MM'), to_char(v_full_day_cutoff, 'HH24:MI')));
+                    ELSIF v_surcharge_mode = 'amount' THEN
+                        v_late_amount := CEIL(v_late_min / 60) * v_hourly_surcharge_rate;
+                        v_explanations := array_append(v_explanations, format('Trả muộn %s phút (vượt mức miễn phí %s phút): Phụ thu %s giờ x %sđ/giờ = %sđ', FLOOR(v_late_min), v_grace_minutes, CEIL(v_late_min/60), public.fn_format_money_vi(v_hourly_surcharge_rate), public.fn_format_money_vi(v_late_amount)));
+                    ELSE
+                        IF v_surcharge_rules IS NOT NULL AND jsonb_typeof(v_surcharge_rules) = 'array' THEN
+                             FOR v_rule IN SELECT * FROM jsonb_array_elements(v_surcharge_rules)
+                             LOOP
+                                v_rule_type := v_rule->>'type';
+                                IF v_rule_type = 'Late' THEN
+                                    v_rule_from_min := COALESCE((v_rule->>'from_minute')::int, 0);
+                                    v_rule_to_min := COALESCE((v_rule->>'to_minute')::int, 0);
+                                    v_rule_percent := (v_rule->>'percentage')::numeric;
+                                    
+                                    IF v_late_min > v_rule_from_min AND v_late_min <= v_rule_to_min THEN
+                                        v_late_amount := v_price_daily * (v_rule_percent / 100);
+                                        v_explanations := array_append(v_explanations, format('Trả muộn %s phút (Khung %s-%s phút): Phụ thu %s%% giá ngày = %sđ', FLOOR(v_late_min), v_rule_from_min, v_rule_to_min, v_rule_percent, public.fn_format_money_vi(v_late_amount)));
+                                        v_rule_matched := true;
+                                        EXIT;
+                                    END IF;
                                 END IF;
-                            END IF;
-                         END LOOP;
-                    END IF;
-                    
-                    IF NOT v_rule_matched THEN
-                         v_late_amount := 0;
-                         v_explanations := array_append(v_explanations, format('Trả muộn %s phút (Chưa có quy định phụ thu trễ)', FLOOR(v_late_min)));
+                             END LOOP;
+                        END IF;
+                        
+                        IF NOT v_rule_matched THEN
+                             v_late_amount := 0;
+                             v_explanations := array_append(v_explanations, format('Trả muộn %s phút (Chưa có quy định phụ thu trễ)', FLOOR(v_late_min)));
+                        END IF;
                     END IF;
                 END IF;
             END IF;

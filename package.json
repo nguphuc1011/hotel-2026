@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "telegram": "node scripts/telegram_bot.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -9,10 +9,12 @@ import {
   Brush,
   Wrench,
   Filter,
-  Store
+  Store,
+  ArrowRightLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import ApprovalNotification from './ApprovalNotification';
 
 export interface FilterState {
   available: boolean;
@@ -33,12 +35,14 @@ interface DashboardHeaderProps {
   };
   filters: FilterState;
   onToggle: (key: keyof FilterState) => void;
+  onHandoverClick: () => void;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
   counts, 
   filters, 
-  onToggle
+  onToggle,
+  onHandoverClick
 }) => {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
@@ -81,7 +85,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   ];
 
   return (
-    <div className="flex flex-col gap-4 mb-6 animate-fade-in">
+    <div className="flex flex-col gap-4 mb-6 animate-fade-in relative z-20">
       {/* Mobile/Desktop Header with User Account */}
       <div className="flex justify-between items-center">
         {/* Brand/Title */}
@@ -97,6 +101,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Right Actions: Mobile Filter + Sell Service + User */}
         <div className="flex items-center gap-2 md:gap-4">
           
+          <button
+            onClick={onHandoverClick}
+            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-200"
+          >
+            <ArrowRightLeft size={18} />
+            <span className="text-sm font-bold hidden md:inline">Giao ca</span>
+          </button>
+
           {/* Mobile Filter Toggle */}
           <button 
             onClick={() => setShowMobileFilters(!showMobileFilters)}

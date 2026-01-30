@@ -316,6 +316,41 @@ export const cashFlowService = {
     return data;
   },
 
+  // Điều chỉnh số dư ví (Wallet Adjustment)
+  async adjustWalletBalance(payload: {
+    walletId: string;
+    actualBalance: number;
+    currentBalance: number;
+    reason: string;
+    verifiedStaff?: { id: string, name: string };
+  }) {
+    const diff = payload.actualBalance - payload.currentBalance;
+    if (diff === 0) return { success: true, message: 'Số dư đã khớp, không cần điều chỉnh.' };
+
+    const flowType = diff > 0 ? 'IN' : 'OUT';
+    const amount = Math.abs(diff);
+    
+    // Determine payment_method_code from walletId
+    // If walletId is 'CASH', use 'cash'. If 'BANK', use 'bank'.
+    const paymentMethodCode = payload.walletId === 'CASH' ? 'cash' : 'bank';
+
+    const description = `Điều chỉnh số dư: ${payload.reason} (Hệ thống: ${payload.currentBalance}, Thực tế: ${payload.actualBalance})`;
+
+    // Ensure category exists first (Optional, but good for safety)
+    // For now, we assume it exists or will be created by the user running the SQL script.
+    // If we want to be super safe, we could call manageCategory here, but that might be overkill.
+    
+    return this.createTransaction({
+      flow_type: flowType,
+      category: 'Điều chỉnh số dư',
+      amount: amount,
+      description: description,
+      occurred_at: new Date(),
+      payment_method_code: paymentMethodCode,
+      verifiedStaff: payload.verifiedStaff
+    });
+  },
+
   // --- Owner Debt Management (Sổ Nợ Ngoài) ---
   async getExternalPayables() {
     const { data, error } = await supabase

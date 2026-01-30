@@ -10,6 +10,7 @@ import RoomCard from '@/components/dashboard/RoomCard';
 import DashboardHeader, { FilterState } from '@/components/dashboard/DashboardHeader';
 import CheckInModal from '@/components/dashboard/CheckInModal';
 import RoomFolioModal from '@/components/dashboard/RoomFolioModal';
+import HandoverModal from '@/components/dashboard/HandoverModal';
 import { differenceInMinutes } from 'date-fns';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
@@ -34,9 +35,15 @@ export default function DashboardPage() {
   });
 
   // Modal State
-  const [selectedRoom, setSelectedRoom] = useState<DashboardRoom | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [isFolioOpen, setIsFolioOpen] = useState(false);
+  const [isHandoverOpen, setIsHandoverOpen] = useState(false);
+
+  // Derived Selected Room (Always fresh)
+  const selectedRoom = useMemo(() => {
+    return rooms.find(r => r.id === selectedRoomId) || null;
+  }, [rooms, selectedRoomId]);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -85,10 +92,44 @@ export default function DashboardPage() {
         }
       }));
 
+      // 2.5 Fetch Pending/Approved Security Requests
+      const { data: approvalData } = await supabase
+        .from('pending_approvals')
+        .select('*')
+        .in('status', ['PENDING', 'APPROVED']);
+
       // 3. Merge Data
       const mergedRooms: DashboardRoom[] = roomsData.map((room: any) => {
         const booking = activeBookings.find(b => b.room_id === room.id);
         
+        // Find relevant approval request
+        // Match by Room Number (if available)
+        const approval = approvalData?.find(req => {
+           const rData = req.request_data as any;
+           
+           // CRITICAL FIX: Only show approval if it matches the CURRENT Booking ID
+           // If booking exists, we MUST match booking_id
+           if (booking && rData?.booking_id) {
+               // Check if the approval's booking_id matches current booking
+               // Use startsWith because booking_id in rData might be short or full
+               return booking.id.startsWith(rData.booking_id) || rData.booking_id === booking.id;
+           }
+           
+           // If no booking exists (room available/dirty), we only show approvals that are NOT tied to a specific closed booking
+           // OR if it's a general room request (maintenance, etc)
+           // BUT for cancellation requests (checkin_cancel_booking), they are tied to a booking.
+           // If the room is now empty/dirty, that booking is gone/cancelled, so we should NOT show the approval anymore.
+           if (!booking && req.action_key === 'checkin_cancel_booking') {
+               return false; 
+           }
+
+           // Fallback for non-booking requests (e.g. maintenance)
+           if (rData?.room_id && rData.room_id === room.id) return true;
+           if (rData?.room_number === (room.room_number || room.name)) return true;
+           
+           return false;
+        });
+
         let dashboardRoom: DashboardRoom = {
           id: room.id,
           name: room.room_number || room.name,
@@ -99,7 +140,13 @@ export default function DashboardPage() {
           price_overnight: room.category?.price_overnight,
           status: room.status as RoomStatus,
           updated_at: room.updated_at, // For "dirty" timer
-          notes: room.notes
+          notes: room.notes,
+          pending_approval: approval ? {
+            id: approval.id,
+            action: approval.action_key,
+            status: approval.status,
+            request_data: approval.request_data
+          } : undefined
         };
 
         if (booking) {
@@ -143,28 +190,108 @@ export default function DashboardPage() {
     }
   };
 
+  // --- Central Execution Handler (The Executioner) ---
+  const handleAutoExecution = async (request: any) => {
+    console.log("Unified Engine Executing:", request.action_key);
+    
+    // Dispatcher
+    switch (request.action_key) {
+        case 'checkin_cancel_booking':
+            await handleAutoFinalizeCancellation(request);
+            break;
+        case 'folio_remove_service':
+            // await handleRemoveService(request); // Placeholder for future
+            console.log("Auto-remove service pending implementation");
+            break;
+        case 'folio_discount_bill':
+            // await handleDiscountBill(request); // Placeholder
+            console.log("Auto-discount pending implementation");
+            break;
+        default:
+            console.warn("Unknown action key for auto-execution:", request.action_key);
+    }
+  };
+
+  // Specific Handler: Cancel Booking
+  const handleAutoFinalizeCancellation = async (request: any) => {
+    try {
+        const { full_booking_id, penalty_amount, payment_method, reason } = request.request_data;
+        
+        // Validation
+        if (!full_booking_id) {
+            console.error("Auto-finalize failed: Missing full_booking_id");
+            return;
+        }
+
+        const approver = {
+            id: request.approved_by_staff_id,
+            name: 'Quản lý (Remote)' // Since we don't have name in the row, we use a generic name
+        };
+        
+        toast.info(`Đang tự động hoàn tất hủy phòng cho yêu cầu #${request.id.slice(0,4)}...`);
+        
+        const result = await bookingService.cancelBooking(
+            full_booking_id,
+            approver,
+            penalty_amount,
+            payment_method,
+            reason
+        );
+        
+        if (result.success) {
+            toast.success("Đã tự động hủy phòng thành công!");
+            // fetchData will be triggered by booking table change, but we can force it
+            fetchData();
+        } else {
+            // Only show error if it's not "already cancelled" (optional, but for now show all)
+            toast.error("Lỗi tự động hủy: " + result.message);
+        }
+    } catch (e: any) {
+        console.error("Auto-finalize error", e);
+        toast.error("Lỗi hệ thống khi tự động hủy: " + e.message);
+    }
+  };
+
   // Real-time Subscription & Initial Fetch
   useEffect(() => {
     fetchData();
 
-    // Subscribe to changes in rooms and bookings
-    const roomsChannel = supabase
-      .channel('public:rooms')
+    // Consolidated Subscription
+    const channel = supabase
+      .channel('dashboard_updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
-        fetchData();
+        console.log("Room updated, refreshing...");
+        setTimeout(() => fetchData(), 500);
       })
-      .subscribe();
-
-    const bookingsChannel = supabase
-      .channel('public:bookings')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-        fetchData();
+        console.log("Booking updated, refreshing...");
+        setTimeout(() => fetchData(), 500);
       })
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_approvals' }, (payload) => {
+        console.log("Approval updated:", payload);
+        setTimeout(() => fetchData(), 500);
+
+        // Auto-Finalize Logic for Cancellation
+            if (payload.eventType === 'UPDATE') {
+                const newRecord = payload.new as any;
+                
+                // Trigger if status is APPROVED (ignoring old record due to Replica Identity limitations)
+                if (newRecord.status === 'APPROVED') {
+                    console.log("Approval received:", newRecord.id);
+                    // DISABLED Auto-Execution as per User Request (Room Map Sync Mode)
+                    // handleAutoExecution(newRecord); 
+                }
+            }
+      })
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+        if (status === 'SUBSCRIBED') {
+            toast.success("Đã kết nối thời gian thực");
+        }
+      });
 
     return () => {
-      supabase.removeChannel(roomsChannel);
-      supabase.removeChannel(bookingsChannel);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -200,7 +327,7 @@ export default function DashboardPage() {
 
   // Handle Click
   const handleRoomClick = async (room: DashboardRoom) => {
-    setSelectedRoom(room);
+    setSelectedRoomId(room.id);
     if (room.status === 'available') {
       setIsCheckInOpen(true);
     } else if (room.status === 'occupied') {
@@ -282,6 +409,7 @@ export default function DashboardPage() {
           counts={counts}
           filters={filters}
           onToggle={handleToggleFilter}
+          onHandoverClick={() => setIsHandoverOpen(true)}
         />
 
         {loading ? (
@@ -322,8 +450,14 @@ export default function DashboardPage() {
             room={selectedRoom}
             booking={selectedRoom.current_booking}
             onUpdate={fetchData}
+            pendingApproval={selectedRoom.pending_approval}
           />
         )}
+      
+      <HandoverModal 
+        isOpen={isHandoverOpen}
+        onClose={() => setIsHandoverOpen(false)}
+      />
     </div>
   );
 }

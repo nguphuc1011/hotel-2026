@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare, User } from 'lucide-react';
+import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare, User, ShieldCheck, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/format';
 import { Room, Booking } from '@/types/dashboard';
@@ -12,7 +12,8 @@ import CancellationPenaltyModal from './CancellationPenaltyModal';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 import { securityService, SecurityAction } from '@/services/securityService';
-import PinValidationModal from '@/components/shared/PinValidationModal';
+import { useSecurity } from '@/hooks/useSecurity';
+import SecurityApprovalModal from '@/components/shared/SecurityApprovalModal';
 
 interface RoomFolioModalProps {
   isOpen: boolean;
@@ -20,6 +21,12 @@ interface RoomFolioModalProps {
   room: Room;
   booking: Booking;
   onUpdate: () => void;
+  pendingApproval?: {
+    id: string;
+    action: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    request_data?: any;
+  };
 }
 
 // Hook for Long Press
@@ -95,10 +102,51 @@ function useLongPress(
     };
 }
 
-export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate }: RoomFolioModalProps) {
+import { supabase } from '@/lib/supabase';
+
+export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate, pendingApproval }: RoomFolioModalProps) {
   const { confirm: confirmDialog, alert } = useGlobalDialog();
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<any>(null); // New state for full approval details
+  const [internalPendingApproval, setInternalPendingApproval] = useState<any>(pendingApproval);
+
+  // Sync internal state with props, but allow internal updates
+  useEffect(() => {
+    setInternalPendingApproval(pendingApproval);
+  }, [pendingApproval]);
+
+  // Real-time listener for THIS specific request inside the modal
+  useEffect(() => {
+    if (!isOpen || !internalPendingApproval?.id) return;
+
+    const channel = supabase
+        .channel(`folio_approval_${internalPendingApproval.id}`)
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'pending_approvals',
+            filter: `id=eq.${internalPendingApproval.id}`
+        }, (payload) => {
+            const newRec = payload.new as any;
+            if (newRec.status !== internalPendingApproval.status) {
+                setInternalPendingApproval((prev: any) => ({
+                    ...prev,
+                    status: newRec.status,
+                    request_data: newRec.request_data
+                }));
+                
+                // If approved, trigger onUpdate to refresh parent dashboard
+                if (newRec.status === 'APPROVED') {
+                    onUpdate();
+                }
+            }
+        })
+        .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [isOpen, internalPendingApproval?.id]);
+
   const customerBalance = bill?.customer_balance ?? 0;
   const hasCustomerBalance = customerBalance !== 0;
   const isCustomerInDebt = customerBalance < 0;
@@ -118,14 +166,109 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
   const [cancellationStaff, setCancellationStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
+  const [showResumeSecurityModal, setShowResumeSecurityModal] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { verify, SecurityModals } = useSecurity({
+    onMinimize: () => {
+      // User clicked "Minimize" on the Security Modal
+      // 1. Close the Security Modal (handled by useSecurity)
+      // 2. Close the Penalty Modal (if open)
+      setShowPenaltyModal(false);
+      // 3. Close the Folio Modal (return to dashboard)
+      onClose();
+      // 4. Trigger update to show "Pending" status on dashboard
+      onUpdate();
+    }
+  });
+
+  // Handle Pending Approval
+  useEffect(() => {
+    if (isOpen && internalPendingApproval) {
+      if (internalPendingApproval.status === 'APPROVED') {
+        // If approved, we might want to fetch who approved it
+        // Or we can just use the status to enable the "Finish" button
+        securityService.checkApprovalStatus(internalPendingApproval.id).then(data => {
+            setApprovalStatus(data);
+        });
+      } else {
+        setApprovalStatus(null);
+      }
+    } else {
+        setApprovalStatus(null);
+    }
+  }, [isOpen, internalPendingApproval]);
+
+  // Execute Finish Cancellation (Post-Approval)
+  const handleFinishCancellation = async () => {
+    // If we have pendingApproval but no approvalStatus, try to fetch it first
+    let currentStatus = approvalStatus;
+    if (!currentStatus && internalPendingApproval?.id) {
+        try {
+            currentStatus = await securityService.checkApprovalStatus(internalPendingApproval.id);
+            setApprovalStatus(currentStatus);
+        } catch (e) {
+            console.error("Failed to fetch approval status", e);
+        }
+    }
+
+    if (!internalPendingApproval || !currentStatus) {
+        toast.error("Thiếu thông tin phê duyệt");
+        return;
+    }
+
+    // Reuse logic
+    executeCancellation({
+        id: currentStatus.approved_by_id,
+        name: currentStatus.approved_by_name
+    });
+  };
+
+  // Resume Approval Flow (Open Security Modal manually)
+  const handleResumeApproval = () => {
+    if (internalPendingApproval?.id) {
+        setShowResumeSecurityModal(true);
+    }
+  };
+
+  // Handle Resume Success
+  const handleResumeSuccess = (staffId?: string, staffName?: string) => {
+    setShowResumeSecurityModal(false);
+    toast.success("Đã duyệt thành công! Vui lòng bấm Hoàn tất để xử lý.");
+    // We do NOT execute cancellation automatically anymore.
+    // The user must click "Hoàn tất" manually.
+  };
+
+  const executeCancellation = async (approver: any) => {
+     setIsLoading(true);
+     try {
+         const reason = internalPendingApproval?.request_data?.reason || 'Hủy phòng (Đã duyệt)';
+         const penaltyAmount = internalPendingApproval?.request_data?.penalty_amount || 0;
+         const paymentMethod = internalPendingApproval?.request_data?.payment_method || 'cash';
+
+         const result = await bookingService.cancelBooking(
+             booking.id, 
+             approver,
+             penaltyAmount,
+             paymentMethod,
+             reason
+         );
+
+         if (result.success) {
+             onUpdate();
+             onClose();
+             toast.success(result.message || "Huỷ phòng hoàn tất");
+         } else {
+             toast.error(result.message || "Lỗi khi huỷ phòng");
+         }
+     } catch (error: any) {
+         console.error("Finish cancel failed", error);
+         toast.error(error.message);
+     } finally {
+         setIsLoading(false);
+     }
+  };
 
   // --- Search for PaymentModal usage ---
-
-  // Security State
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
-  const [pendingAction, setPendingAction] = useState<{ type: string, data?: any } | null>(null);
 
   // Load Initial DataModal Component for Audit Trail
   const AuditTrailModal = () => {
@@ -217,37 +360,28 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       setPendingServices(prev => [...prev, newItem]);
   };
 
-  const handleSaveServices = async (verifiedStaff?: { id: string, name: string }) => {
+  const handleSaveServices = async () => {
       if (pendingServices.length === 0) return;
       
       // Security Check
-      if (!verifiedStaff) {
-          const requiresPin = await securityService.checkActionRequiresPin('folio_add_service');
-          if (requiresPin) {
-              setSecurityAction('folio_add_service');
-              setPendingAction({ type: 'SAVE_SERVICES' });
-              setIsPinModalOpen(true);
-              return;
-          }
-      }
-
-      setIsSaving(true);
-      try {
-          // Process sequentially to ensure order
-          for (const item of pendingServices) {
-             await serviceService.addServiceToBooking(booking.id, item.service_id, 1, item.price_at_time);
-          }
-          
-          setPendingServices([]);
-          await Promise.all([loadServices(), loadBill()]);
-          toast.success("Đã cập nhật dịch vụ");
-      } catch (error) {
-          console.error("Failed to save services", error);
-          toast.error("Lỗi khi lưu dịch vụ");
-      } finally {
-          setIsSaving(false);
-          setPendingAction(null);
-      }
+      verify('folio_add_service', async (staffId, staffName) => {
+        setIsSaving(true);
+        try {
+            // Process sequentially to ensure order
+            for (const item of pendingServices) {
+               await serviceService.addServiceToBooking(booking.id, item.service_id, 1, item.price_at_time);
+            }
+            
+            setPendingServices([]);
+            await Promise.all([loadServices(), loadBill()]);
+            toast.success("Đã cập nhật dịch vụ");
+        } catch (error) {
+            console.error("Failed to save services", error);
+            toast.error("Lỗi khi lưu dịch vụ");
+        } finally {
+            setIsSaving(false);
+        }
+      });
   };
 
   const handleRemoveService = async (serviceId: string, verifiedStaff?: { id: string, name: string }) => {
@@ -268,33 +402,24 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       if (!itemToRemove) return;
 
       // Security Check for DB removal
-      if (!verifiedStaff) {
-          const requiresPin = await securityService.checkActionRequiresPin('folio_remove_service');
-          if (requiresPin) {
-              setSecurityAction('folio_remove_service');
-              setPendingAction({ type: 'REMOVE_SERVICE', data: serviceId });
-              setIsPinModalOpen(true);
-              return;
-          }
-      }
-
-      setProcessingServiceId(serviceId);
-      try {
-          if (itemToRemove.quantity > 1) {
-              await serviceService.updateBookingServiceQuantity(itemToRemove.id, itemToRemove.quantity - 1);
-              toast.success("Đã giảm số lượng");
-          } else {
-              await serviceService.removeServiceFromBooking(itemToRemove.id);
-              toast.success("Đã xóa dịch vụ");
-          }
-          await Promise.all([loadServices(), loadBill()]);
-      } catch (error) {
-          console.error("Failed to remove service", error);
-          toast.error("Lỗi khi xóa dịch vụ");
-      } finally {
-          setProcessingServiceId(null);
-          setPendingAction(null);
-      }
+      verify('folio_remove_service', async (staffId, staffName) => {
+        setProcessingServiceId(serviceId);
+        try {
+            if (itemToRemove.quantity > 1) {
+                await serviceService.updateBookingServiceQuantity(itemToRemove.id, itemToRemove.quantity - 1);
+                toast.success("Đã giảm số lượng");
+            } else {
+                await serviceService.removeServiceFromBooking(itemToRemove.id);
+                toast.success("Đã xóa dịch vụ");
+            }
+            await Promise.all([loadServices(), loadBill()]);
+        } catch (error) {
+            console.error("Failed to remove service", error);
+            toast.error("Lỗi khi xóa dịch vụ");
+        } finally {
+            setProcessingServiceId(null);
+        }
+      });
   };
 
   // Group booking services by ID to count quantity
@@ -308,65 +433,58 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       return pendingQty;
   };
 
-  const handleCancelBooking = async (verifiedStaff?: { id: string, name: string }) => {
-    // Security Check
-    if (!verifiedStaff) {
-      const requiresPin = await securityService.checkActionRequiresPin('checkout_void_bill');
-      if (requiresPin) {
-        setSecurityAction('checkout_void_bill');
-        setPendingAction({ type: 'CANCEL_BOOKING' });
-        setIsPinModalOpen(true);
-        return;
-      }
-    }
-
-    // Save staff for the next step (Penalty Modal)
-    setCancellationStaff(verifiedStaff);
+  const handleCancelBooking = async () => {
+    // Step 1: Show Penalty Modal FIRST to get reason and amount
     setShowPenaltyModal(true);
   };
 
-  const handleConfirmCancelWithPenalty = async (penaltyAmount: number, paymentMethod: string) => {
-    setIsLoading(true);
-    try {
-      const result = await bookingService.cancelBooking(
-        booking.id, 
-        cancellationStaff,
-        penaltyAmount,
-        paymentMethod
-      );
+  const handleConfirmCancelWithPenalty = async (penaltyAmount: number, paymentMethod: string, reason: string) => {
+    // Step 2: Verify permission with full data
+    verify('checkin_cancel_booking', async (staffId, staffName) => {
+      // Step 3: Execute Cancellation after Approval
+      setIsLoading(true);
+      try {
+        const result = await bookingService.cancelBooking(
+          booking.id, 
+          staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined,
+          penaltyAmount,
+          paymentMethod,
+          reason
+        );
 
-      if (result.success) {
-        onUpdate(); // Refresh dashboard
-        onClose(); // Close folio
-        toast.success(result.message || "Huỷ phòng thành công");
-      } else {
-        toast.error(result.message || "Lỗi khi huỷ phòng");
+        if (result.success) {
+          onUpdate(); // Refresh dashboard
+          onClose(); // Close folio
+          toast.success(result.message || "Huỷ phòng thành công");
+        } else {
+          toast.error(result.message || "Lỗi khi huỷ phòng");
+        }
+      } catch (error: any) {
+        console.error("Cancel failed", error);
+        toast.error(error.message || "Lỗi khi huỷ phòng");
+      } finally {
+        setIsLoading(false);
+        setShowPenaltyModal(false);
+        setCancellationStaff(undefined);
       }
-    } catch (error: any) {
-      console.error("Cancel failed", error);
-      toast.error(error.message || "Lỗi khi huỷ phòng");
-    } finally {
-      setIsLoading(false);
-      setShowPenaltyModal(false);
-      setCancellationStaff(undefined);
-      setPendingAction(null);
-    }
+    }, {
+      room_id: room.id, // Critical for dashboard matching
+      room_number: room.name || booking.room?.room_number || 'N/A',
+      customer_name: booking.customer_name || 'Khách vãng lai',
+      booking_id: booking.id.slice(0, 8),
+      full_booking_id: booking.id, // For auto-finalize execution
+      reason: reason,
+      penalty_amount: penaltyAmount,
+      payment_method: paymentMethod
+    }, {
+      skipWaitingModal: true
+    });
   };
 
-  const handleChangeRoom = async (verifiedStaff?: { id: string, name: string }) => {
-      // Security Check
-      if (!verifiedStaff) {
-          const requiresPin = await securityService.checkActionRequiresPin('folio_change_room');
-          if (requiresPin) {
-              setSecurityAction('folio_change_room');
-              setPendingAction({ type: 'CHANGE_ROOM' });
-              setIsPinModalOpen(true);
-              return;
-          }
-      }
-
+  const handleChangeRoom = async () => {
+    verify('folio_change_room', () => {
       toast.info("Tính năng đổi phòng đang được phát triển");
-      setPendingAction(null);
+    });
   };
 
   const filteredServices = availableServices.filter(s => 
@@ -377,11 +495,43 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
   return createPortal(
     <div className="fixed inset-0 z-[50000] flex items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-4">
+      {SecurityModals}
+
+      {/* Manual Resume Security Modal */}
+      <SecurityApprovalModal
+        isOpen={showResumeSecurityModal}
+        onClose={() => setShowResumeSecurityModal(false)}
+        requestId={pendingApproval?.id || null}
+        onApproved={handleResumeSuccess}
+        actionName="Hủy phòng (Tiếp tục)"
+        onMinimize={() => setShowResumeSecurityModal(false)}
+      />
+
       <div className="w-full h-full sm:w-full sm:max-w-6xl sm:h-[90vh] bg-slate-50 sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300">
         <div className="h-16 flex justify-between items-center px-4 bg-white z-10 shrink-0 shadow-sm border-b border-slate-100">
             <div className="flex items-center gap-3">
                 <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg uppercase tracking-wider shadow-sm">Folio</span>
                 <h2 className="text-lg font-bold text-slate-800">Phòng {room.name}</h2>
+                
+                {/* Approval Status Banner */}
+                {internalPendingApproval && (
+                  <div className={cn(
+                    "px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-bold uppercase tracking-wide ml-2 animate-in fade-in slide-in-from-left-4",
+                    internalPendingApproval.status === 'APPROVED' ? "bg-green-100 text-green-700 border border-green-200" : "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                  )}>
+                    {internalPendingApproval.status === 'APPROVED' ? (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        Đã được duyệt hủy
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-4 h-4 animate-pulse" />
+                        Đang chờ duyệt hủy
+                      </>
+                    )}
+                  </div>
+                )}
             </div>
             <div className="flex items-center gap-2">
                 <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
@@ -390,14 +540,85 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             </div>
         </div>
 
+        {/* Approval Status Banner - Fixed at Top */}
+        {internalPendingApproval && (
+            <div className={cn(
+                "mx-4 mt-4 mb-0 p-4 rounded-2xl flex items-center justify-between shadow-sm border animate-in slide-in-from-top-4 duration-300",
+                internalPendingApproval.status === 'APPROVED' 
+                    ? "bg-green-50 border-green-200" 
+                    : "bg-amber-50 border-amber-200"
+            )}>
+                <div className="flex items-center gap-3">
+                    <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                        internalPendingApproval.status === 'APPROVED' ? "bg-green-100 text-green-600" : "bg-amber-100 text-amber-600"
+                    )}>
+                        {internalPendingApproval.status === 'APPROVED' ? <ShieldCheck className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
+                    </div>
+                    <div>
+                        <h4 className={cn("font-bold text-sm", internalPendingApproval.status === 'APPROVED' ? "text-green-800" : "text-amber-800")}>
+                            {internalPendingApproval.status === 'APPROVED' ? 'Yêu cầu hủy đã được duyệt' : 'Đang chờ duyệt hủy phòng'}
+                        </h4>
+                        <p className={cn("text-xs font-medium", internalPendingApproval.status === 'APPROVED' ? "text-green-600" : "text-amber-600")}>
+                            {internalPendingApproval.status === 'APPROVED' ? 'Vui lòng bấm hoàn tất bên dưới' : 'Vui lòng đợi quản lý xác nhận'}
+                        </p>
+                    </div>
+                </div>
+                
+                {internalPendingApproval.status === 'APPROVED' ? (
+                    <button 
+                        onClick={handleFinishCancellation}
+                        disabled={isLoading}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-200 active:scale-95 transition-all animate-pulse whitespace-nowrap"
+                    >
+                        Hoàn tất ngay
+                    </button>
+                ) : (
+                    <button 
+                        onClick={handleResumeApproval}
+                        className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-bold rounded-lg transition-all active:scale-95 whitespace-nowrap flex items-center gap-1.5"
+                    >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        Nhập PIN
+                    </button>
+                )}
+            </div>
+        )}
+
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4">
+
+
             {/* Quick Actions - Scrollable */}
             <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-6">
-                <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={handleChangeRoom} />
+                <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => handleChangeRoom()} />
                 <QuickActionButton icon={Edit3} label="Sửa giờ" onClick={() => {}} />
                 <QuickActionButton icon={DollarSign} label="Nạp tiền" onClick={() => {}} />
                 <QuickActionButton icon={Printer} label="In phiếu" onClick={() => {}} />
-                <QuickActionButton icon={Trash2} label="Huỷ phòng" onClick={handleCancelBooking} variant="danger" />
+                
+                {/* Cancel Button Logic */}
+                {internalPendingApproval && internalPendingApproval.status === 'APPROVED' ? (
+                  <button 
+                    onClick={handleFinishCancellation}
+                    disabled={isLoading}
+                    className={cn(
+                        "flex flex-col items-center justify-center gap-2 min-w-[80px] h-[80px] rounded-2xl transition-all active:scale-95 shadow-sm border group",
+                        "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                    )}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-white group-hover:text-green-600 transition-colors">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wide">Hoàn tất Hủy</span>
+                  </button>
+                ) : (
+                  <QuickActionButton 
+                    icon={Trash2} 
+                    label="Huỷ phòng" 
+                    onClick={() => handleCancelBooking()} 
+                    variant="danger" 
+                    disabled={!!internalPendingApproval} // Disable if pending
+                  />
+                )}
             </div>
 
             {/* Main Toggle Card */}
@@ -703,27 +924,6 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 }}
             />
         )}
-
-        <PinValidationModal
-            isOpen={isPinModalOpen}
-            onClose={() => {
-                setIsPinModalOpen(false);
-                setPendingAction(null);
-            }}
-            onSuccess={(staffId, staffName) => {
-                setIsPinModalOpen(false);
-                if (pendingAction?.type === 'SAVE_SERVICES') {
-                    handleSaveServices({ id: staffId, name: staffName });
-                } else if (pendingAction?.type === 'REMOVE_SERVICE') {
-                    handleRemoveService(pendingAction.data, { id: staffId, name: staffName });
-                } else if (pendingAction?.type === 'CHANGE_ROOM') {
-                    handleChangeRoom({ id: staffId, name: staffName });
-                } else if (pendingAction?.type === 'CANCEL_BOOKING') {
-                    handleCancelBooking({ id: staffId, name: staffName });
-                }
-            }}
-            actionName={securityAction || 'folio_add_service'}
-        />
       </div>
     </div>,
     document.body

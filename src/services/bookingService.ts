@@ -202,14 +202,15 @@ export const bookingService = {
     }
   },
 
-  async cancelBooking(bookingId: string, verifiedStaff?: { id: string, name: string }, penaltyAmount: number = 0, penaltyPaymentMethod: string = 'cash') {
+  async cancelBooking(bookingId: string, verifiedStaff?: { id: string, name: string }, penaltyAmount: number = 0, penaltyPaymentMethod: string = 'cash', reason: string = '') {
     try {
       const { data, error } = await supabase.rpc('cancel_booking', {
         p_booking_id: bookingId,
         p_verified_by_staff_id: verifiedStaff?.id || null,
         p_verified_by_staff_name: verifiedStaff?.name || null,
         p_penalty_amount: penaltyAmount,
-        p_penalty_payment_method: penaltyPaymentMethod
+        p_penalty_payment_method: penaltyPaymentMethod,
+        p_reason: reason
       });
 
       if (error) throw error;

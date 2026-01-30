@@ -33,4 +33,10 @@ export interface Booking {
 export interface DashboardRoom extends Room {
   current_booking?: Booking;
   is_dirty_overdue?: boolean; // For "Clean Eye" feature
+  pending_approval?: {
+    id: string;
+    action: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    request_data?: any;
+  };
 }

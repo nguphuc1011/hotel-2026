@@ -17,7 +17,7 @@ import { settingsService, RoomCategory } from '@/services/settingsService';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { securityService, SecurityAction } from '@/services/securityService';
-import PinValidationModal from '@/components/shared/PinValidationModal';
+import { useSecurity } from '@/hooks/useSecurity';
 
 interface CheckInModalProps {
   isOpen: boolean;
@@ -223,9 +223,8 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Security State
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
+  // Security Hook
+  const { verify, SecurityModals } = useSecurity();
   
   // New State
   const [source, setSource] = useState('direct');
@@ -866,28 +865,34 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
             </div>
 
             {/* --- FOOTER --- */}
-            <div className="bg-white border-t border-slate-100 px-6 py-4 shrink-0 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="p-6 bg-white border-t border-slate-100 flex items-center gap-4 z-50">
                 <button 
-                    onClick={() => {
-                        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
-                        handleSubmit();
-                    }}
-                    disabled={isSubmitting}
-                    className="w-full bg-blue-700 hover:bg-blue-800 text-white h-14 rounded-[28px] font-bold text-lg shadow-lg shadow-blue-900/20 active:scale-[0.98] transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                    onClick={onClose}
+                    className="flex-1 py-4 rounded-[24px] font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider"
                 >
-                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Xác nhận đặt phòng"}
+                    Hủy bỏ
+                </button>
+                <button 
+                    onClick={() => handleSubmit()}
+                    disabled={isSubmitting}
+                    className={cn(
+                        "flex-[2] py-4 rounded-[24px] font-bold text-white uppercase tracking-wider shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-3",
+                        isSubmitting ? "bg-slate-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 active:scale-95"
+                    )}
+                >
+                    {isSubmitting ? (
+                        <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>Đang xử lý...</span>
+                        </>
+                    ) : (
+                        <span>Nhận phòng ngay</span>
+                    )}
                 </button>
             </div>
-
-            <PinValidationModal
-                isOpen={isPinModalOpen}
-                onClose={() => setIsPinModalOpen(false)}
-                onSuccess={(staffId, staffName) => {
-                    setIsPinModalOpen(false);
-                    handleSubmit({ id: staffId, name: staffName });
-                }}
-                actionName={securityAction || 'checkin_custom_price'}
-            />
+            
+            {/* Security Modals */}
+            {SecurityModals}
             </div>
         </div>,
         document.body

@@ -31,10 +31,12 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    setMounted(true);
     // Check local storage for session
     const storedUser = localStorage.getItem('1hotel_user');
     if (storedUser) {
@@ -49,14 +51,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Auth Guard
-    if (!loading) {
-      if (!user && pathname !== '/login') {
-        router.push('/login');
-      } else if (user && pathname === '/login') {
-        router.push('/');
-      }
+    if (mounted && !loading) {
+      const checkAuth = () => {
+        if (!user && pathname !== '/login') {
+          router.replace('/login');
+        } else if (user && pathname === '/login') {
+          router.replace('/');
+        }
+      };
+
+      const timeoutId = setTimeout(checkAuth, 0);
+      return () => clearTimeout(timeoutId);
     }
-  }, [user, loading, pathname, router]);
+  }, [user, loading, pathname, router, mounted]);
 
   const login = async (username: string, pin: string) => {
     try {
