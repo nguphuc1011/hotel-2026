@@ -46,7 +46,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
   const ignoreSearchRef = useRef(false);
 
   // Close search results when clicking outside
-  useOnClickOutside(searchRef, () => setShowSearchResults(false));
+  useOnClickOutside(searchRef as any, () => setShowSearchResults(false));
 
   // Initialize data when modal opens
   useEffect(() => {

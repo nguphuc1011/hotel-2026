@@ -23,10 +23,12 @@ export interface Booking {
   customer_name?: string;
   customer_balance?: number; // New: To track debt
   check_in_at: string;
+  check_in_actual?: string; // New: Actual check-in time from DB
   check_out_at?: string;
   booking_type: BookingType;
   total_amount?: number; // Calculated amount
   prepayment?: number;
+  custom_price?: number; // New: Manual price override
   status: 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
 }
 

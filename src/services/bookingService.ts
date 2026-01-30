@@ -236,5 +236,77 @@ export const bookingService = {
       console.error('Change room error:', err);
       throw err;
     }
+  },
+
+  async addDeposit(params: {
+    bookingId: string;
+    amount: number;
+    paymentMethod: 'cash' | 'transfer' | 'card';
+    description: string;
+    verifiedStaff?: { id: string, name: string };
+  }) {
+    try {
+      // First get booking to get customer_id
+      const { data: booking, error: bError } = await supabase
+        .from('bookings')
+        .select('customer_id')
+        .eq('id', params.bookingId)
+        .single();
+      
+      if (bError) throw bError;
+
+      const { data, error } = await supabase.rpc('adjust_customer_balance', {
+        p_customer_id: booking.customer_id,
+        p_amount: params.amount,
+        p_type: 'deposit',
+        p_description: params.description,
+        p_booking_id: params.bookingId,
+        p_verified_by_staff_id: params.verifiedStaff?.id || null,
+        p_verified_by_staff_name: params.verifiedStaff?.name || null,
+        p_payment_method: params.paymentMethod
+      });
+
+      if (error) throw error;
+
+      // Trigger notification if wallet_changes exists
+      if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
+        useWalletNotificationStore.getState().showNotification(data.wallet_changes);
+      }
+
+      return data;
+    } catch (err: any) {
+      console.error('Add deposit error:', err);
+      throw err;
+    }
+  },
+
+  async updateBookingDetails(params: {
+    bookingId: string;
+    customerName: string;
+    checkInAt: string;
+    customPrice?: number;
+    priceApplyMode: 'all' | 'future';
+    reason: string;
+    customerId?: string;
+    verifiedStaff?: { id: string, name: string };
+  }) {
+    try {
+      const { data, error } = await supabase.rpc('update_booking_details', {
+        p_booking_id: params.bookingId,
+        p_customer_name: params.customerName,
+        p_check_in_at: params.checkInAt,
+        p_custom_price: params.customPrice ?? null,
+        p_price_apply_mode: params.priceApplyMode,
+        p_reason: params.reason,
+        p_customer_id: params.customerId || null,
+        p_staff_id: params.verifiedStaff?.id || null
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      console.error('Update booking details error:', err);
+      throw err;
+    }
   }
 };

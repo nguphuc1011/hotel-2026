@@ -161,7 +161,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
     );
   }
 
-  const processPayment = async () => {
+  const processPayment = async (staffId?: string, staffName?: string) => {
     setIsProcessing(true);
     setError(null);
     try {
@@ -172,10 +172,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
         discount,
         surcharge,
         notes,
-        // verifiedStaff is handled by useSecurity flow now implicitly (or rather, we don't need it because we only get here if allowed)
-        // Wait, bookingService might need to record WHO verified it.
-        // But for now, let's assume the backend or service just records the current user.
-        // If we need to record "Approved by Manager X", that's part of the Approval Request log.
+        verifiedStaff: staffId ? { id: staffId, name: staffName || '' } : undefined
       });
 
       if (result.success) {

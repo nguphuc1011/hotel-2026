@@ -9,6 +9,8 @@ import { serviceService, Service, BookingServiceItem } from '@/services/serviceS
 import PaymentModal from './PaymentModal';
 import BillBreakdown from './BillBreakdown';
 import CancellationPenaltyModal from './CancellationPenaltyModal';
+import EditBookingModal from './folio/EditBookingModal';
+import DepositModal from './folio/DepositModal';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 import { securityService, SecurityAction } from '@/services/securityService';
@@ -164,6 +166,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [isSaving, setIsSaving] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editStaff, setEditStaff] = useState<{ id: string, name: string } | undefined>(undefined);
+  const [showDepositModal, setShowDepositModal] = useState(false);
   const [cancellationStaff, setCancellationStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showResumeSecurityModal, setShowResumeSecurityModal] = useState(false);
@@ -591,8 +596,8 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             {/* Quick Actions - Scrollable */}
             <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-6">
                 <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => handleChangeRoom()} />
-                <QuickActionButton icon={Edit3} label="Sửa giờ" onClick={() => {}} />
-                <QuickActionButton icon={DollarSign} label="Nạp tiền" onClick={() => {}} />
+                <QuickActionButton icon={Edit3} label="Sửa giờ" onClick={() => setShowEditModal(true)} />
+                <QuickActionButton icon={DollarSign} label="Nạp tiền" onClick={() => setShowDepositModal(true)} />
                 <QuickActionButton icon={Printer} label="In phiếu" onClick={() => {}} />
                 
                 {/* Cancel Button Logic */}
@@ -924,6 +929,32 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 }}
             />
         )}
+
+        <EditBookingModal 
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditStaff(undefined);
+          }}
+          booking={booking}
+          room={room}
+          verifiedStaff={editStaff}
+          onSuccess={() => {
+            loadBill();
+            onUpdate();
+          }}
+        />
+
+        <DepositModal 
+          isOpen={showDepositModal}
+          onClose={() => setShowDepositModal(false)}
+          bookingId={booking.id}
+          bill={bill}
+          onSuccess={() => {
+            loadBill();
+            onUpdate();
+          }}
+        />
       </div>
     </div>,
     document.body

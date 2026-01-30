@@ -140,8 +140,8 @@ export function useSecurity(hookOptions?: { onMinimize?: () => void }): UseSecur
 
   const handleMinimize = () => {
     setApprovalModalOpen(false);
-    if (options?.onMinimize) {
-      options.onMinimize();
+    if (hookOptions?.onMinimize) {
+      hookOptions.onMinimize();
     }
   };
 
@@ -150,8 +150,8 @@ export function useSecurity(hookOptions?: { onMinimize?: () => void }): UseSecur
       <PinValidationModal
         isOpen={pinModalOpen}
         onClose={handleClose}
-        onSuccess={handlePinSuccess}
-        title="Xác thực bảo mật"
+        onSuccess={(id, name) => handlePinSuccess(id, name)}
+        actionName={currentAction || 'Xác thực bảo mật'}
       />
       <SecurityApprovalModal
         isOpen={approvalModalOpen}
