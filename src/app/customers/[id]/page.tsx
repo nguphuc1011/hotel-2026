@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { securityService, SecurityAction } from '@/services/securityService';
 import PinValidationModal from '@/components/shared/PinValidationModal';
 
+import { useSecurity } from '@/hooks/useSecurity';
 import { formatMoney } from '@/utils/format';
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,9 +30,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'transactions' | 'bookings' | 'notes'>('transactions');
 
-  // Security states
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
+  // Security Hook
+  const { verify, SecurityModals } = useSecurity();
 
   // Transaction Modal
   const [showTransModal, setShowTransModal] = useState(false);
@@ -91,12 +91,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
     // --- Security Checks ---
     if (!verifiedStaff && transForm.type === 'refund') {
-      const requiresPin = await securityService.checkActionRequiresPin('checkout_refund');
-      if (requiresPin) {
-        setSecurityAction('checkout_refund');
-        setIsPinModalOpen(true);
-        return;
-      }
+      await verify('checkout_refund', (staffId, staffName) => 
+        handleTransaction(staffId ? { id: staffId, name: staffName || '' } : undefined)
+      );
+      return;
     }
 
     // Calculate signed amount based on type

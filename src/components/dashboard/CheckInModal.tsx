@@ -387,30 +387,24 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
         if (!verifiedStaff) {
             // Check if any sensitive action is being performed
             if (isCustomPrice) {
-                const requiresPin = await securityService.checkActionRequiresPin('checkin_custom_price');
-                if (requiresPin) {
-                    setSecurityAction('checkin_custom_price');
-                    setIsPinModalOpen(true);
-                    return;
-                }
+                await verify('checkin_custom_price', (staffId, staffName) => 
+                    handleSubmit(staffId ? { id: staffId, name: staffName || '' } : undefined)
+                );
+                return;
             }
 
             if (selectedCustomer && selectedCustomer.balance < 0) {
-                const requiresPin = await securityService.checkActionRequiresPin('checkin_debt_allow');
-                if (requiresPin) {
-                    setSecurityAction('checkin_debt_allow');
-                    setIsPinModalOpen(true);
-                    return;
-                }
+                await verify('checkin_debt_allow', (staffId, staffName) => 
+                    handleSubmit(staffId ? { id: staffId, name: staffName || '' } : undefined)
+                );
+                return;
             }
 
             if (isExtraPeople && (extraAdults > 0 || extraChildren > 0)) {
-                const requiresPin = await securityService.checkActionRequiresPin('checkin_override_surcharge');
-                if (requiresPin) {
-                    setSecurityAction('checkin_override_surcharge');
-                    setIsPinModalOpen(true);
-                    return;
-                }
+                await verify('checkin_override_surcharge', (staffId, staffName) => 
+                    handleSubmit(staffId ? { id: staffId, name: staffName || '' } : undefined)
+                );
+                return;
             }
         }
 

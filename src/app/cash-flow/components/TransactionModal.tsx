@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { cashFlowService, CashFlowCategory } from '@/services/cashFlowService';
 import { securityService, SecurityAction } from '@/services/securityService';
 import PinValidationModal from '@/components/shared/PinValidationModal';
+import { useSecurity } from '@/hooks/useSecurity';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { cn } from '@/lib/utils';
 import { toLocalISOString, parseLocalISO, getNow } from '@/lib/dateUtils';
@@ -29,9 +30,8 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
     occurred_at: toLocalISOString(),
   });
 
-  // Security states
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
+  // Security Hook
+  const { verify, SecurityModals } = useSecurity();
 
   useEffect(() => {
     if (isOpen) {
@@ -61,19 +61,15 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
     // --- Security Checks ---
     if (!verifiedStaff) {
       if (formData.flow_type === 'IN') {
-        const requiresPin = await securityService.checkActionRequiresPin('finance_create_income');
-        if (requiresPin) {
-          setSecurityAction('finance_create_income');
-          setIsPinModalOpen(true);
-          return;
-        }
+        await verify('finance_create_income', (staffId, staffName) => 
+          handleSubmit(undefined, staffId ? { id: staffId, name: staffName || '' } : undefined)
+        );
+        return;
       } else {
-        const requiresPin = await securityService.checkActionRequiresPin('finance_manual_cash_out');
-        if (requiresPin) {
-          setSecurityAction('finance_manual_cash_out');
-          setIsPinModalOpen(true);
-          return;
-        }
+        await verify('finance_manual_cash_out', (staffId, staffName) => 
+          handleSubmit(undefined, staffId ? { id: staffId, name: staffName || '' } : undefined)
+        );
+        return;
       }
     }
 
@@ -267,19 +263,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess }: Transac
           </button>
         </form>
 
-        <PinValidationModal
-          isOpen={isPinModalOpen}
-          onClose={() => {
-            setIsPinModalOpen(false);
-            setSecurityAction(null);
-          }}
-          onSuccess={(staffId, staffName) => {
-            setIsPinModalOpen(false);
-            setSecurityAction(null);
-            handleSubmit(undefined, { id: staffId, name: staffName });
-          }}
-          actionName={securityAction || 'access_settings'}
-        />
+        {SecurityModals}
       </div>
     </div>
   );
