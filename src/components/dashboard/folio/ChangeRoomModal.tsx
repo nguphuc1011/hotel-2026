@@ -33,13 +33,10 @@ export default function ChangeRoomModal({ isOpen, onClose, bookingId, currentRoo
     setIsLoading(true);
     try {
       // Get all rooms and filter available ones
-      // Ideally backend should provide a filter, but getRooms likely returns all.
-      // Let's check roomService or just fetch all and filter.
       const allRooms = await roomService.getRooms();
-      const available = allRooms.filter(r => r.status === 'available' || r.status === 'clean'); // 'clean' might be 'available' alias?
-      // Check check_in_customer logic: IF v_room_status NOT IN ('available', 'dirty') -> actually it allows dirty?
-      // User said "chỉ được chuyển đến những phòng đang sẵn sàng". So 'available' only.
-      setRooms(available.filter(r => r.status === 'available'));
+      // Only show rooms that are truly available (status === 'available')
+      const available = allRooms.filter(r => r.status === 'available');
+      setRooms(available);
     } catch (error) {
       console.error('Failed to load rooms', error);
       toast.error('Lỗi tải danh sách phòng');
