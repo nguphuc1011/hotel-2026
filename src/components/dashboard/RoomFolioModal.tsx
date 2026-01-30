@@ -469,7 +469,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       }
     }, {
       room_id: room.id, // Critical for dashboard matching
-      room_number: room.name || booking.room?.room_number || 'N/A',
+      room_number: room.name || 'N/A',
       customer_name: booking.customer_name || 'Khách vãng lai',
       booking_id: booking.id.slice(0, 8),
       full_booking_id: booking.id, // For auto-finalize execution
