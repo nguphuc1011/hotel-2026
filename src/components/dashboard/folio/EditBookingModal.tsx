@@ -34,6 +34,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [priceApplyMode, setPriceApplyMode] = useState<'all' | 'future'>('all');
+  const [notes, setNotes] = useState('');
 
   // Customer Search State
   const [searchTerm, setSearchTerm] = useState('');
@@ -88,6 +89,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
 
       setReason('');
       setPriceApplyMode('all');
+      setNotes(booking.notes || '');
     }
   }, [isOpen, booking, room]);
 
@@ -153,20 +155,31 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
 
     setIsSubmitting(true);
     try {
-      await bookingService.updateBookingDetails({
+      const payload = {
         bookingId: booking.id,
         customerName,
         checkInAt: new Date(checkInAt).toISOString(),
         customPrice,
         priceApplyMode,
         reason,
+        notes,
         customerId: selectedCustomer?.id,
         verifiedStaff
-      });
+      };
+      
+      console.log('Updating booking with payload:', payload);
+      
+      const result = await bookingService.updateBookingDetails(payload);
+      
+      if (result && result.success === false) {
+        throw new Error(result.message || 'Lỗi từ hệ thống');
+      }
+      
       toast.success('Cập nhật thông tin thành công');
       onSuccess();
       onClose();
     } catch (error: any) {
+      console.error('Update booking error:', error);
       toast.error(error.message || 'Lỗi khi cập nhật');
     } finally {
       setIsSubmitting(false);
@@ -323,6 +336,18 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
                     Áp dụng từ hôm nay
                 </button>
             </div>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Ghi chú phòng</label>
+            <textarea
+              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 outline-none resize-none"
+              rows={2}
+              placeholder="Nhập ghi chú..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </div>
 
           {/* Reason */}

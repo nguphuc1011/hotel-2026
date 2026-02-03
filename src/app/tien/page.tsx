@@ -16,20 +16,29 @@ import {
   FileText,
   Users,
   FileWarning,
-  AlertTriangle
+  AlertTriangle,
+  ShieldCheck,
+  TrendingUp,
+  Wallet as WalletIcon,
+  ToggleLeft,
+  ToggleRight,
+  EyeOff
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { customerService } from '@/services/customerService';
 import { cashFlowService, CashFlowTransaction, Wallet } from '@/services/cashFlowService';
-import TransactionModal from '../cash-flow/components/TransactionModal';
-import WalletAdjustmentModal from '../cash-flow/components/WalletAdjustmentModal';
-import BookingHistoryModal from '../cash-flow/components/BookingHistoryModal';
-import CustomerDebtModal from '../cash-flow/components/CustomerDebtModal';
-import ExternalDebtModal from '../cash-flow/components/ExternalDebtModal';
+import TransactionModal from './components/TransactionModal';
+import WalletAdjustmentModal from './components/WalletAdjustmentModal';
+import BookingHistoryModal from './components/BookingHistoryModal';
+import CustomerDebtModal from './components/CustomerDebtModal';
+import ExternalDebtModal from './components/ExternalDebtModal';
+import OwnerDebtSection from './components/OwnerDebtSection';
 import { formatMoney } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, setHours, setMinutes, isSameDay } from 'date-fns';
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
 
 // Định nghĩa các ca làm việc
 const SHIFTS = [
@@ -48,6 +57,7 @@ const QUICK_RANGES = [
 ];
 
 export default function MoneyPage() {
+  const { can, user, isLoading: isAuthLoading } = usePermission();
   const [transactions, setTransactions] = useState<CashFlowTransaction[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,8 +84,25 @@ export default function MoneyPage() {
   // Balance Stats
   const [balanceStats, setBalanceStats] = useState({
     cash: { opening: 0, in: 0, out: 0, closing: 0 },
-    bank: { opening: 0, in: 0, out: 0, closing: 0 }
+    bank: { opening: 0, in: 0, out: 0, closing: 0 },
+    escrow: { opening: 0, in: 0, out: 0, closing: 0 },
+    receivable: { opening: 0, in: 0, out: 0, closing: 0 },
+    revenue: { opening: 0, in: 0, out: 0, closing: 0 }
   });
+
+  const [showExtraFunds, setShowExtraFunds] = useState(false);
+
+  // Permission Helpers
+  // NEW LOGIC: Positive permission. If user has VIEW_MONEY_TOTALS -> Show numbers. Else -> '******'
+  const canViewTotals = can(PERMISSION_KEYS.VIEW_MONEY_TOTALS);
+  
+  const displayBalance = (amount: number) => {
+    return canViewTotals ? formatMoney(amount) : '******';
+  };
+  
+  const displayRawBalance = (amount: number) => {
+    return canViewTotals ? formatMoney(amount).replace('₫', '') : '******';
+  };
 
   // --- Logic xử lý thời gian ---
   const handleRangeChange = (type: string) => {
@@ -156,40 +183,63 @@ export default function MoneyPage() {
       setTransactions(data);
 
       // 4. Tính toán "Tồn đầu - Biến động - Tồn cuối"
-      // Đây là logic "Mắt thần": 
-      // Tồn đầu = Số dư hiện tại - Tổng biến động từ (Start -> Hiện tại)
-      // Nhưng để chính xác và nhanh, ta dùng hàm getWalletBalanceAt đã viết trong service
-      
-      // Tuy nhiên, để tối ưu hiệu năng, ta có thể tính dựa trên tập giao dịch đã tải về 
-      // nếu khoảng thời gian gần. Nhưng để "Bằng chứng thép", ta gọi service tính toán.
-      
       const cashWallet = currentWallets.find(w => w.id === 'CASH');
       const bankWallet = currentWallets.find(w => w.id === 'BANK');
+      const escrowWallet = currentWallets.find(w => w.id === 'ESCROW');
+      const receivableWallet = currentWallets.find(w => w.id === 'RECEIVABLE');
+      const revenueWallet = currentWallets.find(w => w.id === 'REVENUE');
 
       if (cashWallet && bankWallet) {
-        const [cashOpening, bankOpening] = await Promise.all([
+        const [cashOpening, bankOpening, escrowOpening, receivableOpening, revenueOpening] = await Promise.all([
           cashFlowService.getWalletBalanceAt('CASH', actualStart),
-          cashFlowService.getWalletBalanceAt('BANK', actualStart)
+          cashFlowService.getWalletBalanceAt('BANK', actualStart),
+          escrowWallet ? cashFlowService.getWalletBalanceAt('ESCROW', actualStart) : 0,
+          receivableWallet ? cashFlowService.getWalletBalanceAt('RECEIVABLE', actualStart) : 0,
+          revenueWallet ? cashFlowService.getWalletBalanceAt('REVENUE', actualStart) : 0
         ]);
 
         // Tính biến động trong kỳ (từ data đã fetch)
         const cashTxs = data.filter(t => !t.payment_method_code || t.payment_method_code === 'cash');
         const bankTxs = data.filter(t => t.payment_method_code === 'bank' || t.payment_method_code === 'transfer' || t.payment_method_code === 'qr');
 
-        const calcStats = (opening: number, txs: CashFlowTransaction[]) => {
-          const totalIn = txs.filter(t => t.flow_type === 'IN').reduce((sum, t) => sum + t.amount, 0);
-          const totalOut = txs.filter(t => t.flow_type === 'OUT').reduce((sum, t) => sum + t.amount, 0);
-          return {
-            opening,
-            in: totalIn,
-            out: totalOut,
-            closing: opening + totalIn - totalOut
-          };
+        // Helper: Tính toán đơn giản cho các quỹ phụ (Opening + Closing)
+        const calcStats = (opening: number, closing: number) => {
+             const net = closing - opening;
+             return {
+               opening,
+               in: net > 0 ? net : 0,
+               out: net < 0 ? -net : 0,
+               closing
+             };
+        };
+        
+        // Helper: Tính toán chi tiết cho Cash/Bank từ transactions
+        const calcDetailedStats = (opening: number, closing: number, txs: CashFlowTransaction[]) => {
+             const totalIn = txs.filter(t => t.flow_type === 'IN').reduce((sum, t) => sum + t.amount, 0);
+             const totalOut = txs.filter(t => t.flow_type === 'OUT').reduce((sum, t) => sum + t.amount, 0);
+             return {
+               opening,
+               in: totalIn,
+               out: totalOut,
+               closing
+             };
         };
 
+        // Lấy Closing Balance tại thời điểm End
+        const [cashClosing, bankClosing, escrowClosing, receivableClosing, revenueClosing] = await Promise.all([
+             cashFlowService.getWalletBalanceAt('CASH', actualEnd),
+             cashFlowService.getWalletBalanceAt('BANK', actualEnd),
+             cashFlowService.getWalletBalanceAt('ESCROW', actualEnd),
+             cashFlowService.getWalletBalanceAt('RECEIVABLE', actualEnd),
+             cashFlowService.getWalletBalanceAt('REVENUE', actualEnd)
+        ]);
+
         setBalanceStats({
-          cash: calcStats(cashOpening, cashTxs),
-          bank: calcStats(bankOpening, bankTxs)
+          cash: calcDetailedStats(cashOpening, cashClosing, cashTxs),
+          bank: calcDetailedStats(bankOpening, bankClosing, bankTxs),
+          escrow: calcStats(escrowOpening, escrowClosing),
+          receivable: calcStats(receivableOpening, receivableClosing),
+          revenue: calcStats(revenueOpening, revenueClosing)
         });
       }
 
@@ -212,6 +262,28 @@ export default function MoneyPage() {
 
     return () => { supabase.removeChannel(channel); };
   }, [dateRange, shiftId]); // Re-fetch khi đổi ngày hoặc đổi ca
+  
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+      </div>
+    );
+  }
+
+  if (!can(PERMISSION_KEYS.VIEW_MONEY)) {
+     return (
+       <div className="min-h-screen flex items-center justify-center bg-slate-50">
+         <div className="text-center">
+           <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+           <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+           <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
+         </div>
+       </div>
+     );
+  }
+
+  const canViewExtraFunds = can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS) || can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS_RECEIVABLE);
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-32 font-sans">
@@ -221,7 +293,12 @@ export default function MoneyPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
             <h1 className="text-4xl font-black tracking-tighter text-slate-900 flex items-center gap-3">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700">Sổ Tiền</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700">Thu Chi</span>
+              {!canViewTotals && (
+                <span className="text-xs bg-amber-50 text-amber-600 px-3 py-1 rounded-full font-bold tracking-wide border border-amber-100 flex items-center gap-1" title="Chế độ điểm mù: Ẩn số dư">
+                  <EyeOff size={12} /> BLIND MODE
+                </span>
+              )}
               <span className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full font-bold tracking-wide border border-emerald-100 shadow-sm flex items-center gap-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
                 LIVE
@@ -233,6 +310,21 @@ export default function MoneyPage() {
           </div>
           
           <div className="flex items-center gap-3 hidden md:flex">
+            {canViewExtraFunds && (
+              <button
+                onClick={() => setShowExtraFunds(!showExtraFunds)}
+                className={cn(
+                  "px-4 py-3.5 rounded-2xl font-bold flex items-center gap-2 border active:scale-95 transition-all duration-300",
+                  showExtraFunds 
+                    ? "bg-slate-800 text-white border-slate-800 shadow-md" 
+                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                )}
+              >
+                {showExtraFunds ? <ToggleRight size={20} className="text-emerald-400" /> : <ToggleLeft size={20} />}
+                <span>Quỹ mở rộng</span>
+              </button>
+            )}
+
             <button 
               onClick={() => setIsAdjustmentModalOpen(true)}
               className="bg-white hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 border border-slate-200 active:scale-95 transition-all duration-300"
@@ -298,94 +390,193 @@ export default function MoneyPage() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           
           {/* CASH WALLET - Primary Hero Card */}
-          <div className="md:col-span-8 bento-card p-8 bg-white border border-slate-100 relative overflow-hidden group hover:border-emerald-100 hover:shadow-xl hover:shadow-emerald-50 transition-all duration-500">
-            <div className="relative z-10 flex flex-col h-full justify-between">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform duration-300">
-                    <Banknote size={28} />
+          {can(PERMISSION_KEYS.VIEW_MONEY_BALANCE_CASH) && (
+            <div className={cn(
+              "bento-card p-8 bg-white border border-slate-100 relative overflow-hidden group hover:border-emerald-100 hover:shadow-xl hover:shadow-emerald-50 transition-all duration-500",
+              can(PERMISSION_KEYS.VIEW_MONEY_BALANCE_BANK) ? "md:col-span-8" : "md:col-span-12"
+            )}>
+              <div className="relative z-10 flex flex-col h-full justify-between">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+                      <Banknote size={28} />
+                    </div>
+                    <div>
+                      <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Tổng Tiền Mặt</span>
+                      <span className="font-bold text-slate-700">Két Khách Sạn</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Tổng Tiền Mặt</span>
-                    <span className="font-bold text-slate-700">Két Khách Sạn</span>
-                  </div>
-                </div>
-                <div className="bg-emerald-50 px-3 py-1 rounded-full text-xs font-bold text-emerald-600 border border-emerald-100">
-                  VNĐ
-                </div>
-              </div>
-              
-              <div className="mt-8 mb-8">
-                <div className="flex items-baseline gap-1 text-slate-800">
-                   <span className="text-6xl font-black tracking-tighter">
-                      {formatMoney(balanceStats.cash.closing).replace('₫', '')}
-                   </span>
-                   <span className="text-2xl font-bold text-slate-300">₫</span>
-                </div>
-                <span className="text-sm font-medium text-slate-400 ml-1">Số dư khả dụng hiện tại</span>
-              </div>
-
-              {/* Stats Footer */}
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
-                 <div className="group/stat">
-                   <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tồn đầu kỳ</div>
-                   <div className="font-bold text-lg text-slate-600">{formatMoney(balanceStats.cash.opening)}</div>
-                 </div>
-                 <div className="group/stat">
-                   <div className="text-[10px] uppercase font-bold text-emerald-500 mb-1">Tổng thu</div>
-                   <div className="font-bold text-lg text-emerald-600">+{formatMoney(balanceStats.cash.in)}</div>
-                 </div>
-                 <div className="group/stat">
-                   <div className="text-[10px] uppercase font-bold text-rose-400 mb-1">Tổng chi</div>
-                   <div className="font-bold text-lg text-rose-500">-{formatMoney(balanceStats.cash.out)}</div>
-                 </div>
-              </div>
-            </div>
-            
-            {/* Artistic Decor */}
-            <div className="absolute -right-12 -bottom-12 text-emerald-500 opacity-[0.03] transform rotate-12 group-hover:rotate-0 transition-all duration-700">
-              <Banknote size={280} strokeWidth={1} />
-            </div>
-          </div>
-
-          {/* BANK WALLET - Secondary Card */}
-          <div className="md:col-span-4 bento-card p-8 bg-white border border-slate-100 relative overflow-hidden group hover:border-blue-100 hover:shadow-xl hover:shadow-blue-50 transition-all duration-500">
-            <div className="relative z-10 flex flex-col h-full justify-between">
-              <div>
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 group-hover:scale-110 transition-transform duration-300">
-                    <CreditCard size={28} />
-                  </div>
-                  <div>
-                     <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Ngân Hàng</span>
-                     <span className="font-bold text-slate-700">Tài Khoản Chính</span>
+                  <div className="bg-emerald-50 px-3 py-1 rounded-full text-xs font-bold text-emerald-600 border border-emerald-100">
+                    VNĐ
                   </div>
                 </div>
                 
-                <div className="flex items-baseline gap-1 text-slate-800">
-                   <span className="text-4xl font-black tracking-tighter">
-                      {formatMoney(balanceStats.bank.closing).replace('₫', '')}
-                   </span>
-                   <span className="text-xl font-bold text-slate-300">₫</span>
+                <div className="mt-8 mb-8">
+                  <div className="flex items-baseline gap-1 text-slate-800">
+                     <span className="text-6xl font-black tracking-tighter">
+                        {displayRawBalance(balanceStats.cash.closing)}
+                     </span>
+                     <span className="text-2xl font-bold text-slate-300">₫</span>
+                  </div>
+                  <span className="text-sm font-medium text-slate-400 ml-1">Số dư khả dụng hiện tại</span>
+                </div>
+
+                {/* Stats Footer */}
+                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
+                   <div className="group/stat">
+                     <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tồn đầu kỳ</div>
+                     <div className="font-bold text-lg text-slate-600">{displayBalance(balanceStats.cash.opening)}</div>
+                   </div>
+                   <div className="group/stat">
+                     <div className="text-[10px] uppercase font-bold text-emerald-500 mb-1">Tổng thu</div>
+                     <div className="font-bold text-lg text-emerald-600">+{formatMoney(balanceStats.cash.in)}</div>
+                   </div>
+                   <div className="group/stat">
+                     <div className="text-[10px] uppercase font-bold text-rose-400 mb-1">Tổng chi</div>
+                     <div className="font-bold text-lg text-rose-500">-{formatMoney(balanceStats.cash.out)}</div>
+                   </div>
+                </div>
+              </div>
+              
+              {/* Artistic Decor */}
+              <div className="absolute -right-12 -bottom-12 text-emerald-500 opacity-[0.03] transform rotate-12 group-hover:rotate-0 transition-all duration-700">
+                <Banknote size={280} strokeWidth={1} />
+              </div>
+            </div>
+          )}
+
+          {/* BANK WALLET - Secondary Card */}
+          {can(PERMISSION_KEYS.VIEW_MONEY_BALANCE_BANK) && (
+            <div className="md:col-span-4 bento-card p-8 bg-white border border-slate-100 relative overflow-hidden group hover:border-blue-100 hover:shadow-xl hover:shadow-blue-50 transition-all duration-500">
+              <div className="relative z-10 flex flex-col h-full justify-between">
+                <div>
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                      <CreditCard size={28} />
+                    </div>
+                    <div>
+                       <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Ngân Hàng</span>
+                       <span className="font-bold text-slate-700">Tài Khoản Chính</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-1 text-slate-800">
+                     <span className="text-4xl font-black tracking-tighter">
+                        {displayRawBalance(balanceStats.bank.closing)}
+                     </span>
+                     <span className="text-xl font-bold text-slate-300">₫</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 mt-8 pt-6 border-t border-slate-50">
+                   <div className="flex justify-between items-center text-sm">
+                     <span className="text-slate-400 font-medium">Thu trong kỳ</span>
+                     <span className="font-bold text-blue-600">+{formatMoney(balanceStats.bank.in)}</span>
+                   </div>
+                   <div className="flex justify-between items-center text-sm">
+                     <span className="text-slate-400 font-medium">Chi trong kỳ</span>
+                     <span className="font-bold text-rose-500">-{formatMoney(balanceStats.bank.out)}</span>
+                   </div>
                 </div>
               </div>
 
-              <div className="space-y-3 mt-8 pt-6 border-t border-slate-50">
-                 <div className="flex justify-between items-center text-sm">
-                   <span className="text-slate-400 font-medium">Thu trong kỳ</span>
-                   <span className="font-bold text-blue-600">+{formatMoney(balanceStats.bank.in)}</span>
-                 </div>
-                 <div className="flex justify-between items-center text-sm">
-                   <span className="text-slate-400 font-medium">Chi trong kỳ</span>
-                   <span className="font-bold text-rose-500">-{formatMoney(balanceStats.bank.out)}</span>
-                 </div>
+              <div className="absolute -right-8 -bottom-8 text-blue-500 opacity-[0.03] transform rotate-12 group-hover:rotate-0 transition-all duration-700">
+                <CreditCard size={200} strokeWidth={1} />
               </div>
             </div>
+          )}
 
-            <div className="absolute -right-8 -bottom-8 text-blue-500 opacity-[0.03] transform rotate-12 group-hover:rotate-0 transition-all duration-700">
-              <CreditCard size={200} strokeWidth={1} />
-            </div>
-          </div>
+          {/* EXTRA FUNDS - TOGGLEABLE */}
+          {showExtraFunds && (
+            <>
+              {/* ESCROW WALLET - Tạm Giữ */}
+              {can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS) && (
+                <div className="md:col-span-4 bento-card p-6 bg-white border border-slate-100 relative overflow-hidden group hover:border-purple-100 hover:shadow-xl hover:shadow-purple-50 transition-all duration-500">
+                  <div className="relative z-10 flex flex-col h-full justify-between">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-purple-50 rounded-2xl text-purple-600">
+                        <ShieldCheck size={24} />
+                      </div>
+                      <div>
+                        <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Quỹ Tạm Giữ</span>
+                        <span className="font-bold text-slate-700">Tiền Cọc/Bảo Đảm</span>
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-1 text-slate-800">
+                       <span className="text-3xl font-black tracking-tighter">
+                          {displayRawBalance(balanceStats.escrow?.closing || 0)}
+                       </span>
+                       <span className="text-lg font-bold text-slate-300">₫</span>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-50 text-xs flex justify-between">
+                       <span className="text-slate-400">Tồn đầu: {displayBalance(balanceStats.escrow?.opening || 0)}</span>
+                       <span className={(balanceStats.escrow?.closing || 0) >= (balanceStats.escrow?.opening || 0) ? "text-emerald-500" : "text-rose-500"}>
+                          {(balanceStats.escrow?.closing || 0) >= (balanceStats.escrow?.opening || 0) ? '+' : ''}{formatMoney((balanceStats.escrow?.closing || 0) - (balanceStats.escrow?.opening || 0))}
+                       </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* RECEIVABLE WALLET - Công Nợ Tạm */}
+              {(can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS) || can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS_RECEIVABLE)) && (
+                <div className="md:col-span-4 bento-card p-6 bg-white border border-slate-100 relative overflow-hidden group hover:border-orange-100 hover:shadow-xl hover:shadow-orange-50 transition-all duration-500">
+                  <div className="relative z-10 flex flex-col h-full justify-between">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-orange-50 rounded-2xl text-orange-600">
+                        <WalletIcon size={24} />
+                      </div>
+                      <div>
+                        <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Công Nợ Tạm</span>
+                        <span className="font-bold text-slate-700">Phải Thu Khách</span>
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-1 text-slate-800">
+                       <span className="text-3xl font-black tracking-tighter">
+                          {displayRawBalance(balanceStats.receivable?.closing || 0)}
+                       </span>
+                       <span className="text-lg font-bold text-slate-300">₫</span>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-50 text-xs flex justify-between">
+                       <span className="text-slate-400">Tồn đầu: {displayBalance(balanceStats.receivable?.opening || 0)}</span>
+                       <span className={(balanceStats.receivable?.closing || 0) >= (balanceStats.receivable?.opening || 0) ? "text-emerald-500" : "text-rose-500"}>
+                          {(balanceStats.receivable?.closing || 0) >= (balanceStats.receivable?.opening || 0) ? '+' : ''}{formatMoney((balanceStats.receivable?.closing || 0) - (balanceStats.receivable?.opening || 0))}
+                       </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* REVENUE WALLET - Sổ Doanh Thu */}
+              {can(PERMISSION_KEYS.VIEW_MONEY_REVENUE) && (
+                <div className="md:col-span-4 bento-card p-6 bg-white border border-slate-100 relative overflow-hidden group hover:border-indigo-100 hover:shadow-xl hover:shadow-indigo-50 transition-all duration-500">
+                  <div className="relative z-10 flex flex-col h-full justify-between">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+                        <TrendingUp size={24} />
+                      </div>
+                      <div>
+                        <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Sổ Doanh Thu</span>
+                        <span className="font-bold text-slate-700">Tổng Hợp</span>
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-1 text-slate-800">
+                       <span className="text-3xl font-black tracking-tighter">
+                          {displayRawBalance(balanceStats.revenue?.closing || 0)}
+                       </span>
+                       <span className="text-lg font-bold text-slate-300">₫</span>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-50 text-xs flex justify-between">
+                       <span className="text-slate-400">Tồn đầu: {displayBalance(balanceStats.revenue?.opening || 0)}</span>
+                       <span className={(balanceStats.revenue?.closing || 0) >= (balanceStats.revenue?.opening || 0) ? "text-emerald-500" : "text-rose-500"}>
+                          {(balanceStats.revenue?.closing || 0) >= (balanceStats.revenue?.opening || 0) ? '+' : ''}{formatMoney((balanceStats.revenue?.closing || 0) - (balanceStats.revenue?.opening || 0))}
+                       </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           {/* DEBT CARDS - Split Row */}
           <div className="md:col-span-6 bento-card p-6 bg-white border border-slate-100 relative overflow-hidden group cursor-pointer hover:shadow-lg hover:shadow-rose-100/50 transition-all duration-300"
@@ -435,6 +626,8 @@ export default function MoneyPage() {
           </div>
 
         </div>
+
+        <OwnerDebtSection onUpdate={fetchData} />
 
         {/* --- TRANSACTION LIST --- */}
         <div className="glass rounded-[32px] shadow-sm border border-slate-100/60 overflow-hidden min-h-[500px] flex flex-col">

@@ -19,7 +19,8 @@ export type SecurityAction =
   | 'finance_create_income'
   | 'inventory_adjust'
   | 'finance_manage_category'
-  | 'finance_delete_transaction';
+  | 'finance_delete_transaction'
+  | 'finance_void_transaction';
 
 export type PolicyType = 'ALLOW' | 'PIN' | 'APPROVAL' | 'DENY';
 
@@ -142,6 +143,31 @@ export const securityService = {
 
     if (error) throw error;
     return data; // { status: 'PENDING' | 'APPROVED' | 'REJECTED', approved_by_id: '...', approved_by_name: '...' }
+  },
+
+  /**
+   * Cancel an approval request (Recovery / Unstick)
+   */
+  async cancelRequest(requestId: string, reason?: string) {
+    try {
+      const { data, error } = await supabase.rpc('fn_cancel_approval_request', {
+        p_request_id: requestId,
+        p_reason: reason || null
+      });
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      const code = err?.code || err?.data?.code;
+      const message = err?.message || err?.data?.message || '';
+      const isCacheMissing = code === 'PGRST202' || message.includes('schema cache');
+      if (!isCacheMissing) throw err;
+      const { error } = await supabase
+        .from('pending_approvals')
+        .update({ status: 'REJECTED' })
+        .eq('id', requestId);
+      if (error) throw error;
+      return { success: true, message: 'Đã hủy yêu cầu' };
+    }
   },
 
   /**

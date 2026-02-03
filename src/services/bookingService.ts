@@ -288,6 +288,7 @@ export const bookingService = {
     priceApplyMode: 'all' | 'future';
     reason: string;
     customerId?: string;
+    notes?: string;
     verifiedStaff?: { id: string, name: string };
   }) {
     try {
@@ -299,13 +300,14 @@ export const bookingService = {
         p_price_apply_mode: params.priceApplyMode,
         p_reason: params.reason,
         p_customer_id: params.customerId || null,
-        p_staff_id: params.verifiedStaff?.id || null
+        p_staff_id: params.verifiedStaff?.id || null,
+        p_notes: params.notes || null
       });
 
       if (error) throw error;
       return data;
     } catch (err: any) {
-      console.error('Update booking details error:', err);
+      console.error('Update booking details error:', JSON.stringify(err, null, 2));
       throw err;
     }
   }

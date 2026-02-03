@@ -402,9 +402,10 @@ export const cashFlowService = {
   },
 
   // Xóa giao dịch (chỉ cho phép xóa thủ công)
-  async deleteTransaction(id: string) {
+  async deleteTransaction(id: string, reason?: string) {
     const { data, error } = await supabase.rpc('fn_delete_cash_flow', {
-      p_id: id
+      p_id: id,
+      p_reason: reason || null
     });
 
     if (error) throw error;

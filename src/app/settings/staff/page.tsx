@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { 
   Users, 
   ShieldCheck, 
+  Shield,
   Plus, 
   Trash2, 
   Key, 
@@ -15,11 +16,16 @@ import {
   AlertTriangle,
   MoreHorizontal,
   Search,
-  MapPin
+  MapPin,
+  Check,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { PERMISSION_METADATA } from '@/constants/permissions';
+import { permissionService, RolePermission, PERMISSION_KEYS } from '@/services/permissionService';
+import { usePermission } from '@/hooks/usePermission';
 
 interface Staff {
   id: string;
@@ -28,6 +34,7 @@ interface Staff {
   role: string;
   is_active: boolean;
   pin_hash?: string;
+  permissions?: string[];
 }
 
 interface SecurityMatrixItem {
@@ -53,16 +60,17 @@ const OVERRIDE_OPTIONS = [
 ];
 
 export default function StaffSettingsPage() {
+  const { can, isLoading: isAuthLoading } = usePermission();
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [securityMatrix, setSecurityMatrix] = useState<SecurityMatrixItem[]>([]);
+  const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'staff' | 'security'>('staff');
+  const [activeTab, setActiveTab] = useState<'staff' | 'security' | 'functional'>('staff');
   const [showInactive, setShowInactive] = useState(false);
 
   // Modals State
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [isSelfChangePinModalOpen, setIsSelfChangePinModalOpen] = useState(false);
   const [isFloorModalOpen, setIsFloorModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   
@@ -76,6 +84,8 @@ export default function StaffSettingsPage() {
 
   // User Override Modal
   const [editingActionKey, setEditingActionKey] = useState<string | null>(null);
+  const [overrideUserId, setOverrideUserId] = useState<string>('');
+  const [overridePolicy, setOverridePolicy] = useState<string>('ALLOW');
 
   const [staffFormData, setStaffFormData] = useState({
     username: '',
@@ -87,12 +97,20 @@ export default function StaffSettingsPage() {
     pin: '',
     confirmPin: ''
   });
-  const [selfChangePinFormData, setSelfChangePinFormData] = useState({
-    staffId: '',
-    oldPin: '',
-    newPin: '',
-    confirmPin: ''
-  });
+
+  if (isAuthLoading) return null;
+
+  if (!can(PERMISSION_KEYS.MANAGE_PERMISSIONS)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+          <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
+        </div>
+      </div>
+    );
+  }
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -121,6 +139,10 @@ export default function StaffSettingsPage() {
       const { data: matrixData, error: matrixError } = await supabase.rpc('fn_get_security_matrix');
       if (matrixError) throw matrixError;
       setSecurityMatrix(matrixData || []);
+
+      // Fetch Functional Permissions (Roles)
+      const rolesData = await permissionService.getAllRoles();
+      setRolePermissions(rolesData);
 
       // Fetch Floors
       const { data: floorsData } = await supabase.rpc('fn_get_available_floors');
@@ -296,55 +318,6 @@ export default function StaffSettingsPage() {
     }
   };
 
-  const handleSelfChangePin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selfChangePinFormData.staffId) {
-      toast.error('Vui lòng chọn nhân viên');
-      return;
-    }
-    if (selfChangePinFormData.newPin.length !== 4) {
-      toast.error('Mã PIN mới phải có đúng 4 số');
-      return;
-    }
-    if (selfChangePinFormData.newPin !== selfChangePinFormData.confirmPin) {
-      toast.error('Mã PIN xác nhận không khớp');
-      return;
-    }
-
-    try {
-      // 1. Verify Old PIN (Only if changing own PIN)
-      if (selfChangePinFormData.staffId === currentUserId) {
-        const { data: isValid, error: verifyError } = await supabase.rpc('fn_verify_staff_pin', {
-          p_staff_id: selfChangePinFormData.staffId,
-          p_pin_hash: selfChangePinFormData.oldPin
-        });
-
-        if (verifyError) throw verifyError;
-        if (!isValid) {
-          toast.error('Mã PIN cũ không chính xác');
-          return;
-        }
-      }
-
-      // 2. Set New PIN
-      const { data, error } = await supabase.rpc('fn_manage_staff', {
-        p_action: 'SET_PIN',
-        p_id: selfChangePinFormData.staffId,
-        p_pin_hash: selfChangePinFormData.newPin
-      });
-
-      if (error) throw error;
-      if (data && !data.success) throw new Error(data.message);
-
-      toast.success('Đổi mã PIN thành công');
-      setIsSelfChangePinModalOpen(false);
-      setSelfChangePinFormData({ staffId: '', oldPin: '', newPin: '', confirmPin: '' });
-      fetchData();
-    } catch (error: any) {
-      toast.error('Lỗi: ' + error.message);
-    }
-  };
-
   const securityCategories = [
     { id: 'checkin', name: 'Nhận phòng', color: 'text-blue-500', bg: 'bg-blue-50' },
     { id: 'folio', name: 'Dịch vụ', color: 'text-purple-500', bg: 'bg-purple-50' },
@@ -434,6 +407,56 @@ export default function StaffSettingsPage() {
     );
   };
 
+  // Functional Permissions Handlers
+  const handleToggleFunctionalPermission = async (roleCode: string, permissionCode: string) => {
+    const role = rolePermissions.find(r => r.role_code === roleCode);
+    if (!role) return;
+
+    let newPermissions: string[];
+    const hasPermission = role.permissions.includes(permissionCode);
+    
+    if (hasPermission) {
+      newPermissions = role.permissions.filter(p => p !== permissionCode);
+    } else {
+      newPermissions = [...role.permissions, permissionCode];
+    }
+
+    try {
+      await permissionService.updateRolePermissions(roleCode, newPermissions);
+      
+      // Update local state
+      setRolePermissions(prev => prev.map(r => 
+        r.role_code === roleCode ? { ...r, permissions: newPermissions } : r
+      ));
+      toast.success('Đã cập nhật quyền thành công');
+    } catch (error: any) {
+      toast.error('Lỗi cập nhật: ' + error.message);
+    }
+  };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+      </div>
+    );
+  }
+
+  if (!can(PERMISSION_KEYS.MANAGE_PERMISSIONS)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+          <p className="text-slate-500">Bạn không có quyền quản lý nhân viên & phân quyền.</p>
+          <Link href="/settings" className="text-blue-500 hover:underline mt-4 block">
+            Quay lại Cài đặt
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto pb-32">
       <div className="mb-8 md:mb-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -449,14 +472,6 @@ export default function StaffSettingsPage() {
         </div>
 
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
-          <button
-            onClick={() => setIsSelfChangePinModalOpen(true)}
-            className="hidden md:flex px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all shadow-sm"
-          >
-            Đổi PIN Cá Nhân
-          </button>
-
-          <div className="flex bg-gray-100 p-1 rounded-2xl w-full md:w-auto">
             <button 
               onClick={() => setActiveTab('staff')}
               className={`flex-1 md:flex-none px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'staff' ? 'bg-white text-accent shadow-sm' : 'text-muted hover:text-main'}`}
@@ -467,534 +482,504 @@ export default function StaffSettingsPage() {
               onClick={() => setActiveTab('security')}
               className={`flex-1 md:flex-none px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'security' ? 'bg-white text-accent shadow-sm' : 'text-muted hover:text-main'}`}
             >
-              Phân quyền 3 tầng
+              Phân quyền theo hành động
+            </button>
+             <button 
+              onClick={() => setActiveTab('functional')}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'functional' ? 'bg-white text-accent shadow-sm' : 'text-muted hover:text-main'}`}
+            >
+              Phân quyền Chức năng
             </button>
           </div>
         </div>
-      </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
         </div>
-      ) : activeTab === 'staff' ? (
-        <div className="space-y-8">
-          {/* Staff Filter/Toggle */}
-          <div className="flex justify-end">
-            <button 
-              onClick={() => setShowInactive(!showInactive)}
-              className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border-2 transition-all ${showInactive ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-gray-50 border-transparent text-muted hover:border-gray-200'}`}
-            >
-              {showInactive ? 'Đang hiện nhân viên đã khóa' : 'Xem nhân viên đã nghỉ việc'}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Add Staff Card */}
-            <div 
-              onClick={() => handleOpenStaffModal()}
-              className="bento-card p-8 bg-accent/5 border-dashed border-accent/20 flex flex-col items-center justify-center text-center group cursor-pointer hover:bg-accent/10 transition-all min-h-[200px]"
-            >
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-accent mb-4 shadow-sm group-hover:scale-110 transition-transform">
-                <Plus size={32} />
-              </div>
-              <h3 className="font-black uppercase tracking-tight text-accent">Thêm nhân viên</h3>
-              <p className="text-[10px] text-muted font-bold mt-2 uppercase">Cấp tài khoản mới</p>
-            </div>
-
-            {/* Staff List */}
-            {staffList
-              .filter(s => showInactive || s.is_active)
-              .map((staff) => (
-                <div key={staff.id} className={`bento-card p-8 relative group transition-all ${staff.is_active ? 'bg-white' : 'bg-gray-50/50 grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}`}>
-                  <div className="flex items-start justify-between mb-6">
-                <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-main">
-                  <Users size={24} />
-                </div>
-                <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${staff.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                  {staff.is_active ? 'Đang hoạt động' : 'Đã khóa'}
-                </div>
-              </div>
-
-              <h3 className="text-xl font-black tracking-tight text-main mb-1">{staff.full_name}</h3>
-              <p className="text-xs font-bold text-muted uppercase tracking-wider mb-4">@{staff.username} • {ROLE_NAMES[staff.role] || staff.role}</p>
-
-              <div className="flex gap-2 pt-4 border-t border-gray-50">
+      ) : (
+        <>
+          {/* TAB 1: STAFF MANAGEMENT */}
+          {activeTab === 'staff' && (
+            <div className="space-y-8">
+              {/* Staff Filter/Toggle */}
+              <div className="flex justify-end">
                 <button 
-                  onClick={() => handleOpenPinModal(staff)}
-                  className="flex-1 py-2 bg-gray-50 hover:bg-accent hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                  onClick={() => setShowInactive(!showInactive)}
+                  className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border-2 transition-all ${showInactive ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-gray-50 border-transparent text-muted hover:border-gray-200'}`}
                 >
-                  <Key size={14} /> PIN
-                </button>
-                <button 
-                  onClick={() => handleOpenFloorModal(staff)}
-                  className="w-10 h-10 bg-gray-50 hover:bg-blue-50 hover:text-blue-500 rounded-xl flex items-center justify-center transition-all"
-                  title="Phân tầng"
-                >
-                  <MapPin size={16} />
-                </button>
-                <button 
-                  onClick={() => handleOpenStaffModal(staff)}
-                  className="w-10 h-10 bg-gray-50 hover:bg-rose-50 hover:text-rose-500 rounded-xl flex items-center justify-center transition-all"
-                >
-                  <Settings2 size={16} />
+                  {showInactive ? 'Đang hiện nhân viên đã khóa' : 'Xem nhân viên đã nghỉ việc'}
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    ) : (
-      <div className="space-y-12">
-          {securityCategories.map((cat) => {
-            // Find items for this category (handling both 'checkin' and 'checkin_...' keys)
-            const items = groupedMatrix[cat.id] || [];
-            if (items.length === 0) return null;
 
-            return (
-              <section key={cat.id} className="bento-card bg-white overflow-hidden">
-                <div className={`p-6 border-b border-gray-100 flex items-center gap-3 ${cat.bg}`}>
-                  <div className={`w-10 h-10 rounded-xl bg-white flex items-center justify-center ${cat.color} shadow-sm`}>
-                    <Lock size={20} />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Add Staff Card */}
+                <div 
+                  onClick={() => handleOpenStaffModal()}
+                  className="bento-card p-8 bg-accent/5 border-dashed border-accent/20 flex flex-col items-center justify-center text-center group cursor-pointer hover:bg-accent/10 transition-all min-h-[200px]"
+                >
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-accent mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                    <Plus size={32} />
                   </div>
-                  <h2 className="text-xl font-black tracking-tight uppercase italic text-main">{cat.name}</h2>
+                  <h3 className="font-black uppercase tracking-tight text-accent">Thêm nhân viên</h3>
+                  <p className="text-[10px] text-muted font-bold mt-2 uppercase">Cấp tài khoản mới</p>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px]">
-                    <thead>
-                      <tr className="bg-gray-50/50">
-                        <th className="text-left py-4 px-6 text-[10px] font-black uppercase tracking-widest text-muted w-[30%]">Hành động</th>
-                        <th className="text-center py-4 px-4 text-[10px] font-black uppercase tracking-widest text-muted w-[15%]">Mặc định</th>
-                        {ROLES.map(role => (
-                          <th key={role} className="text-center py-4 px-4 text-[10px] font-black uppercase tracking-widest text-muted w-[15%]">{ROLE_NAMES[role] || role}</th>
-                        ))}
-                        <th className="text-center py-4 px-4 text-[10px] font-black uppercase tracking-widest text-muted w-[10%]">Ngoại lệ</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {items.map((item) => (
-                        <tr key={item.key} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="py-4 px-6">
-                            <div className="font-bold text-sm text-main">{item.description}</div>
-                          </td>
-                          
-                          {/* Global Setting */}
-                          <td className="py-4 px-4 text-center">
-                            <PolicySelect 
-                              value={item.global_policy}
-                              onChange={(val) => handleUpdateGlobalPolicy(item.key, val!)}
-                              options={POLICY_OPTIONS}
-                              className="w-full"
-                            />
-                          </td>
-
-                          {/* Role Overrides */}
-                          {ROLES.map(role => (
-                            <td key={role} className="py-4 px-4 text-center">
-                              <PolicySelect 
-                                value={item.role_policies?.[role] || null}
-                                onChange={(val) => handleUpdateRolePolicy(role, item.key, val)}
-                                options={OVERRIDE_OPTIONS}
-                                className="w-full"
-                              />
-                            </td>
-                          ))}
-
-                          {/* User Exceptions Trigger */}
-                          <td className="py-4 px-4 text-center">
-                            <button
-                              onClick={() => setEditingActionKey(item.key)}
-                              className={`h-8 w-full rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all ${
-                                item.user_policies && Object.keys(item.user_policies).length > 0 
-                                  ? 'bg-accent text-white shadow-md hover:bg-accent/90' 
-                                  : 'bg-gray-100 text-muted hover:bg-gray-200'
-                              }`}
-                            >
-                              <Users size={14} />
-                              <span>{item.user_policies ? Object.keys(item.user_policies).length : 0}</span>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Warning Footer */}
-      <div className="mt-16 p-8 bg-rose-50 rounded-3xl border border-rose-100 flex items-start gap-6">
-        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-rose-500 shadow-sm shrink-0">
-          <ShieldCheck size={24} />
-        </div>
-        <div>
-          <h4 className="font-black uppercase tracking-tight text-rose-600 mb-2">Tam Tầng Phòng Thủ</h4>
-          <p className="text-xs font-medium text-rose-800/70 leading-relaxed">
-            Hệ thống ưu tiên quyền theo thứ tự: <b>Cá nhân (User) &gt; Chức vụ (Role) &gt; Mặc định (Global)</b>.<br/>
-            Nếu một nhân viên được cấu hình riêng (Ngoại lệ), hệ thống sẽ bỏ qua quyền của Role và Global.<br/>
-            Nếu không có cấu hình riêng, hệ thống sẽ kiểm tra quyền Role. Nếu Role để "Kế thừa", sẽ dùng quyền Global.
-          </p>
-        </div>
-      </div>
-
-      {/* Modal: Add/Edit Staff */}
-      {isStaffModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8">
-              <h3 className="text-2xl font-black tracking-tight text-main mb-8 uppercase italic">
-                {editingStaff ? 'Cập nhật nhân viên' : 'Thêm nhân viên mới'}
-              </h3>
-              <form onSubmit={handleSaveStaff} className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Tên đăng nhập</label>
-                  <input
-                    type="text"
-                    value={staffFormData.username}
-                    onChange={(e) => setStaffFormData({ ...staffFormData, username: e.target.value })}
-                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none transition-all"
-                    placeholder="VD: nguyenvanan"
-                    disabled={!!editingStaff}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Họ và tên</label>
-                  <input
-                    type="text"
-                    value={staffFormData.full_name}
-                    onChange={(e) => setStaffFormData({ ...staffFormData, full_name: e.target.value })}
-                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none transition-all"
-                    placeholder="VD: Nguyễn Văn An"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Vai trò</label>
-                    <select
-                      value={staffFormData.role}
-                      onChange={(e) => setStaffFormData({ ...staffFormData, role: e.target.value })}
-                      className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none transition-all"
-                    >
-                      <option value="Staff">Nhân viên</option>
-                      <option value="Manager">Quản lý</option>
-                      <option value="Admin">Quản trị viên</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Trạng thái</label>
-                    <div 
-                      onClick={() => setStaffFormData({ ...staffFormData, is_active: !staffFormData.is_active })}
-                      className={`h-14 rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all font-black uppercase tracking-widest text-[10px] ${staffFormData.is_active ? 'bg-emerald-50 text-emerald-600 border-2 border-emerald-100' : 'bg-rose-50 text-rose-600 border-2 border-rose-100'}`}
-                    >
-                      {staffFormData.is_active ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                      {staffFormData.is_active ? 'Hoạt động' : 'Đã khóa'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsStaffModalOpen(false)}
-                    className="flex-1 h-12 rounded-xl bg-gray-100 text-muted font-bold hover:bg-gray-200 transition-all uppercase tracking-wider text-xs"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 h-12 rounded-xl bg-accent text-white font-bold hover:bg-accent/90 transition-all uppercase tracking-wider text-xs shadow-lg shadow-accent/25"
-                  >
-                    Lưu
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Set PIN */}
-      {isPinModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8">
-              <h3 className="text-xl font-black tracking-tight text-main mb-6 uppercase italic">
-                Đặt PIN cho {editingStaff?.full_name}
-              </h3>
-              <form onSubmit={handleSavePin} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Mã PIN mới (4 số)</label>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    value={pinFormData.pin}
-                    onChange={(e) => setPinFormData({ ...pinFormData, pin: e.target.value.replace(/[^0-9]/g, '') })}
-                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none text-center text-2xl tracking-[0.5em] transition-all"
-                    placeholder="••••"
-                    autoFocus
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Xác nhận mã PIN</label>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    value={pinFormData.confirmPin}
-                    onChange={(e) => setPinFormData({ ...pinFormData, confirmPin: e.target.value.replace(/[^0-9]/g, '') })}
-                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none text-center text-2xl tracking-[0.5em] transition-all"
-                    placeholder="••••"
-                  />
-                </div>
-                <div className="pt-4 flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsPinModalOpen(false)}
-                    className="flex-1 h-12 rounded-xl bg-gray-100 text-muted font-bold hover:bg-gray-200 transition-all uppercase tracking-wider text-xs"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 h-12 rounded-xl bg-accent text-white font-bold hover:bg-accent/90 transition-all uppercase tracking-wider text-xs shadow-lg shadow-accent/25"
-                  >
-                    Lưu PIN
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Self Change PIN */}
-      {isSelfChangePinModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8">
-              <h3 className="text-xl font-black tracking-tight text-main mb-6 uppercase italic">
-                Đổi PIN Cá Nhân
-              </h3>
-              <form onSubmit={handleSelfChangePin} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Chọn nhân viên</label>
-                  <select
-                    value={selfChangePinFormData.staffId}
-                    onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, staffId: e.target.value })}
-                    className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none transition-all"
-                  >
-                    <option value="">-- Chọn tài khoản --</option>
-                    {staffList.filter(s => s.is_active).map(s => (
-                      <option key={s.id} value={s.id}>{s.full_name} (@{s.username})</option>
-                    ))}
-                  </select>
-                </div>
-                
-                {selfChangePinFormData.staffId === currentUserId && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">PIN cũ</label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      value={selfChangePinFormData.oldPin}
-                      onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, oldPin: e.target.value.replace(/[^0-9]/g, '') })}
-                      className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none text-center text-xl tracking-[0.5em] transition-all"
-                      placeholder="••••"
-                    />
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">PIN mới</label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      value={selfChangePinFormData.newPin}
-                      onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, newPin: e.target.value.replace(/[^0-9]/g, '') })}
-                      className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none text-center text-xl tracking-[0.5em] transition-all"
-                      placeholder="••••"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-4">Xác nhận</label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      value={selfChangePinFormData.confirmPin}
-                      onChange={(e) => setSelfChangePinFormData({ ...selfChangePinFormData, confirmPin: e.target.value.replace(/[^0-9]/g, '') })}
-                      className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-accent rounded-2xl px-6 font-bold outline-none text-center text-xl tracking-[0.5em] transition-all"
-                      placeholder="••••"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsSelfChangePinModalOpen(false)}
-                    className="flex-1 h-12 rounded-xl bg-gray-100 text-muted font-bold hover:bg-gray-200 transition-all uppercase tracking-wider text-xs"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 h-12 rounded-xl bg-accent text-white font-bold hover:bg-accent/90 transition-all uppercase tracking-wider text-xs shadow-lg shadow-accent/25"
-                  >
-                    Đổi PIN
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Set Floors */}
-      {isFloorModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8">
-              <h3 className="text-xl font-black tracking-tight text-main mb-2 uppercase italic">
-                Phân tầng quản lý
-              </h3>
-              <p className="text-xs text-muted font-medium mb-6">
-                Chọn các tầng mà <span className="text-accent font-bold">{editingStaff?.full_name}</span> được phép quản lý.
-              </p>
-              
-              <form onSubmit={handleSaveFloors} className="space-y-6">
-                <div className="flex flex-wrap gap-3">
-                  {availableFloors.length > 0 ? availableFloors.map(floor => {
-                    const isSelected = floorFormData.floors.includes(floor);
-                    return (
-                      <div 
-                        key={floor}
-                        onClick={() => toggleFloor(floor)}
-                        className={`
-                          w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black cursor-pointer transition-all select-none
-                          ${isSelected 
-                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30 scale-110' 
-                            : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}
-                        `}
-                      >
-                        {floor}
+                {/* Staff List */}
+                {staffList
+                  .filter(s => showInactive || s.is_active)
+                  .map((staff) => (
+                    <div key={staff.id} className={`bento-card p-8 relative group transition-all ${staff.is_active ? 'bg-white' : 'bg-gray-50/50 grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}`}>
+                      <div className="flex items-start justify-between mb-6">
+                        <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-main">
+                          <Users size={24} />
+                        </div>
+                        <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${staff.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                          {staff.is_active ? 'Đang hoạt động' : 'Đã khóa'}
+                        </div>
                       </div>
-                    );
-                  }) : (
-                    <div className="text-sm text-muted italic w-full text-center py-4 bg-gray-50 rounded-xl">
-                      Chưa có dữ liệu tầng (cần tạo phòng trước)
+
+                      <h3 className="text-xl font-black tracking-tight text-main mb-1">{staff.full_name}</h3>
+                      <p className="text-xs font-bold text-muted uppercase tracking-wider mb-4">@{staff.username} • {ROLE_NAMES[staff.role] || staff.role}</p>
+
+                      <div className="flex gap-2 pt-4 border-t border-gray-50">
+                        <button 
+                          onClick={() => handleOpenPinModal(staff)}
+                          className="flex-1 py-2 bg-gray-50 hover:bg-accent hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                        >
+                          <Key size={14} /> PIN
+                        </button>
+                        <button 
+                          onClick={() => handleOpenFloorModal(staff)}
+                          className="w-10 h-10 bg-gray-50 hover:bg-blue-50 hover:text-blue-500 rounded-xl flex items-center justify-center transition-all"
+                          title="Phân tầng"
+                        >
+                          <MapPin size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleOpenStaffModal(staff)}
+                          className="w-10 h-10 bg-gray-50 hover:bg-rose-50 hover:text-rose-500 rounded-xl flex items-center justify-center transition-all"
+                        >
+                          <Settings2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                  )}
-                </div>
-
-                <div className="pt-4 flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsFloorModalOpen(false)}
-                    className="flex-1 h-12 rounded-xl bg-gray-100 text-muted font-bold hover:bg-gray-200 transition-all uppercase tracking-wider text-xs"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 h-12 rounded-xl bg-blue-500 text-white font-bold hover:bg-blue-600 transition-all uppercase tracking-wider text-xs shadow-lg shadow-blue-500/25"
-                  >
-                    Lưu cấu hình
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: User Exceptions */}
-      {editingActionKey && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-              <div>
-                <h3 className="text-xl font-black tracking-tight text-main uppercase italic">
-                  Ngoại lệ cấp cá nhân
-                </h3>
-                <p className="text-xs text-muted font-medium mt-1">
-                  Cấu hình riêng cho: <span className="text-accent font-bold">{securityMatrix.find(i => i.key === editingActionKey)?.description}</span>
-                </p>
+                  ))}
               </div>
-              <button 
-                onClick={() => setEditingActionKey(null)}
-                className="w-10 h-10 rounded-xl bg-white text-muted hover:text-rose-500 hover:bg-rose-50 flex items-center justify-center transition-all shadow-sm"
-              >
-                <XCircle size={20} />
-              </button>
             </div>
-            
-            <div className="p-0 overflow-y-auto flex-1">
-              <table className="w-full">
-                <thead className="bg-white sticky top-0 z-10 shadow-sm">
-                  <tr>
-                    <th className="text-left py-4 px-8 text-[10px] font-black uppercase tracking-widest text-muted">Nhân viên</th>
-                    <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-muted">Vai trò</th>
-                    <th className="text-left py-4 px-8 text-[10px] font-black uppercase tracking-widest text-muted w-[200px]">Quyền riêng</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {staffList.map(staff => {
-                    const currentItem = securityMatrix.find(i => i.key === editingActionKey);
-                    const userPolicy = currentItem?.user_policies?.[staff.id] || null;
-                    const rolePolicy = currentItem?.role_policies?.[staff.role] || null;
-                    const globalPolicy = currentItem?.global_policy || 'PIN';
-                    
-                    // Determine effective policy for display
-                    const effective = userPolicy || rolePolicy || globalPolicy;
-                    
-                    return (
-                      <tr key={staff.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-8">
-                          <div className="font-bold text-sm text-main">{staff.full_name}</div>
-                          <div className="text-[10px] font-medium text-muted">@{staff.username}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="px-2 py-1 rounded-md bg-gray-100 text-[10px] font-bold text-muted uppercase tracking-wider">
-                            {ROLE_NAMES[staff.role] || staff.role}
-                          </span>
-                        </td>
-                        <td className="py-4 px-8">
-                          <PolicySelect 
-                            value={userPolicy}
-                            onChange={(val) => handleUpdateUserPolicy(staff.id, editingActionKey, val)}
-                            options={OVERRIDE_OPTIONS}
-                            className="w-full"
-                          />
-                          {/* Show effective resolved policy hint if inherited */}
-                          {!userPolicy && (
-                            <div className="text-[9px] text-muted mt-1 pl-1">
-                              Đang dùng: <span className="font-bold">{POLICY_OPTIONS.find(o => o.id === effective)?.label}</span>
-                              <span className="opacity-50"> ({rolePolicy ? 'Chức vụ' : 'Mặc định'})</span>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          )}
 
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end">
-              <button
-                onClick={() => setEditingActionKey(null)}
-                className="px-8 py-3 rounded-xl bg-accent text-white font-bold hover:bg-accent/90 transition-all uppercase tracking-wider text-xs shadow-lg shadow-accent/25"
-              >
-                Đóng
-              </button>
+          {/* TAB 2: SECURITY MATRIX */}
+          {activeTab === 'security' && (
+            <div className="space-y-12">
+              {securityCategories.map((cat) => {
+                // Find items for this category (handling both 'checkin' and 'checkin_...' keys)
+                const items = groupedMatrix[cat.id] || [];
+                if (items.length === 0) return null;
+
+                return (
+                  <div key={cat.id}>
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${cat.bg} ${cat.color}`}>
+                        <ShieldCheck size={18} />
+                      </div>
+                      <h2 className="text-xl font-black uppercase tracking-tight text-main">{cat.name}</h2>
+                    </div>
+                    
+                    <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="text-left py-4 px-6 text-[10px] font-black uppercase tracking-widest text-muted w-1/3">Hành động bảo mật</th>
+                            <th className="text-center py-4 px-4 text-[10px] font-black uppercase tracking-widest text-muted w-32">Mặc định</th>
+                            {ROLES.map(role => (
+                              <th key={role} className="text-center py-4 px-4 text-[10px] font-black uppercase tracking-widest text-muted w-32">
+                                {ROLE_NAMES[role] || role}
+                              </th>
+                            ))}
+                            <th className="text-left py-4 px-6 text-[10px] font-black uppercase tracking-widest text-muted">Ngoại lệ (Nhân viên)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {items.map((item) => (
+                            <tr key={item.key} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="py-4 px-6">
+                                <p className="font-bold text-sm text-main">{item.description}</p>
+                              </td>
+                              
+                              {/* Global Policy */}
+                              <td className="py-4 px-4 text-center">
+                                <PolicySelect 
+                                  value={item.global_policy}
+                                  onChange={(val) => handleUpdateGlobalPolicy(item.key, val!)}
+                                  options={POLICY_OPTIONS}
+                                />
+                              </td>
+
+                              {/* Role Overrides */}
+                              {ROLES.map(role => (
+                                <td key={role} className="py-4 px-4 text-center">
+                                  <PolicySelect 
+                                    value={item.role_policies[role] || null}
+                                    onChange={(val) => handleUpdateRolePolicy(role, item.key, val)}
+                                    options={OVERRIDE_OPTIONS}
+                                    className={!item.role_policies[role] ? 'opacity-50 hover:opacity-100' : ''}
+                                  />
+                                </td>
+                              ))}
+
+                              {/* User Overrides Display */}
+                              <td className="py-4 px-6">
+                                <div className="flex flex-wrap gap-2">
+                                  {Object.entries(item.user_policies).map(([userId, policy]) => {
+                                    const staff = staffList.find(s => s.id === userId);
+                                    if (!staff) return null;
+                                    
+                                    const policyConfig = POLICY_OPTIONS.find(p => p.id === policy);
+                                    
+                                    return (
+                                      <div key={userId} className={`flex items-center gap-2 px-2 py-1 rounded-lg border text-[10px] font-bold ${policyConfig?.color || 'bg-gray-100 border-gray-200'}`}>
+                                        <span>{staff.full_name}</span>
+                                        <button 
+                                          onClick={() => handleUpdateUserPolicy(userId, item.key, null)}
+                                          className="hover:text-red-500"
+                                        >
+                                          <XCircle size={12} />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                  
+                                  <button 
+                                    onClick={() => {
+                                      setEditingActionKey(item.key);
+                                      setOverrideUserId('');
+                                      setOverridePolicy('ALLOW');
+                                    }}
+                                    className="w-6 h-6 rounded-full border border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:text-accent hover:border-accent transition-colors"
+                                  >
+                                    <Plus size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* TAB 3: FUNCTIONAL PERMISSIONS (NEW SIMPLE MATRIX) */}
+          {activeTab === 'functional' && (
+             <div className="space-y-6">
+                <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm p-8">
+                  <div className="mb-6">
+                    <h2 className="text-xl font-black uppercase tracking-tight text-main mb-2">Phân quyền Chức năng</h2>
+                    <p className="text-muted text-sm">Cấp quyền truy cập các trang và tính năng cho từng vai trò.</p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          <th className="text-left py-4 px-6 text-[10px] font-black uppercase tracking-widest text-muted w-1/3">Chức năng / Trang</th>
+                          {/* Only show non-admin roles */}
+                          {rolePermissions.filter(r => r.role_code !== 'admin').map(role => (
+                            <th key={role.role_code} className="text-center py-4 px-4 text-[10px] font-black uppercase tracking-widest text-muted w-32">
+                              {role.role_name}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {PERMISSION_METADATA.map((group) => (
+                          <Fragment key={group.group}>
+                            {/* Group Header */}
+                            <tr className="bg-slate-50/50">
+                              <td colSpan={rolePermissions.length} className="py-3 px-6 font-black text-xs uppercase text-slate-500 tracking-wider">
+                                {group.group}
+                              </td>
+                            </tr>
+                            
+                            {/* Permission Items */}
+                            {group.items.map(item => (
+                              <tr key={item.code} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="py-4 px-6">
+                                  <p className="font-bold text-sm text-main">{item.label}</p>
+                                </td>
+                                
+                                {rolePermissions.filter(r => r.role_code !== 'admin').map(role => {
+                                  const isChecked = role.permissions.includes(item.code);
+                                  return (
+                                    <td key={role.role_code} className="py-4 px-4 text-center">
+                                      <button
+                                        onClick={() => handleToggleFunctionalPermission(role.role_code, item.code)}
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                                          isChecked 
+                                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200' 
+                                            : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
+                                        }`}
+                                      >
+                                        {isChecked ? <Check size={18} strokeWidth={3} /> : <X size={18} />}
+                                      </button>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+             </div>
+          )}
+        </>
+      )}
+
+      {/* Modals */}
+      {isStaffModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h2 className="text-2xl font-black uppercase tracking-tight text-main mb-6">
+              {editingStaff ? 'Cập nhật nhân viên' : 'Thêm nhân viên mới'}
+            </h2>
+            <form onSubmit={handleSaveStaff} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Tên đăng nhập</label>
+                <input 
+                  type="text"
+                  value={staffFormData.username}
+                  onChange={e => setStaffFormData({...staffFormData, username: e.target.value})}
+                  className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-bold"
+                  placeholder="VD: user1"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Họ và tên</label>
+                <input 
+                  type="text"
+                  value={staffFormData.full_name}
+                  onChange={e => setStaffFormData({...staffFormData, full_name: e.target.value})}
+                  className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-bold"
+                  placeholder="VD: Nguyễn Văn A"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Vai trò</label>
+                <select 
+                  value={staffFormData.role}
+                  onChange={e => setStaffFormData({...staffFormData, role: e.target.value})}
+                  className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-bold"
+                >
+                  <option value="Staff">Nhân viên</option>
+                  <option value="Manager">Quản lý</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+                <input 
+                  type="checkbox"
+                  checked={staffFormData.is_active}
+                  onChange={e => setStaffFormData({...staffFormData, is_active: e.target.checked})}
+                  className="w-5 h-5 accent-accent"
+                />
+                <span className="font-bold text-sm text-main">Đang hoạt động</span>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button 
+                  type="button"
+                  onClick={() => setIsStaffModalOpen(false)}
+                  className="flex-1 py-3 rounded-xl font-bold text-muted hover:bg-gray-50 transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl font-bold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20"
+                >
+                  Lưu thay đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isPinModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h2 className="text-xl font-black uppercase tracking-tight text-main mb-6">
+              Đặt mã PIN cho {editingStaff?.full_name}
+            </h2>
+            <form onSubmit={handleSavePin} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Mã PIN mới (4 số)</label>
+                <input 
+                  type="password"
+                  maxLength={4}
+                  value={pinFormData.pin}
+                  onChange={e => setPinFormData({...pinFormData, pin: e.target.value.replace(/\D/g, '')})}
+                  className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-black text-center text-2xl tracking-[1em]"
+                  placeholder="••••"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Xác nhận mã PIN</label>
+                <input 
+                  type="password"
+                  maxLength={4}
+                  value={pinFormData.confirmPin}
+                  onChange={e => setPinFormData({...pinFormData, confirmPin: e.target.value.replace(/\D/g, '')})}
+                  className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-black text-center text-2xl tracking-[1em]"
+                  placeholder="••••"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button 
+                  type="button"
+                  onClick={() => setIsPinModalOpen(false)}
+                  className="flex-1 py-3 rounded-xl font-bold text-muted hover:bg-gray-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl font-bold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20"
+                >
+                  Lưu PIN
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isFloorModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h2 className="text-xl font-black uppercase tracking-tight text-main mb-2">
+              Phân tầng hoạt động
+            </h2>
+            <p className="text-muted text-sm mb-6 font-medium">Chọn các tầng mà {editingStaff?.full_name} được phép quản lý</p>
+            
+            <form onSubmit={handleSaveFloors} className="space-y-6">
+              <div className="grid grid-cols-3 gap-3">
+                {availableFloors.map(floor => (
+                  <button
+                    key={floor}
+                    type="button"
+                    onClick={() => toggleFloor(floor)}
+                    className={`h-12 rounded-xl font-black text-lg flex items-center justify-center transition-all border-2 ${
+                      floorFormData.floors.includes(floor)
+                        ? 'bg-accent text-white border-accent shadow-lg shadow-accent/20'
+                        : 'bg-gray-50 text-muted border-transparent hover:border-gray-200'
+                    }`}
+                  >
+                    {floor}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button 
+                  type="button"
+                  onClick={() => setIsFloorModalOpen(false)}
+                  className="flex-1 py-3 rounded-xl font-bold text-muted hover:bg-gray-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl font-bold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20"
+                >
+                  Lưu
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Override Modal (Restored) */}
+      {editingActionKey && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h2 className="text-xl font-black uppercase tracking-tight text-main mb-2">
+              Thêm ngoại lệ
+            </h2>
+            <p className="text-muted text-sm mb-6 font-medium">Cấp quyền riêng cho nhân viên cụ thể</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Nhân viên</label>
+                <select 
+                  value={overrideUserId}
+                  onChange={e => setOverrideUserId(e.target.value)}
+                  className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-bold"
+                >
+                  <option value="">-- Chọn nhân viên --</option>
+                  {staffList
+                    .filter(s => s.is_active)
+                    .map(s => (
+                    <option key={s.id} value={s.id}>{s.full_name} (@{s.username})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Quyền hạn</label>
+                <div className="grid grid-cols-2 gap-2">
+                    {POLICY_OPTIONS.map(opt => (
+                        <button
+                            key={opt.id}
+                            onClick={() => setOverridePolicy(opt.id)}
+                            className={`p-2 rounded-lg text-xs font-black uppercase tracking-wider border-2 transition-all ${
+                                overridePolicy === opt.id 
+                                    ? opt.color + ' border-current shadow-sm' 
+                                    : 'bg-gray-50 text-muted border-transparent hover:bg-gray-100'
+                            }`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button 
+                  onClick={() => setEditingActionKey(null)}
+                  className="flex-1 py-3 rounded-xl font-bold text-muted hover:bg-gray-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (!overrideUserId) {
+                        toast.error('Vui lòng chọn nhân viên');
+                        return;
+                    }
+                    await handleUpdateUserPolicy(overrideUserId, editingActionKey, overridePolicy);
+                    setEditingActionKey(null);
+                  }}
+                  className="flex-1 py-3 rounded-xl font-bold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20"
+                >
+                  Lưu
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+
     </div>
   );
 }

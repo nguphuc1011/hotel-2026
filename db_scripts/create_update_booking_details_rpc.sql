@@ -1,3 +1,8 @@
+-- DROP ALL OVERLOADS to ensure a clean state
+DROP FUNCTION IF EXISTS public.update_booking_details(uuid, text, timestamp with time zone, numeric, text, text, uuid, uuid, text);
+DROP FUNCTION IF EXISTS public.update_booking_details(uuid, text, timestamp with time zone, numeric, text, text, uuid, uuid);
+DROP FUNCTION IF EXISTS public.update_booking_details(uuid, text, timestamp with time zone, numeric, text, text, uuid);
+
 CREATE OR REPLACE FUNCTION public.update_booking_details(
     p_booking_id uuid,
     p_customer_name text DEFAULT NULL,
@@ -6,7 +11,8 @@ CREATE OR REPLACE FUNCTION public.update_booking_details(
     p_price_apply_mode text DEFAULT 'all',
     p_reason text DEFAULT NULL,
     p_staff_id uuid DEFAULT NULL,
-    p_customer_id uuid DEFAULT NULL -- New parameter for changing customer
+    p_customer_id uuid DEFAULT NULL, -- New parameter for changing customer
+    p_notes text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -40,7 +46,7 @@ BEGIN
     END IF;
 
     -- 2. Update Customer Name (on the target customer)
-    IF p_customer_name IS NOT NULL THEN
+    IF p_customer_name IS NOT NULL AND v_target_customer_id IS NOT NULL THEN
         UPDATE public.customers
         SET full_name = p_customer_name, updated_at = now()
         WHERE id = v_target_customer_id;
@@ -52,8 +58,16 @@ BEGIN
         check_in_actual = COALESCE(p_check_in_at, check_in_actual),
         custom_price = CASE WHEN p_custom_price IS NOT NULL THEN p_custom_price ELSE custom_price END,
         custom_price_reason = CASE WHEN p_custom_price IS NOT NULL THEN p_reason ELSE custom_price_reason END,
-        notes = COALESCE(notes, '') || E'\n[' || now() || '] Cập nhật thông tin. ' || COALESCE(p_reason, '')
+        notes = CASE WHEN p_notes IS NOT NULL THEN p_notes ELSE notes END,
+        updated_at = now()
     WHERE id = p_booking_id;
+
+    -- 4. Log Audit with appended history in notes if reason provided
+    IF p_reason IS NOT NULL THEN
+        UPDATE public.bookings
+        SET notes = COALESCE(notes, '') || E'\n[' || now() || '] Cập nhật: ' || p_reason
+        WHERE id = p_booking_id;
+    END IF;
 
     -- 4. Log Audit
     INSERT INTO public.audit_logs (booking_id, customer_id, staff_id, explanation)
@@ -68,7 +82,8 @@ BEGIN
                 'check_in_at', p_check_in_at,
                 'custom_price', p_custom_price,
                 'price_apply_mode', p_price_apply_mode,
-                'customer_id', p_customer_id
+                'customer_id', p_customer_id,
+                'notes', p_notes
             ),
             'reason', p_reason
         )
@@ -79,3 +94,4 @@ EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object('success', false, 'message', 'Lỗi hệ thống: ' || SQLERRM);
 END;
 $function$;
+

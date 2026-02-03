@@ -45,6 +45,45 @@ BEGIN
 END;
 $$;
 
+-- 3. RPC: Cancel Request (Recovery / Unstick)
+CREATE OR REPLACE FUNCTION public.fn_cancel_approval_request(
+    p_request_id uuid,
+    p_reason text DEFAULT NULL,
+    p_actor_id uuid DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_req RECORD;
+    v_actor uuid;
+BEGIN
+    IF p_request_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Thiếu ID yêu cầu (p_request_id)');
+    END IF;
+    
+    SELECT * INTO v_req FROM public.pending_approvals WHERE id = p_request_id;
+    IF v_req IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Yêu cầu không tồn tại');
+    END IF;
+    
+    v_actor := COALESCE(p_actor_id, auth.uid());
+    
+    UPDATE public.pending_approvals
+    SET 
+        status = 'REJECTED',
+        updated_at = now(),
+        request_data = CASE 
+            WHEN p_reason IS NOT NULL THEN COALESCE(request_data, '{}'::jsonb) || jsonb_build_object('cancel_reason', p_reason)
+            ELSE request_data
+        END
+    WHERE id = p_request_id;
+    
+    RETURN jsonb_build_object('success', true, 'message', 'Đã hủy yêu cầu');
+END;
+$$;
+
 -- 2. Tạo lại fn_approve_request 
 -- LƯU Ý: Thứ tự tham số cực kỳ quan trọng để khớp với Schema Cache của PostgREST
 -- p_manager_id, p_manager_pin, p_method, p_request_id (theo thứ tự alphabet của tên tham số)

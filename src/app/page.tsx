@@ -17,9 +17,13 @@ import { toast } from 'sonner';
 import { cashFlowService, Wallet } from '@/services/cashFlowService';
 import WalletCards from '@/app/cash-flow/components/WalletCards';
 import { useRouter } from 'next/navigation';
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
+import { ShieldCheck } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { can, isLoading: isAuthLoading } = usePermission();
   const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [rooms, setRooms] = useState<DashboardRoom[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -47,6 +51,8 @@ export default function DashboardPage() {
 
   // Fetch initial data
   const fetchData = async () => {
+    if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) return;
+
     try {
       setLoading(true);
       
@@ -96,7 +102,8 @@ export default function DashboardPage() {
       const { data: approvalData } = await supabase
         .from('pending_approvals')
         .select('*')
-        .in('status', ['PENDING', 'APPROVED']);
+        .in('status', ['PENDING', 'APPROVED'])
+        .order('created_at', { ascending: false }); // Lấy cái mới nhất lên trước
 
       // 3. Merge Data
       const mergedRooms: DashboardRoom[] = roomsData.map((room: any) => {
@@ -109,21 +116,31 @@ export default function DashboardPage() {
            
            // CRITICAL FIX: Only show approval if it matches the CURRENT Booking ID
            // If booking exists, we MUST match booking_id
-           if (booking && rData?.booking_id) {
-               // Check if the approval's booking_id matches current booking
-               // Use startsWith because booking_id in rData might be short or full
-               return booking.id.startsWith(rData.booking_id) || rData.booking_id === booking.id;
-           }
-           
-           // If no booking exists (room available/dirty), we only show approvals that are NOT tied to a specific closed booking
-           // OR if it's a general room request (maintenance, etc)
-           // BUT for cancellation requests (checkin_cancel_booking), they are tied to a booking.
-           // If the room is now empty/dirty, that booking is gone/cancelled, so we should NOT show the approval anymore.
-           if (!booking && req.action_key === 'checkin_cancel_booking') {
-               return false; 
+           if (booking) {
+               // If request has booking_id, it MUST match the current booking
+               if (rData?.booking_id) {
+                   return booking.id.startsWith(rData.booking_id) || rData.booking_id === booking.id;
+               }
+               // If request has NO booking_id but has room_id (generic room request), we might show it
+               // But usually approval requests are booking-specific. 
+               // For safety, if booking exists, we prefer strict matching.
+               // Let's allow generic room requests only if they don't look like booking actions.
            }
 
-           // Fallback for non-booking requests (e.g. maintenance)
+           // If no booking exists (room available/dirty)
+           // We only show approvals that are NOT tied to a specific closed booking
+           if (!booking) {
+               // If it's a cancellation request, it is tied to a booking that is now gone/cancelled.
+               // So we should NOT show it on the empty room.
+               if (req.action_key === 'checkin_cancel_booking') {
+                   return false; 
+               }
+               // If request has booking_id, and booking is gone, don't show it?
+               // Ideally yes.
+               if (rData?.booking_id) return false;
+           }
+
+           // Fallback for non-booking requests or requests without booking_id
            if (rData?.room_id && rData.room_id === room.id) return true;
            if (rData?.room_number === (room.room_number || room.name)) return true;
            
@@ -240,7 +257,6 @@ export default function DashboardPage() {
         
         if (result.success) {
             toast.success("Đã tự động hủy phòng thành công!");
-            // fetchData will be triggered by booking table change, but we can force it
             fetchData();
         } else {
             // Only show error if it's not "already cancelled" (optional, but for now show all)
@@ -252,10 +268,34 @@ export default function DashboardPage() {
     }
   };
 
-  // Real-time Subscription & Initial Fetch
   useEffect(() => {
-    fetchData();
+    if (!isAuthLoading && can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
+      fetchData();
+    }
+  }, [isAuthLoading, can]);
 
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+      </div>
+    );
+  }
+
+  if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+          <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Real-time Subscription
+  useEffect(() => {
     // Consolidated Subscription
     const channel = supabase
       .channel('dashboard_updates')
@@ -278,7 +318,7 @@ export default function DashboardPage() {
                 // Trigger if status is APPROVED (ignoring old record due to Replica Identity limitations)
                 if (newRecord.status === 'APPROVED') {
                     console.log("Approval received:", newRecord.id);
-                    // DISABLED Auto-Execution as per User Request (Room Map Sync Mode)
+                    // DISABLED Auto-Execution as per User Request (Manual Completion Mode)
                     // handleAutoExecution(newRecord); 
                 }
             }

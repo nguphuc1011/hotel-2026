@@ -50,5 +50,31 @@ Hệ thống phát hiện gian lận thông qua 2 lớp rào chắn:
 - [x] Viết RPC `open_shift`, `close_shift`.
 - [x] Viết Trigger đồng bộ `wallets`.
 
+## 5. [MỚI] Tái cấu trúc Hệ thống An ninh & Phân quyền (2026-02-02)
+Thực hiện Mật lệnh "Cửa tầng lồng cửa lớp":
+
+### 5.1. Cấu trúc Modular & Master Switch
+- **Bảng mới**: `permission_settings` lưu cấu hình cho từng Module (`money`, `dashboard`, `settings`).
+- **Master Switch**: Cho phép tắt/bật toàn bộ module.
+    - Nếu OFF: Chặn toàn bộ truy cập (kể cả Manager), TRỪ Exception.
+    - Nếu ON: Áp dụng phân quyền RBAC bình thường.
+
+### 5.2. Quyền Ngoại lệ (Exception Priority)
+- **Cơ chế**: Danh sách `exceptions` (Array of Staff IDs) được lưu trong `permission_settings`.
+- **Logic**: Exception có độ ưu tiên CAO NHẤT.
+    - Nếu User nằm trong Exception List -> **ALLOW** (Bỏ qua Master Switch OFF, bỏ qua RBAC restrictions).
+
+### 5.3. Cập nhật Logic Store
+- Cập nhật `useAuthStore` để load và cache `permission_settings`.
+- Hàm `hasPermission` đã được nâng cấp để kiểm tra theo thứ tự ưu tiên:
+    1. **Exception Check**: Nếu có tên trong ngoại lệ -> Allow.
+    2. **Master Switch Check**: Nếu Module OFF -> Deny (trừ khi là Exception).
+    3. **RBAC Check**: Kiểm tra quyền theo Vai trò/Tùy chỉnh cá nhân.
+
+### 5.4. Giao diện Modular Matrix
+- Đã chuyển đổi trang `/settings/permissions` sang giao diện thẻ bài (Cards).
+- Hiển thị trực quan trạng thái Module (Active/Blocked).
+- Cho phép gạt Master Switch và thêm/bớt Ngoại lệ ngay trên giao diện.
+
 ---
-*Cập nhật lần cuối: 2026-01-22*
+*Cập nhật lần cuối: 2026-02-02*

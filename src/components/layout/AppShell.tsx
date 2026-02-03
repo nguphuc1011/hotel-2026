@@ -9,13 +9,21 @@ import {
   Wallet,
   Banknote,
   Users,
-  Clock
+  Clock,
+  Key,
+  ChevronUp,
+  User,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/AuthProvider';
 import WalletNotificationModal from '@/components/shared/WalletNotificationModal';
+import { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
 
 export default function AppShell({
   children,
@@ -23,7 +31,44 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { logout, user } = useAuth();
+  const { logout, user, updatePin } = useAuth();
+  const { can } = usePermission();
+  
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
+  const [pinForm, setPinForm] = useState({ oldPin: '', newPin: '', confirmPin: '' });
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleChangePinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinForm.newPin.length !== 4) {
+      toast.error('Mã PIN mới phải có 4 số');
+      return;
+    }
+    if (pinForm.newPin !== pinForm.confirmPin) {
+      toast.error('Xác nhận mã PIN không khớp');
+      return;
+    }
+
+    const success = await updatePin(pinForm.oldPin, pinForm.newPin);
+    if (success) {
+      setIsChangePinModalOpen(false);
+      setPinForm({ oldPin: '', newPin: '', confirmPin: '' });
+    }
+  };
+
 
   // Don't show shell on login page
   if (pathname === '/login') {
@@ -31,16 +76,15 @@ export default function AppShell({
   }
 
   const navItems = [
-    { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: '/' },
-    { icon: <Banknote size={24} />, label: 'Tiền', href: '/tien' },
+    { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: '/', permission: PERMISSION_KEYS.VIEW_DASHBOARD },
+    { icon: <Banknote size={24} />, label: 'Thu Chi', href: '/tien', permission: PERMISSION_KEYS.VIEW_MONEY },
     { icon: <Users size={24} />, label: 'Khách hàng', href: '/customers' },
     { icon: <Clock size={24} />, label: 'Giao ca', href: '/shifts' },
-    { icon: <Wallet size={24} />, label: 'Thu Chi', href: '/cash-flow' },
-    { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: '/reports' },
-    { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: '/settings' },
+    { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: '/reports', permission: PERMISSION_KEYS.VIEW_REPORTS },
+    { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: '/settings', permission: PERMISSION_KEYS.VIEW_SETTINGS },
   ];
 
-  const visibleNavItems = navItems;
+  const visibleNavItems = navItems.filter(item => !item.permission || can(item.permission));
 
   const homeItem = visibleNavItems.find(i => i.href === '/') || visibleNavItems[0];
   const mobileItems = visibleNavItems.filter(i => i.href !== homeItem?.href).slice(0, 4);
@@ -76,13 +120,42 @@ export default function AppShell({
           ))}
         </nav>
 
-        <div className="p-8 border-t border-white/20">
+        <div className="p-6 border-t border-white/20 relative" ref={userMenuRef}>
+          {isUserMenuOpen && (
+            <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
+              <button 
+                onClick={() => {
+                  setIsChangePinModalOpen(true);
+                  setIsUserMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-main font-bold text-sm transition-colors text-left"
+              >
+                <Key size={16} className="text-muted" />
+                Đổi mã PIN
+              </button>
+              <div className="h-px bg-gray-100 my-1" />
+              <button 
+                onClick={logout}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 text-rose-500 font-bold text-sm transition-colors text-left"
+              >
+                <LogOut size={16} />
+                Đăng xuất
+              </button>
+            </div>
+          )}
+          
           <button 
-            onClick={logout}
-            className="flex items-center gap-3 px-4 py-3 w-full text-muted font-bold text-[14px] hover:text-red-500 transition-colors"
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="flex items-center gap-3 p-3 w-full rounded-2xl hover:bg-white/40 transition-all group"
           >
-            <LogOut size={18} />
-            Đăng xuất
+            <div className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center font-black text-lg shadow-lg shadow-accent/20 group-hover:scale-105 transition-transform">
+              {user?.full_name?.charAt(0) || 'U'}
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-black text-main truncate">{user?.full_name}</p>
+              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">{user?.role}</p>
+            </div>
+            <ChevronUp size={16} className={`text-muted transition-transform duration-300 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
           </button>
         </div>
       </aside>
@@ -93,6 +166,79 @@ export default function AppShell({
           {children}
         </div>
       </main>
+
+      {/* Change PIN Modal */}
+      {isChangePinModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-black uppercase tracking-tight text-main">
+                Đổi mã PIN
+              </h2>
+              <button 
+                onClick={() => setIsChangePinModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-muted hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePinSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Mã PIN cũ</label>
+                <input 
+                  type="password"
+                  maxLength={4}
+                  value={pinForm.oldPin}
+                  onChange={e => setPinForm({...pinForm, oldPin: e.target.value.replace(/\D/g, '')})}
+                  className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-black text-center text-2xl tracking-[1em]"
+                  placeholder="••••"
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">PIN Mới</label>
+                  <input 
+                    type="password"
+                    maxLength={4}
+                    value={pinForm.newPin}
+                    onChange={e => setPinForm({...pinForm, newPin: e.target.value.replace(/\D/g, '')})}
+                    className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-black text-center text-2xl tracking-[0.5em]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Xác nhận</label>
+                  <input 
+                    type="password"
+                    maxLength={4}
+                    value={pinForm.confirmPin}
+                    onChange={e => setPinForm({...pinForm, confirmPin: e.target.value.replace(/\D/g, '')})}
+                    className="w-full p-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-accent outline-none font-black text-center text-2xl tracking-[0.5em]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button 
+                  type="button"
+                  onClick={() => setIsChangePinModalOpen(false)}
+                  className="flex-1 py-3 rounded-xl font-bold text-muted hover:bg-gray-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl font-bold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20"
+                >
+                  Lưu thay đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
 
       {/* Contrast Overlay under Mobile Nav - Subtle Blur Gradient */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white/90 via-white/50 to-transparent pointer-events-none z-40" />

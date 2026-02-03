@@ -11,8 +11,26 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import Link from 'next/link';
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
 
 export default function SettingsPage() {
+  const { can, isLoading } = usePermission();
+
+  if (isLoading) return null;
+
+  if (!can(PERMISSION_KEYS.VIEW_SETTINGS)) {
+     return (
+       <div className="min-h-screen flex items-center justify-center bg-slate-50">
+         <div className="text-center">
+           <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+           <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+           <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
+         </div>
+       </div>
+     );
+  }
+
   return (
     <div className="p-8 md:p-16 max-w-5xl mx-auto pb-32 md:pb-16">
       <header className="mb-16">
@@ -85,21 +103,23 @@ export default function SettingsPage() {
           </div>
         </Link>
 
-        {/* Staff & Security - NEW */}
-        <Link href="/settings/staff" className="bento-card p-8 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-rose-50 rounded-[18px] flex items-center justify-center mb-6 text-rose-500">
-              <ShieldCheck size={24} />
+        {/* Staff & Permissions - NEW GỘP */}
+        {can(PERMISSION_KEYS.MANAGE_PERMISSIONS) && (
+          <Link href="/settings/staff" className="bento-card p-8 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+            <div className="relative z-10">
+              <div className="w-12 h-12 bg-rose-50 rounded-[18px] flex items-center justify-center mb-6 text-rose-500">
+                <Users size={24} />
+              </div>
+              <h3 className="text-2xl font-black tracking-tight mb-2 text-main">Nhân viên & Phân quyền</h3>
+              <p className="text-muted font-medium text-xs leading-relaxed">Quản lý tài khoản, mã PIN, phân quyền chức năng và ma trận bảo mật.</p>
             </div>
-            <h3 className="text-2xl font-black tracking-tight mb-2 text-main">Nhân viên & Bảo mật</h3>
-            <p className="text-muted font-medium text-xs leading-relaxed">Quản lý tài khoản và cấu hình mã PIN.</p>
-          </div>
-          <div className="flex justify-end mt-4">
-            <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 group-hover:scale-110 transition-transform">
-              <ArrowUpRight size={20} />
+            <div className="flex justify-end mt-4">
+              <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 group-hover:scale-110 transition-transform">
+                <ArrowUpRight size={20} />
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
         {/* System Info Wide */}
         <div className="md:col-span-3 bento-card p-8 bg-white/50 border-accent/5 flex items-center justify-between">

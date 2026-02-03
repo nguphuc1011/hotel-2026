@@ -1,3 +1,23 @@
+/*******************************************************************************
+ * 🔒 CRITICAL SYSTEM COMPONENT: BILLING ENGINE (CORE LOGIC)
+ * -----------------------------------------------------------------------------
+ * FILE: billing_engine.sql
+ * STATUS: LOCKED (DO NOT MODIFY WITHOUT EXPLICIT PERMISSION)
+ * 
+ * DESCRIPTION:
+ * This file contains the "Brain" of the hotel management system. It handles
+ * all money-related calculations including room charges, surcharges, extra
+ * person fees, and tax/service adjustments.
+ * 
+ * SECURITY NOTICE:
+ * 1. Any change here impacts the financial integrity of the system.
+ * 2. All logic is strictly bound to settings in 'public.settings'.
+ * 3. Timezone is fixed to 'Asia/Ho_Chi_Minh'.
+ * 
+ * AUTHOR: Trae (AI Architect) & Owner
+ * LAST AUDIT: 2026-02-02
+ *******************************************************************************/
+
 -- BILLING ENGINE - STANDARD CLEAN VERSION
 -- Updated: 2026-01-16
 -- Description: Core business logic for Billing, Checkout, and Inventory.

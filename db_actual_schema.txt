@@ -1,0 +1,284 @@
+Function: adjust_customer_balance
+Result: jsonb
+Arguments: p_customer_id uuid, p_amount numeric, p_type text, p_description text, p_booking_id uuid DEFAULT NULL::uuid, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_payment_method text DEFAULT 'cash'::text
+-------------------
+Function: adjust_inventory
+Result: json
+Arguments: p_service_id uuid, p_new_quantity integer, p_notes text DEFAULT NULL::text, p_staff_id uuid DEFAULT NULL::uuid
+-------------------
+Function: calculate_booking_bill
+Result: jsonb
+Arguments: p_booking_id uuid, p_now_override timestamp with time zone DEFAULT NULL::timestamp with time zone
+-------------------
+Function: cancel_booking
+Result: jsonb
+Arguments: p_booking_id uuid, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_penalty_amount numeric DEFAULT 0, p_penalty_payment_method text DEFAULT 'cash'::text, p_reason text DEFAULT NULL::text
+-------------------
+Function: cancel_booking
+Result: jsonb
+Arguments: p_booking_id uuid, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text
+-------------------
+Function: change_room
+Result: jsonb
+Arguments: p_booking_id uuid, p_new_room_id uuid, p_reason text DEFAULT NULL::text, p_staff_id uuid DEFAULT NULL::uuid
+-------------------
+Function: check_in_customer
+Result: jsonb
+Arguments: p_room_id uuid, p_rental_type text, p_customer_id uuid DEFAULT NULL::uuid, p_deposit numeric DEFAULT 0, p_services jsonb DEFAULT '[]'::jsonb, p_customer_name text DEFAULT NULL::text, p_extra_adults integer DEFAULT 0, p_extra_children integer DEFAULT 0, p_notes text DEFAULT NULL::text, p_custom_price numeric DEFAULT NULL::numeric, p_custom_price_reason text DEFAULT NULL::text, p_source text DEFAULT 'direct'::text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_payment_method text DEFAULT 'cash'::text
+-------------------
+Function: close_shift
+Result: jsonb
+Arguments: p_shift_id uuid, p_declared_cash numeric, p_notes text DEFAULT NULL::text
+-------------------
+Function: debug_auth
+Result: json
+Arguments: 
+-------------------
+Function: fn_apply_wallet_logic
+Result: void
+Arguments: p_rec record, p_sign_multiplier integer
+-------------------
+Function: fn_approve_request
+Result: jsonb
+Arguments: p_manager_id uuid DEFAULT NULL::uuid, p_manager_pin text DEFAULT NULL::text, p_method text DEFAULT 'PIN_OVERRIDE'::text, p_request_id uuid DEFAULT NULL::uuid
+-------------------
+Function: fn_approve_request_override
+Result: jsonb
+Arguments: p_request_id uuid, p_manager_pin text
+-------------------
+Function: fn_calculate_bill_adjustments
+Result: jsonb
+Arguments: p_sub_total numeric, p_discount_amount numeric, p_custom_surcharge numeric
+-------------------
+Function: fn_calculate_extra_person_charge
+Result: jsonb
+Arguments: p_booking_id uuid
+-------------------
+Function: fn_calculate_extra_person_charge
+Result: jsonb
+Arguments: p_room_cat_id uuid, p_adult_count integer, p_child_count integer
+-------------------
+Function: fn_calculate_room_charge
+Result: jsonb
+Arguments: p_booking_id uuid, p_check_in timestamp with time zone, p_check_out timestamp with time zone, p_rental_type text, p_room_cat_id uuid
+-------------------
+Function: fn_calculate_surcharge
+Result: jsonb
+Arguments: p_check_in timestamp with time zone, p_check_out timestamp with time zone, p_room_cat_id uuid, p_rental_type text
+-------------------
+Function: fn_change_own_pin
+Result: jsonb
+Arguments: p_staff_id uuid, p_old_pin text, p_new_pin text
+-------------------
+Function: fn_check_approval_status
+Result: jsonb
+Arguments: p_request_id uuid
+-------------------
+Function: fn_check_financial_health
+Result: jsonb
+Arguments: 
+-------------------
+Function: fn_create_approval_request
+Result: jsonb
+Arguments: p_action_key text, p_request_data jsonb DEFAULT '{}'::jsonb, p_staff_id uuid DEFAULT NULL::uuid
+-------------------
+Function: fn_create_cash_flow
+Result: jsonb
+Arguments: p_flow_type text, p_category text, p_amount numeric, p_description text, p_occurred_at timestamp with time zone DEFAULT now(), p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text
+-------------------
+Function: fn_create_cash_flow
+Result: jsonb
+Arguments: p_flow_type text, p_category text, p_amount numeric, p_description text, p_occurred_at timestamp with time zone DEFAULT now(), p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_payment_method_code text DEFAULT 'cash'::text
+-------------------
+Function: fn_delete_cash_flow
+Result: jsonb
+Arguments: p_id uuid
+-------------------
+Function: fn_format_money_vi
+Result: text
+Arguments: p_amount numeric
+-------------------
+Function: fn_get_all_user_floors_map
+Result: TABLE(user_id uuid, floors integer[])
+Arguments: 
+-------------------
+Function: fn_get_available_floors
+Result: TABLE(floor integer)
+Arguments: 
+-------------------
+Function: fn_get_cash_flow_categories
+Result: TABLE(id uuid, name text, type text, description text, is_system boolean, is_active boolean, is_revenue boolean)
+Arguments: p_type text DEFAULT NULL::text
+-------------------
+Function: fn_get_security_context
+Result: jsonb
+Arguments: p_role text
+-------------------
+Function: fn_get_security_context_v2
+Result: jsonb
+Arguments: p_staff_id uuid
+-------------------
+Function: fn_get_security_matrix
+Result: jsonb
+Arguments: 
+-------------------
+Function: fn_get_security_settings
+Result: jsonb
+Arguments: 
+-------------------
+Function: fn_get_system_setting
+Result: text
+Arguments: p_key text
+-------------------
+Function: fn_get_user_floors
+Result: TABLE(floor integer)
+Arguments: p_user_id uuid
+-------------------
+Function: fn_manage_cash_flow_category
+Result: jsonb
+Arguments: p_action text, p_id uuid DEFAULT NULL::uuid, p_name text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_description text DEFAULT NULL::text, p_is_revenue boolean DEFAULT true
+-------------------
+Function: fn_manage_staff
+Result: jsonb
+Arguments: p_action text, p_id uuid DEFAULT NULL::uuid, p_username text DEFAULT NULL::text, p_full_name text DEFAULT NULL::text, p_role text DEFAULT NULL::text, p_pin_hash text DEFAULT NULL::text, p_is_active boolean DEFAULT true
+-------------------
+Function: fn_perform_night_audit
+Result: jsonb
+Arguments: p_staff_id uuid DEFAULT NULL::uuid
+-------------------
+Function: fn_prevent_modification
+Result: trigger
+Arguments: 
+-------------------
+Function: fn_resolve_policy
+Result: text
+Arguments: p_staff_id uuid, p_action_key text
+-------------------
+Function: fn_reverse_cash_flow_on_cancel
+Result: jsonb
+Arguments: p_booking_id uuid
+-------------------
+Function: fn_set_policy_override
+Result: jsonb
+Arguments: p_scope text, p_target_id text, p_action_key text, p_policy_type text
+-------------------
+Function: fn_set_updated_at
+Result: trigger
+Arguments: 
+-------------------
+Function: fn_set_user_floors
+Result: void
+Arguments: p_user_id uuid, p_floors integer[]
+-------------------
+Function: fn_staff_login
+Result: jsonb
+Arguments: p_username text, p_pin text
+-------------------
+Function: fn_sync_booking_to_ledger
+Result: void
+Arguments: p_booking_id uuid
+-------------------
+Function: fn_sync_wallets
+Result: trigger
+Arguments: 
+-------------------
+Function: fn_update_security_setting
+Result: jsonb
+Arguments: p_key text, p_policy_type text
+-------------------
+Function: fn_update_security_setting
+Result: jsonb
+Arguments: p_key text, p_is_enabled boolean
+-------------------
+Function: fn_verify_staff_pin
+Result: boolean
+Arguments: p_staff_id uuid, p_pin_hash text
+-------------------
+Function: get_financial_health_check
+Result: json
+Arguments: 
+-------------------
+Function: get_room_categories
+Result: SETOF room_categories
+Arguments: 
+-------------------
+Function: get_settings
+Result: SETOF settings
+Arguments: 
+-------------------
+Function: get_system_settings
+Result: jsonb
+Arguments: 
+-------------------
+Function: handle_service_inventory
+Result: trigger
+Arguments: 
+-------------------
+Function: import_inventory
+Result: json
+Arguments: p_service_id uuid, p_qty_buy numeric, p_total_amount numeric, p_payment_method_code text DEFAULT 'cash'::text, p_shift_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text, p_verified_by_staff_id uuid DEFAULT NULL::uuid
+-------------------
+Function: import_inventory
+Result: json
+Arguments: p_service_id uuid, p_qty_buy numeric, p_total_amount numeric, p_notes text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_payment_method_code text DEFAULT 'cash'::text
+-------------------
+Function: open_shift
+Result: jsonb
+Arguments: p_staff_id uuid, p_start_cash numeric
+-------------------
+Function: process_checkout
+Result: jsonb
+Arguments: p_booking_id uuid, p_payment_method text, p_amount_paid numeric, p_discount numeric, p_surcharge numeric, p_notes text, p_staff_id uuid DEFAULT NULL::uuid
+-------------------
+Function: record_owner_expense
+Result: jsonb
+Arguments: p_creditor_name text, p_description text, p_amount numeric
+-------------------
+Function: record_owner_expense
+Result: jsonb
+Arguments: p_amount numeric, p_description text, p_creditor_name text DEFAULT 'Chủ đầu tư'::text
+-------------------
+Function: record_owner_expense
+Result: jsonb
+Arguments: p_amount numeric, p_description text, p_creditor_name text DEFAULT 'Chủ đầu tư'::text, p_evidence_url text DEFAULT NULL::text
+-------------------
+Function: refresh_active_ledgers
+Result: jsonb
+Arguments: 
+-------------------
+Function: register_service_usage
+Result: json
+Arguments: p_booking_id uuid, p_service_id uuid, p_quantity integer, p_notes text DEFAULT NULL::text
+-------------------
+Function: repay_owner_debt
+Result: jsonb
+Arguments: p_payable_id uuid, p_payment_method text, p_pin text DEFAULT NULL::text
+-------------------
+Function: repay_owner_debt
+Result: jsonb
+Arguments: p_payable_id uuid, p_payment_method text
+-------------------
+Function: trg_sync_booking_to_cash_flow
+Result: trigger
+Arguments: 
+-------------------
+Function: trg_sync_service_to_cash_flow
+Result: trigger
+Arguments: 
+-------------------
+Function: update_booking_details
+Result: jsonb
+Arguments: p_booking_id uuid, p_customer_name text, p_check_in_at timestamp with time zone, p_custom_price numeric, p_price_apply_mode text, p_reason text, p_staff_id uuid, p_customer_id uuid DEFAULT NULL::uuid
+-------------------
+Function: update_room_category
+Result: room_categories
+Arguments: p_id uuid, p_category jsonb
+-------------------
+Function: update_settings
+Result: SETOF settings
+Arguments: p_check_in_time time without time zone, p_check_out_time time without time zone, p_overnight_start time without time zone, p_overnight_end time without time zone, p_overnight_checkout_enabled boolean, p_overnight_checkout_time time without time zone, p_night_audit_hour time without time zone, p_late_checkout_limit time without time zone, p_early_checkin_limit time without time zone, p_auto_surcharge_enabled boolean, p_surcharge_rules jsonb, p_grace_in_enabled boolean, p_grace_out_enabled boolean, p_grace_minutes integer, p_vat_enabled boolean, p_vat_percent numeric, p_service_fee_enabled boolean, p_service_fee_percent numeric, p_auto_deduct_inventory boolean, p_enable_print_bill boolean, p_allow_manual_price_override boolean
+-------------------
+Function: update_system_settings
+Result: jsonb
+Arguments: p_settings jsonb
+-------------------

@@ -10,6 +10,7 @@ import PaymentModal from './PaymentModal';
 import BillBreakdown from './BillBreakdown';
 import CancellationPenaltyModal from './CancellationPenaltyModal';
 import EditBookingModal from './folio/EditBookingModal';
+import ChangeRoomModal from './folio/ChangeRoomModal';
 import DepositModal from './folio/DepositModal';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
@@ -131,23 +132,28 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             filter: `id=eq.${internalPendingApproval.id}`
         }, (payload) => {
             const newRec = payload.new as any;
-            if (newRec.status !== internalPendingApproval.status) {
-                setInternalPendingApproval((prev: any) => ({
-                    ...prev,
-                    status: newRec.status,
-                    request_data: newRec.request_data
-                }));
-                
-                // If approved, trigger onUpdate to refresh parent dashboard
-                if (newRec.status === 'APPROVED') {
-                    onUpdate();
+            console.log("Folio Approval Update Received:", newRec.status);
+            
+            setInternalPendingApproval((prev: any) => {
+                // Chỉ cập nhật nếu status thực sự thay đổi
+                if (prev && prev.status !== newRec.status) {
+                    return {
+                        ...prev,
+                        status: newRec.status,
+                        request_data: newRec.request_data
+                    };
                 }
-            }
+                return prev;
+            });
+            
+            // Trigger onUpdate for ANY status change (APPROVED, REJECTED, etc.)
+            // to ensure parent dashboard is always in sync
+            onUpdate();
         })
         .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [isOpen, internalPendingApproval?.id]);
+  }, [isOpen, internalPendingApproval?.id, onUpdate]);
 
   const customerBalance = bill?.customer_balance ?? 0;
   const hasCustomerBalance = customerBalance !== 0;
@@ -167,6 +173,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showChangeRoomModal, setShowChangeRoomModal] = useState(false);
   const [editStaff, setEditStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [cancellationStaff, setCancellationStaff] = useState<{ id: string, name: string } | undefined>(undefined);
@@ -241,6 +248,31 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     toast.success("Đã duyệt thành công! Vui lòng bấm Hoàn tất để xử lý.");
     // We do NOT execute cancellation automatically anymore.
     // The user must click "Hoàn tất" manually.
+  };
+
+  // Cancel the request entirely (Recovery / Unstick)
+  const handleCancelRequest = async () => {
+      if (!internalPendingApproval?.id) return;
+      
+      const confirm = await confirmDialog({
+          title: "Hủy yêu cầu",
+          message: "Bạn có chắc muốn hủy yêu cầu này? Thao tác này sẽ xóa trạng thái chờ duyệt/đã duyệt.",
+          confirmLabel: "Hủy yêu cầu",
+          type: "danger"
+      });
+
+      if (!confirm) return;
+
+      try {
+          const res = await securityService.cancelRequest(internalPendingApproval.id, 'User cancelled');
+
+          toast.success("Đã hủy yêu cầu");
+          onUpdate(); // Refresh parent
+          onClose();
+      } catch (e) {
+          console.error("Failed to cancel request", JSON.stringify(e, null, 2));
+          toast.error("Lỗi khi hủy yêu cầu");
+      }
   };
 
   const executeCancellation = async (approver: any) => {
@@ -332,6 +364,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     setIsLoading(true);
     try {
       const data = await bookingService.calculateBill(booking.id);
+      console.log('Folio Bill Data:', data);
       setBill(data);
     } catch (error) {
       console.error('Error loading bill:', error);
@@ -487,8 +520,16 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleChangeRoom = async () => {
-    verify('folio_change_room', () => {
-      toast.info("Tính năng đổi phòng đang được phát triển");
+    verify('folio_change_room', (staffId, staffName) => {
+      setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
+      setShowChangeRoomModal(true);
+    });
+  };
+
+  const handleEditBooking = async () => {
+    verify('folio_edit_booking', (staffId, staffName) => {
+      setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
+      setShowEditModal(true);
     });
   };
 
@@ -571,21 +612,39 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 </div>
                 
                 {internalPendingApproval.status === 'APPROVED' ? (
-                    <button 
-                        onClick={handleFinishCancellation}
-                        disabled={isLoading}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-200 active:scale-95 transition-all animate-pulse whitespace-nowrap"
-                    >
-                        Hoàn tất ngay
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={handleCancelRequest}
+                            className="px-3 py-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-all"
+                            title="Hủy bỏ yêu cầu này"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                            onClick={handleFinishCancellation}
+                            disabled={isLoading}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-200 active:scale-95 transition-all animate-pulse whitespace-nowrap"
+                        >
+                            Hoàn tất ngay
+                        </button>
+                    </div>
                 ) : (
-                    <button 
-                        onClick={handleResumeApproval}
-                        className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-bold rounded-lg transition-all active:scale-95 whitespace-nowrap flex items-center gap-1.5"
-                    >
-                        <KeyRound className="w-3.5 h-3.5" />
-                        Nhập PIN
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={handleCancelRequest}
+                            className="px-3 py-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-all"
+                            title="Hủy yêu cầu"
+                        >
+                            Hủy yêu cầu
+                        </button>
+                        <button 
+                            onClick={handleResumeApproval}
+                            className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-bold rounded-lg transition-all active:scale-95 whitespace-nowrap flex items-center gap-1.5"
+                        >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            Nhập PIN
+                        </button>
+                    </div>
                 )}
             </div>
         )}
@@ -596,7 +655,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             {/* Quick Actions - Scrollable */}
             <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-6">
                 <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => handleChangeRoom()} />
-                <QuickActionButton icon={Edit3} label="Sửa giờ" onClick={() => setShowEditModal(true)} />
+                <QuickActionButton icon={Edit3} label="Sửa thông tin" onClick={() => handleEditBooking()} />
                 <QuickActionButton icon={DollarSign} label="Nạp tiền" onClick={() => setShowDepositModal(true)} />
                 <QuickActionButton icon={Printer} label="In phiếu" onClick={() => {}} />
                 
@@ -942,6 +1001,21 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           onSuccess={() => {
             loadBill();
             onUpdate();
+          }}
+        />
+
+        <ChangeRoomModal 
+          isOpen={showChangeRoomModal}
+          onClose={() => {
+            setShowChangeRoomModal(false);
+            setEditStaff(undefined);
+          }}
+          bookingId={booking.id}
+          currentRoomName={room.name}
+          verifiedStaff={editStaff}
+          onSuccess={() => {
+            onUpdate();
+            onClose();
           }}
         />
 

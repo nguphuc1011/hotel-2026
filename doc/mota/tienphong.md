@@ -44,6 +44,7 @@ Hệ thống tính toán theo thứ tự ưu tiên từ phòng -> phụ thu -> n
 - **Gói đầu**: Tính tròn số tiền `price_hourly` cho `base_hourly_limit` giờ đầu tiên.
 - **Giờ tiếp theo**: 
   - Sau khi hết gói đầu + thời gian ân hạn (`grace_minutes`), mỗi block lẻ (dù chỉ 1 phút) sẽ được làm tròn lên 1 block (`hourly_unit`) và tính tiền theo giá `price_next_hour`.
+  - **Khoan hồng theo Block**: Tại mỗi block tiếp theo, nếu phần lẻ của phút ≤ `grace_minutes` thì miễn phí block đó, nếu > `grace_minutes` tính tròn 1 block.
   - **Chống vượt trần**: Nếu `hourly_ceiling_enabled` bật, tổng tiền giờ nếu vượt quá `price_daily * percent` sẽ tự động chuyển sang tính theo giá Ngày.
 
 #### 1.2. Thuê Qua đêm (`overnight`)
@@ -79,7 +80,9 @@ Dựa trên `surcharge_mode` tại Hạng phòng, hệ thống chọn 1 trong 2 
 - **Nhận sớm (Early)**: Tìm rule loại 'Early' tương tự.
 - Tiền phụ thu = `price_daily` x `% quy định`.
 
-*Quy tắc loại trừ: Nếu khách đã bị cộng thêm 1 ngày phòng ở Bước 1 (do quá mốc 05:00 hoặc 18:00), hệ thống sẽ không tính thêm phụ thu ở Bước 2 nữa.*
+*Quy tắc loại trừ quan trọng:*
+1. **Ưu tiên tiền phòng**: Nếu khách đã bị cộng thêm 1 ngày phòng ở Bước 1 (do quá mốc Night Audit hoặc Trả muộn sau 18h), hệ thống sẽ KHÔNG tính thêm phụ thu ở Bước 2 nữa để tránh tính trùng.
+2. **Trả trong ngày**: Nếu thuê theo Ngày (`daily`) và trả phòng ngay trong cùng ngày nhận, hệ thống không tính phụ thu trả muộn.
 
 ---
 
@@ -88,11 +91,46 @@ Dựa trên `surcharge_mode` tại Hạng phòng, hệ thống chọn 1 trong 2 
 - **Cơ chế**:
   - Tính số người lớn vượt quá `max_adults` x `price_extra_adult`.
   - Tính số trẻ em vượt quá `max_children` x `price_extra_child`.
+  - Dữ liệu lấy từ `extra_adults` và `extra_children` được nhập trong Booking.
 
 ---
 
 ### BƯỚC 4: TIỀN DỊCH VỤ (SERVICES)
 - Tổng hợp từ bảng `booking_services`: `Số lượng` x `Giá tại thời điểm gọi đồ`.
+- Hệ thống tự động trừ kho (nếu có bật quản lý kho) khi thêm dịch vụ.
+
+---
+
+## III. CƠ CHẾ BẢO MẬT & PHÂN QUYỀN (TAM TẦNG & VOID)
+
+Hệ thống áp dụng mô hình bảo mật 3 lớp (Dynamic Security Policy) để đảm bảo tính toàn vẹn dữ liệu tài chính.
+
+### 1. Tam Tầng Phân Quyền
+Quyền hạn của nhân viên không cố định mà phụ thuộc vào cài đặt trong `Settings > Cấu hình nhân viên`:
+- **Tầng 1: Cài đặt Chung (Global)**: Thiết lập mặc định cho toàn hệ thống (Ví dụ: Hành động X cần mã PIN).
+- **Tầng 2: Theo Vai trò (Role-based)**: Manager được 'ALLOW' (Tự quyết), Staff bị 'PIN' (Cần mã quản lý).
+- **Tầng 3: Theo Cá nhân (User-specific)**: Đặc cách cho một nhân viên cụ thể (Ví dụ: Staff A được tin tưởng cấp quyền 'ALLOW').
+
+Các mức độ quyền hạn:
+- `ALLOW`: Cho phép thực hiện ngay.
+- `PIN`: Yêu cầu nhập mã PIN của Quản lý/Admin để duyệt.
+- `APPROVAL`: Yêu cầu gửi lệnh xin phép và chờ duyệt từ xa (qua App/Telegram).
+- `DENY`: Cấm hoàn toàn.
+
+### 2. Cơ Chế "Void" (Hủy/Đảo Bút Toán)
+Để đảm bảo tính minh bạch tài chính (Audit Trail), hệ thống **KHÔNG XÓA VĨNH VIỄN** các giao dịch tài chính quan trọng (Phiếu thu/chi).
+Thay vào đó, hệ thống sử dụng cơ chế **Void**:
+- Khi người dùng chọn "Xóa" (Trash icon), hệ thống sẽ yêu cầu nhập **Lý do**.
+- Hệ thống tạo ra một giao dịch mới có giá trị ngược dấu (Âm/Dương) để triệt tiêu số dư của giao dịch cũ.
+- Giao dịch cũ vẫn tồn tại trong Database nhưng bị đánh dấu hoặc có giao dịch Void tham chiếu tới.
+- Lịch sử này giúp Quản lý theo dõi được ai đã hủy phiếu, lý do là gì và vào thời điểm nào.
+
+### 3. Phân Quyền Hủy Giao Dịch (`finance_void_transaction`)
+- Hành động này mặc định được cấu hình là `PIN` đối với nhân viên Lễ tân.
+- Quản lý có thể thay đổi cấu hình sang các chế độ khác tùy nhu cầu vận hành:
+  - `DENY`: Cấm tuyệt đối nhân viên tự hủy.
+  - `APPROVAL` (Xin lệnh): Nhân viên bấm hủy -> Hệ thống gửi thông báo xin phép đến App của Quản lý -> Quản lý bấm "Duyệt" -> Giao dịch mới được hủy. (Dành cho trường hợp Quản lý không có mặt tại quầy để nhập PIN).
+  - `ALLOW`: Cho phép nhân viên tự quyết (Dành cho nhân viên tin cậy).
 
 ---
 
@@ -100,13 +138,13 @@ Dựa trên `surcharge_mode` tại Hạng phòng, hệ thống chọn 1 trong 2 
 
 #### 5.1. Giảm giá & Phụ phí thủ công
 - **Giảm giá (`discount_amount`)**: Trừ trực tiếp vào tổng tiền.
-- **Phụ phí cộng thêm (`custom_surcharge`)**: Cộng trực tiếp (Dành cho các khoản phí phát sinh khác).
+- **Phụ phí cộng thêm (`custom_surcharge`)**: Cộng trực tiếp (Dành cho các khoản phí phát sinh khác không nằm trong khung tự động).
 
 #### 5.2. Phí phục vụ (SVC)
-- Nếu `service_fee_enabled` bật: `(Tổng sau giảm giá) * service_fee_percent`.
+- Nếu `service_fee_enabled` bật: `(Tổng sau giảm giá + Phụ phí thủ công) * service_fee_percent`.
 
 #### 5.3. Thuế VAT
-- Nếu `vat_enabled` bật: `(Tổng sau giảm giá + Phí phục vụ) * vat_percent`.
+- Nếu `vat_enabled` bật: `(Tổng sau giảm giá + Phụ phí thủ công + Phí phục vụ) * vat_percent`.
 
 ---
 
@@ -123,4 +161,5 @@ Số tiền cần thanh toán = Tổng cộng - Tiền đặt cọc (deposit_amo
 ```
 
 ---
-*Ghi chú: Mọi mốc thời gian đều được xử lý theo múi giờ `Asia/Ho_Chi_Minh`.*
+*Ghi chú kỹ thuật: Toàn bộ logic này được thực thi tại Database (PL/pgSQL) để đảm bảo tính chính xác tuyệt đối và đồng nhất giữa App Mobile, Web Dashboard và Tablet.*
+*Múi giờ áp dụng: `Asia/Ho_Chi_Minh` (Cố định).*

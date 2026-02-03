@@ -10,6 +10,9 @@ import SmartAlerts from '@/components/report/SmartAlerts';
 import DrillDownModal from '@/components/report/DrillDownModal';
 import { toast } from 'sonner';
 import { getEndOfDay } from '@/lib/dateUtils'; // Assuming this exists, or I'll define local helpers
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
+import { ShieldCheck } from 'lucide-react';
 
 // Helper for date formatting
 const formatDate = (date: Date) => {
@@ -17,6 +20,7 @@ const formatDate = (date: Date) => {
 };
 
 export default function ReportsPage() {
+  const { can, isLoading: isAuthLoading } = usePermission();
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date();
     return {
@@ -63,8 +67,24 @@ export default function ReportsPage() {
   };
 
   useEffect(() => {
-    loadData();
-  }, [dateRange]);
+    if (can(PERMISSION_KEYS.VIEW_REPORTS)) {
+      loadData();
+    }
+  }, [dateRange, can]); // Add can to deps
+
+  if (isAuthLoading) return null;
+
+  if (!can(PERMISSION_KEYS.VIEW_REPORTS)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+          <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleMonthChange = (delta: number) => {
     const newStart = new Date(dateRange.start);

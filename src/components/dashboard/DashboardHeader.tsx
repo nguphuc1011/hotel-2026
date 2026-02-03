@@ -10,10 +10,15 @@ import {
   Wrench,
   Filter,
   Store,
-  ArrowRightLeft
+  ArrowRightLeft,
+  LogOut,
+  Key,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/lib/supabase';
 
 export interface FilterState {
   available: boolean;
@@ -43,7 +48,59 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onToggle,
   onHandoverClick
 }) => {
+  const { user, logout } = useAuth();
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
+  const [changePinData, setChangePinData] = useState({
+    oldPin: '',
+    newPin: '',
+    confirmPin: ''
+  });
+
+  const handleChangePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    if (changePinData.newPin.length !== 4) {
+      toast.error('Mã PIN mới phải có đúng 4 số');
+      return;
+    }
+    if (changePinData.newPin !== changePinData.confirmPin) {
+      toast.error('Mã PIN xác nhận không khớp');
+      return;
+    }
+
+    try {
+      // 1. Verify Old PIN
+      const { data: isValid, error: verifyError } = await supabase.rpc('fn_verify_staff_pin', {
+        p_staff_id: user.id,
+        p_pin_hash: changePinData.oldPin
+      });
+
+      if (verifyError) throw verifyError;
+      if (!isValid) {
+        toast.error('Mã PIN cũ không chính xác');
+        return;
+      }
+
+      // 2. Set New PIN
+      const { data, error } = await supabase.rpc('fn_manage_staff', {
+        p_action: 'SET_PIN',
+        p_id: user.id,
+        p_pin_hash: changePinData.newPin
+      });
+
+      if (error) throw error;
+      if (data && !data.success) throw new Error(data.message);
+
+      toast.success('Đổi mã PIN thành công');
+      setIsChangePinModalOpen(false);
+      setChangePinData({ oldPin: '', newPin: '', confirmPin: '' });
+    } catch (error: any) {
+      toast.error('Lỗi: ' + error.message);
+    }
+  };
 
   const filterItems = [
     { 
@@ -131,14 +188,54 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </button>
 
           {/* User Profile */}
-          <div className="flex items-center gap-3 pl-2 border-l border-slate-200">
-            <div className="text-right hidden md:block">
-              <p className="text-xs font-bold text-slate-800">Admin</p>
-              <p className="text-[10px] font-medium text-slate-400 uppercase">Quản lý</p>
-            </div>
-            <button className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center border border-slate-200 shadow-sm active:scale-95 transition-transform">
-              <User size={20} className="text-slate-600" />
+          <div className="relative pl-2 border-l border-slate-200">
+            <button 
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-3 hover:bg-slate-50 rounded-2xl p-1 pr-3 transition-colors"
+            >
+              <div className="text-right hidden md:block">
+                <p className="text-xs font-bold text-slate-800">{user?.full_name || 'Staff'}</p>
+                <p className="text-[10px] font-medium text-slate-400 uppercase">{user?.role || 'Nhân viên'}</p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center border border-slate-200 shadow-sm">
+                <User size={20} className="text-slate-600" />
+              </div>
             </button>
+
+            {/* Dropdown Menu */}
+            {isUserMenuOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-30" 
+                  onClick={() => setIsUserMenuOpen(false)} 
+                />
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-40 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="p-2">
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        setIsChangePinModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                    >
+                      <Key size={16} />
+                      Đổi mã PIN
+                    </button>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        logout();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-50 transition-colors"
+                    >
+                      <LogOut size={16} />
+                      Đăng xuất
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -186,6 +283,79 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             ))}
          </div>
       </div>
+
+      {/* Change PIN Modal */}
+      {isChangePinModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">
+                Đổi mã PIN
+              </h2>
+              <button 
+                onClick={() => setIsChangePinModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleChangePin} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Mã PIN cũ</label>
+                <input 
+                  type="password"
+                  maxLength={4}
+                  value={changePinData.oldPin}
+                  onChange={e => setChangePinData({...changePinData, oldPin: e.target.value.replace(/\D/g, '')})}
+                  className="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-emerald-500 outline-none font-black text-center text-2xl tracking-[1em]"
+                  placeholder="••••"
+                  autoFocus
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">PIN Mới</label>
+                  <input 
+                    type="password"
+                    maxLength={4}
+                    value={changePinData.newPin}
+                    onChange={e => setChangePinData({...changePinData, newPin: e.target.value.replace(/\D/g, '')})}
+                    className="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-emerald-500 outline-none font-black text-center text-2xl tracking-[0.5em]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Xác nhận</label>
+                  <input 
+                    type="password"
+                    maxLength={4}
+                    value={changePinData.confirmPin}
+                    onChange={e => setChangePinData({...changePinData, confirmPin: e.target.value.replace(/\D/g, '')})}
+                    className="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-emerald-500 outline-none font-black text-center text-2xl tracking-[0.5em]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button 
+                  type="button"
+                  onClick={() => setIsChangePinModalOpen(false)}
+                  className="flex-1 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                >
+                  Đổi PIN
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

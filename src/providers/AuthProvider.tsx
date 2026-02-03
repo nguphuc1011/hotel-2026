@@ -17,6 +17,7 @@ interface AuthContextType {
   loading: boolean;
   login: (username: string, pin: string) => Promise<boolean>;
   logout: () => void;
+  updatePin: (oldPin: string, newPin: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   login: async () => false,
   logout: () => {},
+  updatePin: async () => false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -100,8 +102,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
+  const updatePin = async (oldPin: string, newPin: string) => {
+    if (!user) return false;
+    
+    try {
+        // Verify old PIN
+        const { data: isValid, error: verifyError } = await supabase.rpc('fn_verify_staff_pin', {
+          p_staff_id: user.id,
+          p_pin_hash: oldPin
+        });
+
+        if (verifyError) throw verifyError;
+        if (!isValid) {
+          toast.error('Mã PIN cũ không chính xác');
+          return false;
+        }
+
+        // Set new PIN
+        const { data, error } = await supabase.rpc('fn_manage_staff', {
+            p_action: 'SET_PIN',
+            p_id: user.id,
+            p_pin_hash: newPin
+        });
+
+        if (error) throw error;
+        if (data && !data.success) throw new Error(data.message);
+        
+        toast.success('Đổi mã PIN thành công');
+        return true;
+    } catch (error: any) {
+        toast.error('Lỗi: ' + error.message);
+        return false;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updatePin }}>
       {children}
     </AuthContext.Provider>
   );
