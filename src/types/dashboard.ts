@@ -30,6 +30,7 @@ export interface Booking {
   prepayment?: number;
   custom_price?: number; // New: Manual price override
   status: 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
+  notes?: string;
 }
 
 export interface DashboardRoom extends Room {
