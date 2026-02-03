@@ -137,5 +137,3 @@ export const shiftService = {
     return data;
   }
 };
-  }
-};
