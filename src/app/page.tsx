@@ -274,29 +274,11 @@ export default function DashboardPage() {
     }
   }, [isAuthLoading, can]);
 
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-      </div>
-    );
-  }
-
-  if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
-          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
-          <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
-        </div>
-      </div>
-    );
-  }
-
   // Real-time Subscription
   useEffect(() => {
     // Consolidated Subscription
+    if (isAuthLoading || !can(PERMISSION_KEYS.VIEW_DASHBOARD)) return;
+
     const channel = supabase
       .channel('dashboard_updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
@@ -333,7 +315,7 @@ export default function DashboardPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [isAuthLoading, can]);
 
   // Filtering Logic
   const filteredRooms = useMemo(() => {
@@ -360,6 +342,26 @@ export default function DashboardPage() {
       repair: rooms.filter(r => r.status === 'repair').length,
     };
   }, [rooms]);
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+      </div>
+    );
+  }
+
+  if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+          <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleToggleFilter = (key: keyof FilterState) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }));
