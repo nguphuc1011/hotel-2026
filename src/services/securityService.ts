@@ -9,6 +9,7 @@ export type SecurityAction =
   | 'folio_remove_service'
   | 'folio_edit_service'
   | 'folio_change_room'
+  | 'folio_edit_booking'
   | 'checkout_discount'
   | 'checkout_custom_surcharge'
   | 'checkout_mark_as_debt'
