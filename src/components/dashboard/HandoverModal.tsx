@@ -25,6 +25,11 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
+  const [blockedInfo, setBlockedInfo] = useState<{
+      blocked: boolean;
+      staff_name: string;
+      shift_id: string;
+  } | null>(null);
   
   useEffect(() => {
     setMounted(true);
@@ -59,12 +64,59 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
     try {
       const shift = await shiftService.getCurrentShift(user.id);
       setCurrentShift(shift);
+      
+      // If no personal shift, check if global shift exists (blocking)
+      if (!shift) {
+          const globalStatus = await shiftService.getGlobalOpenShift();
+          if (globalStatus.has_open_shift && globalStatus.shift) {
+              setBlockedInfo({
+                  blocked: true,
+                  staff_name: globalStatus.shift.staff_name,
+                  shift_id: globalStatus.shift.id
+              });
+          } else {
+              setBlockedInfo(null);
+          }
+      }
     } catch (error) {
       console.error('Error checking shift:', error);
       toast.error('Không thể tải thông tin ca làm việc');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForceClose = async () => {
+      if (!blockedInfo || !user) return;
+      if (user.role !== 'Admin') {
+          toast.error('Chỉ Admin mới có quyền đóng ca hộ!');
+          return;
+      }
+      
+      if (!confirm(`Bạn có chắc chắn muốn ĐÓNG CA HỘ nhân viên ${blockedInfo.staff_name}? Hành động này sẽ được ghi lại.`)) return;
+
+      setLoading(true);
+      try {
+          // Force close with 0 declared cash (Blind Close)
+          // Since it's a force close, we assume the admin takes responsibility or will count later.
+          // For now, we just close it so operations can continue.
+          // Note: In a real scenario, we might want to let Admin input the cash too.
+          // But for "Unlock" purpose, 0 is fine, it will show Variance.
+          const result = await shiftService.closeShift(blockedInfo.shift_id, 0, 'Admin Force Close - Đóng ca hộ');
+          
+          if (result.success) {
+              toast.success('Đã đóng ca hộ thành công');
+              setBlockedInfo(null); // Clear blocking
+              await checkShiftStatus(); // Refresh status (should be clear now)
+          } else {
+              toast.error(result.message || 'Lỗi khi đóng ca hộ');
+          }
+      } catch (error) {
+          console.error('Error force closing shift:', error);
+          toast.error('Lỗi khi đóng ca hộ');
+      } finally {
+          setLoading(false);
+      }
   };
 
   const handleOpenShift = async (e: React.FormEvent) => {
@@ -156,7 +208,51 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
         </div>
 
         <div className="p-8">
-          {closeResult ? (
+          {blockedInfo ? (
+            /* BLOCKED STATE UI */
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="p-6 rounded-2xl border-2 border-red-100 bg-red-50 flex flex-col items-center text-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0 mb-2">
+                  <AlertCircle size={32} />
+                </div>
+                
+                <div>
+                  <h3 className="text-xl font-black text-red-800 mb-1">
+                    KHÔNG THỂ MỞ CA
+                  </h3>
+                  <p className="text-slate-600 font-medium text-sm leading-relaxed">
+                    Nhân viên <span className="font-bold text-red-700">{blockedInfo.staff_name}</span> đang giữ ca làm việc.
+                    <br/>
+                    Hệ thống chỉ cho phép 1 ca hoạt động tại một thời điểm.
+                  </p>
+                </div>
+
+                <div className="w-full bg-white/50 rounded-xl p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                   Yêu cầu bàn giao trước khi tiếp quản
+                </div>
+              </div>
+
+              {user?.role === 'Admin' && (
+                <div className="space-y-3">
+                   <div className="flex items-center gap-2 px-2">
+                      <div className="h-px bg-slate-200 flex-1"></div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Admin Control</span>
+                      <div className="h-px bg-slate-200 flex-1"></div>
+                   </div>
+                   <button 
+                      onClick={handleForceClose}
+                      className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black text-lg uppercase tracking-wide shadow-xl shadow-red-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                   >
+                      <LogOut size={20} />
+                      Đóng Ca Hộ (Force Close)
+                   </button>
+                   <p className="text-[10px] text-slate-400 text-center italic">
+                      * Hành động này sẽ được ghi lại trong nhật ký hệ thống
+                   </p>
+                </div>
+              )}
+            </div>
+          ) : closeResult ? (
             /* CASE 3: SHOW CLOSE RESULT */
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className={cn(

@@ -76,5 +76,20 @@ export const shiftService = {
 
     if (error) throw error;
     return { data, count };
+  },
+
+  // Check global open shift status
+  async getGlobalOpenShift() {
+      const { data, error } = await supabase.rpc('get_global_open_shift');
+      if (error) throw error;
+      return data as { 
+          has_open_shift: boolean; 
+          shift: { 
+              id: string; 
+              staff_id: string; 
+              staff_name: string; 
+              start_time: string; 
+          } | null 
+      };
   }
 };
