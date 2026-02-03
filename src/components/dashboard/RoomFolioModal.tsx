@@ -258,7 +258,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           title: "Hủy yêu cầu",
           message: "Bạn có chắc muốn hủy yêu cầu này? Thao tác này sẽ xóa trạng thái chờ duyệt/đã duyệt.",
           confirmLabel: "Hủy yêu cầu",
-          type: "danger"
+          destructive: true
       });
 
       if (!confirm) return;
