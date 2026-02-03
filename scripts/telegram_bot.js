@@ -46,9 +46,23 @@ bot.on('callback_query', async (query) => {
   if (action === 'approve') {
     console.log(`[${new Date().toLocaleTimeString()}] ✅ Approving request: ${requestId}`);
     try {
+      // 1. Get a valid manager ID
+      let approverId = defaultManagerId;
+      const { data: adminUser } = await supabase
+          .from('staff')
+          .select('id')
+          .in('role', ['Owner', 'Admin'])
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+      
+      if (adminUser) {
+          approverId = adminUser.id;
+      }
+
       // SỬA ĐỔI: Ép kiểu dữ liệu rõ ràng để khớp với Database
       const { data: result, error } = await supabase.rpc('fn_approve_request', {
-        p_manager_id: String(defaultManagerId),
+        p_manager_id: String(approverId),
         p_manager_pin: null,
         p_method: 'TELEGRAM',
         p_request_id: String(requestId)

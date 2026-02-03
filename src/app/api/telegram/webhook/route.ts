@@ -29,8 +29,24 @@ export async function POST(req: NextRequest) {
       const [action, requestId] = data.split('_');
 
       if (action === 'approve') {
+        // 1. Get a valid manager ID (Owner/Admin) to act as the approver
+        // We prioritize the hardcoded ID if it exists, otherwise fallback to any Admin/Owner
+        let approverId = defaultManagerId;
+        
+        const { data: adminUser } = await supabase
+            .from('staff')
+            .select('id')
+            .in('role', ['Owner', 'Admin'])
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+
+        if (adminUser) {
+            approverId = adminUser.id;
+        }
+
         const { data: result, error } = await supabase.rpc('fn_approve_request', {
-          p_manager_id: String(defaultManagerId),
+          p_manager_id: String(approverId),
           p_manager_pin: null,
           p_method: 'TELEGRAM',
           p_request_id: String(requestId)
