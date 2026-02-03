@@ -15,7 +15,7 @@ import { differenceInMinutes } from 'date-fns';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 import { cashFlowService, Wallet } from '@/services/cashFlowService';
-import WalletCards from '@/app/cash-flow/components/WalletCards';
+import WalletCards from '@/app/tien/components/WalletCards';
 import { useRouter } from 'next/navigation';
 import { usePermission } from '@/hooks/usePermission';
 import { PERMISSION_KEYS } from '@/services/permissionService';
