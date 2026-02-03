@@ -23,20 +23,42 @@ const supabaseUrl = config.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = config.SUPABASE_SERVICE_ROLE_KEY;
 const defaultManagerId = '25b0a204-064b-4281-89cf-ccfc95d9adf7'; // ntt (Admin)
 
-if (!token || !supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing configuration in .env or .env.local');
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Missing Supabase configuration in .env or .env.local');
   process.exit(1);
 }
 
-// 2. Init clients
-const bot = new TelegramBot(token, { polling: true });
+// 2. Init Supabase client
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-console.log('🚀 Local Telegram Bot is running (Polling Mode)...');
-console.log('🔗 Connected to Supabase:', supabaseUrl);
+async function startBot() {
+  try {
+    // 3. Fetch Telegram Token from Database
+    console.log('🔄 Fetching Telegram Bot Token from Database...');
+    const { data: settings, error } = await supabase
+      .from('settings')
+      .select('telegram_bot_token')
+      .eq('key', 'config')
+      .single();
 
-// 3. Handle Callback Queries (Buttons)
-bot.on('callback_query', async (query) => {
+    if (error || !settings?.telegram_bot_token) {
+      console.error('❌ Telegram Bot Token not found in Database settings!');
+      console.error('👉 Please configure it at: /settings/system');
+      process.exit(1);
+    }
+
+    const token = settings.telegram_bot_token;
+    console.log('✅ Found Telegram Token');
+
+    // 4. Init Bot
+    const bot = new TelegramBot(token, { polling: true });
+
+    console.log('🚀 Local Telegram Bot is running (Polling Mode)...');
+    console.log('🔗 Connected to Supabase:', supabaseUrl);
+
+    // 5. Handle Callback Queries (Buttons)
+    bot.on('callback_query', async (query) => {
+
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
   const data = query.data;
@@ -115,7 +137,14 @@ bot.on('callback_query', async (query) => {
   }
 });
 
-// Error handling
-bot.on('polling_error', (error) => {
-  console.error('Polling Error:', error.code, error.message);
-});
+    // Error handling
+    bot.on('polling_error', (error) => {
+      console.error('Polling Error:', error.code, error.message);
+    });
+
+  } catch (error) {
+    console.error('Failed to start bot:', error);
+  }
+}
+
+startBot();

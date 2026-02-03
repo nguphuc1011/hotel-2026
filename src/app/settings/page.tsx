@@ -103,6 +103,22 @@ export default function SettingsPage() {
           </div>
         </Link>
 
+        {/* System Settings - New */}
+        <Link href="/settings/system" className="bento-card p-8 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+          <div className="relative z-10">
+            <div className="w-12 h-12 bg-slate-50 rounded-[18px] flex items-center justify-center mb-6 text-slate-500">
+              <ShieldCheck size={24} />
+            </div>
+            <h3 className="text-2xl font-black tracking-tight mb-2 text-main">Hệ thống</h3>
+            <p className="text-muted font-medium text-xs leading-relaxed">Cấu hình kết nối Telegram và tích hợp.</p>
+          </div>
+          <div className="flex justify-end mt-4">
+            <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 group-hover:scale-110 transition-transform">
+              <ArrowUpRight size={20} />
+            </div>
+          </div>
+        </Link>
+
         {/* Staff & Permissions - NEW GỘP */}
         {can(PERMISSION_KEYS.MANAGE_PERMISSIONS) && (
           <Link href="/settings/staff" className="bento-card p-8 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">

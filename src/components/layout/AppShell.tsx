@@ -79,7 +79,7 @@ export default function AppShell({
     { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: '/', permission: PERMISSION_KEYS.VIEW_DASHBOARD },
     { icon: <Banknote size={24} />, label: 'Thu Chi', href: '/tien', permission: PERMISSION_KEYS.VIEW_MONEY },
     { icon: <Users size={24} />, label: 'Khách hàng', href: '/customers' },
-    { icon: <Clock size={24} />, label: 'Giao ca', href: '/shifts' },
+    // { icon: <Clock size={24} />, label: 'Giao ca', href: '/shifts' },
     { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: '/reports', permission: PERMISSION_KEYS.VIEW_REPORTS },
     { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: '/settings', permission: PERMISSION_KEYS.VIEW_SETTINGS },
   ];

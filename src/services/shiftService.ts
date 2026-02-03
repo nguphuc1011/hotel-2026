@@ -47,11 +47,12 @@ export const shiftService = {
   },
 
   // Đóng ca (Blind Close)
-  async closeShift(shiftId: string, declaredCash: number, notes: string) {
+  async closeShift(shiftId: string, declaredCash: number, notes: string, denominations?: { denomination: number; quantity: number }[]) {
     const { data, error } = await supabase.rpc('close_shift', {
       p_shift_id: shiftId,
-      p_declared_cash: declaredCash,
-      p_notes: notes
+      p_declared_cash_manual: declaredCash,
+      p_notes: notes,
+      p_denominations: denominations
     });
 
     if (error) throw error;

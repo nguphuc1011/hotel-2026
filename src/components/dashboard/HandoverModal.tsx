@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, CheckCircle2, AlertTriangle, Play, LogOut, Banknote, Loader2, History } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Play, LogOut, Banknote, Loader2, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/providers/AuthProvider';
 import { shiftService, Shift } from '@/services/shiftService';
+import { telegramService } from '@/services/telegramService';
 import { MoneyInput } from '@/components/ui/MoneyInput';
-import { formatMoney } from '@/lib/utils';
+import { formatMoney, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+
+const DENOMINATIONS = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000];
 
 interface HandoverModalProps {
   isOpen: boolean;
@@ -30,7 +33,18 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
   // Form States
   const [startCash, setStartCash] = useState<number>(0);
   const [declaredCash, setDeclaredCash] = useState<number>(0);
+  const [denominations, setDenominations] = useState<Record<number, number>>({});
   const [notes, setNotes] = useState('');
+  const [closeResult, setCloseResult] = useState<{ system_cash: number; variance: number } | null>(null);
+
+  const handleDenominationChange = (value: number, count: number) => {
+    const newDenominations = { ...denominations, [value]: count };
+    setDenominations(newDenominations);
+    
+    // Auto calculate declared cash
+    const total = DENOMINATIONS.reduce((sum, d) => sum + d * (newDenominations[d] || 0), 0);
+    setDeclaredCash(total);
+  };
 
   // Fetch current shift status when modal opens
   useEffect(() => {
@@ -79,11 +93,39 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
 
     setLoading(true);
     try {
-      await shiftService.closeShift(currentShift.id, declaredCash, notes);
-      toast.success('Đã chốt ca thành công');
-      onClose();
-      if (onSuccess) onSuccess();
-    } catch (error) {
+      // Convert denominations map to array
+      const denominationList = Object.entries(denominations)
+        .filter(([_, count]) => count > 0)
+        .map(([value, count]) => ({
+          denomination: parseInt(value),
+          quantity: count
+        }));
+
+      const result = await shiftService.closeShift(currentShift.id, declaredCash, notes, denominationList);
+      
+      if (result.success) {
+         setCloseResult({
+             system_cash: result.system_cash,
+             variance: result.variance
+         });
+         
+         // Send Telegram Report
+         const message = telegramService.formatShiftReportMessage(
+            user?.full_name || user?.username || 'Nhân viên',
+            result.system_cash,
+            declaredCash,
+            result.variance,
+            result.audit_status
+         );
+         await telegramService.sendMessage(message);
+
+         toast.success('Đã chốt ca thành công');
+         if (onSuccess) onSuccess();
+         // Do NOT onClose() here, let user see the result.
+      } else {
+         toast.error(result.message || 'Lỗi khi chốt ca');
+      }
+    } catch (error: any) {
       console.error('Error closing shift:', error);
       toast.error('Lỗi khi chốt ca');
     } finally {
@@ -114,7 +156,59 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
         </div>
 
         <div className="p-8">
-          {loading && !currentShift ? (
+          {closeResult ? (
+            /* CASE 3: SHOW CLOSE RESULT */
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className={cn(
+                "p-6 rounded-2xl border-2 flex flex-col items-center text-center gap-4",
+                closeResult.variance === 0 
+                  ? "bg-green-50 border-green-100" 
+                  : "bg-orange-50 border-orange-100"
+              )}>
+                <div className={cn(
+                  "w-16 h-16 rounded-full flex items-center justify-center shrink-0 mb-2",
+                  closeResult.variance === 0 ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
+                )}>
+                  {closeResult.variance === 0 ? <CheckCircle2 size={32} /> : <AlertCircle size={32} />}
+                </div>
+                
+                <div>
+                  <h3 className={cn(
+                    "text-xl font-black mb-1",
+                    closeResult.variance === 0 ? "text-green-800" : "text-orange-800"
+                  )}>
+                    {closeResult.variance === 0 ? "Chốt ca hoàn hảo!" : "Có chênh lệch tiền mặt"}
+                  </h3>
+                  <p className="text-slate-500 font-medium text-sm">
+                    {closeResult.variance === 0 
+                      ? "Số tiền thực tế khớp hoàn toàn với hệ thống." 
+                      : "Vui lòng kiểm tra lại các giao dịch tiền mặt."}
+                  </p>
+                </div>
+
+                <div className="w-full bg-white/50 rounded-xl p-4 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 font-bold">Hệ thống ghi nhận:</span>
+                    <span className="font-bold text-slate-900">{formatMoney(closeResult.system_cash)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 font-bold">Chênh lệch:</span>
+                    <span className={cn(
+                      "font-bold",
+                      closeResult.variance > 0 ? "text-green-600" : "text-red-600"
+                    )}>{closeResult.variance > 0 ? '+' : ''}{formatMoney(closeResult.variance)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={handleFinish}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-lg uppercase tracking-wide shadow-xl shadow-slate-200 transition-all active:scale-[0.98]"
+              >
+                Hoàn tất & Đóng
+              </button>
+            </div>
+          ) : loading && !currentShift ? (
             <div className="py-12 flex justify-center">
               <Loader2 className="animate-spin text-slate-300" size={32} />
             </div>
@@ -172,16 +266,33 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
                   </div>
 
                   <div className="space-y-3">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Tiền thực tế tại két (Cuối ca)</label>
-                    <MoneyInput
-                      value={declaredCash}
-                      onChange={setDeclaredCash}
-                      placeholder="0"
-                      className="text-3xl font-black text-center py-6 h-auto bg-slate-50 border-transparent focus:bg-white"
-                      autoFocus
-                    />
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Kiểm đếm tiền mặt (Két)</label>
+                    
+                    <div className="bg-slate-50 rounded-2xl p-4 space-y-3 max-h-[300px] overflow-y-auto">
+                      <div className="grid grid-cols-2 gap-3">
+                        {DENOMINATIONS.map((d) => (
+                          <div key={d} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
+                            <span className="text-xs font-bold text-slate-500 w-16 text-right">{formatMoney(d)}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              value={denominations[d] || ''}
+                              onChange={(e) => handleDenominationChange(d, parseInt(e.target.value) || 0)}
+                              className="w-full text-sm font-bold text-slate-900 text-right outline-none bg-transparent"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                        <span className="text-xs font-bold text-slate-500 uppercase">Tổng thực tế</span>
+                        <span className="text-lg font-black text-slate-900">{formatMoney(declaredCash)}</span>
+                      </div>
+                    </div>
+                    
                     <p className="text-[10px] text-slate-400 font-medium italic text-center">
-                        * Hãy đếm kỹ tiền mặt trong két trước khi nhập
+                        * Hãy đếm kỹ từng mệnh giá tiền trong két
                     </p>
                   </div>
 

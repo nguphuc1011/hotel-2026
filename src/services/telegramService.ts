@@ -1,31 +1,20 @@
-import { supabase } from '@/lib/supabase';
 import { formatMoney } from '@/utils/format';
 
 export const telegramService = {
   async sendMessage(text: string) {
-    const BOT_TOKEN = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const CHAT_ID = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-
-    if (!BOT_TOKEN || !CHAT_ID) {
-      console.warn('Telegram Bot Token or Chat ID is missing');
-      return;
-    }
-
     try {
-      const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      const response = await fetch('/api/telegram/send-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          chat_id: CHAT_ID,
-          text: text,
-          parse_mode: 'HTML',
+          text
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send Telegram message');
+        console.error('Failed to send Telegram message');
       }
     } catch (error) {
       console.error('Error sending Telegram message:', error);
@@ -52,110 +41,51 @@ export const telegramService = {
     `.trim();
   },
 
-  async sendApprovalRequest(requestId: string, action: string, staffName: string, requestData: any = {}) {
-    const BOT_TOKEN = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const CHAT_ID = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-
-    if (!BOT_TOKEN || !CHAT_ID) {
-      console.warn('Telegram Bot Token or Chat ID is missing');
-      return;
-    }
-
-    const actionNames: Record<string, string> = {
-      'checkin_cancel_booking': 'HỦY PHÒNG',
-      'checkin_custom_price': 'ĐỔI GIÁ PHÒNG',
-      'checkout_discount': 'GIẢM GIÁ BILL',
-      'checkout_void_bill': 'XÓA HÓA ĐƠN',
-      'folio_add_service': 'THÊM DỊCH VỤ',
-      'folio_remove_service': 'XÓA DỊCH VỤ',
-    };
-
-    const friendlyAction = actionNames[action] || action.toUpperCase().replace(/_/g, ' ');
+  formatShiftReportMessage(
+    staffName: string, 
+    systemCash: number, 
+    declaredCash: number, 
+    variance: number, 
+    auditStatus: string
+  ) {
+    const isMatched = variance === 0;
+    const icon = isMatched ? '🟢' : '🔴';
+    const title = isMatched ? 'BÁO CÁO GIAO CA (KHỚP)' : 'CẢNH BÁO GIAO CA (LỆCH)';
     
-    // Whitelist & Mapping
-    let details = '';
-    const labelMap: Record<string, string> = {
-        'room_number': '🏠 Phòng',
-        'roomNumber': '🏠 Phòng',
-        'customer_name': '👤 Khách',
-        'customerName': '👤 Khách',
-        'amount': '💰 Số tiền',
-        'price': '💰 Giá mới',
-        'old_price': '🔻 Giá cũ',
-        'discount_amount': '📉 Giảm',
-        'penalty_amount': '⚠️ Phạt',
-        'payment_method': '💳 HTTT',
-        'reason': '📝 Lý do',
-        'notes': '📝 Ghi chú'
-    };
-
-    const paymentMethodMap: Record<string, string> = {
-        'cash': 'Tiền mặt',
-        'transfer': 'Chuyển khoản',
-        'card': 'Thẻ',
-        'credit': 'Công nợ'
-    };
-
-    if (requestData && typeof requestData === 'object') {
-      // 1. Context Info (Room & Customer)
-      const room = requestData.room_number || requestData.roomNumber;
-      const customer = requestData.customer_name || requestData.customerName;
-      
-      if (room) details += `\n🏠 <b>Phòng:</b> ${room}`;
-      if (customer) details += `\n👤 <b>Khách:</b> ${customer}`;
-      
-      details += `\n━━━━━━━━━━━━━━━━━━`;
-
-      // 2. Financial & Detail Info
-      Object.entries(requestData).forEach(([key, value]) => {
-        if (!labelMap[key]) return; 
-        if (key.includes('room') || key.includes('customer')) return; // Already handled
-        
-        let displayValue = value;
-
-        // Format Money
-        if ((key.includes('amount') || key.includes('price')) && typeof value === 'number') {
-          displayValue = formatMoney(value);
-        }
-
-        // Format Payment Method
-        if (key === 'payment_method' && typeof value === 'string') {
-            displayValue = paymentMethodMap[value] || value;
-        }
-        
-        details += `\n${labelMap[key]}: <b>${displayValue}</b>`;
-      });
-    }
-
-    const text = `
-<b>🔔 YÊU CẦU DUYỆT: ${friendlyAction}</b>
+    return `
+${icon} <b>${title}</b>
 ━━━━━━━━━━━━━━━━━━
-👮 <b>Người gửi:</b> ${staffName}
-${details}
+👤 <b>Nhân viên:</b> ${staffName}
+💻 <b>Tiền hệ thống:</b> ${formatMoney(systemCash)}
+💵 <b>Tiền thực tế:</b> ${formatMoney(declaredCash)}
 ━━━━━━━━━━━━━━━━━━
+📊 <b>Chênh lệch:</b> ${formatMoney(variance)}
+📝 <b>Trạng thái:</b> ${auditStatus === 'pending' ? 'Chờ kiểm duyệt' : 'Đã duyệt'}
 🕒 <i>${new Date().toLocaleString('vi-VN')}</i>
     `.trim();
+  },
 
+  async sendApprovalRequest(requestId: string, action: string, staffName: string, requestData: any = {}) {
     try {
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      const response = await fetch('/api/telegram/send-request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          chat_id: CHAT_ID,
-          text: text,
-          parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '✅ ĐỒNG Ý', callback_data: `approve_${requestId}` },
-                { text: '❌ TỪ CHỐI', callback_data: `reject_${requestId}` }
-              ]
-            ]
-          }
+          requestId,
+          action,
+          staffName,
+          requestData
         }),
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Failed to send Telegram request via API:', error);
+      }
     } catch (error) {
-      console.error('Error sending Telegram approval request:', error);
+      console.error('Error calling Telegram API:', error);
     }
   }
 };
