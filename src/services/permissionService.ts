@@ -23,6 +23,9 @@ export const PERMISSION_KEYS = {
   VIEW_SETTINGS: 'view_settings',
   VIEW_REPORTS: 'view_reports',
   MANAGE_PERMISSIONS: 'manage_permissions',
+  
+  // Shift Operations
+  SHIFT_FORCE_CLOSE: 'shift_force_close', // Admin/Owner override to close shift
 } as const;
 
 export const DEFAULT_ROLES: RolePermission[] = [

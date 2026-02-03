@@ -11,6 +11,8 @@ import { MoneyInput } from '@/components/ui/MoneyInput';
 import { formatMoney, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
 
 const DENOMINATIONS = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000];
 
@@ -232,7 +234,7 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
                 </div>
               </div>
 
-              {user?.role === 'Admin' && (
+              {canForceClose && (
                 <div className="space-y-3">
                    <div className="flex items-center gap-2 px-2">
                       <div className="h-px bg-slate-200 flex-1"></div>

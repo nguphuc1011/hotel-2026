@@ -25,6 +25,7 @@ export const PERMISSION_METADATA = [
     items: [
       { code: PERMISSION_KEYS.VIEW_SETTINGS, label: 'Truy cập Cài đặt' },
       { code: PERMISSION_KEYS.MANAGE_PERMISSIONS, label: 'Quản lý Phân quyền' },
+      { code: PERMISSION_KEYS.SHIFT_FORCE_CLOSE, label: 'Quyền Đóng Ca Hộ (Force Close)' },
     ]
   }
 ];
