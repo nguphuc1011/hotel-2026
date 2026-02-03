@@ -82,14 +82,60 @@ export const shiftService = {
   async getGlobalOpenShift() {
       const { data, error } = await supabase.rpc('get_global_open_shift');
       if (error) throw error;
-      return data as { 
-          has_open_shift: boolean; 
-          shift: { 
-              id: string; 
-              staff_id: string; 
-              staff_name: string; 
-              start_time: string; 
-          } | null 
+      return data as {
+          has_open_shift: boolean;
+          shift: {
+              id: string;
+              staff_name: string;
+              start_time: string;
+          } | null;
       };
+  },
+
+  // --- Admin Shift Management ---
+  
+  async getShiftDefinitions() {
+    const { data, error } = await supabase.rpc('get_shift_definitions');
+    if (error) throw error;
+    return data as {
+      id: string;
+      name: string;
+      start_time: string;
+      end_time: string;
+      is_active: boolean;
+    }[];
+  },
+
+  async manageShiftDefinition(definition: {
+    id?: string;
+    name: string;
+    start_time: string;
+    end_time: string;
+    is_active: boolean;
+    action: 'CREATE' | 'UPDATE' | 'DELETE';
+  }) {
+    const { data, error } = await supabase.rpc('manage_shift_definition', {
+      p_id: definition.id,
+      p_name: definition.name,
+      p_start_time: definition.start_time,
+      p_end_time: definition.end_time,
+      p_is_active: definition.is_active,
+      p_action: definition.action
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async resolveShiftVariance(shiftId: string, type: 'ADJUST' | 'IGNORE', notes: string, adminId: string) {
+    const { data, error } = await supabase.rpc('resolve_shift_variance', {
+      p_shift_id: shiftId,
+      p_resolution_type: type,
+      p_notes: notes,
+      p_admin_id: adminId
+    });
+    if (error) throw error;
+    return data;
+  }
+};
   }
 };
