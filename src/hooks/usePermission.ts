@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 
 export function usePermission(permissionCode?: string) {
-  const { user, permissions, isLoading, fetchUser, hasPermission } = useAuthStore();
+  const { user, permissions, modularSettings, isLoading, fetchUser, hasPermission } = useAuthStore();
 
   useEffect(() => {
     // Only fetch if not loaded yet (or implement smarter re-fetch logic)
@@ -11,7 +11,8 @@ export function usePermission(permissionCode?: string) {
     }
   }, []);
 
-  const can = (code: string) => hasPermission(code);
+  // Stabilize 'can' function to prevent infinite loops in useEffect dependencies
+  const can = useCallback((code: string) => hasPermission(code), [hasPermission, user, permissions, modularSettings]);
 
   return {
     user,
