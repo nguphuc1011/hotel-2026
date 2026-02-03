@@ -24,6 +24,7 @@ interface HandoverModalProps {
 
 export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverModalProps) {
   const { user } = useAuth();
+  const { can } = usePermission();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
@@ -90,8 +91,10 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
 
   const handleForceClose = async () => {
       if (!blockedInfo || !user) return;
-      if (user.role !== 'Admin') {
-          toast.error('Chỉ Admin mới có quyền đóng ca hộ!');
+      
+      // Use permission check instead of role check
+      if (!can(PERMISSION_KEYS.SHIFT_FORCE_CLOSE)) {
+          toast.error('Bạn không có quyền đóng ca hộ!');
           return;
       }
       
@@ -234,7 +237,7 @@ export default function HandoverModal({ isOpen, onClose, onSuccess }: HandoverMo
                 </div>
               </div>
 
-              {canForceClose && (
+              {can(PERMISSION_KEYS.SHIFT_FORCE_CLOSE) && (
                 <div className="space-y-3">
                    <div className="flex items-center gap-2 px-2">
                       <div className="h-px bg-slate-200 flex-1"></div>
