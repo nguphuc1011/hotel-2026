@@ -14,6 +14,7 @@ interface BillBreakdownProps {
   onDiscountChange?: (val: number) => void;
   surcharge?: number;
   onSurchargeChange?: (val: number) => void;
+  hideSummary?: boolean;
 }
 
 export default function BillBreakdown({ 
@@ -21,6 +22,7 @@ export default function BillBreakdown({
   className, 
   isDark = false, 
   hideAuditLog = false,
+  hideSummary = false,
   discount,
   onDiscountChange,
   surcharge,
@@ -73,6 +75,7 @@ export default function BillBreakdown({
   return (
     <div className={cn("space-y-3", className)}>
       {/* 1. Main items */}
+      {!hideSummary && (
       <div className="space-y-3">
         <div className="flex flex-col">
           <div className="flex justify-between items-center">
@@ -101,7 +104,29 @@ export default function BillBreakdown({
           </div>
         )}
 
-        {bill.surcharge_total > 0 && (
+        {/* Group Bill Breakdown */}
+        {bill.is_group_bill && bill.group_members && bill.group_members.length > 0 && (
+          <div className={cn("flex flex-col pt-2 border-t border-dashed", borderColor)}>
+            <span className={cn("text-xs font-bold uppercase tracking-wider mb-1", labelColor)}>Gộp phòng ({bill.group_members.length})</span>
+            {bill.group_members.map((member: any) => (
+                <div key={member.booking_id} className="flex justify-between items-center pl-2 text-xs mb-1">
+                    <span className={cn(isDark ? "text-white/80" : "text-slate-600")}>
+                        Phòng {member.room_name || 'Phòng ?'}
+                    </span>
+                    <span className={cn("font-bold", isDark ? "text-white" : "text-slate-900")}>
+                        {formatMoney(member.amount)}
+                    </span>
+                </div>
+            ))}
+             <div className="flex justify-end pt-1">
+                <span className={cn("text-xs font-bold", isDark ? "text-yellow-400" : "text-yellow-600")}>
+                    Tổng gộp: {formatMoney(bill.group_total || 0)}
+                </span>
+             </div>
+          </div>
+        )}
+
+        {(bill.surcharge_total > 0 || (bill.custom_surcharge && bill.custom_surcharge > 0)) && (
           <div className="flex flex-col">
             <div className="flex justify-between items-center">
                 <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Phụ thu</span>
@@ -119,25 +144,6 @@ export default function BillBreakdown({
                     </div>
                 )
             })}
-          </div>
-        )}
-
-        {(bill.custom_surcharge > 0 || surcharge !== undefined) && (
-          <div className="flex justify-between items-center">
-            <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Phụ phí khác</span>
-            {onSurchargeChange ? (
-              <div className="w-32">
-                <MoneyInput
-                  value={surcharge ?? bill.custom_surcharge}
-                  onChange={onSurchargeChange}
-                  className="h-8 text-right font-black text-sm border-none bg-slate-50 focus:bg-slate-100 rounded-lg px-2"
-                />
-              </div>
-            ) : (
-              <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
-                {formatMoney(surcharge ?? bill.custom_surcharge)}
-              </span>
-            )}
           </div>
         )}
 
@@ -174,6 +180,35 @@ export default function BillBreakdown({
           </div>
         )}
 
+        {bill.deposit_amount > 0 && (
+          <div className={cn("pt-2 border-t flex justify-between items-center", borderColor)}>
+            <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-blue-300" : "text-blue-500")}>Đã cọc</span>
+            <span className={cn("font-black", isDark ? "text-blue-300" : "text-blue-600")}>
+              -{formatMoney(bill.deposit_amount)}
+            </span>
+          </div>
+        )}
+
+        {(bill.custom_surcharge > 0 || surcharge !== undefined) && (
+          <div className={cn("pt-2 border-t flex justify-between items-center", borderColor)}>
+            <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Phụ phí khác</span>
+            {onSurchargeChange ? (
+              <div className="w-32">
+                <MoneyInput
+                  value={surcharge ?? bill.custom_surcharge}
+                  onChange={onSurchargeChange}
+                  className="h-8 text-right font-black text-sm border-none bg-slate-50 focus:bg-slate-100 rounded-lg px-2"
+                  align="right"
+                />
+              </div>
+            ) : (
+              <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
+                {formatMoney(surcharge ?? bill.custom_surcharge)}
+              </span>
+            )}
+          </div>
+        )}
+
         {(bill.discount_amount > 0 || discount !== undefined) && (
           <div className={cn("pt-2 border-t flex justify-between items-center", borderColor)}>
             <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-rose-200" : "text-rose-500")}>Giảm giá</span>
@@ -182,7 +217,8 @@ export default function BillBreakdown({
                 <MoneyInput
                   value={discount ?? bill.discount_amount}
                   onChange={onDiscountChange}
-                  className="h-8 text-right font-black text-sm border-none bg-rose-50 focus:bg-rose-100 rounded-lg px-2 text-rose-600"
+                  className="h-8 font-black text-sm border-none bg-rose-50 focus:bg-rose-100 rounded-lg px-2 text-rose-600"
+                  align="right"
                 />
               </div>
             ) : (
@@ -192,25 +228,17 @@ export default function BillBreakdown({
             )}
           </div>
         )}
-
-        {bill.deposit_amount > 0 && (
-          <div className={cn("pt-2 border-t flex justify-between items-center", borderColor)}>
-            <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-blue-300" : "text-blue-500")}>Đã cọc</span>
-            <span className={cn("font-black", isDark ? "text-blue-300" : "text-blue-600")}>
-              -{formatMoney(bill.deposit_amount)}
-            </span>
-          </div>
-        )}
       </div>
+      )}
 
       {/* 2. Audit Trail (Lá Sớ) */}
       {!hideAuditLog && bill.explanation && bill.explanation.length > 0 && (
-        <div className={cn("mt-4 p-4 rounded-2xl border", auditBg, borderColor)}>
+        <div className={cn("p-4 rounded-2xl border text-left", auditBg, borderColor, !hideSummary && "mt-4")}>
           <div className="flex items-center gap-2 mb-2 opacity-60">
             <MessageSquare className="w-3 h-3" />
-            <span className="font-black uppercase tracking-widest text-xs">Chi tiết tính toán (Lá sớ)</span>
+            <span className="font-black uppercase tracking-widest text-xs">Chi tiết tính toán</span>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 text-left">
             {/* Explicit Check-in Time */}
             {bill.check_in_at && (
                 <div className={cn("flex gap-2 text-xs leading-relaxed italic font-medium", auditTextColor)}>

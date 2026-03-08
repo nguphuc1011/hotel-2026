@@ -50,6 +50,16 @@ export interface Settings {
   allow_manual_price_override: boolean;
   enable_print_bill: boolean;
   
+  // Hotel Info
+  hotel_name?: string;
+  hotel_address?: string;
+  hotel_phone?: string;
+  hotel_email?: string;
+
+  // Telegram
+  telegram_bot_token?: string;
+  telegram_chat_id?: string;
+  
   updated_at?: string;
 }
 
@@ -85,13 +95,18 @@ export interface RoomCategory {
 }
 
 export const settingsService = {
-  async getSettings(): Promise<Settings | null> {
+  async getSettings(hotelId?: string): Promise<Settings | null> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('settings')
         .select('*')
-        .eq('key', 'config')
-        .single();
+        .eq('key', 'config');
+      
+      if (hotelId) {
+        query = query.eq('hotel_id', hotelId);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         // Fallback or just return defaults
@@ -137,6 +152,12 @@ export const settingsService = {
         auto_deduct_inventory: val.auto_deduct_inventory ?? true,
         allow_manual_price_override: true,
         enable_print_bill: val.enable_print_bill ?? true,
+
+        // Hotel Info
+        hotel_name: val.hotel_name || '',
+        hotel_address: val.hotel_address || '',
+        hotel_phone: val.hotel_phone || '',
+        hotel_email: val.hotel_email || '',
         
         updated_at: val.updated_at
       } as Settings;
@@ -182,7 +203,13 @@ export const settingsService = {
         hourly_ceiling_percent: settings.hourly_ceiling_percent,
         surcharge_rules: settings.surcharge_rules,
         auto_deduct_inventory: settings.auto_deduct_inventory,
-        enable_print_bill: settings.enable_print_bill
+        enable_print_bill: settings.enable_print_bill,
+        hotel_name: settings.hotel_name,
+        hotel_address: settings.hotel_address,
+        hotel_phone: settings.hotel_phone,
+        hotel_email: settings.hotel_email,
+        telegram_bot_token: settings.telegram_bot_token,
+        telegram_chat_id: settings.telegram_chat_id,
       };
 
       // Remove undefined keys
@@ -289,6 +316,12 @@ export const settingsService = {
     try {
       const { id, updated_at, ...payload } = category as any;
       
+      // Auto-inject hotel_id from localStorage if not provided
+      if (!payload.hotel_id && typeof window !== 'undefined') {
+        const user = JSON.parse(localStorage.getItem('1hotel_user') || '{}');
+        if (user?.hotel_id) payload.hotel_id = user.hotel_id;
+      }
+
       if (payload.overnight_enabled === undefined) {
         payload.overnight_enabled = true;
       }

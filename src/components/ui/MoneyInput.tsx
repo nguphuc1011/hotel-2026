@@ -10,11 +10,12 @@ interface MoneyInputProps {
   inputClassName?: string;
   placeholder?: string;
   centered?: boolean;
+  align?: 'left' | 'center' | 'right';
   disabled?: boolean;
   autoFocus?: boolean;
 }
 
-export function MoneyInput({ value, onChange, label, className, inputClassName, placeholder = "0", centered, disabled, autoFocus }: MoneyInputProps) {
+export function MoneyInput({ value, onChange, label, className, inputClassName, placeholder = "0", centered, align = 'left', disabled, autoFocus }: MoneyInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const shortValue = Math.floor(value / 1000);
   const displayValue = shortValue === 0 ? '' : new Intl.NumberFormat('vi-VN').format(shortValue);
@@ -25,8 +26,10 @@ export function MoneyInput({ value, onChange, label, className, inputClassName, 
       <div 
         onClick={() => inputRef.current?.focus()}
         className={cn(
-            "relative flex items-center bg-transparent rounded-xl focus-within:ring-0 transition-all w-full cursor-text",
-            centered && "justify-center"
+            "relative flex items-center bg-transparent rounded-xl focus-within:ring-0 transition-all w-full cursor-text h-full",
+            (centered || align === 'center') && "justify-center",
+            align === 'right' && "justify-end",
+            align === 'left' && "justify-start"
         )}
       >
         <div className="flex items-center">

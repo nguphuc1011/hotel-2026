@@ -11,14 +11,19 @@ import {
   StickyNote,
   LucideIcon,
   Calendar,
-  ShieldCheck
+  ShieldCheck,
+  DoorOpen,
+  User,
+  Users,
+  Link,
+  Crown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardRoom } from '@/types/dashboard';
 import { format } from 'date-fns';
 import LiveTimer from './LiveTimer';
 
-import { formatMoney } from '@/utils/format';
+import { formatMoney, getContrastTextColor } from '@/utils/format';
 
 interface RoomCardProps {
   room: DashboardRoom;
@@ -30,16 +35,17 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
   const display = useMemo(() => {
     let bgColor = 'bg-[#155e75]'; // Default: Available (Xanh Teal)
     let textColor = 'text-white';
-    let Icon: LucideIcon = Sun;
+    let Icon: LucideIcon = DoorOpen;
     let statusText: React.ReactNode = 'Sẵn sàng';
     let subText = 'Trống';
     let isFlashing = false;
+    let iconClassName = '';
 
     if (room.status === 'repair') {
       bgColor = 'bg-[#1e293b]'; // Repair (Xám Đen)
       Icon = Wrench;
       statusText = 'Bảo trì';
-      subText = 'Đang sửa chữa';
+      subText = room.notes || 'Đang sửa chữa';
     } else if (room.status === 'dirty') {
       bgColor = 'bg-[#f97316]'; // Dirty (Cam Cháy)
       Icon = Brush;
@@ -51,7 +57,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
         isFlashing = true;
       }
     } else if (room.status === 'occupied' && room.current_booking) {
-      const { booking_type, check_in_at } = room.current_booking;
+      const { booking_type, check_in_at, duration_text } = room.current_booking;
       subText = room.current_booking.customer_name || 'Khách vãng lai';
       
       const checkIn = check_in_at ? new Date(check_in_at) : null;
@@ -59,33 +65,57 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
 
       switch (booking_type) {
         case 'hourly':
-          bgColor = 'bg-[#f59e0b]'; // Hourly (Vàng Hổ Phách)
+          bgColor = 'bg-[#f59e0b]';
           textColor = 'text-black';
           Icon = Clock;
           
           if (isValidDate && check_in_at) {
-             statusText = (
-               <div className="flex items-center gap-1.5">
-                 <Clock size={16} className="animate-pulse" />
-                 <LiveTimer checkInAt={check_in_at} mode="hourly" />
-               </div>
-             );
+             const isOverLimit = (room.current_booking?.total_amount ?? 0) >= (room.price_daily ?? Number.MAX_SAFE_INTEGER);
+             
+             if (isOverLimit) {
+                // Transform to Daily look
+                bgColor = 'bg-[#1e40af]';
+                textColor = 'text-white';
+                iconClassName = 'text-[#f59e0b]'; // Yellow Icon to indicate hourly origin
+                
+                // Use Daily status text format (Days)
+                statusText = (
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={16} />
+                    <LiveTimer checkInAt={check_in_at} mode="daily" />
+                  </div>
+                );
+             } else {
+                statusText = (
+                  <div className="flex items-center gap-1.5">
+                    <Clock size={16} className="animate-pulse" />
+                    <LiveTimer checkInAt={check_in_at} mode="hourly" />
+                  </div>
+                );
+             }
           } else {
             statusText = '--:--';
           }
           break;
         case 'daily':
         case 'overnight':
-          bgColor = 'bg-[#1e40af]'; // Daily/Overnight (Xanh Dương)
+          bgColor = 'bg-[#1e40af]';
           Icon = booking_type === 'daily' ? Sun : Moon;
           
-          if (isValidDate && check_in_at) {
-             statusText = (
-               <div className="flex items-center gap-1.5">
-                 <Calendar size={16} />
-                 <LiveTimer checkInAt={check_in_at} mode={booking_type} />
-               </div>
-             );
+          if (duration_text) {
+            statusText = (
+              <div className="flex items-center gap-1.5">
+                <Calendar size={16} />
+                <span>{duration_text}</span>
+              </div>
+            );
+          } else if (isValidDate && check_in_at) {
+            statusText = (
+              <div className="flex items-center gap-1.5">
+                <Calendar size={16} />
+                <LiveTimer checkInAt={check_in_at} mode={booking_type} />
+              </div>
+            );
           } else {
             statusText = '--- ngày';
           }
@@ -93,10 +123,10 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
       }
     }
 
-    return { bgColor, textColor, Icon, statusText, subText, isFlashing };
+    return { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName };
   }, [room]);
 
-  const { bgColor, textColor, Icon, statusText, subText, isFlashing } = display;
+  const { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName } = display;
 
   // Formatting currency
   const formattedAmount = useMemo(() => {
@@ -122,68 +152,81 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
         isFlashing && "animate-flash-red"
       )}
     >
-      {/* Background Watermark Icon */}
-      <Icon 
-        className="absolute -bottom-4 -right-4 w-[120px] h-[120px] opacity-10 rotate-12 transform transition-transform duration-500 group-hover:rotate-0" 
-        strokeWidth={1}
-      />
-
       {/* Content Container */}
       <div className="relative z-10 p-6 flex flex-col h-full justify-between">
         
-        {/* Top Row: Room Number & Status Icon */}
-        <div className="flex justify-between items-start">
-          <div>
-            <span className={cn(
-              "text-4xl font-black tracking-tighter block", // Prompt requirement
-              // "Number color change" effect - slightly distinct from main text if needed, 
-              // but prompt says "Text color" is defined by status. 
-              // Let's add a slight brightness boost on hover.
-              "transition-colors duration-300 group-hover:brightness-110"
-            )}>
-              {room.name}
-            </span>
-            {/* Category Badge */}
-            <div className="mt-2 inline-block px-2 py-1 rounded-lg bg-black/10 backdrop-blur-md">
+        {/* Top Row: Room Number & Rental Type */}
+        <div className="flex justify-between items-end">
+          <span className={cn(
+            "text-4xl font-black tracking-tighter block",
+            "transition-colors duration-300 group-hover:brightness-110"
+          )}>
+            {room.name}
+          </span>
+
+          {room.status === 'occupied' && room.current_booking && (
+            <div className="px-2 py-1 rounded-lg bg-black/10 backdrop-blur-md ml-auto">
               <span className="text-[9px] font-black uppercase tracking-wider block">
-                {room.category_name || 'STANDARD'}
+                {room.current_booking.booking_type === 'hourly' ? 'GIỜ' : 
+                 room.current_booking.booking_type === 'overnight' ? 'ĐÊM' : 'NGÀY'}
               </span>
             </div>
-
-            {/* Pending Approval Indicator - Moved Here */}
-            {room.pending_approval && (
-              <div className={cn(
-                "mt-2 flex w-fit px-2 py-1 rounded-lg items-center gap-1.5 animate-pulse",
-                room.pending_approval.status === 'APPROVED' ? "bg-green-600 text-white" : "bg-yellow-400 text-black"
-              )}>
-                {room.pending_approval.status === 'APPROVED' ? (
-                  <ShieldCheck size={14} />
-                ) : (
-                  <Clock size={14} />
-                )}
-                <span className="text-[10px] font-bold uppercase tracking-wide">
-                  {room.pending_approval.status === 'APPROVED' ? 'ĐÃ DUYỆT' : 'Chờ duyệt'}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col items-end gap-1">
-            {/* Icon Running In Effect */}
-            <div className="transform translate-x-2 opacity-80 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
-              <Icon size={32} strokeWidth={2.5} />
-            </div>
-          </div>
+          )}
         </div>
 
+        {/* Category Badge & Group Indicator */}
+        <div className="mt-2 flex flex-col items-start gap-1">
+              
+              {/* Group Indicator - Color Box */}
+              {room.group_color && (room.is_group_master || room.current_booking?.is_group_member) && (
+                <div 
+                  className="px-2 py-1 rounded-lg backdrop-blur-md flex items-center gap-1" 
+                  style={{ backgroundColor: room.group_color, color: getContrastTextColor(room.group_color) }} // Áp dụng màu chữ tương phản
+                >
+                  {room.is_group_master ? (
+                    <>
+                      <Crown size={10} />
+                      <span className="text-[9px] font-black uppercase tracking-wider block whitespace-nowrap">
+                        CHỦ NHÓM {room.name}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Link size={10} />
+                      <span className="text-[9px] font-black uppercase tracking-wider block whitespace-nowrap">
+                        NHÓM {room.current_booking?.master_room_name || '?'}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+              
+              {room.status === 'available' && room.category_name && (
+                <div className="px-2 py-1 rounded-lg bg-black/10 backdrop-blur-md">
+                  <span className="text-[9px] font-black uppercase tracking-wider block">
+                    {room.category_name}
+                  </span>
+                </div>
+              )}
+            </div>
+
         {/* Middle: Customer Name & Booking Details (if occupied) */}
-        <div className="mt-auto mb-2">
+        <div className="mt-auto mb-2 pt-3">
           {room.status === 'occupied' && room.current_booking && (
             <div className="animate-fade-in flex flex-col gap-1">
-              <p className="text-[11px] font-bold uppercase tracking-wide opacity-90 truncate">
-                {subText}
-              </p>
+              <div className="flex items-center gap-1.5 opacity-90">
+                <User size={12} strokeWidth={2.5} />
+                <p className="text-[11px] font-bold uppercase tracking-wide truncate">
+                  {subText}
+                </p>
+              </div>
               
+              {/* Separator */}
+              <div className={cn(
+                "h-px w-full my-0.5",
+                textColor === 'text-black' ? "bg-black/20" : "bg-white/20"
+              )} />
+
               <div className="flex flex-col gap-0.5">
               </div>
             </div>
@@ -200,7 +243,10 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
             
             {/* Amount */}
             {room.status === 'occupied' || room.status === 'available' ? (
-               <span className="text-[22px] font-black tracking-tighter leading-none">
+               <span className={cn(
+                 "font-bold tracking-normal leading-none",
+                 "text-[22px]"
+               )}>
                  {formattedAmount || '0 ₫'}
                </span>
             ) : (
@@ -210,12 +256,10 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             {/* Debt Warning Logic */}
             {room.current_booking && (room.current_booking.customer_balance || 0) < 0 && (
-               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center animate-bounce shadow-lg shadow-black/20">
-                 <AlertTriangle size={18} className="text-rose-600" />
-               </div>
+               <AlertTriangle size={16} className="text-rose-600 animate-bounce" />
             )}
             
             {room.notes && (

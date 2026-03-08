@@ -13,12 +13,16 @@ import {
   ArrowRightLeft,
   LogOut,
   Key,
-  X
+  X,
+  Banknote
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
+import TransactionModal from '@/app/[slug]/tien/components/TransactionModal';
 
 export interface FilterState {
   available: boolean;
@@ -39,18 +43,18 @@ interface DashboardHeaderProps {
   };
   filters: FilterState;
   onToggle: (key: keyof FilterState) => void;
-  onHandoverClick: () => void;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
   counts, 
   filters, 
-  onToggle,
-  onHandoverClick
+  onToggle
 }) => {
   const { user, logout } = useAuth();
+  const { can } = usePermission();
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
   const [changePinData, setChangePinData] = useState({
     oldPin: '',
@@ -157,14 +161,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Right Actions: Mobile Filter + Sell Service + User */}
         <div className="flex items-center gap-2 md:gap-4">
           
-          <button
-            onClick={onHandoverClick}
-            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-200"
-          >
-            <ArrowRightLeft size={18} />
-            <span className="text-sm font-bold hidden md:inline">Giao ca</span>
-          </button>
-
           {/* Mobile Filter Toggle */}
           <button 
             onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -177,6 +173,17 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           >
             <Filter size={18} />
           </button>
+
+          {/* Transaction Button */}
+          {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
+            <button 
+              onClick={() => setIsTransactionModalOpen(true)}
+              className="h-10 px-3 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+            >
+              <Banknote size={18} />
+              <span className="hidden md:inline font-bold text-sm">Tạo Phiếu Thu/Chi</span>
+            </button>
+          )}
 
           {/* Sell Service Button */}
           <button 
@@ -283,6 +290,15 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             ))}
          </div>
       </div>
+
+      {/* Transaction Modal */}
+      <TransactionModal 
+        isOpen={isTransactionModalOpen}
+        onClose={() => setIsTransactionModalOpen(false)}
+        onSuccess={() => {
+          // No need to refresh data here as dashboard doesn't show transaction list
+        }}
+      />
 
       {/* Change PIN Modal */}
       {isChangePinModalOpen && (

@@ -10,7 +10,7 @@ export const PERMISSION_METADATA = [
       { code: PERMISSION_KEYS.VIEW_MONEY_REVENUE, label: 'Xem Sổ Doanh thu' },
       { code: PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS, label: 'Xem Quỹ mở rộng (Tạm giữ, Công nợ...)' },
       { code: PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS_RECEIVABLE, label: 'Xem Công nợ khách hàng (Nếu ẩn Quỹ mở rộng)' },
-      { code: PERMISSION_KEYS.VIEW_MONEY_TOTALS, label: 'Xem Số dư/Tồn quỹ (Nếu tắt sẽ ẩn thành *****)' },
+      { code: PERMISSION_KEYS.CREATE_TRANSACTION, label: 'Tạo Phiếu Thu/Chi (Ngoài màn hình Sơ đồ phòng)' },
     ]
   },
   {
@@ -25,7 +25,6 @@ export const PERMISSION_METADATA = [
     items: [
       { code: PERMISSION_KEYS.VIEW_SETTINGS, label: 'Truy cập Cài đặt' },
       { code: PERMISSION_KEYS.MANAGE_PERMISSIONS, label: 'Quản lý Phân quyền' },
-      { code: PERMISSION_KEYS.SHIFT_FORCE_CLOSE, label: 'Quyền Đóng Ca Hộ (Force Close)' },
     ]
   }
 ];

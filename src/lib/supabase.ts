@@ -22,4 +22,24 @@ export const supabase = createClient(finalUrl, finalKey, {
     persistSession: true,
     autoRefreshToken: true,
   },
+  global: {
+    // Dynamic headers based on logged in user
+    get headers() {
+      const headers: Record<string, string> = {};
+      
+      // Try to get hotel_id from localStorage (same place AuthProvider/Store uses)
+      if (typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem('1hotel_user');
+        if (storedUser) {
+          try {
+            const user = JSON.parse(storedUser);
+            if (user?.hotel_id) {
+              headers['x-hotel-id'] = user.hotel_id;
+            }
+          } catch (e) {}
+        }
+      }
+      return headers;
+    }
+  }
 });

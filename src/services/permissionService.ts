@@ -14,7 +14,7 @@ export const PERMISSION_KEYS = {
   VIEW_MONEY_REVENUE: 'view_money_revenue',
   VIEW_MONEY_EXTRA_FUNDS: 'view_money_extra_funds', // Shows Escrow/Receivable/Revenue blocks
   VIEW_MONEY_EXTRA_FUNDS_RECEIVABLE: 'view_money_extra_funds_receivable', // Specific for debt
-  VIEW_MONEY_TOTALS: 'view_money_totals', // NEW: Positive permission. If missing -> Blind Mode (******)
+  CREATE_TRANSACTION: 'create_transaction',
 
   // Dashboard
   VIEW_DASHBOARD: 'view_dashboard',
@@ -23,12 +23,14 @@ export const PERMISSION_KEYS = {
   VIEW_SETTINGS: 'view_settings',
   VIEW_REPORTS: 'view_reports',
   MANAGE_PERMISSIONS: 'manage_permissions',
-  
-  // Shift Operations
-  SHIFT_FORCE_CLOSE: 'shift_force_close', // Admin/Owner override to close shift
 } as const;
 
 export const DEFAULT_ROLES: RolePermission[] = [
+  { 
+    role_code: 'OWNER', 
+    role_name: 'Chủ khách sạn', 
+    permissions: ['*'] 
+  },
   { 
     role_code: 'Admin', 
     role_name: 'Quản trị viên', 
@@ -37,27 +39,12 @@ export const DEFAULT_ROLES: RolePermission[] = [
   { 
     role_code: 'Manager', 
     role_name: 'Quản lý', 
-    permissions: [
-      PERMISSION_KEYS.VIEW_DASHBOARD,
-      PERMISSION_KEYS.VIEW_MONEY,
-      PERMISSION_KEYS.VIEW_MONEY_BALANCE_CASH,
-      PERMISSION_KEYS.VIEW_MONEY_BALANCE_BANK,
-      PERMISSION_KEYS.VIEW_MONEY_REVENUE,
-      PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS,
-      PERMISSION_KEYS.VIEW_MONEY_TOTALS, // Manager can see totals by default
-      PERMISSION_KEYS.VIEW_SETTINGS,
-      PERMISSION_KEYS.VIEW_REPORTS
-    ] 
+    permissions: ['view_dashboard', 'view_money', 'view_reports', 'view_settings'] 
   },
   { 
     role_code: 'Staff', 
     role_name: 'Nhân viên', 
-    permissions: [
-      PERMISSION_KEYS.VIEW_DASHBOARD,
-      PERMISSION_KEYS.VIEW_MONEY,
-      // PERMISSION_KEYS.VIEW_MONEY_TOTALS, // Staff defaults to Blind Mode (Hidden totals)
-      PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS_RECEIVABLE
-    ] 
+    permissions: ['view_dashboard'] 
   }
 ];
 

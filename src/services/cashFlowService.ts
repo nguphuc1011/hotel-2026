@@ -294,6 +294,8 @@ export const cashFlowService = {
     occurred_at: Date;
     payment_method_code?: string;
     verifiedStaff?: { id: string, name: string };
+    ref_id?: string;
+    is_auto?: boolean;
   }) {
     const { data, error } = await supabase.rpc('fn_create_cash_flow', {
       p_flow_type: payload.flow_type,
@@ -303,10 +305,15 @@ export const cashFlowService = {
       p_occurred_at: payload.occurred_at.toISOString(),
       p_verified_by_staff_id: payload.verifiedStaff?.id || null,
       p_verified_by_staff_name: payload.verifiedStaff?.name || null,
-      p_payment_method_code: payload.payment_method_code || 'cash'
+      p_payment_method_code: payload.payment_method_code || 'cash',
+      p_ref_id: payload.ref_id || null,
+      p_is_auto: payload.is_auto || false
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('RPC createTransaction Error:', error);
+      throw error;
+    }
 
     // Trigger notification if wallet_changes exists
     if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
@@ -342,7 +349,7 @@ export const cashFlowService = {
     
     return this.createTransaction({
       flow_type: flowType,
-      category: 'Điều chỉnh số dư',
+      category: 'Điều chỉnh',
       amount: amount,
       description: description,
       occurred_at: new Date(),
@@ -351,58 +358,45 @@ export const cashFlowService = {
     });
   },
 
-  // --- Owner Debt Management (Sổ Nợ Ngoài) ---
-  async getExternalPayables() {
-    const { data, error } = await supabase
-      .from('external_payables')
-      .select('*')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
-      
-    if (error) throw error;
-    return data;
-  },
+  async updateTransaction(
+    id: string,
+    data: {
+      amount?: number
+      description?: string
+      occurred_at?: string
+      category?: string
+      payment_method_code?: string
+      verifiedStaff?: { id: string, name: string }
+    }
+  ) {
+    const { data: result, error } = await supabase.rpc('fn_update_cash_flow', {
+      p_id: id,
+      p_amount: data.amount,
+      p_description: data.description,
+      p_occurred_at: data.occurred_at,
+      p_category: data.category,
+      p_payment_method_code: data.payment_method_code,
+      p_verified_by_staff_id: data.verifiedStaff?.id,
+      p_verified_by_staff_name: data.verifiedStaff?.name
+    })
 
-  async createOwnerExpense(payload: {
-    amount: number;
-    description: string;
-    creditorName?: string;
-    evidenceUrl: string;
-  }) {
-    const { data, error } = await supabase.rpc('record_owner_expense', {
-      p_amount: payload.amount,
-      p_description: payload.description,
-      p_creditor_name: payload.creditorName || 'Chủ đầu tư',
-      p_evidence_url: payload.evidenceUrl
-    });
-
-    if (error) throw error;
-    return data;
-  },
-
-  async repayOwnerDebt(payload: {
-    payableId: string;
-    paymentMethod: 'cash' | 'transfer';
-    pin: string;
-  }) {
-    const { data, error } = await supabase.rpc('repay_owner_debt', {
-      p_payable_id: payload.payableId,
-      p_payment_method: payload.paymentMethod,
-      p_pin: payload.pin
-    });
-
-    if (error) throw error;
-
-    // Trigger notification if wallet_changes exists
-    if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
-      useWalletNotificationStore.getState().showNotification(data.wallet_changes);
+    if (error) {
+      console.error('Error updating transaction:', error)
+      throw error
     }
 
-    return data;
+    // Check result from RPC
+    // fn_update_cash_flow returns jsonb { success: boolean, message: string }
+    const res = result as { success: boolean, message: string }
+    if (!res.success) {
+      throw new Error(res.message)
+    }
+
+    return res
   },
 
   // Xóa giao dịch (chỉ cho phép xóa thủ công)
-  async deleteTransaction(id: string, reason?: string) {
+  async deleteTransaction(id: string, reason: string, verifiedStaff?: { id: string, name: string }) {
     const { data, error } = await supabase.rpc('fn_delete_cash_flow', {
       p_id: id,
       p_reason: reason || null
@@ -415,6 +409,53 @@ export const cashFlowService = {
       useWalletNotificationStore.getState().showNotification(data.wallet_changes);
     }
 
+    return data;
+  },
+
+  // --- External Payables (Nợ ngoài / Chủ chi) ---
+  async getExternalPayables() {
+    const { data, error } = await supabase
+      .from('external_payables')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async createOwnerExpense(payload: {
+    amount: number;
+    description: string;
+    creditorName: string;
+    evidenceUrl?: string;
+  }) {
+    const { data, error } = await supabase.rpc('record_owner_expense', {
+      p_amount: payload.amount,
+      p_description: payload.description,
+      p_creditor_name: payload.creditorName,
+      p_evidence_url: payload.evidenceUrl || null
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async repayOwnerDebt(payload: {
+    payableId: string;
+    paymentMethod: string;
+    pin?: string;
+  }) {
+    const { data, error } = await supabase.rpc('repay_owner_debt', {
+      p_payable_id: payload.payableId,
+      p_payment_method: payload.paymentMethod,
+      p_pin: payload.pin || null
+    });
+    if (error) throw error;
+    
+    // Trigger notification if wallet_changes exists
+    if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
+      useWalletNotificationStore.getState().showNotification(data.wallet_changes);
+    }
+    
     return data;
   }
 };

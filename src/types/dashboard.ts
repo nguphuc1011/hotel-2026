@@ -31,15 +31,16 @@ export interface Booking {
   custom_price?: number; // New: Manual price override
   status: 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
   notes?: string;
+  duration_text?: string;
+  parent_booking_id?: string;
+  is_group_member?: boolean;
+  master_room_name?: string; // e.g. "101" if this booking belongs to master room 101
 }
 
 export interface DashboardRoom extends Room {
   current_booking?: Booking;
-  is_dirty_overdue?: boolean; // For "Clean Eye" feature
-  pending_approval?: {
-    id: string;
-    action: string;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED';
-    request_data?: any;
-  };
+  is_dirty_overdue?: boolean;
+  is_group_master?: boolean;
+  group_count?: number;
+  group_color?: string; // Màu sắc để phân biệt nhóm
 }

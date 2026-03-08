@@ -23,7 +23,8 @@ export type SecurityAction =
   | 'finance_delete_transaction'
   | 'finance_void_transaction';
 
-export type PolicyType = 'ALLOW' | 'PIN' | 'APPROVAL' | 'DENY';
+export type PolicyType = 'ALLOW' | 'PIN' | 'DENY';
+type PolicyTypeRaw = PolicyType | 'APPROVAL';
 
 export const securityService = {
   /**
@@ -61,21 +62,26 @@ export const securityService = {
 
     if (error) {
       console.error(`[Security] Error resolving policy for ${action}:`, error);
-      return 'PIN'; // Fail safe
+      return 'PIN';
     }
 
-    console.log(`[Security] Policy for ${action} (User: ${staffId}): ${data}`);
-    return data as PolicyType;
+    const raw = data as PolicyTypeRaw;
+    const resolved: PolicyType = raw === 'APPROVAL' ? 'PIN' : raw;
+
+    console.log(
+      `[Security] Policy for ${action} (User: ${staffId}): ${raw} -> ${resolved}`
+    );
+    return resolved;
   },
 
   /**
    * DEPRECATED: Use getPolicy() instead.
    * Kept for backward compatibility.
-   * Returns true if the action requires any form of security interaction (PIN or APPROVAL).
+   * Returns true if the action requires any form of security interaction (PIN).
    */
   async checkActionRequiresPin(action: SecurityAction): Promise<boolean> {
     const policy = await this.getPolicy(action);
-    return policy === 'PIN' || policy === 'APPROVAL';
+    return policy === 'PIN';
   },
 
   /**
@@ -93,82 +99,6 @@ export const securityService = {
     }
 
     return !!data;
-  },
-
-  /**
-   * Create an approval request (Remote Approval)
-   */
-  async createApprovalRequest(action: SecurityAction, requestData: any = {}) {
-    // Try to get staffId from localStorage
-    let staffId: string | null = null;
-    try {
-      const storedUser = localStorage.getItem('1hotel_user');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        staffId = user.id;
-      }
-    } catch (e) {}
-
-    const { data, error } = await supabase.rpc('fn_create_approval_request', {
-      p_action_key: action,
-      p_request_data: requestData,
-      p_staff_id: staffId
-    });
-
-    if (error) throw error;
-    return data; // { success: true, approval_id: '...' }
-  },
-
-  /**
-   * Approve a request (Manager Override or Telegram)
-   */
-  async approveRequest(requestId: string, managerPin?: string) {
-    const { data, error } = await supabase.rpc('fn_approve_request', {
-      p_manager_id: null,
-      p_manager_pin: managerPin ? String(managerPin) : null,
-      p_method: managerPin ? 'PIN_OVERRIDE' : 'TELEGRAM',
-      p_request_id: String(requestId)
-    });
-
-    if (error) throw error;
-    return data;
-  },
-
-  /**
-   * Check status of an approval request (Polling)
-   */
-  async checkApprovalStatus(requestId: string) {
-    const { data, error } = await supabase.rpc('fn_check_approval_status', {
-      p_request_id: requestId
-    });
-
-    if (error) throw error;
-    return data; // { status: 'PENDING' | 'APPROVED' | 'REJECTED', approved_by_id: '...', approved_by_name: '...' }
-  },
-
-  /**
-   * Cancel an approval request (Recovery / Unstick)
-   */
-  async cancelRequest(requestId: string, reason?: string) {
-    try {
-      const { data, error } = await supabase.rpc('fn_cancel_approval_request', {
-        p_request_id: requestId,
-        p_reason: reason || null
-      });
-      if (error) throw error;
-      return data;
-    } catch (err: any) {
-      const code = err?.code || err?.data?.code;
-      const message = err?.message || err?.data?.message || '';
-      const isCacheMissing = code === 'PGRST202' || message.includes('schema cache');
-      if (!isCacheMissing) throw err;
-      const { error } = await supabase
-        .from('pending_approvals')
-        .update({ status: 'REJECTED' })
-        .eq('id', requestId);
-      if (error) throw error;
-      return { success: true, message: 'Đã hủy yêu cầu' };
-    }
   },
 
   /**

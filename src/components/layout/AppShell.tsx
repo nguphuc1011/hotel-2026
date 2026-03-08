@@ -9,21 +9,26 @@ import {
   Wallet,
   Banknote,
   Users,
-  Clock,
   Key,
   ChevronUp,
   User,
-  X
+  X,
+  ShieldCheck,
+  Building2,
+  Smartphone,
+  Download
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuthStore } from '@/stores/authStore';
+import { supabase } from '@/lib/supabase';
 import WalletNotificationModal from '@/components/shared/WalletNotificationModal';
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { usePermission } from '@/hooks/usePermission';
 import { PERMISSION_KEYS } from '@/services/permissionService';
+import { settingsService } from '@/services/settingsService';
 
 export default function AppShell({
   children,
@@ -31,13 +36,116 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { logout, user, updatePin } = useAuth();
+  const params = useParams();
+  const slug = params?.slug as string;
+  const { user, fetchUser } = useAuthStore();
   const { can } = usePermission();
+  const [isWalletNotificationOpen, setIsWalletNotificationOpen] = useState(false);
   
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
   const [pinForm, setPinForm] = useState({ oldPin: '', newPin: '', confirmPin: '' });
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const [hotelName, setHotelName] = useState<string>('');
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    // 1. Kiểm tra iOS
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    setIsIOS(isIOSDevice && !isStandalone);
+
+    // 2. Kiểm tra nếu có sẵn lời mời cài đặt trong biến global
+    if ((window as any).deferredPWAInstallPrompt) {
+      setShowInstallBtn(true);
+    }
+
+    const handlePWAAvailable = () => {
+      setShowInstallBtn(true);
+    };
+
+    window.addEventListener('pwa-install-available', handlePWAAvailable);
+    return () => window.removeEventListener('pwa-install-available', handlePWAAvailable);
+  }, []);
+
+  const handleInstallApp = async () => {
+    const prompt = (window as any).deferredPWAInstallPrompt;
+    if (!prompt) return;
+    
+    prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    if (outcome === 'accepted') {
+      (window as any).deferredPWAInstallPrompt = null;
+      setShowInstallBtn(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('1hotel_user');
+    document.cookie = '1hotel_session=; path=/; max-age=0';
+    document.cookie = '1hotel_role=; path=/; max-age=0';
+    window.location.href = `/${slug}/login`;
+  };
+
+  const updatePin = async (oldPin: string, newPin: string) => {
+    if (!user) return false;
+    try {
+        const { data: isValid } = await supabase.rpc('fn_verify_staff_pin', {
+          p_staff_id: user.id,
+          p_pin_hash: oldPin
+        });
+
+        if (!isValid) {
+          toast.error('Mã PIN cũ không chính xác');
+          return false;
+        }
+
+        const { data } = await supabase.rpc('fn_manage_staff', {
+            p_action: 'SET_PIN',
+            p_id: user.id,
+            p_pin_hash: newPin
+        });
+
+        if (data && !data.success) throw new Error(data.message);
+        toast.success('Đổi mã PIN thành công');
+        return true;
+    } catch (error: any) {
+        toast.error('Lỗi: ' + error.message);
+        return false;
+    }
+  };
+
+  useEffect(() => {
+    if (!user) {
+      fetchUser();
+    }
+  }, [user, fetchUser]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    const fetchHotelName = async () => {
+      if (!user?.hotel_id) return;
+      try {
+        const settings = await settingsService.getSettings(user.hotel_id);
+        if (settings?.hotel_name) {
+          setHotelName(settings.hotel_name);
+        }
+      } catch (error) {
+        console.error('Failed to fetch hotel name', error);
+      }
+    };
+    
+    if (user?.hotel_id) {
+      fetchHotelName();
+      interval = setInterval(fetchHotelName, 5000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [user?.hotel_id]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -70,24 +178,42 @@ export default function AppShell({
   };
 
 
-  // Don't show shell on login page
-  if (pathname === '/login') {
+  // Don't show shell on login page or SaaS Admin
+  if (pathname === `/${slug}/login` || pathname === '/login' || pathname.startsWith('/saas-admin')) {
     return <>{children}</>;
   }
 
   const navItems = [
-    { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: '/', permission: PERMISSION_KEYS.VIEW_DASHBOARD },
-    { icon: <Banknote size={24} />, label: 'Thu Chi', href: '/tien', permission: PERMISSION_KEYS.VIEW_MONEY },
-    { icon: <Users size={24} />, label: 'Khách hàng', href: '/customers' },
-    { icon: <Clock size={24} />, label: 'Giao ca', href: '/shifts' },
-    { icon: <Clock size={24} />, label: 'Quản lý Ca', href: '/admin/shifts', permission: PERMISSION_KEYS.SHIFT_FORCE_CLOSE },
-    { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: '/reports', permission: PERMISSION_KEYS.VIEW_REPORTS },
-    { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: '/settings', permission: PERMISSION_KEYS.VIEW_SETTINGS },
+    { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: `/${slug}`, permission: PERMISSION_KEYS.VIEW_DASHBOARD },
+    { icon: <Banknote size={24} />, label: 'Thu Chi', href: `/${slug}/tien`, permission: PERMISSION_KEYS.VIEW_MONEY },
+    { icon: <Users size={24} />, label: 'Khách hàng', href: `/${slug}/customers` },
+    { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: `/${slug}/reports`, permission: PERMISSION_KEYS.VIEW_REPORTS },
+    { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: `/${slug}/settings`, permission: PERMISSION_KEYS.VIEW_SETTINGS },
   ];
 
-  const visibleNavItems = navItems.filter(item => !item.permission || can(item.permission));
+  // SaaS Admin Link (Only for authorized users)
+  const saasAdminItem = user?.hotels?.features?.saas_admin_access ? {
+    icon: <ShieldCheck size={24} />,
+    label: 'Quản trị SaaS',
+    href: '/saas-admin',
+    isSpecial: true
+  } : null;
 
-  const homeItem = visibleNavItems.find(i => i.href === '/') || visibleNavItems[0];
+  // Feature Toggle Check
+  const filteredNavItems = navItems.filter(item => {
+    if (item.href.endsWith('/reports') && user?.hotels?.features?.advanced_reports === false) {
+      return false;
+    }
+    return true;
+  });
+
+  const visibleNavItems = filteredNavItems.filter(item => !item.permission || can(item.permission));
+
+  // Combined Items for sidebar
+  const finalSidebarItems = [...visibleNavItems];
+  if (saasAdminItem) finalSidebarItems.push(saasAdminItem);
+
+  const homeItem = visibleNavItems.find(i => i.href === `/${slug}`) || visibleNavItems[0];
   const mobileItems = visibleNavItems.filter(i => i.href !== homeItem?.href).slice(0, 4);
   const leftItems = mobileItems.slice(0, Math.ceil(mobileItems.length / 2));
   const rightItems = mobileItems.slice(Math.ceil(mobileItems.length / 2));
@@ -98,13 +224,20 @@ export default function AppShell({
       {/* PC Sidebar - Airy Glassmorphism */}
       <aside className="hidden md:flex flex-col w-72 h-screen glass border-r border-white/40 z-50">
         <div className="p-10">
-          <h1 className="text-2xl font-black-italic tracking-tighter flex items-center gap-2">
-            1HOTEL <span className="text-[10px] bg-accent text-white px-2 py-0.5 rounded-full not-italic tracking-normal">V2</span>
-          </h1>
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-black-italic tracking-tighter flex items-center gap-2 text-accent">
+              MANA PMS
+            </h1>
+            {hotelName && (
+              <span className="text-xs font-bold text-slate-500 truncate max-w-[200px] mt-1 uppercase tracking-wider">
+                {hotelName}
+              </span>
+            )}
+          </div>
         </div>
         
         <nav className="flex-1 px-6 space-y-2">
-          {visibleNavItems.map((item) => (
+          {finalSidebarItems.map((item) => (
             <Link 
               key={item.href} 
               href={item.href}
@@ -112,7 +245,9 @@ export default function AppShell({
                 "flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-500 font-bold text-[15px]",
                 pathname === item.href 
                   ? "bg-accent text-white shadow-xl shadow-accent/20 scale-[1.02]" 
-                  : "text-muted hover:bg-accent/5 hover:text-accent"
+                  : (item as any).isSpecial 
+                    ? "text-emerald-500 hover:bg-emerald-50 bg-emerald-50/50"
+                    : "text-muted hover:bg-accent/5 hover:text-accent"
               )}
             >
               {item.icon}
@@ -122,6 +257,35 @@ export default function AppShell({
         </nav>
 
         <div className="p-6 border-t border-white/20 relative" ref={userMenuRef}>
+          {/* PWA Install Button (Android/Chrome) */}
+          {showInstallBtn && (
+            <button 
+              onClick={handleInstallApp}
+              className="flex items-center gap-3 p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group animate-bounce-subtle"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
+                <Download size={20} />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-black uppercase tracking-tight">Cài đặt App</p>
+                <p className="text-[10px] font-bold opacity-70 uppercase tracking-wider">Trải nghiệm tốt hơn</p>
+              </div>
+            </button>
+          )}
+
+          {/* iOS Install Guide */}
+          {isIOS && (
+            <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 mb-4 animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Smartphone size={16} className="text-blue-500" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Cài đặt trên iPhone</p>
+              </div>
+              <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                Nhấn nút <span className="text-blue-600 font-black">Chia sẻ</span> bên dưới trình duyệt và chọn <span className="text-blue-600 font-black">Thêm vào MH chính</span>.
+              </p>
+            </div>
+          )}
+
           {isUserMenuOpen && (
             <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
               <button 

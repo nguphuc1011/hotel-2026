@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare, User, ShieldCheck, KeyRound } from 'lucide-react';
+import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare, User, Users, ShieldCheck, KeyRound, Link, Unlink } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatMoney } from '@/utils/format';
+import { Checkbox } from '@/components/ui/checkbox';
+import { supabase } from '@/lib/supabase';
+import { formatMoney, getContrastTextColor } from '@/utils/format';
 import { Room, Booking } from '@/types/dashboard';
+import { DashboardRoom } from '@/types/dashboard';
 import { bookingService, BookingBill } from '@/services/bookingService';
 import { serviceService, Service, BookingServiceItem } from '@/services/serviceService';
 import PaymentModal from './PaymentModal';
@@ -14,16 +17,18 @@ import ChangeRoomModal from './folio/ChangeRoomModal';
 import DepositModal from './folio/DepositModal';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
-import { securityService, SecurityAction } from '@/services/securityService';
+import TransferGroupMasterModal from './TransferGroupMasterModal';
+import { SecurityAction } from '@/services/securityService';
 import { useSecurity } from '@/hooks/useSecurity';
-import SecurityApprovalModal from '@/components/shared/SecurityApprovalModal';
+import { groupBookingService } from '@/services/groupBookingService';
 
 interface RoomFolioModalProps {
   isOpen: boolean;
   onClose: () => void;
-  room: Room;
+  room: DashboardRoom;
   booking: Booking;
   onUpdate: () => void;
+  onGroupRoom?: () => void;
   pendingApproval?: {
     id: string;
     action: string;
@@ -105,55 +110,30 @@ function useLongPress(
     };
 }
 
-import { supabase } from '@/lib/supabase';
+export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate, onGroupRoom, pendingApproval }: RoomFolioModalProps) {
+  const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
+  const [isTransferGroupMasterModalOpen, setIsTransferGroupMasterModalOpen] = useState(false);
 
-export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate, pendingApproval }: RoomFolioModalProps) {
-  const { confirm: confirmDialog, alert } = useGlobalDialog();
+  const handleTransferGroupMaster = () => {
+    setIsTransferGroupMasterModalOpen(true);
+  };
+
+  const handleUngroupRoom = async (bookingId: string) => {
+    try {
+      const { groupBookingService } = await import('@/services/groupBookingService');
+      await groupBookingService.ungroupRoom(bookingId);
+      toast.success('Đã tách phòng khỏi nhóm thành công');
+      onUpdate(); // Refresh data
+    } catch (error) {
+      console.error('Ungroup error:', error);
+      toast.error('Tách phòng thất bại');
+    }
+  };
+  const [mounted, setMounted] = useState(false);
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [approvalStatus, setApprovalStatus] = useState<any>(null); // New state for full approval details
-  const [internalPendingApproval, setInternalPendingApproval] = useState<any>(pendingApproval);
-
-  // Sync internal state with props, but allow internal updates
-  useEffect(() => {
-    setInternalPendingApproval(pendingApproval);
-  }, [pendingApproval]);
-
-  // Real-time listener for THIS specific request inside the modal
-  useEffect(() => {
-    if (!isOpen || !internalPendingApproval?.id) return;
-
-    const channel = supabase
-        .channel(`folio_approval_${internalPendingApproval.id}`)
-        .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'pending_approvals',
-            filter: `id=eq.${internalPendingApproval.id}`
-        }, (payload) => {
-            const newRec = payload.new as any;
-            console.log("Folio Approval Update Received:", newRec.status);
-            
-            setInternalPendingApproval((prev: any) => {
-                // Chỉ cập nhật nếu status thực sự thay đổi
-                if (prev && prev.status !== newRec.status) {
-                    return {
-                        ...prev,
-                        status: newRec.status,
-                        request_data: newRec.request_data
-                    };
-                }
-                return prev;
-            });
-            
-            // Trigger onUpdate for ANY status change (APPROVED, REJECTED, etc.)
-            // to ensure parent dashboard is always in sync
-            onUpdate();
-        })
-        .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [isOpen, internalPendingApproval?.id, onUpdate]);
+  const [internalPendingApproval] = useState<any>(null);
+  const [groupDetails, setGroupDetails] = useState<any>(null); // State mới cho chi tiết nhóm
 
   const customerBalance = bill?.customer_balance ?? 0;
   const hasCustomerBalance = customerBalance !== 0;
@@ -174,178 +154,12 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showChangeRoomModal, setShowChangeRoomModal] = useState(false);
+  const [showGroupRooms, setShowGroupRooms] = useState(false);
   const [editStaff, setEditStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [cancellationStaff, setCancellationStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
-  const [showResumeSecurityModal, setShowResumeSecurityModal] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const { verify, SecurityModals } = useSecurity({
-    onMinimize: () => {
-      // User clicked "Minimize" on the Security Modal
-      // 1. Close the Security Modal (handled by useSecurity)
-      // 2. Close the Penalty Modal (if open)
-      setShowPenaltyModal(false);
-      // 3. Close the Folio Modal (return to dashboard)
-      onClose();
-      // 4. Trigger update to show "Pending" status on dashboard
-      onUpdate();
-    }
-  });
-
-  // Handle Pending Approval
-  useEffect(() => {
-    if (isOpen && internalPendingApproval) {
-      if (internalPendingApproval.status === 'APPROVED') {
-        // If approved, we might want to fetch who approved it
-        // Or we can just use the status to enable the "Finish" button
-        securityService.checkApprovalStatus(internalPendingApproval.id).then(data => {
-            setApprovalStatus(data);
-        });
-      } else {
-        setApprovalStatus(null);
-      }
-    } else {
-        setApprovalStatus(null);
-    }
-  }, [isOpen, internalPendingApproval]);
-
-  // Execute Finish Cancellation (Post-Approval)
-  const handleFinishCancellation = async () => {
-    // If we have pendingApproval but no approvalStatus, try to fetch it first
-    let currentStatus = approvalStatus;
-    if (!currentStatus && internalPendingApproval?.id) {
-        try {
-            currentStatus = await securityService.checkApprovalStatus(internalPendingApproval.id);
-            setApprovalStatus(currentStatus);
-        } catch (e) {
-            console.error("Failed to fetch approval status", e);
-        }
-    }
-
-    if (!internalPendingApproval || !currentStatus) {
-        toast.error("Thiếu thông tin phê duyệt");
-        return;
-    }
-
-    // Reuse logic
-    executeCancellation({
-        id: currentStatus.approved_by_id,
-        name: currentStatus.approved_by_name
-    });
-  };
-
-  // Resume Approval Flow (Open Security Modal manually)
-  const handleResumeApproval = () => {
-    if (internalPendingApproval?.id) {
-        setShowResumeSecurityModal(true);
-    }
-  };
-
-  // Handle Resume Success
-  const handleResumeSuccess = (staffId?: string, staffName?: string) => {
-    setShowResumeSecurityModal(false);
-    toast.success("Đã duyệt thành công! Vui lòng bấm Hoàn tất để xử lý.");
-    // We do NOT execute cancellation automatically anymore.
-    // The user must click "Hoàn tất" manually.
-  };
-
-  // Cancel the request entirely (Recovery / Unstick)
-  const handleCancelRequest = async () => {
-      if (!internalPendingApproval?.id) return;
-      
-      const confirm = await confirmDialog({
-          title: "Hủy yêu cầu",
-          message: "Bạn có chắc muốn hủy yêu cầu này? Thao tác này sẽ xóa trạng thái chờ duyệt/đã duyệt.",
-          confirmLabel: "Hủy yêu cầu",
-          destructive: true
-      });
-
-      if (!confirm) return;
-
-      try {
-          const res = await securityService.cancelRequest(internalPendingApproval.id, 'User cancelled');
-
-          toast.success("Đã hủy yêu cầu");
-          onUpdate(); // Refresh parent
-          onClose();
-      } catch (e) {
-          console.error("Failed to cancel request", JSON.stringify(e, null, 2));
-          toast.error("Lỗi khi hủy yêu cầu");
-      }
-  };
-
-  const executeCancellation = async (approver: any) => {
-     setIsLoading(true);
-     try {
-         const reason = internalPendingApproval?.request_data?.reason || 'Hủy phòng (Đã duyệt)';
-         const penaltyAmount = internalPendingApproval?.request_data?.penalty_amount || 0;
-         const paymentMethod = internalPendingApproval?.request_data?.payment_method || 'cash';
-
-         const result = await bookingService.cancelBooking(
-             booking.id, 
-             approver,
-             penaltyAmount,
-             paymentMethod,
-             reason
-         );
-
-         if (result.success) {
-             onUpdate();
-             onClose();
-             toast.success(result.message || "Huỷ phòng hoàn tất");
-         } else {
-             toast.error(result.message || "Lỗi khi huỷ phòng");
-         }
-     } catch (error: any) {
-         console.error("Finish cancel failed", error);
-         toast.error(error.message);
-     } finally {
-         setIsLoading(false);
-     }
-  };
-
-  // --- Search for PaymentModal usage ---
-
-  // Load Initial DataModal Component for Audit Trail
-  const AuditTrailModal = () => {
-    if (!showAuditTrail || !bill) return null;
-    return createPortal(
-      <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-        <div className="w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
-                <Clock className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-800 leading-none">Chi tiết tính tiền</h3>
-                <p className="text-xs text-slate-500 mt-1 font-medium">Lá sớ hệ thống</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => setShowAuditTrail(false)}
-              className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
-            >
-              <X className="w-5 h-5 text-slate-500" />
-            </button>
-          </div>
-          <div className="p-6 max-h-[70vh] overflow-y-auto bg-white">
-            <BillBreakdown bill={bill} />
-          </div>
-          <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
-            <button 
-              onClick={() => setShowAuditTrail(false)}
-              className="px-6 py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
-            >
-              Đã hiểu
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
-  };
+  const { verify, SecurityModals } = useSecurity();
 
   useEffect(() => {
     setMounted(true);
@@ -357,6 +171,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     if (isOpen && booking) {
       loadBill();
       loadServices();
+      if (room.is_group_master || booking.is_group_member) {
+        loadGroupDetails();
+      }
     }
   }, [isOpen, booking]);
 
@@ -364,12 +181,29 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     setIsLoading(true);
     try {
       const data = await bookingService.calculateBill(booking.id);
-      console.log('Folio Bill Data:', data);
+      console.log('Folio Bill Data (after loadBill):', data); // Thêm log này
       setBill(data);
     } catch (error) {
       console.error('Error loading bill:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadGroupDetails = async () => {
+    try {
+      const data = await groupBookingService.getGroupDetails(booking.id);
+      if (data.is_group) {
+        console.log('Group Details loaded:', data); // Thêm log để kiểm tra dữ liệu
+        setGroupDetails(data);
+      } else {
+        // If data.is_group is false, it means this booking is not part of a group.
+        // This is not an error, so we just set groupDetails to null.
+        setGroupDetails(null);
+      }
+    } catch (error) {
+      console.error('Error loading group details:', error);
+      setGroupDetails(null);
     }
   };
 
@@ -412,6 +246,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             
             setPendingServices([]);
             await Promise.all([loadServices(), loadBill()]);
+            onUpdate();
             toast.success("Đã cập nhật dịch vụ");
         } catch (error) {
             console.error("Failed to save services", error);
@@ -451,6 +286,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 toast.success("Đã xóa dịch vụ");
             }
             await Promise.all([loadServices(), loadBill()]);
+            onUpdate();
         } catch (error) {
             console.error("Failed to remove service", error);
             toast.error("Lỗi khi xóa dịch vụ");
@@ -490,7 +326,12 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           reason
         );
 
-        if (result.success) {
+        if (result.is_master_booking) {
+          alertDialog({
+            title: 'Không thể hủy phòng chủ',
+            message: 'Phòng chủ không thể hủy trực tiếp. Vui lòng tách các phòng con ra trước hoặc chuyển quyền chủ nhóm sang phòng khác.'
+          });
+        } else if (result.success) {
           onUpdate(); // Refresh dashboard
           onClose(); // Close folio
           toast.success(result.message || "Huỷ phòng thành công");
@@ -537,47 +378,57 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       s.name.toLowerCase().includes(serviceSearch.toLowerCase())
   );
 
+  // Load Initial DataModal Component for Audit Trail
+  const AuditTrailModal = () => {
+    if (!showAuditTrail || !bill) return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                <Clock className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 leading-none">Chi tiết tính tiền</h3>
+                <p className="text-xs text-slate-500 mt-1 font-medium">Lá sớ hệ thống</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAuditTrail(false)}
+              className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
+            >
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
+          <div className="p-6 max-h-[70vh] overflow-y-auto bg-white">
+            <BillBreakdown bill={bill} />
+          </div>
+          <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+            <button
+              onClick={() => setShowAuditTrail(false)}
+              className="px-6 py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   if (!isOpen || !mounted) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[50000] flex items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-4">
       {SecurityModals}
 
-      {/* Manual Resume Security Modal */}
-      <SecurityApprovalModal
-        isOpen={showResumeSecurityModal}
-        onClose={() => setShowResumeSecurityModal(false)}
-        requestId={pendingApproval?.id || null}
-        onApproved={handleResumeSuccess}
-        actionName="Hủy phòng (Tiếp tục)"
-        onMinimize={() => setShowResumeSecurityModal(false)}
-      />
-
       <div className="w-full h-full sm:w-full sm:max-w-6xl sm:h-[90vh] bg-slate-50 sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300">
         <div className="h-16 flex justify-between items-center px-4 bg-white z-10 shrink-0 shadow-sm border-b border-slate-100">
             <div className="flex items-center gap-3">
                 <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg uppercase tracking-wider shadow-sm">Folio</span>
                 <h2 className="text-lg font-bold text-slate-800">Phòng {room.name}</h2>
-                
-                {/* Approval Status Banner */}
-                {internalPendingApproval && (
-                  <div className={cn(
-                    "px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-bold uppercase tracking-wide ml-2 animate-in fade-in slide-in-from-left-4",
-                    internalPendingApproval.status === 'APPROVED' ? "bg-green-100 text-green-700 border border-green-200" : "bg-yellow-100 text-yellow-700 border border-yellow-200"
-                  )}>
-                    {internalPendingApproval.status === 'APPROVED' ? (
-                      <>
-                        <ShieldCheck className="w-4 h-4" />
-                        Đã được duyệt hủy
-                      </>
-                    ) : (
-                      <>
-                        <Clock className="w-4 h-4 animate-pulse" />
-                        Đang chờ duyệt hủy
-                      </>
-                    )}
-                  </div>
-                )}
             </div>
             <div className="flex items-center gap-2">
                 <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
@@ -586,69 +437,6 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             </div>
         </div>
 
-        {/* Approval Status Banner - Fixed at Top */}
-        {internalPendingApproval && (
-            <div className={cn(
-                "mx-4 mt-4 mb-0 p-4 rounded-2xl flex items-center justify-between shadow-sm border animate-in slide-in-from-top-4 duration-300",
-                internalPendingApproval.status === 'APPROVED' 
-                    ? "bg-green-50 border-green-200" 
-                    : "bg-amber-50 border-amber-200"
-            )}>
-                <div className="flex items-center gap-3">
-                    <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                        internalPendingApproval.status === 'APPROVED' ? "bg-green-100 text-green-600" : "bg-amber-100 text-amber-600"
-                    )}>
-                        {internalPendingApproval.status === 'APPROVED' ? <ShieldCheck className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
-                    </div>
-                    <div>
-                        <h4 className={cn("font-bold text-sm", internalPendingApproval.status === 'APPROVED' ? "text-green-800" : "text-amber-800")}>
-                            {internalPendingApproval.status === 'APPROVED' ? 'Yêu cầu hủy đã được duyệt' : 'Đang chờ duyệt hủy phòng'}
-                        </h4>
-                        <p className={cn("text-xs font-medium", internalPendingApproval.status === 'APPROVED' ? "text-green-600" : "text-amber-600")}>
-                            {internalPendingApproval.status === 'APPROVED' ? 'Vui lòng bấm hoàn tất bên dưới' : 'Vui lòng đợi quản lý xác nhận'}
-                        </p>
-                    </div>
-                </div>
-                
-                {internalPendingApproval.status === 'APPROVED' ? (
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={handleCancelRequest}
-                            className="px-3 py-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-all"
-                            title="Hủy bỏ yêu cầu này"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                            onClick={handleFinishCancellation}
-                            disabled={isLoading}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-200 active:scale-95 transition-all animate-pulse whitespace-nowrap"
-                        >
-                            Hoàn tất ngay
-                        </button>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={handleCancelRequest}
-                            className="px-3 py-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-all"
-                            title="Hủy yêu cầu"
-                        >
-                            Hủy yêu cầu
-                        </button>
-                        <button 
-                            onClick={handleResumeApproval}
-                            className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-bold rounded-lg transition-all active:scale-95 whitespace-nowrap flex items-center gap-1.5"
-                        >
-                            <KeyRound className="w-3.5 h-3.5" />
-                            Nhập PIN
-                        </button>
-                    </div>
-                )}
-            </div>
-        )}
-
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4">
 
 
@@ -656,33 +444,19 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-6">
                 <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => handleChangeRoom()} />
                 <QuickActionButton icon={Edit3} label="Sửa thông tin" onClick={() => handleEditBooking()} />
+                <QuickActionButton icon={Users} label="Gộp phòng" onClick={() => onGroupRoom?.()} />
+                {groupDetails && groupDetails.is_group && groupDetails.master_id === booking.id && groupDetails.rooms && groupDetails.rooms.length > 1 && (
+                  <QuickActionButton icon={KeyRound} label="Chuyển chủ nhóm" onClick={handleTransferGroupMaster} />
+                )}
                 <QuickActionButton icon={DollarSign} label="Nạp tiền" onClick={() => setShowDepositModal(true)} />
                 <QuickActionButton icon={Printer} label="In phiếu" onClick={() => {}} />
                 
-                {/* Cancel Button Logic */}
-                {internalPendingApproval && internalPendingApproval.status === 'APPROVED' ? (
-                  <button 
-                    onClick={handleFinishCancellation}
-                    disabled={isLoading}
-                    className={cn(
-                        "flex flex-col items-center justify-center gap-2 min-w-[80px] h-[80px] rounded-2xl transition-all active:scale-95 shadow-sm border group",
-                        "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                    )}
-                  >
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-white group-hover:text-green-600 transition-colors">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wide">Hoàn tất Hủy</span>
-                  </button>
-                ) : (
-                  <QuickActionButton 
-                    icon={Trash2} 
-                    label="Huỷ phòng" 
-                    onClick={() => handleCancelBooking()} 
-                    variant="danger" 
-                    disabled={!!internalPendingApproval} // Disable if pending
-                  />
-                )}
+                <QuickActionButton 
+                  icon={Trash2} 
+                  label="Huỷ phòng" 
+                  onClick={() => handleCancelBooking()} 
+                  variant="danger" 
+                />
             </div>
 
             {/* Main Toggle Card */}
@@ -768,19 +542,32 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                 {(() => {
                                     if (!bill) return '--';
                                     
-                                    // Priority 1: Check explanation for explicit unit (fixes auto-switch cases)
-                                    const hasDay = bill.explanation?.some(e => e.includes('ngày') && (e.includes('x') || e.includes('Tính')));
-                                    const hasNight = bill.explanation?.some(e => e.includes('đêm') && (e.includes('x') || e.includes('Tính')));
-                                    
-                                    if (hasDay || hasNight || bill.rental_type === 'daily' || bill.rental_type === 'overnight') {
-                                        const unit = hasNight || bill.rental_type === 'overnight' ? 'đêm' : 'ngày';
-                                        const exp = bill.explanation?.find(e => e.includes(` ${unit}`) && (e.includes('x') || e.includes('Tính')));
-                                        if (exp) {
-                                            const match = exp.match(/(\d+)\s+(?:ngày|đêm)/);
-                                            if (match) return `${match[1]} ${unit}`;
+                                    // Robust Duration Display Logic
+                                    // 1. Daily: Use calculated duration_hours / 24 (rounded up)
+                                    if (bill.rental_type === 'daily') {
+                                        // If backend provides duration_hours, use it
+                                        if (bill.duration_hours) {
+                                            const days = Math.ceil(bill.duration_hours / 24);
+                                            return `${Math.max(1, days)} ngày`;
                                         }
-                                        // Fallback if no explicit number found but type is daily/overnight
-                                        return `1 ${unit}`;
+                                        // Fallback: Calculate from dates if duration_hours missing
+                                        if (bill.check_in_at) {
+                                            const start = new Date(bill.check_in_at);
+                                            const end = bill.check_out_at ? new Date(bill.check_out_at) : new Date();
+                                            const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                                            const days = Math.ceil(hours / 24);
+                                            return `${Math.max(1, days)} ngày`;
+                                        }
+                                        return '1 ngày';
+                                    }
+
+                                    // 2. Overnight: Usually 1 night, but if duration > 24h, treat as days?
+                                    if (bill.rental_type === 'overnight') {
+                                        if (bill.duration_hours && bill.duration_hours > 24) {
+                                            const nights = Math.ceil(bill.duration_hours / 24);
+                                            return `${nights} đêm`;
+                                        }
+                                        return '1 đêm';
                                     }
                                     
                                     return bill.duration_text;
@@ -808,6 +595,84 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                     </div>
                 </div>
             </div>
+
+            {/* Unified Group Room Info */}
+            {(groupDetails && groupDetails.is_group && groupDetails.rooms && groupDetails.rooms.length > 0) || booking.is_group_member ? (
+                <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-4 space-y-3">
+                    {groupDetails && groupDetails.is_group && groupDetails.rooms && groupDetails.rooms.length > 0 ? (
+                        <>
+                            <button 
+                                className="flex items-center justify-between w-full group"
+                                onClick={() => setShowGroupRooms(!showGroupRooms)}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-blue-600" />
+                                    <h3 className="text-lg font-bold text-slate-800">
+                                        Phòng gộp ({groupDetails.rooms.length})
+                                    </h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-base font-bold text-blue-600">
+                                        {formatMoney(groupDetails.total_group_amount || 0)}
+                                    </span>
+                                    <ChevronDown 
+                                        className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showGroupRooms ? 'rotate-180' : ''}`}
+                                    />
+                                </div>
+                            </button>
+                            
+                            {/* Group rooms list with toggle */}
+                            {showGroupRooms && (
+                                <div className="animate-in fade-in duration-200">
+                                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mt-3">
+                                        {groupDetails.rooms.map((member: any) => (
+                                            <GroupedRoomMemberCard 
+                                                key={member.booking_id} 
+                                                member={member} 
+                                                groupColor={room.group_color || '#4A5568'} // Màu xám đậm sang trọng
+                                                isMaster={member.is_master}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : booking.is_group_member ? (
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                    <Link className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="font-bold text-blue-700 text-base">
+                                        Đã gộp vào phòng {groupDetails?.master_room_name || groupDetails?.rooms?.find((r: any) => r.is_master)?.room_name || 'chính'}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Tách nhóm button for member room */}
+                            <button
+                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                                onClick={async () => {
+                                    try {
+                                        // Ungroup this room
+                                        const { groupBookingService } = await import('@/services/groupBookingService');
+                                        await groupBookingService.ungroupRoom(booking.id);
+                                        toast.success('Đã tách phòng khỏi nhóm thành công');
+                                        onUpdate(); // Refresh data
+                                    } catch (error) {
+                                        console.error('Ungroup error:', error);
+                                        toast.error('Tách phòng thất bại');
+                                    }
+                                }}
+                            >
+                                <Unlink className="w-3 h-3" />
+                                Tách nhóm
+                            </button>
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
 
             <div className="space-y-3 pt-2">
                 <div className="flex overflow-x-auto pb-4 pt-2 gap-3 snap-x hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -856,7 +721,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
                 <div className="mt-4">
                     <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">Dịch vụ đã dùng</h3>
-                    <div className="bg-white rounded-[24px] border border-slate-200 divide-y divide-slate-100 shadow-sm">
+                    <div className="bg-white rounded-[24px] border border-slate-100 divide-y divide-slate-100 shadow-sm">
                         {bookingServices.length === 0 && pendingServices.length === 0 ? (
                             <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
                                 <Coffee className="w-8 h-8 opacity-20" />
@@ -958,13 +823,26 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                     </button>
                 </div>
             ) : (
-                <button 
-                    onClick={() => setShowPaymentModal(true)}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white h-14 rounded-[28px] font-bold text-lg shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                    <span>THANH TOÁN</span>
-                    <ChevronRight className="w-5 h-5" />
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={onClose}
+                        className="w-32 bg-slate-100 hover:bg-slate-200 text-slate-700 h-14 rounded-[28px] font-bold text-sm shadow-sm active:scale-[0.98] transition-all flex items-center justify-center"
+                    >
+                        ĐÓNG
+                    </button>
+                    <button 
+                        onClick={() => setShowPaymentModal(true)}
+                        className={cn(
+                            "flex-1 h-14 rounded-[28px] font-bold text-lg shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2",
+                            "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/20"
+                        )}
+                    >
+                        <>
+                            <span>THANH TOÁN</span>
+                            <ChevronRight className="w-5 h-5" />
+                        </>
+                    </button>
+                </div>
             )}
         </div>
 
@@ -974,6 +852,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           onClose={() => setShowPenaltyModal(false)}
           roomName={room.name}
           customerName={bill?.customer_name || 'Khách lẻ'}
+          bill={bill}
           onConfirm={handleConfirmCancelWithPenalty}
           isLoading={isLoading}
         />
@@ -1029,6 +908,29 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             onUpdate();
           }}
         />
+
+        {groupDetails && groupDetails.is_group && groupDetails.master_id === booking.id && (
+          <TransferGroupMasterModal
+            isOpen={isTransferGroupMasterModalOpen}
+            onClose={() => setIsTransferGroupMasterModalOpen(false)}
+            onSuccess={() => {
+              onUpdate();
+              onClose();
+            }}
+            oldMasterBooking={{
+              id: booking.id,
+              room_name: room.name,
+              customer_name: bill?.customer_name || 'Khách vãng lai'
+            } as any}
+            childBookings={groupDetails.rooms
+              .filter((m: any) => m.booking_id !== booking.id)
+              .map((m: any) => ({
+                id: m.booking_id,
+                room_name: m.room_name,
+                customer_name: m.customer_name
+              })) as any}
+          />
+        )}
       </div>
     </div>,
     document.body
@@ -1095,6 +997,81 @@ function ServiceCard({ service, quantity, isProcessing, onAdd, onRemove }: {
         </div>
     )
 }
+
+// --- Grouped Room Member Card Component ---
+interface GroupedRoomMemberCardProps {
+  member: any; // Type should be more specific, e.g., GroupMember
+  groupColor: string;
+  onSelect?: (memberId: string) => void;
+  isSelected?: boolean;
+  isMaster?: boolean;
+  onOpenFolio?: (member: any) => void;
+  onUngroup?: (memberId: string) => void;
+}
+
+const GroupedRoomMemberCard: React.FC<GroupedRoomMemberCardProps> = ({ 
+  member, 
+  groupColor, 
+  onSelect, 
+  isSelected,
+  isMaster,
+  onOpenFolio,
+  onUngroup
+}) => {
+  const textColor = getContrastTextColor(groupColor);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSelect) {
+      onSelect(member.booking_id);
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-[24px] p-4 bg-blue-600 text-white shadow-sm hover:shadow-md transition-all",
+        "cursor-pointer",
+        isSelected && "ring-2 ring-white ring-offset-2"
+      )}
+      onClick={handleClick}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-black">{member.room_name}</span>
+          {isMaster && (
+            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full border border-white/50">
+              CHỦ NHÓM
+            </span>
+          )}
+        </div>
+        {onSelect && (
+          <Checkbox checked={isSelected} className="w-4 h-4 rounded-full border-white" />
+        )}
+      </div>
+      <div className="text-sm">
+        {member.customer_name || "Khách lẻ"}
+      </div>
+      <div className="mt-2 text-lg font-bold">
+        {formatMoney(member.payable_amount || 0)}
+      </div>
+      
+      {/* Tách nhóm button for child rooms */}
+      {!isMaster && onUngroup && (
+        <button
+          className="mt-3 w-full py-1.5 px-3 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            onUngroup(member.booking_id);
+          }}
+        >
+          <Unlink className="w-3 h-3" />
+          Tách nhóm
+        </button>
+      )}
+    </div>
+  );
+};
 
 function QuickActionButton({ 
     icon: Icon, 

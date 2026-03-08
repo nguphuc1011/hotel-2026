@@ -20,24 +20,45 @@ export default function CancellationPenaltyModal({
   onClose, 
   roomName, 
   customerName, 
+  bill,
   onConfirm,
   isLoading = false
-}: CancellationPenaltyModalProps) {
+}: CancellationPenaltyModalProps & { bill?: any }) {
   const [hasPenalty, setHasPenalty] = useState<boolean | null>(null);
   const [penaltyAmount, setPenaltyAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [reason, setReason] = useState<string>('');
   const [mounted, setMounted] = useState(false);
 
+  // Tính toán gợi ý số tiền phạt từ bill
+  const suggestedPenalty = bill ? ((bill.room_charge || 0) + (bill.service_total || 0) + (bill.surcharge_total || 0) + (bill.custom_surcharge || 0)) : 0;
+  
+  // Debug log
+  useEffect(() => {
+    if (isOpen) {
+        console.log("CancellationPenaltyModal OPENED with:", {
+            bill,
+            suggestedPenalty,
+            roomName,
+            customerName
+        });
+    }
+  }, [isOpen, bill, suggestedPenalty, roomName, customerName]);
+
   useEffect(() => {
     setMounted(true);
     if (isOpen) {
         setHasPenalty(null);
-        setPenaltyAmount(0);
+        // Mặc định gợi ý số tiền phạt nếu có bill
+        if (suggestedPenalty > 0) {
+            setPenaltyAmount(suggestedPenalty);
+        } else {
+            setPenaltyAmount(0);
+        }
         setPaymentMethod('cash');
         setReason('');
     }
-  }, [isOpen]);
+  }, [isOpen, suggestedPenalty]);
 
   if (!isOpen || !mounted) return null;
 
@@ -46,6 +67,13 @@ export default function CancellationPenaltyModal({
         alert("Vui lòng nhập lý do hủy phòng!");
         return;
     }
+    // Nếu có bill > 0 mà chọn "Không phạt" thì cảnh báo
+    if (suggestedPenalty > 0 && hasPenalty === false) {
+        if (!confirm(`Khách đã sử dụng ${suggestedPenalty.toLocaleString()}đ dịch vụ/tiền phòng. Bạn có chắc chắn muốn HỦY mà KHÔNG THU tiền này không?`)) {
+            return;
+        }
+    }
+
     if (hasPenalty === true) {
       onConfirm(penaltyAmount, paymentMethod, reason);
     } else {
@@ -76,7 +104,36 @@ export default function CancellationPenaltyModal({
         </div>
 
         {/* Content */}
-        <div className="p-8 space-y-8">
+        <div className="p-8 space-y-6">
+          {suggestedPenalty > 0 && hasPenalty === null && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
+              <h4 className="font-bold text-amber-800 text-sm mb-2 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Khoản cần thu (Gợi ý)
+              </h4>
+              <div className="space-y-1 text-sm text-amber-900">
+                <div className="flex justify-between">
+                  <span>Tiền phòng:</span>
+                  <span className="font-bold">{bill?.room_charge?.toLocaleString()}đ</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Dịch vụ:</span>
+                  <span className="font-bold">{bill?.service_total?.toLocaleString()}đ</span>
+                </div>
+                 {(bill?.surcharge_total > 0 || bill?.custom_surcharge > 0) && (
+                    <div className="flex justify-between">
+                      <span>Phụ thu:</span>
+                      <span className="font-bold">{((bill?.surcharge_total || 0) + (bill?.custom_surcharge || 0)).toLocaleString()}đ</span>
+                    </div>
+                 )}
+                <div className="border-t border-amber-200 pt-1 mt-1 flex justify-between font-black text-lg">
+                  <span>Tổng cộng:</span>
+                  <span>{suggestedPenalty.toLocaleString()}đ</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {hasPenalty === null ? (
             <div className="space-y-6">
               <div className="text-center space-y-2">
@@ -85,13 +142,21 @@ export default function CancellationPenaltyModal({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <button
-                  onClick={() => setHasPenalty(true)}
+                  onClick={() => {
+                      setHasPenalty(true);
+                      setPenaltyAmount(suggestedPenalty); // Tự điền số tiền gợi ý
+                  }}
                   className="py-6 rounded-[24px] border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50 transition-all flex flex-col items-center gap-3 group"
                 >
                   <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-all">
                     <Banknote className="w-6 h-6" />
                   </div>
                   <span className="font-black text-slate-700 uppercase tracking-widest text-xs">CÓ PHẠT</span>
+                  {suggestedPenalty > 0 && (
+                    <span className="text-xs font-bold text-rose-600 bg-rose-100 px-2 py-1 rounded-lg">
+                        Gợi ý: {suggestedPenalty.toLocaleString()}đ
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => setHasPenalty(false)}
@@ -116,6 +181,11 @@ export default function CancellationPenaltyModal({
                       className="h-20 text-3xl font-black text-rose-600 border-2 border-slate-100 focus:border-rose-500 rounded-[24px] bg-slate-50"
                       autoFocus
                     />
+                     {suggestedPenalty > 0 && penaltyAmount !== suggestedPenalty && (
+                        <p className="text-xs text-amber-600 font-bold ml-1 cursor-pointer hover:underline" onClick={() => setPenaltyAmount(suggestedPenalty)}>
+                            Gợi ý: {suggestedPenalty.toLocaleString()}đ (Nhấn để dùng)
+                        </p>
+                     )}
                   </div>
 
                   <div className="space-y-3">

@@ -6,7 +6,7 @@ import {
     X, User, Plus, Minus, Search, Loader2, 
     Calendar, Clock, MapPin, 
     Phone, Globe, Facebook, MessageCircle,
-    Briefcase, AlertCircle
+    Briefcase, AlertCircle, Wrench, Brush
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/format';
@@ -24,6 +24,7 @@ interface CheckInModalProps {
   onClose: () => void;
   room: Room | null;
   onCheckIn: (bookingData: any) => Promise<void>;
+  onOpenStatusModal?: () => void;
 }
 
 type RentalType = 'hourly' | 'daily' | 'overnight';
@@ -211,7 +212,7 @@ function ServiceCard({ service, quantity, onAdd, onRemove }: {
     )
 }
 
-export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: CheckInModalProps) {
+export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenStatusModal }: CheckInModalProps) {
   const { alert: alertDialog, confirm: confirmDialog } = useGlobalDialog();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<RentalType>('hourly');
@@ -509,14 +510,62 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn }: Check
                     <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg uppercase tracking-wider shadow-sm">Check-in</span>
                     <h2 className="text-lg font-bold text-slate-800">Phòng {room.name}</h2>
                 </div>
-                <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
-                    <X className="w-5 h-5 text-slate-500" />
-                </button>
+                <div className="flex items-center gap-2">
+                    {onOpenStatusModal && (
+                        <button 
+                            onClick={onOpenStatusModal}
+                            className="h-10 px-4 flex items-center gap-2 bg-orange-50 border border-orange-100 hover:bg-orange-100 hover:border-orange-200 text-orange-600 rounded-full transition-all active:scale-95 font-bold text-sm shadow-sm"
+                            title="Đổi trạng thái phòng"
+                        >
+                            <Wrench className="w-4 h-4" />
+                            <span className="hidden sm:inline">Bảo trì/Dọn</span>
+                        </button>
+                    )}
+                    <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
+                        <X className="w-5 h-5 text-slate-500" />
+                    </button>
+                </div>
             </div>
 
             {/* --- BODY --- */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] bg-slate-50">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] bg-slate-50 relative">
                 
+                {/* Warning Overlay for non-available rooms */}
+                {room.status !== 'available' && (
+                    <div className="absolute inset-0 z-40 bg-slate-50/95 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+                        <div className={cn(
+                            "w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-xl ring-4 ring-white",
+                            room.status === 'repair' ? "bg-rose-100 text-rose-600" : "bg-orange-100 text-orange-600"
+                        )}>
+                            {room.status === 'repair' ? <Wrench className="w-10 h-10" /> : <Brush className="w-10 h-10" />}
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">
+                            {room.status === 'repair' ? 'Phòng đang bảo trì' : 'Phòng chưa dọn dẹp'}
+                        </h3>
+                        <p className="text-slate-500 max-w-xs mb-8 font-medium">
+                            {room.status === 'repair' 
+                                ? 'Phòng đang được sửa chữa. Vui lòng cập nhật trạng thái khi hoàn tất.'
+                                : 'Phòng chưa được dọn dẹp sau khi khách trả phòng.'
+                            }
+                        </p>
+                        
+                        {onOpenStatusModal && (
+                            <button 
+                                onClick={onOpenStatusModal}
+                                className={cn(
+                                    "px-8 py-4 text-white font-bold rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-3",
+                                    room.status === 'repair' 
+                                        ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/30" 
+                                        : "bg-orange-600 hover:bg-orange-700 shadow-orange-500/30"
+                                )}
+                            >
+                                {room.status === 'repair' ? <Wrench className="w-5 h-5" /> : <Brush className="w-5 h-5" />}
+                                <span>Cập nhật trạng thái ngay</span>
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* 1. SOURCE & CUSTOMER */}
                 <div className="space-y-4">
                      {/* Source Icons */}

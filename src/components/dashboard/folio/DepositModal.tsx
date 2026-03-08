@@ -18,7 +18,7 @@ interface DepositModalProps {
 
 export default function DepositModal({ isOpen, onClose, bookingId, bill, onSuccess, verifiedStaff }: DepositModalProps) {
   const [amount, setAmount] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
   const [description, setDescription] = useState('Thanh toán trước');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -111,11 +111,10 @@ export default function DepositModal({ isOpen, onClose, bookingId, bill, onSucce
           {/* Payment Method */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-slate-700">Hình thức thanh toán</label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {[
                 { id: 'cash', label: 'Tiền mặt', icon: Banknote, color: 'emerald' },
                 { id: 'transfer', label: 'Chuyển khoản', icon: CreditCard, color: 'blue' },
-                { id: 'card', label: 'Quẹt thẻ', icon: Wallet, color: 'purple' },
               ].map((m) => (
                 <button
                   key={m.id}

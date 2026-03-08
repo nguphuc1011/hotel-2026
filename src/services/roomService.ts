@@ -41,15 +41,23 @@ export const roomService = {
 
   async createRoom(room: Partial<Room>): Promise<Room | null> {
     try {
+      const payload: any = {
+        room_number: room.name || room.room_number,
+        category_id: room.category_id,
+        status: room.status || 'available',
+        floor: room.floor,
+        notes: room.notes
+      };
+
+      // Auto-inject hotel_id from localStorage if not provided
+      if (!payload.hotel_id && typeof window !== 'undefined') {
+        const user = JSON.parse(localStorage.getItem('1hotel_user') || '{}');
+        if (user?.hotel_id) payload.hotel_id = user.hotel_id;
+      }
+
       const { data, error } = await supabase
         .from('rooms')
-        .insert([{
-          room_number: room.name || room.room_number,
-          category_id: room.category_id,
-          status: room.status || 'available',
-          floor: room.floor,
-          notes: room.notes
-        }])
+        .insert([payload])
         .select()
         .single();
 

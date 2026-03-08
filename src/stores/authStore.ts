@@ -7,6 +7,8 @@ interface UserProfile {
   username: string;
   full_name: string;
   role: string;
+  hotel_id: string;
+  hotel_slug?: string;
 }
 
 interface AuthState {
@@ -59,17 +61,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // 1. Get Profile & Role
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('staff')
-        .select('id, username, full_name, role, permissions')
+        .select('id, username, full_name, role, permissions, hotel_id, hotels(slug)')
         .eq('id', userId)
         .single();
         
-      if (!profile) {
-         console.warn('User logged in but no staff profile found');
+      if (profileError || !profile) {
+         console.warn('User logged in but no staff profile found or error:', profileError?.message);
          set({ user: null, permissions: [], isLoading: false });
          return;
       }
+
+      // Flatten the slug from hotels relation (handle both object and array from PostgREST)
+      const hotelRaw = (profile as any).hotels;
+      const hotelSlug = Array.isArray(hotelRaw) ? hotelRaw[0]?.slug : hotelRaw?.slug;
+      
+      const userProfile: UserProfile = {
+        ...profile,
+        hotel_slug: hotelSlug
+      };
 
       // 2. Load Modular Settings Cache
       const { data: modSettings } = await supabase.from('permission_settings').select('*');
@@ -81,17 +92,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 3. Get Base Permissions (Role-based only)
       let finalPermissions: string[] = [];
       
-      // Force Admin to have * permissions regardless of DB state
-      if (profile.role.toLowerCase() === 'admin') {
-        finalPermissions = ['*'];
-      } else {
-        // ALWAYS fetch from Role Permissions (Functional Permissions)
-        // Ignoring individual profile.permissions as per new requirement
-        finalPermissions = await permissionService.getRolePermissions(profile.role);
-      }
+      finalPermissions = await permissionService.getRolePermissions(profile.role);
       
       set({ 
-        user: profile, 
+        user: userProfile, 
         permissions: finalPermissions, 
         modularSettings: settingsMap,
         isLoading: false 
@@ -104,11 +108,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   hasPermission: (permission: string) => {
+    if (!permission || typeof permission !== 'string') return false;
     const { permissions, user, modularSettings } = get();
     if (!user) return false;
-
-    // 0. Admin Bypass
-    if (user.role.toLowerCase() === 'admin') return true;
 
     // 1. Identify Module for this permission
     let moduleId = '';
@@ -129,7 +131,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // If module is OFF, deny unless exception
       if (setting.is_enabled === false) return false;
       
-      // PRIORITY 3: 3-Tier Matrix Policies (ALLOW/DENY/PIN/APPROVAL)
+      // PRIORITY 3: 3-Tier Matrix Policies (ALLOW/DENY/PIN)
       // Check if there is a specific policy for this action
       // Currently, `permission_settings` table stores `actions` map
       if (setting.actions && setting.actions[permission]) {
@@ -140,8 +142,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
            const userPol = actionPolicy.user_policies[user.id];
            if (userPol === 'DENY') return false;
            if (userPol === 'ALLOW') return true;
-           // For PIN/APPROVAL, we might treat as ALLOW here (and UI asks for PIN), or handle specifically.
-           // For simple `hasPermission` check (visibility), PIN/APPROVAL usually means VISIBLE (true).
+           // For PIN we might treat as ALLOW here (and UI asks for PIN), or handle specifically.
+           // For simple `hasPermission` check (visibility), PIN usually means VISIBLE (true).
            // The actual action execution will re-verify.
            return true; 
         }
@@ -150,7 +152,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (actionPolicy.role_policies && actionPolicy.role_policies[user.role]) {
            const rolePol = actionPolicy.role_policies[user.role];
            if (rolePol === 'DENY') return false;
-           // ALLOW/PIN/APPROVAL -> Visible
+           // ALLOW/PIN -> Visible
            return true;
         }
 

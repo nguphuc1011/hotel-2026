@@ -148,7 +148,7 @@ BEGIN
 
     -- [HỢP NHẤT] Mốc vào sớm tính thêm 1 ngày chính là mốc Night Audit
     IF v_full_day_early_cutoff IS NULL THEN
-        v_full_day_early_cutoff := '04:00:00'::time;
+        v_full_day_early_cutoff := v_night_audit_time;  -- ✅ Lấy từ cài đặt thay vì hardcode
     END IF;
     
     -- 1.1. Validate Settings (CƯỞNG CHẾ: Không dùng thông số cứng)
@@ -171,8 +171,17 @@ BEGIN
     INTO 
         v_price_hourly, v_price_next, v_price_daily, v_price_overnight,
         v_overnight_enabled, v_hourly_unit, v_base_block_count
-    FROM public.room_categories 
+    FROM public.room_categories
     WHERE id = p_room_cat_id;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'message', 'LỖI CẤU HÌNH: Không tìm thấy loại phòng với ID đã cung cấp. Không thể tính tiền.',
+            'context', 'fn_calculate_room_charge -> room_categories lookup',
+            'room_category_id', p_room_cat_id
+        );
+    END IF;
 
     -- 3. Load Custom Price from Booking
     SELECT COALESCE(custom_price, 0) INTO v_custom_price FROM public.bookings WHERE id = p_booking_id;
@@ -423,7 +432,9 @@ BEGIN
         v_grace_in_enabled, v_grace_out_enabled, v_surcharge_rules, 
         v_auto_surcharge_enabled
     FROM public.settings WHERE key = 'config' LIMIT 1;
-    
+
+    RAISE NOTICE 'fn_calculate_surcharge: v_std_check_in = %, v_std_check_out = %', v_std_check_in, v_std_check_out;
+
     -- Validate Settings
     IF v_std_check_in IS NULL OR v_std_check_out IS NULL THEN
          RETURN jsonb_build_object('amount', 0, 'success', false, 'explanation', ARRAY['LỖI CẤU HÌNH: Thiếu mốc giờ Check-in/Check-out chuẩn.']);
@@ -731,6 +742,7 @@ CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid, p_no
      v_audit_trail text[] := '{}';
      v_tz text := 'Asia/Ho_Chi_Minh';
  BEGIN
+    -- 1. Select booking details
      SELECT 
          b.*, r.category_id, r.room_number as room_name,
          c.balance as cust_balance, c.full_name as cust_name
@@ -753,15 +765,42 @@ CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid, p_no
  
      -- 1. Room Charge
    v_room_res := public.fn_calculate_room_charge(p_booking_id, v_booking.check_in_actual, v_check_out, v_booking.rental_type, v_room_cat_id);
+   -- Check for error from fn_calculate_room_charge
+   IF v_room_res->>'success' = 'false' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'message', 'Lỗi khi tính tiền phòng: ' || COALESCE(v_room_res->>'message', 'Không xác định'),
+            'context', 'calculate_booking_bill -> fn_calculate_room_charge',
+            'booking_id', p_booking_id
+        );
+   END IF;
    v_audit_trail := v_audit_trail || ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v_room_res->'explanation') = 'array' THEN v_room_res->'explanation' ELSE '[]'::jsonb END) AS x);
    
    -- 2. Early/Late Surcharge
    -- [FIX] Use actual rental type (in case it switched from Hourly -> Daily)
    v_surcharge_res := public.fn_calculate_surcharge(v_booking.check_in_actual, v_check_out, v_room_cat_id, COALESCE(v_room_res->>'rental_type_actual', v_booking.rental_type));
+   -- Check for error from fn_calculate_surcharge
+   IF v_surcharge_res->>'success' = 'false' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'message', 'Lỗi khi tính phụ thu: ' || COALESCE(v_surcharge_res->>'message', 'Không xác định'),
+            'context', 'calculate_booking_bill -> fn_calculate_surcharge',
+            'booking_id', p_booking_id
+        );
+   END IF;
    v_audit_trail := v_audit_trail || ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v_surcharge_res->'explanation') = 'array' THEN v_surcharge_res->'explanation' ELSE '[]'::jsonb END) AS x);
     
     -- 3. Extra Person
     v_extra_person_res := public.fn_calculate_extra_person_charge(p_booking_id);
+    -- Check for error from fn_calculate_extra_person_charge
+    IF v_extra_person_res->>'success' = 'false' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'message', 'Lỗi khi tính phí người thêm: ' || COALESCE(v_extra_person_res->>'message', 'Không xác định'),
+            'context', 'calculate_booking_bill -> fn_calculate_extra_person_charge',
+            'booking_id', p_booking_id
+        );
+    END IF;
     v_audit_trail := v_audit_trail || ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v_extra_person_res->'explanation') = 'array' THEN v_extra_person_res->'explanation' ELSE '[]'::jsonb END) AS x);
 
     -- 4. Services
@@ -788,6 +827,15 @@ CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid, p_no
         COALESCE(v_booking.discount_amount, 0), 
         COALESCE(v_booking.custom_surcharge, 0)
     );
+    -- Check for error from fn_calculate_bill_adjustments
+    IF v_adj_res->>'success' = 'false' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'message', 'Lỗi khi tính điều chỉnh hóa đơn: ' || COALESCE(v_adj_res->>'message', 'Không xác định'),
+            'context', 'calculate_booking_bill -> fn_calculate_bill_adjustments',
+            'booking_id', p_booking_id
+        );
+    END IF;
     v_audit_trail := v_audit_trail || ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v_adj_res->'explanation') = 'array' THEN v_adj_res->'explanation' ELSE '[]'::jsonb END) AS x);
 
     RETURN jsonb_build_object(

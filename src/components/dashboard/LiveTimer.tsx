@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, memo } from 'react';
-import { differenceInSeconds, differenceInDays } from 'date-fns';
+import { differenceInSeconds, differenceInHours } from 'date-fns';
 
 interface LiveTimerProps {
   checkInAt: string;
@@ -26,8 +26,11 @@ const LiveTimer: React.FC<LiveTimerProps> = ({ checkInAt, mode }) => {
         setDisplay(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
       } else {
         // Daily or Overnight
-        const diffDays = Math.max(1, differenceInDays(now, checkIn));
-        setDisplay(`${diffDays} ngày`);
+        // Calculate full hours passed
+        const diffHours = Math.max(0, differenceInHours(now, checkIn));
+        // Round up to nearest day (e.g. 1h -> 1 day, 25h -> 2 days)
+        const diffDays = Math.ceil(diffHours / 24);
+        setDisplay(`${Math.max(1, diffDays)} ngày`);
       }
     };
 

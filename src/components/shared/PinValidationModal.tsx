@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Lock, X, CheckCircle2, AlertCircle, User } from 'lucide-react';
+import { Lock, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuthStore } from '@/stores/authStore';
 
 interface PinValidationModalProps {
   isOpen: boolean;
@@ -21,7 +21,7 @@ export default function PinValidationModal({
   actionName,
   description 
 }: PinValidationModalProps) {
-  const { user } = useAuth();
+  const user = useAuthStore(state => state.user);
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

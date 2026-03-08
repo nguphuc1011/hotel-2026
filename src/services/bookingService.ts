@@ -23,6 +23,7 @@ export interface BookingBill {
   check_in_at: string;
   check_out_at: string;
   duration_text: string;
+  duration_hours: number;
   duration_min: number;
   
   // Price Breakdown
@@ -44,6 +45,12 @@ export interface BookingBill {
   deposit_amount: number;
   amount_to_pay: number; // Số tiền còn lại cần thanh toán (final_amount - deposit)
   
+  // Group Billing
+  is_group_bill?: boolean;
+  master_booking_id?: string;
+  group_total?: number;
+  group_members?: any[];
+  
   // Customer Balance
   customer_balance: number;
   explanation?: string[];
@@ -64,6 +71,58 @@ export const bookingService = {
         throw error;
       }
 
+      // Manual Fetch Group Members if RPC doesn't return them (Safety Fallback)
+      let groupMembers = data.group_members || [];
+      let groupTotal = data.group_total || 0;
+      let isGroupBill = data.is_group_bill || false;
+
+      // Improved Group Detection:
+      // Check if this booking IS a master OR HAS a parent
+      const { data: bookingInfo } = await supabase
+        .from('bookings')
+        .select('id, parent_booking_id')
+        .eq('id', bookingId)
+        .single();
+
+      const masterId = bookingInfo?.parent_booking_id || bookingId;
+      
+      // Find all members of this group (including master)
+      const { data: allMembers } = await supabase
+        .from('bookings')
+        .select('id, parent_booking_id')
+        .or(`id.eq.${masterId},parent_booking_id.eq.${masterId}`)
+        .in('status', ['checked_in', 'confirmed', 'occupied']);
+
+      if (allMembers && allMembers.length > 1) {
+        isGroupBill = true;
+      }
+
+      if (isGroupBill && !groupMembers.length && bookingInfo?.id === masterId) {
+        // If I am the master, calculate total for all children
+        const memberIds = (allMembers || []).filter(m => m.id !== masterId);
+        
+        if (memberIds.length > 0) {
+           try {
+             const memberBills = await Promise.all(
+                memberIds.map(m => bookingService.calculateBill(m.id, nowOverride))
+             );
+             
+             const validBills = memberBills.filter(b => b !== null) as BookingBill[];
+             
+             groupTotal = validBills.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+             groupMembers = validBills.map(b => ({
+                booking_id: b.booking_id,
+                room_name: b.room_number || 'Phòng ?',
+                amount: b.total_amount,
+                service_total: b.service_total,
+                room_charge: b.room_charge
+             }));
+           } catch (err) {
+             console.error('Error calculating member bills:', err);
+           }
+        }
+      }
+
       if (!data || !data.success) {
         console.error('Error or no data returned from calculate_booking_bill:', data?.message);
         return null;
@@ -80,6 +139,7 @@ export const bookingService = {
           check_in_at: data.check_in_at,
           check_out_at: data.check_out_at,
           duration_text: formatDuration(data.duration_hours, data.duration_minutes),
+          duration_hours: data.duration_hours || 0,
           duration_min: data.duration_minutes || 0,
           
           room_charge: data.room_charge,
@@ -96,9 +156,15 @@ export const bookingService = {
           total_amount: data.total_amount,
           discount_amount: data.discount_amount,
           final_amount: data.total_amount,
+
+          is_group_bill: isGroupBill,
+          master_booking_id: data.master_booking_id,
+          group_total: groupTotal,
+          group_members: groupMembers,
           
-          deposit_amount: data.deposit_amount,
-          amount_to_pay: data.amount_to_pay,
+          // Payments
+          deposit_amount: data.deposit_amount || 0,
+          amount_to_pay: (data.total_amount - (data.deposit_amount || 0)),
           
           customer_id: data.customer_id,
           customer_balance: data.customer_balance,
@@ -118,6 +184,7 @@ export const bookingService = {
     surcharge: number;
     notes: string;
     verifiedStaff?: { id: string, name: string };
+    selectedChildBookingIds?: string[];
   }): Promise<{ success: boolean; message: string; bill?: any }> {
     try {
       const { data, error } = await supabase.rpc('process_checkout', {
@@ -127,7 +194,9 @@ export const bookingService = {
         p_discount: params.discount,
         p_surcharge: params.surcharge,
         p_notes: params.notes,
-        p_staff_id: params.verifiedStaff?.id || null
+        p_verified_by_staff_id: params.verifiedStaff?.id || null,
+        p_verified_by_staff_name: params.verifiedStaff?.name || null,
+        p_selected_child_ids: params.selectedChildBookingIds || null,
       });
 
       if (error) {
@@ -215,9 +284,25 @@ export const bookingService = {
 
       if (error) throw error;
       return data;
-    } catch (err: any) {
-      console.error('Cancel booking error:', err);
-      throw err;
+    } catch (error: any) {
+      console.error('Error cancelling booking:', error);
+      return { success: false, message: error.message };
+    }
+  },
+
+  async transferGroupMaster(oldMasterBookingId: string, newMasterBookingId: string, actionForOldMaster: 'become_child' | 'ungroup' | 'cancel' = 'ungroup') {
+    try {
+      const { data, error } = await supabase.rpc('transfer_group_master', {
+        p_old_master_booking_id: oldMasterBookingId,
+        p_new_master_booking_id: newMasterBookingId,
+        p_action_for_old_master: actionForOldMaster
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error transferring group master:', error);
+      return { success: false, message: error.message };
     }
   },
 
@@ -241,7 +326,7 @@ export const bookingService = {
   async addDeposit(params: {
     bookingId: string;
     amount: number;
-    paymentMethod: 'cash' | 'transfer' | 'card';
+    paymentMethod: 'cash' | 'transfer';
     description: string;
     verifiedStaff?: { id: string, name: string };
   }) {
