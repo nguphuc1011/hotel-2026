@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// 🏛️ LAYER 1: GREAT WALL SECURITY (Middleware)
+// 🏛️ LAYER 1: GREAT WALL SECURITY (Proxy)
 // Intercepts all requests before they hit the Page/Layout
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const res = NextResponse.next();
   const url = req.nextUrl.clone();
   

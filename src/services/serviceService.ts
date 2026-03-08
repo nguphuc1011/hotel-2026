@@ -18,6 +18,7 @@ const formatError = (err: any) => {
 
 export interface Service {
   id: string;
+  hotel_id: string;
   name: string;
   price: number;
   image_url?: string | null;

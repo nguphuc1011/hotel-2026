@@ -9,6 +9,10 @@ interface UserProfile {
   role: string;
   hotel_id: string;
   hotel_slug?: string;
+  hotels?: {
+    slug: string;
+    features: Record<string, boolean>;
+  };
 }
 
 interface AuthState {
@@ -63,7 +67,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 1. Get Profile & Role
       const { data: profile, error: profileError } = await supabase
         .from('staff')
-        .select('id, username, full_name, role, permissions, hotel_id, hotels(slug)')
+        .select('id, username, full_name, role, permissions, hotel_id, hotels(slug, features)')
         .eq('id', userId)
         .single();
         
@@ -75,11 +79,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Flatten the slug from hotels relation (handle both object and array from PostgREST)
       const hotelRaw = (profile as any).hotels;
-      const hotelSlug = Array.isArray(hotelRaw) ? hotelRaw[0]?.slug : hotelRaw?.slug;
+      const hotelData = Array.isArray(hotelRaw) ? hotelRaw[0] : hotelRaw;
+      const hotelSlug = hotelData?.slug;
       
       const userProfile: UserProfile = {
         ...profile,
-        hotel_slug: hotelSlug
+        hotel_slug: hotelSlug,
+        hotels: hotelData
       };
 
       // 2. Load Modular Settings Cache
