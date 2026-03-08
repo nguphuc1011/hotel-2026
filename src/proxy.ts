@@ -37,7 +37,7 @@ export async function proxy(req: NextRequest) {
   if (!hasAuthCookie) {
     // Nếu chưa đăng nhập, đưa về trang login của khách sạn đó
     const pathParts = url.pathname.split('/').filter(Boolean);
-    if (pathParts.length > 0 && pathParts[0] !== 'login') {
+    if (pathParts.length > 0 && pathParts[0] !== 'login' && pathParts[0] !== 'undefined') {
       const slug = pathParts[0];
       url.pathname = `/${slug}/login`;
     } else {

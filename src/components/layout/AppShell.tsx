@@ -37,8 +37,11 @@ export default function AppShell({
 }) {
   const pathname = usePathname();
   const params = useParams();
-  const slug = params?.slug as string;
   const { user, fetchUser } = useAuthStore();
+  
+  // Priority: 1. URL Slug, 2. User Profile Slug, 3. Default
+  const slug = (params?.slug as string) || user?.hotel_slug || 'default';
+  
   const { can } = usePermission();
   const [isWalletNotificationOpen, setIsWalletNotificationOpen] = useState(false);
   

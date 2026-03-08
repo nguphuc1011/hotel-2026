@@ -69,10 +69,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const isLoginPage = pathname.endsWith('/login');
         
         // Slug mismatch check: if logged in but on wrong tenant URL
-        const isSlugMismatch = user && currentSlug && user.hotel_slug !== currentSlug;
+        const isSlugMismatch = user && currentSlug && user.hotel_slug && user.hotel_slug !== currentSlug;
 
         if (!user && !isLoginPage) {
-          if (currentSlug) {
+          if (currentSlug && currentSlug !== 'undefined') {
             router.replace(`/${currentSlug}/login`);
           } else {
             router.replace('/login');
@@ -81,9 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Instead of immediate logout, we can just redirect to the correct slug
           // or force a logout if we want to be strict. 
           // For now, let's redirect to the user's correct dashboard
-          router.replace(`/${user?.hotel_slug}`);
+          if (user?.hotel_slug) {
+            router.replace(`/${user.hotel_slug}`);
+          }
         } else if (user && isLoginPage) {
-          router.replace(currentSlug ? `/${currentSlug}` : `/${user.hotel_slug}`);
+          router.replace(currentSlug && currentSlug !== 'undefined' ? `/${currentSlug}` : `/${user.hotel_slug || 'default'}`);
         }
       };
 
