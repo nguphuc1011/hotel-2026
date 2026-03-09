@@ -439,6 +439,11 @@ export default function DashboardPage() {
     
     // If occupied, open Folio
     if (room.status === 'occupied') {
+      if (!room.current_booking) {
+        toast.error('Không tìm thấy thông tin đặt phòng. Đang cập nhật lại dữ liệu...');
+        fetchData();
+        return;
+      }
       setSelectedRoomId(room.id);
       setIsFolioOpen(true);
       return;

@@ -114,6 +114,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [isTransferGroupMasterModalOpen, setIsTransferGroupMasterModalOpen] = useState(false);
 
+  // Early return if not open or no booking to prevent crashes
+  if (!isOpen || !booking) return null;
+
   const handleTransferGroupMaster = () => {
     setIsTransferGroupMasterModalOpen(true);
   };
@@ -534,8 +537,8 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                     {bill?.rental_type === 'hourly' ? 'Theo Giờ' : 
                                      bill?.rental_type === 'overnight' ? 'Qua Đêm' : 
                                      bill?.rental_type === 'daily' ? 'Theo Ngày' : 
-                                     booking.booking_type === 'hourly' ? 'Theo Giờ' :
-                                     booking.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày'}
+                                     booking?.booking_type === 'hourly' ? 'Theo Giờ' :
+                                     booking?.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày'}
                                 </div>
                             </div>
                             <div className="font-bold text-lg leading-tight">
