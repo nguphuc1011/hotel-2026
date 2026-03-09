@@ -39,8 +39,15 @@ export default function AppShell({
   const params = useParams();
   const { user, fetchUser } = useAuthStore();
   
+  // Prevent hydration mismatch by using a mounted state
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Priority: 1. URL Slug, 2. User Profile Slug, 3. Default
-  const slug = (params?.slug as string) || user?.hotel_slug || 'default';
+  const rawSlug = params?.slug as string;
+  const slug = (rawSlug && rawSlug !== 'undefined') ? rawSlug : (user?.hotel_slug || 'default');
   
   const { can } = usePermission();
   const [isWalletNotificationOpen, setIsWalletNotificationOpen] = useState(false);
@@ -213,10 +220,13 @@ export default function AppShell({
   const visibleNavItems = filteredNavItems.filter(item => !item.permission || can(item.permission));
 
   // Combined Items for sidebar
-  const finalSidebarItems = [...visibleNavItems];
-  if (saasAdminItem) finalSidebarItems.push(saasAdminItem);
+  const finalSidebarItems = mounted ? (() => {
+    const items = [...visibleNavItems];
+    if (saasAdminItem) items.push(saasAdminItem);
+    return items;
+  })() : visibleNavItems; // Render basic items during SSR to match initial client state
 
-  const homeItem = visibleNavItems.find(i => i.href === `/${slug}`) || visibleNavItems[0];
+  const homeItem = (mounted ? visibleNavItems : navItems).find(i => i.href === `/${slug}`) || (mounted ? visibleNavItems[0] : navItems[0]);
   const mobileItems = visibleNavItems.filter(i => i.href !== homeItem?.href).slice(0, 4);
   const leftItems = mobileItems.slice(0, Math.ceil(mobileItems.length / 2));
   const rightItems = mobileItems.slice(Math.ceil(mobileItems.length / 2));

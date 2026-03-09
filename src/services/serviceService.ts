@@ -183,12 +183,12 @@ export const serviceService = {
 
   async createService(service: Partial<Service>) {
     try {
-      const payload = { ...service };
+      const payload: any = { ...service };
       
       // Auto-inject hotel_id from localStorage if not provided
       if (!payload.hotel_id && typeof window !== 'undefined') {
         const user = JSON.parse(localStorage.getItem('1hotel_user') || '{}');
-        if (user?.hotel_id) (payload as any).hotel_id = user.hotel_id;
+        if (user?.hotel_id) payload.hotel_id = user.hotel_id;
       }
 
       const { data, error } = await supabase

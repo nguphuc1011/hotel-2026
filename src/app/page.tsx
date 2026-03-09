@@ -12,7 +12,7 @@ export default function RootPage() {
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
-        if (user?.hotel_slug) {
+        if (user?.hotel_slug && user.hotel_slug !== 'undefined') {
           router.replace(`/${user.hotel_slug}`);
           return;
         }
