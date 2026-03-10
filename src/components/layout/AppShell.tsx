@@ -264,14 +264,9 @@ export default function AppShell({
       <aside className="hidden md:flex flex-col w-72 h-screen glass border-r border-white/40 z-50">
         <div className="p-10">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-black-italic tracking-tighter flex items-center gap-2 text-accent">
-              MANA PMS
+            <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2 text-accent">
+              {hotelName || 'Hệ thống'}
             </h1>
-            {hotelName && (
-              <span className="text-xs font-bold text-slate-500 truncate max-w-[200px] mt-1 uppercase tracking-wider">
-                {hotelName}
-              </span>
-            )}
           </div>
         </div>
         

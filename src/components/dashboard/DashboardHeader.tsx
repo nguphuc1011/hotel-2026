@@ -164,12 +164,13 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Logo & Refresh Section */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-900 rounded-2xl shadow-lg">
+            <div className="p-2 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200">
               <Store className="text-white" size={24} />
             </div>
             <div>
-              <h1 className="text-xl font-black tracking-tighter text-slate-900">MANA PMS</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Vương quốc của Bệ Hạ</p>
+              <h1 className="text-xl font-black tracking-tighter text-slate-900 uppercase">
+                {user?.hotel_name || 'Hệ thống'}
+              </h1>
             </div>
           </div>
 

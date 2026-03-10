@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const name = slug === 'default' ? 'MANA PMS' : `MANA PMS - ${slug.toUpperCase()}`;
+  const name = slug === 'default' ? 'PMS' : `${slug.toUpperCase()}`;
   
   return {
     title: `${name} - Quản lý khách sạn`,

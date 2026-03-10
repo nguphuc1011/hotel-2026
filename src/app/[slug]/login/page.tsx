@@ -58,18 +58,8 @@ export default function LoginPage() {
         <div className="p-8 md:p-12">
           {/* ... existing content ... */}
           <div className="text-center mb-10">
-            <h1 className="text-3xl font-black-italic tracking-tighter flex flex-col items-center justify-center gap-1 mb-2 text-accent">
-              MANA PMS
-              {hotelInfo?.name && (
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500">
-                    <Building2 size={16} />
-                  </div>
-                  <span className="text-sm font-bold text-slate-500 not-italic tracking-wider uppercase">
-                    {hotelInfo.name}
-                  </span>
-                </div>
-              )}
+            <h1 className="text-3xl font-black tracking-tighter flex flex-col items-center justify-center gap-1 mb-2 text-accent uppercase">
+              {hotelInfo?.name || 'PMS'}
             </h1>
             <p className="text-slate-500 font-medium text-sm">Đăng nhập hệ thống</p>
           </div>

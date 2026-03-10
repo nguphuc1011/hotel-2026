@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug') || 'default';
-  const name = slug === 'default' ? 'MANA PMS' : `MANA PMS - ${slug.toUpperCase()}`;
+  const name = slug === 'default' ? 'PMS' : `${slug.toUpperCase()}`;
   
   const manifest = {
     name: name,
