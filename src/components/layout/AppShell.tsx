@@ -444,40 +444,42 @@ export default function AppShell({
 
       {/* Mobile Bottom Nav - Curved Cutout with Floating Center Button */}
       {mounted && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-20 pointer-events-none flex flex-col justify-end">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-24 pointer-events-none flex flex-col justify-end pb-[env(safe-area-inset-bottom)]">
           
           {/* Main Bar Background with SVG Curve */}
-          <div className="relative w-full h-[60px] pointer-events-auto flex items-end justify-between px-4 pb-1">
+          <div className="relative w-full h-[65px] pointer-events-auto flex items-end justify-between px-4">
             
             {/* Background Layer using SVG for smooth curve */}
-            <div className="absolute inset-0 flex items-end drop-shadow-[0_-10px_20px_rgba(0,0,0,0.1)] -z-10">
-              <div className="flex-1 h-full bg-white rounded-tl-[20px]" />
-              <svg width="150" height="60" viewBox="0 0 150 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="block shrink-0">
-                <path d="M 0 0 H 30 Q 40 0 40 8 A 35 35 0 0 0 110 8 Q 110 0 120 0 H 150 V 60 H 0 Z" fill="white"/>
-              </svg>
-              <div className="flex-1 h-full bg-white rounded-tr-[20px]" />
+            <div className="absolute inset-0 flex items-end drop-shadow-[0_-8px_25px_rgba(0,0,0,0.08)] -z-10">
+              <div className="flex-1 h-full bg-white rounded-tl-[32px]" />
+              <div className="relative w-[120px] h-full bg-white">
+                <svg width="120" height="65" viewBox="0 0 120 65" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute bottom-0 left-0">
+                  <path d="M 0 0 H 20 Q 30 0 35 10 A 30 30 0 0 0 85 10 Q 90 0 100 0 H 120 V 65 H 0 Z" fill="white"/>
+                </svg>
+              </div>
+              <div className="flex-1 h-full bg-white rounded-tr-[32px]" />
             </div>
 
             {/* Left Items */}
-            <div className="flex-1 flex justify-evenly items-center h-full pb-1">
+            <div className="flex-1 flex justify-around items-center h-full pt-1">
               {leftItems.map((item) => (
                 <Link 
                   key={item.href}
                   href={item.href}
-                  className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+                  className="flex flex-col items-center justify-center active:scale-90 transition-all group"
                 >
                   <div className={cn(
-                    "p-2 rounded-2xl transition-all duration-300",
-                    pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                    "w-10 h-10 flex items-center justify-center rounded-2xl transition-all duration-300",
+                    pathname === item.href ? "bg-blue-50 text-blue-600 scale-110" : "text-slate-400 group-hover:bg-slate-50"
                   )}>
                     {React.cloneElement(item.icon as any, { 
-                      size: 24,
+                      size: 22,
                       strokeWidth: pathname === item.href ? 2.5 : 2 
                     })}
                   </div>
                   <span className={cn(
-                    "text-[10px] font-bold transition-colors duration-300",
-                    pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                    "text-[9px] font-black uppercase tracking-tighter mt-1 transition-colors duration-300",
+                    pathname === item.href ? "text-blue-600" : "text-slate-400"
                   )}>
                     {item.label}
                   </span>
@@ -486,53 +488,68 @@ export default function AppShell({
             </div>
 
             {/* Spacer for Center Button */}
-            <div className="w-20" /> 
+            <div className="w-[100px]" /> 
 
             {/* Right Items */}
-            <div className="flex-1 flex justify-evenly items-center h-full pb-1">
+            <div className="flex-1 flex justify-around items-center h-full pt-1">
               {rightItems.map((item) => (
                 <Link 
                   key={item.href}
                   href={item.href}
-                  className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+                  className="flex flex-col items-center justify-center active:scale-90 transition-all group"
                 >
                   <div className={cn(
-                    "p-2 rounded-2xl transition-all duration-300",
-                    pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                    "w-10 h-10 flex items-center justify-center rounded-2xl transition-all duration-300",
+                    pathname === item.href ? "bg-blue-50 text-blue-600 scale-110" : "text-slate-400 group-hover:bg-slate-50"
                   )}>
                     {React.cloneElement(item.icon as any, { 
-                      size: 24,
+                      size: 22,
                       strokeWidth: pathname === item.href ? 2.5 : 2 
                     })}
                   </div>
                   <span className={cn(
-                    "text-[10px] font-bold transition-colors duration-300",
-                    pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                    "text-[9px] font-black uppercase tracking-tighter mt-1 transition-colors duration-300",
+                    pathname === item.href ? "text-blue-600" : "text-slate-400"
                   )}>
                     {item.label}
                   </span>
                 </Link>
               ))}
             </div>
+
           </div>
 
           {/* Center Floating Button (Sơ đồ) - Positioned in the cutout */}
-          <div className="absolute bottom-[15px] left-1/2 -translate-x-1/2 pointer-events-auto">
+          <div className="absolute bottom-[35px] left-1/2 -translate-x-1/2 pointer-events-auto z-50">
              {homeItem && (
                <Link 
                  href={homeItem.href}
                  className={cn(
-                   "flex items-center justify-center w-[56px] h-[56px] rounded-full shadow-[0_6px_15px_rgba(0,122,255,0.3)] transition-all duration-300 active:scale-95 group",
+                   "flex items-center justify-center w-[68px] h-[68px] rounded-full shadow-[0_12px_24px_rgba(37,99,235,0.3)] transition-all duration-500 active:scale-90 group relative overflow-hidden",
                    pathname === homeItem.href 
-                     ? "bg-[#007AFF] text-white" 
-                     : "bg-white text-slate-400 border border-slate-100"
+                     ? "bg-blue-600 text-white" 
+                     : "bg-white text-slate-400 border-4 border-slate-50 shadow-lg"
                  )}
                >
-                 {React.cloneElement(homeItem.icon as any, { 
-                    size: 24,
-                    strokeWidth: 2.5,
-                    className: "group-hover:scale-110 transition-transform"
-                 })}
+                 {/* Shine effect when active */}
+                 {pathname === homeItem.href && (
+                   <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent animate-pulse" />
+                 )}
+                 
+                 <div className="flex flex-col items-center justify-center gap-0.5">
+                   {React.cloneElement(homeItem.icon as any, { 
+                      size: 26,
+                      strokeWidth: 2.5,
+                      className: cn(
+                        "transition-transform duration-500",
+                        pathname === homeItem.href ? "scale-110" : "group-hover:scale-110"
+                      )
+                   })}
+                   <span className={cn(
+                     "text-[8px] font-black uppercase tracking-widest",
+                     pathname === homeItem.href ? "text-white/90" : "text-slate-400"
+                   )}>Sơ đồ</span>
+                 </div>
                </Link>
              )}
           </div>

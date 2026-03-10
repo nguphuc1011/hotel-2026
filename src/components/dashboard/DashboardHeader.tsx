@@ -158,13 +158,16 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   ];
 
   return (
-    <div className="flex flex-col gap-2 md:gap-4 mb-1 md:mb-6 animate-fade-in relative z-20 px-2 md:px-0">
+    <div className={cn(
+      "flex flex-col gap-2 md:gap-4 mb-1 md:mb-6 animate-fade-in relative z-20 md:px-0",
+      "md:relative sticky top-0 bg-[#F8F9FB]/80 backdrop-blur-md md:bg-transparent px-4 py-3 md:p-0 border-b border-slate-200/50 md:border-none shadow-sm md:shadow-none"
+    )}>
       {/* Mobile/Desktop Header with User Account */}
       <div className="flex justify-between items-center">
         {/* Logo & Refresh Section */}
         <div className="flex items-center gap-2 md:gap-4">
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
+            <div className="hidden md:flex p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
               <Store className="text-white w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
