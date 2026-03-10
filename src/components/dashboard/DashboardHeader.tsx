@@ -209,7 +209,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               "disabled:opacity-50"
             )}
           >
-            <ArrowRightLeft className={cn("text-blue-600", (isRefreshing || loading) && "animate-spin")} size={14} md:size={18} />
+            <ArrowRightLeft className={cn("text-blue-600", (isRefreshing || loading) && "animate-spin", "w-3.5 h-3.5 md:w-[18px] md:h-[18px]")} />
             <span className="hidden md:inline text-sm font-bold text-slate-700">Cập nhật</span>
           </button>
           
@@ -223,7 +223,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 : "bg-white text-slate-500 border-slate-200"
             )}
           >
-            <Filter size={14} />
+            <Filter className="w-3.5 h-3.5" />
           </button>
 
           {/* Transaction Button */}
@@ -232,7 +232,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               onClick={() => setIsTransactionModalOpen(true)}
               className="w-8 h-8 md:h-10 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg md:rounded-2xl flex items-center justify-center md:gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
             >
-              <Banknote size={14} md:size={18} />
+              <Banknote className="w-3.5 h-3.5 md:w-[18px] md:h-[18px]" />
               <span className="hidden md:inline font-bold text-sm">Thu/Chi</span>
             </button>
           )}
@@ -242,7 +242,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             onClick={() => toast.info('Tính năng đang phát triển')}
             className="w-8 h-8 md:h-10 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg md:rounded-2xl flex items-center justify-center md:gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
           >
-            <Store size={14} md:size={18} />
+            <Store className="w-3.5 h-3.5 md:w-[18px] md:h-[18px]" />
             <span className="hidden md:inline font-bold text-sm">Bán lẻ</span>
           </button>
         </div>
@@ -259,7 +259,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <p className="text-[10px] font-medium text-slate-400 uppercase">{user?.role || 'Nhân viên'}</p>
               </div>
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-2xl bg-white flex items-center justify-center border border-slate-200 shadow-sm">
-                <User size={16} md:size={20} className="text-slate-600" />
+                <User className="text-slate-600 w-4 h-4 md:w-5 md:h-5" />
               </div>
             </button>
 
