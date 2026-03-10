@@ -442,22 +442,22 @@ export default function AppShell({
       {/* Contrast Overlay under Mobile Nav - Subtle Blur Gradient */}
       {mounted && <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white/90 via-white/50 to-transparent pointer-events-none z-40" />}
 
-      {/* Mobile Bottom Nav - Curved Cutout with Floating Center Button */}
+      {/* Mobile Bottom Nav - Clean Curved Cutout from Image 2 */}
       {mounted && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-24 pointer-events-none flex flex-col justify-end pb-[env(safe-area-inset-bottom)]">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-20 pointer-events-none flex flex-col justify-end pb-[env(safe-area-inset-bottom)]">
           
-          {/* Main Bar Background with SVG Curve */}
-          <div className="relative w-full h-[65px] pointer-events-auto flex items-end justify-between px-4">
+          {/* Main Bar Background */}
+          <div className="relative w-full h-[60px] pointer-events-auto flex items-center justify-between px-2">
             
-            {/* Background Layer using SVG for smooth curve */}
-            <div className="absolute inset-0 flex items-end drop-shadow-[0_-8px_25px_rgba(0,0,0,0.08)] -z-10">
-              <div className="flex-1 h-full bg-white rounded-tl-[32px]" />
-              <div className="relative w-[120px] h-full bg-white">
-                <svg width="120" height="65" viewBox="0 0 120 65" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute bottom-0 left-0">
-                  <path d="M 0 0 H 20 Q 30 0 35 10 A 30 30 0 0 0 85 10 Q 90 0 100 0 H 120 V 65 H 0 Z" fill="white"/>
+            {/* Background Layer with smooth cutout */}
+            <div className="absolute inset-0 flex items-end drop-shadow-[0_-10px_30px_rgba(0,0,0,0.06)] -z-10">
+              <div className="flex-1 h-full bg-white rounded-tl-[24px]" />
+              <div className="relative w-[100px] h-full bg-white">
+                <svg width="100" height="60" viewBox="0 0 100 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute bottom-0 left-0">
+                  <path d="M 0 0 H 15 C 25 0 28 2 32 8 A 24 24 0 0 0 68 8 C 72 2 75 0 85 0 H 100 V 60 H 0 Z" fill="white"/>
                 </svg>
               </div>
-              <div className="flex-1 h-full bg-white rounded-tr-[32px]" />
+              <div className="flex-1 h-full bg-white rounded-tr-[24px]" />
             </div>
 
             {/* Left Items */}
@@ -469,26 +469,26 @@ export default function AppShell({
                   className="flex flex-col items-center justify-center active:scale-90 transition-all group"
                 >
                   <div className={cn(
-                    "w-10 h-10 flex items-center justify-center rounded-2xl transition-all duration-300",
-                    pathname === item.href ? "bg-blue-50 text-blue-600 scale-110" : "text-slate-400 group-hover:bg-slate-50"
+                    "w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-300",
+                    pathname === item.href ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
                   )}>
                     {React.cloneElement(item.icon as any, { 
-                      size: 22,
-                      strokeWidth: pathname === item.href ? 2.5 : 2 
+                      size: 20,
+                      strokeWidth: 2
                     })}
                   </div>
                   <span className={cn(
-                    "text-[9px] font-black uppercase tracking-tighter mt-1 transition-colors duration-300",
+                    "text-[10px] font-bold mt-1 transition-colors duration-300 tracking-tight",
                     pathname === item.href ? "text-blue-600" : "text-slate-400"
                   )}>
-                    {item.label}
+                    {item.label === 'THU CHI' ? 'Thu Chi' : item.label === 'KHÁCH HÀNG' ? 'Khách hàng' : item.label}
                   </span>
                 </Link>
               ))}
             </div>
 
             {/* Spacer for Center Button */}
-            <div className="w-[100px]" /> 
+            <div className="w-[80px]" /> 
 
             {/* Right Items */}
             <div className="flex-1 flex justify-around items-center h-full pt-1">
@@ -499,19 +499,19 @@ export default function AppShell({
                   className="flex flex-col items-center justify-center active:scale-90 transition-all group"
                 >
                   <div className={cn(
-                    "w-10 h-10 flex items-center justify-center rounded-2xl transition-all duration-300",
-                    pathname === item.href ? "bg-blue-50 text-blue-600 scale-110" : "text-slate-400 group-hover:bg-slate-50"
+                    "w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-300",
+                    pathname === item.href ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
                   )}>
                     {React.cloneElement(item.icon as any, { 
-                      size: 22,
-                      strokeWidth: pathname === item.href ? 2.5 : 2 
+                      size: 20,
+                      strokeWidth: 2
                     })}
                   </div>
                   <span className={cn(
-                    "text-[9px] font-black uppercase tracking-tighter mt-1 transition-colors duration-300",
+                    "text-[10px] font-bold mt-1 transition-colors duration-300 tracking-tight",
                     pathname === item.href ? "text-blue-600" : "text-slate-400"
                   )}>
-                    {item.label}
+                    {item.label === 'BÁO CÁO' ? 'Báo cáo' : item.label === 'CÀI ĐẶT' ? 'Cài đặt' : item.label}
                   </span>
                 </Link>
               ))}
@@ -519,36 +519,24 @@ export default function AppShell({
 
           </div>
 
-          {/* Center Floating Button (Sơ đồ) - Positioned in the cutout */}
-          <div className="absolute bottom-[35px] left-1/2 -translate-x-1/2 pointer-events-auto z-50">
+          {/* Center Floating Button (Sơ đồ) - Smaller and cleaner like Image 2 */}
+          <div className="absolute bottom-[24px] left-1/2 -translate-x-1/2 pointer-events-auto z-50">
              {homeItem && (
                <Link 
                  href={homeItem.href}
                  className={cn(
-                   "flex items-center justify-center w-[68px] h-[68px] rounded-full shadow-[0_12px_24px_rgba(37,99,235,0.3)] transition-all duration-500 active:scale-90 group relative overflow-hidden",
+                   "flex items-center justify-center w-[54px] h-[54px] rounded-full shadow-[0_8px_20px_rgba(37,99,235,0.25)] transition-all duration-300 active:scale-90 group relative overflow-hidden",
                    pathname === homeItem.href 
                      ? "bg-blue-600 text-white" 
-                     : "bg-white text-slate-400 border-4 border-slate-50 shadow-lg"
+                     : "bg-white text-slate-400 border-2 border-slate-50 shadow-md"
                  )}
                >
-                 {/* Shine effect when active */}
-                 {pathname === homeItem.href && (
-                   <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent animate-pulse" />
-                 )}
-                 
-                 <div className="flex flex-col items-center justify-center gap-0.5">
+                 <div className="flex flex-col items-center justify-center">
                    {React.cloneElement(homeItem.icon as any, { 
-                      size: 26,
+                      size: 22,
                       strokeWidth: 2.5,
-                      className: cn(
-                        "transition-transform duration-500",
-                        pathname === homeItem.href ? "scale-110" : "group-hover:scale-110"
-                      )
+                      className: "transition-transform"
                    })}
-                   <span className={cn(
-                     "text-[8px] font-black uppercase tracking-widest",
-                     pathname === homeItem.href ? "text-white/90" : "text-slate-400"
-                   )}>Sơ đồ</span>
                  </div>
                </Link>
              )}
