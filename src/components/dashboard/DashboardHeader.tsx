@@ -181,22 +181,20 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   return (
     <div className={cn(
-      "flex flex-col gap-1 md:gap-4 mb-1 md:mb-6 animate-fade-in relative z-20 md:px-0",
-      "md:relative sticky top-0 bg-white/95 backdrop-blur-md md:bg-transparent px-4 py-1.5 md:p-0 border-b border-slate-100 md:border-none shadow-sm md:shadow-none"
+      "flex flex-col gap-2 md:gap-4 mb-2 md:mb-6 animate-fade-in relative z-20 md:px-0",
+      "md:relative sticky top-0 bg-white/95 backdrop-blur-md md:bg-transparent px-4 py-3 md:p-0 border-b border-slate-100 md:border-none shadow-sm md:shadow-none"
     )}>
       {/* Mobile/Desktop Header with User Account */}
-      <div className="flex justify-between items-center h-10 md:h-auto">
-        {/* Left Side: Everything except User icon */}
-        <div className="flex items-center gap-1.5 md:gap-4 flex-1">
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="hidden md:flex p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
-              <Store className="text-white w-5 h-5 md:w-6 md:h-6" />
+      <div className="flex justify-between items-center">
+        {/* Left Side: Logo, Refresh, and Actions */}
+        <div className="flex items-center gap-2 md:gap-4 flex-1 overflow-x-auto no-scrollbar pb-1 md:pb-0">
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
+            <div className="flex p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
+              <Store className="text-white w-4 h-4 md:w-6 md:h-6" />
             </div>
-            <div>
-              <h1 className="text-sm md:text-xl font-black tracking-tighter text-slate-900 uppercase truncate max-w-[100px] md:max-w-none">
-                {user?.hotel_name || ''}
-              </h1>
-            </div>
+            <h1 className="text-base md:text-xl font-black tracking-tighter text-slate-900 uppercase whitespace-nowrap">
+              {user?.hotel_name || ''}
+            </h1>
           </div>
 
           {/* Nút Cập Nhật (Refresh) */}
@@ -204,12 +202,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             onClick={handleRefresh}
             disabled={loading || isRefreshing}
             className={cn(
-              "flex items-center gap-1.5 px-2 py-1 md:px-3 md:py-2 bg-slate-50 md:bg-white rounded-lg md:rounded-2xl border border-slate-100",
-              "hover:bg-slate-100 active:scale-95 transition-all duration-200",
+              "flex items-center gap-2 px-4 py-2 bg-white rounded-2xl shadow-sm border border-slate-100 shrink-0",
+              "hover:bg-slate-50 active:scale-95 transition-all duration-200",
               "disabled:opacity-50"
             )}
           >
-            <ArrowRightLeft className={cn("text-blue-600", (isRefreshing || loading) && "animate-spin", "w-3.5 h-3.5 md:w-[18px] md:h-[18px]")} />
+            <ArrowRightLeft className={cn("text-blue-600", (isRefreshing || loading) && "animate-spin")} size={18} />
             <span className="hidden md:inline text-sm font-bold text-slate-700">Cập nhật</span>
           </button>
           
@@ -217,49 +215,60 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <button 
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={cn(
-              "md:hidden w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
+              "md:hidden w-10 h-10 rounded-2xl flex items-center justify-center border shadow-sm transition-all shrink-0",
               showMobileFilters 
                 ? "bg-slate-900 text-white border-slate-900" 
-                : "bg-white text-slate-500 border-slate-200"
+                : "bg-white text-slate-600 border-slate-200"
             )}
           >
-            <Filter className="w-3.5 h-3.5" />
+            <Filter size={18} />
           </button>
 
           {/* Transaction Button */}
           {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
             <button 
               onClick={() => setIsTransactionModalOpen(true)}
-              className="w-8 h-8 md:h-10 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg md:rounded-2xl flex items-center justify-center md:gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+              className="h-10 px-3 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95 shrink-0"
             >
-              <Banknote className="w-3.5 h-3.5 md:w-[18px] md:h-[18px]" />
-              <span className="hidden md:inline font-bold text-sm">Thu/Chi</span>
+              <Banknote size={18} />
+              <span className="hidden md:inline font-bold text-sm">Tạo Phiếu Thu/Chi</span>
             </button>
           )}
 
           {/* Sell Service Button */}
           <button 
             onClick={() => toast.info('Tính năng đang phát triển')}
-            className="w-8 h-8 md:h-10 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg md:rounded-2xl flex items-center justify-center md:gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+            className="h-10 px-3 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 shrink-0"
           >
-            <Store className="w-3.5 h-3.5 md:w-[18px] md:h-[18px]" />
-            <span className="hidden md:inline font-bold text-sm">Bán lẻ</span>
+            <Store size={18} />
+            <span className="hidden md:inline font-bold text-sm">Bán DV tại quầy</span>
           </button>
+
+          {/* PWA Install Button */}
+          {showInstallBtn && (
+            <button 
+              onClick={handleInstallApp}
+              className="h-10 px-3 md:px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95 shrink-0"
+            >
+              <Download size={18} />
+              <span className="hidden md:inline font-bold text-sm">Cài đặt App</span>
+            </button>
+          )}
         </div>
 
         {/* Right Side: User Icon Only on Mobile */}
-        <div className="flex items-center ml-2">
+        <div className="flex items-center ml-2 shrink-0">
           <div className="relative">
             <button 
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 hover:bg-slate-50 rounded-xl p-1 transition-colors"
+              className="flex items-center gap-3 hover:bg-slate-50 rounded-2xl p-1 pr-3 transition-colors"
             >
               <div className="text-right hidden md:block">
                 <p className="text-xs font-bold text-slate-800">{user?.full_name || 'Staff'}</p>
                 <p className="text-[10px] font-medium text-slate-400 uppercase">{user?.role || 'Nhân viên'}</p>
               </div>
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-2xl bg-white flex items-center justify-center border border-slate-200 shadow-sm">
-                <User className="text-slate-600 w-4 h-4 md:w-5 md:h-5" />
+              <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center border border-slate-200 shadow-sm">
+                <User size={20} className="text-slate-600" />
               </div>
             </button>
 
