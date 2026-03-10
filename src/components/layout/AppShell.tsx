@@ -444,24 +444,20 @@ export default function AppShell({
 
       {/* Mobile Bottom Nav - Clean Curved Cutout from Image 2 */}
       {mounted && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-20 pointer-events-none flex flex-col justify-end pb-[env(safe-area-inset-bottom)]">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-[70px] pointer-events-none flex flex-col justify-end">
           
           {/* Main Bar Background */}
-          <div className="relative w-full h-[60px] pointer-events-auto flex items-center justify-between px-2">
+          <div className="relative w-full h-[65px] pointer-events-auto flex items-center justify-between px-2 bg-white rounded-t-[24px] shadow-[0_-10px_30px_rgba(0,0,0,0.06)]">
             
-            {/* Background Layer with smooth cutout */}
-            <div className="absolute inset-0 flex items-end drop-shadow-[0_-10px_30px_rgba(0,0,0,0.06)] -z-10">
-              <div className="flex-1 h-full bg-white rounded-tl-[24px]" />
-              <div className="relative w-[100px] h-full bg-white">
-                <svg width="100" height="60" viewBox="0 0 100 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute bottom-0 left-0">
-                  <path d="M 0 0 H 15 C 25 0 28 2 32 8 A 24 24 0 0 0 68 8 C 72 2 75 0 85 0 H 100 V 60 H 0 Z" fill="white"/>
-                </svg>
-              </div>
-              <div className="flex-1 h-full bg-white rounded-tr-[24px]" />
+            {/* Cutout Area SVG */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[100px] h-full -z-10">
+               <svg width="100" height="20" viewBox="0 0 100 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M 0 0 H 15 C 25 0 28 2 32 8 A 24 24 0 0 0 68 8 C 72 2 75 0 85 0 H 100 V 20 H 0 Z" fill="white"/>
+               </svg>
             </div>
 
             {/* Left Items */}
-            <div className="flex-1 flex justify-around items-center h-full pt-1">
+            <div className="flex-1 flex justify-around items-center h-full">
               {leftItems.map((item) => (
                 <Link 
                   key={item.href}
@@ -469,16 +465,16 @@ export default function AppShell({
                   className="flex flex-col items-center justify-center active:scale-90 transition-all group"
                 >
                   <div className={cn(
-                    "w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-300",
+                    "w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-300",
                     pathname === item.href ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
                   )}>
                     {React.cloneElement(item.icon as any, { 
-                      size: 20,
+                      size: 18,
                       strokeWidth: 2
                     })}
                   </div>
                   <span className={cn(
-                    "text-[10px] font-bold mt-1 transition-colors duration-300 tracking-tight",
+                    "text-[10px] font-bold transition-colors duration-300 tracking-tight",
                     pathname === item.href ? "text-blue-600" : "text-slate-400"
                   )}>
                     {item.label === 'THU CHI' ? 'Thu Chi' : item.label === 'KHÁCH HÀNG' ? 'Khách hàng' : item.label}
@@ -491,7 +487,7 @@ export default function AppShell({
             <div className="w-[80px]" /> 
 
             {/* Right Items */}
-            <div className="flex-1 flex justify-around items-center h-full pt-1">
+            <div className="flex-1 flex justify-around items-center h-full">
               {rightItems.map((item) => (
                 <Link 
                   key={item.href}
@@ -499,16 +495,16 @@ export default function AppShell({
                   className="flex flex-col items-center justify-center active:scale-90 transition-all group"
                 >
                   <div className={cn(
-                    "w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-300",
+                    "w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-300",
                     pathname === item.href ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
                   )}>
                     {React.cloneElement(item.icon as any, { 
-                      size: 20,
+                      size: 18,
                       strokeWidth: 2
                     })}
                   </div>
                   <span className={cn(
-                    "text-[10px] font-bold mt-1 transition-colors duration-300 tracking-tight",
+                    "text-[10px] font-bold transition-colors duration-300 tracking-tight",
                     pathname === item.href ? "text-blue-600" : "text-slate-400"
                   )}>
                     {item.label === 'BÁO CÁO' ? 'Báo cáo' : item.label === 'CÀI ĐẶT' ? 'Cài đặt' : item.label}
@@ -519,8 +515,8 @@ export default function AppShell({
 
           </div>
 
-          {/* Center Floating Button (Sơ đồ) - Smaller and cleaner like Image 2 */}
-          <div className="absolute bottom-[24px] left-1/2 -translate-x-1/2 pointer-events-auto z-50">
+          {/* Center Floating Button (Sơ đồ) */}
+          <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 pointer-events-auto z-50">
              {homeItem && (
                <Link 
                  href={homeItem.href}
