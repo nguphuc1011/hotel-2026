@@ -214,6 +214,7 @@ function ServiceCard({ service, quantity, onAdd, onRemove }: {
 }
 
 export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenStatusModal }: CheckInModalProps) {
+  // Force rebuild to clear stale HMR cache
   const { alert: alertDialog, confirm: confirmDialog } = useGlobalDialog();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<RentalType>('hourly');
