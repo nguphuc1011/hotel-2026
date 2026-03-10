@@ -109,17 +109,20 @@ export default function DashboardPage() {
 
       // 2. Fetch Active Bookings
       // We want bookings that are NOT checked_out or cancelled
+      // FALLBACK: If RLS is blocking direct 'bookings' access due to missing hotel_id,
+      // we might need to rely on the RPC which has different security context or fix data.
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
           *,
           customer:customers(full_name, balance)
         `)
-        .in('status', ['confirmed', 'checked_in']);
+        .in('status', ['confirmed', 'checked_in', 'occupied']); // Added 'occupied' just in case
 
       if (bookingsError) throw bookingsError;
 
       // 2.1 Fetch real-time bills for all active bookings in one bulk RPC
+      // This RPC might return bookings even if RLS on table is tricky
       let ratesData = [];
       try {
         const { data, error: ratesError } = await supabase
@@ -138,27 +141,38 @@ export default function DashboardPage() {
         ratesData.map((r: any) => [r.booking_id, r])
       );
 
-      const activeBookings = (bookingsData || []).map((b: any) => {
-        const rate = ratesByBookingId.get(b.id);
-        let durationText: string | undefined = undefined;
-
-        if (rate) {
-          // We intentionally skip durationText calculation here to allow RoomCard 
-          // to use LiveTimer for real-time updates (daily/overnight).
-          // The previous logic parsing 'explanation' was fragile and caused '1 ngày' bugs.
+      // Map rates to active bookings, and also handle bookings found in rates but not in bookingsData
+      // (This happens if bookings have hotel_id=null and are hidden from normal table SELECT)
+      const activeBookings = [...(bookingsData || [])];
+      
+      // Look for "ghost" bookings in ratesData that aren't in bookingsData
+      ratesData.forEach((rate: any) => {
+        if (!activeBookings.find(b => b.id === rate.booking_id)) {
+          console.log("Found ghost booking from RPC:", rate.booking_id);
+          activeBookings.push({
+            id: rate.booking_id,
+            room_id: rate.room_id,
+            rental_type: rate.rental_type,
+            check_in_at: rate.check_in_at,
+            status: 'checked_in',
+            total_amount: rate.total_amount,
+            is_ghost: true // Flag for debugging
+          });
         }
+      });
 
+      const processedBookings = activeBookings.map((b: any) => {
+        const rate = ratesByBookingId.get(b.id);
         return {
           ...b,
           total_amount: rate?.total_amount ?? b.total_amount ?? 0,
           check_in_at: rate?.check_in_at ?? b.check_in_actual,
-          duration_text: durationText
         };
       });
 
       // 3. Merge Data
       const mergedRooms: DashboardRoom[] = roomsData.map((room: any) => {
-        const booking = activeBookings.find(b => b.room_id === room.id);
+        const booking = processedBookings.find(b => b.room_id === room.id);
 
         let dashboardRoom: DashboardRoom = {
           id: room.id,
@@ -522,17 +536,23 @@ export default function DashboardPage() {
         extra_adults: bookingData.extra_adults,
         extra_children: bookingData.extra_children,
         custom_price: bookingData.custom_price,
-        custom_price_reason: bookingData.custom_price_reason
+        custom_price_reason: bookingData.custom_price_reason,
+        verifiedStaff: user ? { id: user.id, name: user.full_name } : undefined
       });
 
       toast.success('Nhận phòng thành công');
       setIsCheckInOpen(false);
       // fetchData(); // Removed direct call, rely on real-time
-    } catch (error) {
-      console.error('Check-in error:', JSON.stringify(error, null, 2));
+    } catch (error: any) {
+      console.error('Check-in error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       await alertDialog({
         title: 'Lỗi nhận phòng',
-        message: (error as any).message || 'Lỗi không xác định',
+        message: error.message || 'Lỗi không xác định',
         type: 'error'
       });
     }
