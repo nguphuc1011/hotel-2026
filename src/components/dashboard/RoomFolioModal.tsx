@@ -114,9 +114,6 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [isTransferGroupMasterModalOpen, setIsTransferGroupMasterModalOpen] = useState(false);
 
-  // Early return if not open or no booking to prevent crashes
-  if (!isOpen || !booking) return null;
-
   const handleTransferGroupMaster = () => {
     setIsTransferGroupMasterModalOpen(true);
   };
@@ -421,7 +418,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     );
   };
 
-  if (!isOpen || !mounted) return null;
+  if (!isOpen || !mounted || !booking) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[50000] flex items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-4">
