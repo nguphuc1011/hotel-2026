@@ -31,7 +31,7 @@ BEGIN
         -- Physical Wallet
         IF NEW.payment_method_code = 'cash' OR NEW.payment_method_code IS NULL THEN
             UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'CASH';
-        ELSIF NEW.payment_method_code IN ('transfer', 'credit_card', 'bank', 'qr') THEN
+        ELSIF NEW.payment_method_code IN ('transfer', 'bank', 'qr') THEN
             UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'BANK';
         END IF;
 
@@ -71,7 +71,7 @@ BEGIN
     -- A. Update PHYSICAL WALLETS (Cash/Bank)
     IF NEW.payment_method_code = 'cash' OR NEW.payment_method_code IS NULL THEN
         UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'CASH';
-    ELSIF NEW.payment_method_code IN ('transfer', 'credit_card', 'bank', 'qr') THEN
+    ELSIF NEW.payment_method_code IN ('transfer', 'bank', 'qr') THEN
         UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'BANK';
     END IF;
 

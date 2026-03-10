@@ -3,6 +3,11 @@
 -- AUTHOR: Trae AI
 -- DATE: 2026-01-31
 
+-- Ensure no ambiguous overload remains
+DROP FUNCTION IF EXISTS public.cancel_booking(
+    uuid, uuid, text, numeric, text, text, text
+);
+
 CREATE OR REPLACE FUNCTION public.cancel_booking(
     p_booking_id uuid,
     p_verified_by_staff_id uuid DEFAULT NULL,
@@ -18,6 +23,8 @@ AS $$
 DECLARE
     v_room_id uuid;
     v_status text;
+    v_is_master_booking boolean;
+    v_child_bookings_count integer;
 BEGIN
     -- Check if booking exists and get status
     SELECT room_id, status INTO v_room_id, v_status
@@ -34,6 +41,23 @@ BEGIN
 
     IF v_status = 'checked_out' THEN
         RETURN jsonb_build_object('success', false, 'message', 'Không thể hủy Booking đã trả phòng');
+    END IF;
+
+    -- Check if it's a master booking
+    SELECT COUNT(id) INTO v_child_bookings_count
+    FROM public.bookings
+    WHERE parent_booking_id = p_booking_id;
+
+    v_is_master_booking := (v_child_bookings_count > 0);
+
+    IF v_is_master_booking THEN
+        -- If it's a master booking, return a flag to the frontend to ask for user's decision.
+        RETURN jsonb_build_object(
+            'success', false,
+            'message', 'Booking này là phòng chủ của một nhóm. Vui lòng tách các phòng con ra trước hoặc chuyển quyền chủ nhóm.',
+            'is_master_booking', true,
+            'child_bookings_count', v_child_bookings_count
+        );
     END IF;
 
     -- Update Booking

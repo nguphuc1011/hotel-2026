@@ -50,21 +50,7 @@ export function BottomSheet({
           className="relative bg-white w-full rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 fade-in duration-300 z-[101]"
           style={{ maxWidth, maxHeight: "90vh" }}
         >
-          {/* PC Header */}
-          <div className="flex items-center justify-between px-8 py-6 border-b border-slate-50 shrink-0 bg-white/80 backdrop-blur-md">
-            <div>
-              {title && <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">{title}</h2>}
-              {description && <p className="text-sm text-slate-500 mt-1 font-medium">{description}</p>}
-            </div>
-            <button 
-              onClick={onClose}
-              className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all active:scale-90"
-            >
-              <X size={20} strokeWidth={2.5} />
-            </button>
-          </div>
-
-          {/* PC Content */}
+          {/* PC Content - Header is handled by children if needed */}
           <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
             {children}
           </div>
@@ -90,13 +76,7 @@ export function BottomSheet({
               <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-slate-200 my-4" />
             )}
             
-            {(title || description) && (
-              <div className="px-6 pb-2">
-                {title && <Drawer.Title className="text-xl font-black text-slate-900 uppercase tracking-tight">{title}</Drawer.Title>}
-                {description && <Drawer.Description className="text-sm text-slate-500 mt-1 font-medium">{description}</Drawer.Description>}
-              </div>
-            )}
-
+            {/* Mobile Header - Optional, handled by children if needed */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {children}
             </div>

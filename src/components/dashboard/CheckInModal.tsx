@@ -349,7 +349,15 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
     }
   }, [isCustomPrice, activeTab, room]);
 
-  if (!isOpen || !room) return null;
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  if (!mounted || !isOpen || !room) return null;
 
   // --- Handlers ---
 
@@ -498,36 +506,26 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
 
   const totalAmount = finalRoomPrice + servicesTotal + surchargeTotal + debt;
 
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
   const ModalContent = (
     <div className="flex flex-col h-full bg-white relative">
-        {/* --- HEADER (PC only) --- */}
-        {!isMobile && (
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
-                        <User className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-800 leading-none">Nhận phòng {room.name}</h3>
-                        <p className="text-xs text-slate-500 mt-1 font-medium">{roomCategory?.name || 'Đang thực hiện nhận phòng'}</p>
-                    </div>
+        {/* --- HEADER --- */}
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                    <User className="w-5 h-5 text-white" />
                 </div>
-                <button
-                    onClick={onClose}
-                    className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
-                >
-                    <X className="w-5 h-5 text-slate-500" />
-                </button>
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800 leading-none">Nhận phòng {room.name}</h3>
+                    <p className="text-xs text-slate-500 mt-1 font-medium">{roomCategory?.name || 'Đang thực hiện nhận phòng'}</p>
+                </div>
             </div>
-        )}
+            <button
+                onClick={onClose}
+                className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
+            >
+                <X className="w-5 h-5 text-slate-500" />
+            </button>
+        </div>
 
         {/* --- BODY --- */}
         <div className={cn(

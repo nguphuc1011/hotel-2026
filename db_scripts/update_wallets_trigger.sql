@@ -31,7 +31,7 @@ BEGIN
         WHERE id = 'CASH';
         
     -- BANK (Transfer, Credit Card, etc.)
-    ELSIF NEW.payment_method_code IN ('transfer', 'credit_card', 'bank') THEN
+    ELSIF NEW.payment_method_code IN ('transfer', 'bank', 'qr') THEN
         UPDATE public.wallets 
         SET balance = balance + (v_amount * v_sign),
             updated_at = now()

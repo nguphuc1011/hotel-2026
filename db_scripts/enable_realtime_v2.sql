@@ -13,12 +13,8 @@ $$;
 -- 2. Add tables to publication
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
 ALTER PUBLICATION supabase_realtime ADD TABLE bookings;
-ALTER PUBLICATION supabase_realtime ADD TABLE pending_approvals;
-
--- 3. Set Replica Identity to FULL for pending_approvals to ensure we get old record (optional but recommended for updates)
-ALTER TABLE pending_approvals REPLICA IDENTITY FULL;
-
--- 4. Set Replica Identity for rooms and bookings just in case
+ 
+-- 3. Set Replica Identity for rooms and bookings
 ALTER TABLE rooms REPLICA IDENTITY FULL;
 ALTER TABLE bookings REPLICA IDENTITY FULL;
 

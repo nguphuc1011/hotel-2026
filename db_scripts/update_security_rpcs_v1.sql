@@ -28,7 +28,7 @@ SECURITY DEFINER
 AS $$
 BEGIN
     -- Validate policy_type
-    IF p_policy_type NOT IN ('ALLOW', 'PIN', 'APPROVAL', 'DENY') THEN
+    IF p_policy_type NOT IN ('ALLOW', 'PIN', 'DENY') THEN
         RETURN jsonb_build_object('success', false, 'message', 'Loại chính sách không hợp lệ');
     END IF;
 

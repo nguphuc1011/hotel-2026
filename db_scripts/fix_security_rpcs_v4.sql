@@ -33,58 +33,14 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'message', 'Không xác định được nhân viên yêu cầu');
     END IF;
 
-    INSERT INTO public.pending_approvals (action_key, staff_id, request_data)
-    VALUES (p_action_key, v_staff_id, p_request_data)
-    RETURNING id INTO v_id;
-    
     RETURN jsonb_build_object(
-        'success', true, 
-        'request_id', v_id,
-        'approval_id', v_id
+        'success', false, 
+        'message', 'Flow xin lệnh đã bị vô hiệu hóa'
     );
 END;
 $$;
 
--- 3. RPC: Cancel Request (Recovery / Unstick)
-CREATE OR REPLACE FUNCTION public.fn_cancel_approval_request(
-    p_request_id uuid,
-    p_reason text DEFAULT NULL,
-    p_actor_id uuid DEFAULT NULL
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_req RECORD;
-    v_actor uuid;
-BEGIN
-    IF p_request_id IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Thiếu ID yêu cầu (p_request_id)');
-    END IF;
-    
-    SELECT * INTO v_req FROM public.pending_approvals WHERE id = p_request_id;
-    IF v_req IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Yêu cầu không tồn tại');
-    END IF;
-    
-    v_actor := COALESCE(p_actor_id, auth.uid());
-    
-    UPDATE public.pending_approvals
-    SET 
-        status = 'REJECTED',
-        updated_at = now(),
-        request_data = CASE 
-            WHEN p_reason IS NOT NULL THEN COALESCE(request_data, '{}'::jsonb) || jsonb_build_object('cancel_reason', p_reason)
-            ELSE request_data
-        END
-    WHERE id = p_request_id;
-    
-    RETURN jsonb_build_object('success', true, 'message', 'Đã hủy yêu cầu');
-END;
-$$;
-
--- 2. Tạo lại fn_approve_request 
+-- 2. Tạo lại fn_approve_request (giữ stub để tránh lỗi schema cache, nhưng không còn dùng)
 -- LƯU Ý: Thứ tự tham số cực kỳ quan trọng để khớp với Schema Cache của PostgREST
 -- p_manager_id, p_manager_pin, p_method, p_request_id (theo thứ tự alphabet của tên tham số)
 CREATE OR REPLACE FUNCTION public.fn_approve_request(
@@ -101,57 +57,9 @@ DECLARE
     v_manager_id uuid;
     v_req RECORD;
 BEGIN
-    -- Kiểm tra requestId có hợp lệ không
-    IF p_request_id IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Thiếu ID yêu cầu (p_request_id)');
-    END IF;
-
-    SELECT * INTO v_req FROM public.pending_approvals WHERE id = p_request_id;
-    
-    IF v_req IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Yêu cầu không tồn tại hoặc ID sai định dạng: ' || p_request_id::text);
-    END IF;
-    
-    IF v_req.status <> 'PENDING' THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Yêu cầu đã được xử lý (Status: ' || v_req.status || ')');
-    END IF;
-
-    -- Xác định managerId
-    IF p_manager_pin IS NOT NULL AND p_manager_pin <> '' THEN
-        -- Xác thực qua PIN
-        SELECT id INTO v_manager_id FROM public.staff 
-        WHERE pin_hash = p_manager_pin AND (role IN ('Manager', 'Admin', 'Owner')) AND is_active = true;
-        
-        IF v_manager_id IS NULL THEN
-            RETURN jsonb_build_object('success', false, 'message', 'Mã PIN quản lý không đúng hoặc không đủ quyền');
-        END IF;
-    ELSIF p_manager_id IS NOT NULL THEN
-        -- Xác thực qua ID (Telegram/Webhook)
-        v_manager_id := p_manager_id;
-    ELSE
-        -- Fallback về auth.uid()
-        v_manager_id := auth.uid(); 
-    END IF;
-
-    IF v_manager_id IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Không xác định được người phê duyệt');
-    END IF;
-
-    -- Thực hiện update
-    UPDATE public.pending_approvals
-    SET status = 'APPROVED',
-        approved_by_staff_id = v_manager_id,
-        approval_method = p_method,
-        updated_at = now()
-    WHERE id = p_request_id;
-    
     RETURN jsonb_build_object(
-        'success', true, 
-        'message', 'Đã duyệt yêu cầu thành công',
-        'approved_by_id', v_manager_id,
-        'approved_by_name', (SELECT full_name FROM public.staff WHERE id = v_manager_id)
+        'success', false,
+        'message', 'Flow xin lệnh đã bị vô hiệu hóa'
     );
-EXCEPTION WHEN OTHERS THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Lỗi hệ thống SQL: ' || SQLERRM);
 END;
 $$;

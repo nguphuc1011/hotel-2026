@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.security_user_policies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     staff_id uuid NOT NULL REFERENCES public.staff(id) ON DELETE CASCADE,
     action_key text NOT NULL REFERENCES public.settings_security(key),
-    policy_type text NOT NULL CHECK (policy_type IN ('ALLOW', 'PIN', 'APPROVAL', 'DENY')),
+    policy_type text NOT NULL CHECK (policy_type IN ('ALLOW', 'PIN', 'DENY')),
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now(),
     UNIQUE(staff_id, action_key)
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.security_role_policies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     role text NOT NULL,
     action_key text NOT NULL REFERENCES public.settings_security(key),
-    policy_type text NOT NULL CHECK (policy_type IN ('ALLOW', 'PIN', 'APPROVAL', 'DENY')),
+    policy_type text NOT NULL CHECK (policy_type IN ('ALLOW', 'PIN', 'DENY')),
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now(),
     UNIQUE(role, action_key)
@@ -117,7 +117,7 @@ CREATE OR REPLACE FUNCTION public.fn_set_policy_override(
     p_scope text, -- 'ROLE' or 'USER'
     p_target_id text, -- Role Name (e.g. 'Manager') or Staff UUID
     p_action_key text,
-    p_policy_type text -- 'ALLOW', 'PIN', 'APPROVAL', 'DENY', or 'RESET' (to delete override)
+    p_policy_type text -- 'ALLOW', 'PIN', 'DENY', or 'RESET' (to delete override)
 )
 RETURNS jsonb
 LANGUAGE plpgsql

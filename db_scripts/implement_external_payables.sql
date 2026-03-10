@@ -42,7 +42,7 @@ BEGIN
         -- Physical
         IF NEW.payment_method_code = 'cash' OR NEW.payment_method_code IS NULL THEN
             UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'CASH';
-        ELSIF NEW.payment_method_code IN ('transfer', 'credit_card', 'bank', 'qr') THEN
+        ELSIF NEW.payment_method_code IN ('transfer', 'bank', 'qr') THEN
             UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'BANK';
         END IF;
         -- Logical: Escrow
@@ -69,7 +69,7 @@ BEGIN
         -- A. Physical
         IF NEW.payment_method_code = 'cash' OR NEW.payment_method_code IS NULL THEN
             UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'CASH';
-        ELSIF NEW.payment_method_code IN ('transfer', 'credit_card', 'bank', 'qr') THEN
+        ELSIF NEW.payment_method_code IN ('transfer', 'bank', 'qr') THEN
             UPDATE public.wallets SET balance = balance + (v_amount * v_sign), updated_at = now() WHERE id = 'BANK';
         END IF;
 
@@ -89,7 +89,7 @@ BEGIN
         -- A. Physical Wallet Update
         IF NEW.payment_method_code = 'cash' OR NEW.payment_method_code IS NULL THEN
             UPDATE public.wallets SET balance = balance - v_amount, updated_at = now() WHERE id = 'CASH'; -- OUT is positive amount
-        ELSIF NEW.payment_method_code IN ('transfer', 'credit_card', 'bank', 'qr') THEN
+        ELSIF NEW.payment_method_code IN ('transfer', 'bank', 'qr') THEN
             UPDATE public.wallets SET balance = balance - v_amount, updated_at = now() WHERE id = 'BANK';
         END IF;
         -- Note: If 'owner_equity', no Physical update.

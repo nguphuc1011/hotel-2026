@@ -28,14 +28,14 @@ BEGIN
 
     -- 0. SECURITY CHECK (DYNAMIC POLICY)
     -- Check if user is allowed to perform 'finance_void_transaction'
-    -- Using fn_resolve_policy to get: ALLOW, PIN, APPROVAL, DENY
+    -- Using fn_resolve_policy to get: ALLOW, PIN, DENY
     
     -- Note: If the UI has already done the PIN check/Approval flow, 
     -- it should technically be fine, but the RPC is the last line of defense.
     -- However, fn_resolve_policy doesn't validate the PIN itself, it just tells us the requirement.
     -- Ideally, we should trust the UI verification OR pass the approval proof.
     -- For now, we will BLOCK if policy is DENY.
-    -- If policy is PIN/APPROVAL, we assume the UI handled it (or we could enforce strict check later).
+    -- If policy is PIN, we assume the UI handled it (or we could enforce strict check later).
     
     -- Let's check the policy:
     SELECT public.fn_resolve_policy(v_user_id, 'finance_void_transaction') INTO v_policy;

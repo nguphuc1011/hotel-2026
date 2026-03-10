@@ -150,29 +150,13 @@ $function$;
 
 
 -- 2. UPDATE SECURITY SETTINGS
--- Insert missing keys and set APPROVAL mode
+-- Insert missing keys and set PIN/deny modes
 INSERT INTO public.settings_security (key, policy_type, description)
 VALUES 
-    ('folio_edit_booking', 'APPROVAL', 'Sửa thông tin Booking (Tên, Giờ, Giá)'),
-    ('folio_change_room', 'DENY', 'Đổi phòng') -- Re-affirm DENY, though it might exist
+    ('folio_edit_booking', 'PIN', 'Sửa thông tin Booking (Tên, Giờ, Giá)'),
+    ('folio_change_room', 'PIN', 'Đổi phòng')
 ON CONFLICT (key) DO UPDATE 
 SET policy_type = EXCLUDED.policy_type;
-
--- Force update specific sensitive actions to APPROVAL
-UPDATE public.settings_security
-SET policy_type = 'APPROVAL'
-WHERE key IN ('checkin_cancel_booking', 'folio_edit_booking');
-
--- Ensure folio_change_room is DENY as per current state (or APPROVAL if user wants, but user said 'Change Room' filter logic was important, let's keep DENY or APPROVAL? 
--- Wait, user didn't say Change Room is forbidden, user said "Change Room: Only to ready rooms".
--- User complained about "Global là XIN LỆNH" for "Sửa phòng" (Edit Booking).
--- Let's set 'folio_change_room' to 'PIN' or 'APPROVAL' to be safe, NOT DENY. 
--- User previously said: "1. Đổi phòng xong thì về lại sơ đồ phòng nhé". So it IS allowed.
--- My previous report said it was DENY in DB. That was why it was blocked (or bypassed).
--- I should set it to PIN or APPROVAL.
-UPDATE public.settings_security
-SET policy_type = 'PIN' -- Default to PIN for Change Room, unless user said otherwise. 
-WHERE key = 'folio_change_room';
 
 -- Verify Clean State
 SELECT routine_name, pg_get_function_identity_arguments(to_regproc(routine_name::text)) as args
