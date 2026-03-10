@@ -4,8 +4,8 @@ import type { NextRequest } from 'next/server';
 // 🏛️ LAYER 1: GREAT WALL SECURITY (Proxy)
 // Intercepts all requests before they hit the Page/Layout
 export async function proxy(req: NextRequest) {
-  const res = NextResponse.next();
   const url = req.nextUrl.clone();
+  console.log(`🛡️ Proxy: ${req.method} ${url.pathname}`);
   
   // 1. PUBLIC PATHS & ASSETS (Bỏ qua bảo mật cho tệp công khai)
   const publicPaths = ['/login', '/auth/callback', '/favicon.ico', '/manifest.json', '/sw.js', '/next.svg'];
@@ -15,7 +15,8 @@ export async function proxy(req: NextRequest) {
   const isTenantLogin = /\/[^/]+\/login\/?$/.test(url.pathname);
 
   if (isPublicPath || isTenantLogin) {
-    return res;
+    console.log(`✅ Proxy: Public/Login path allowed`);
+    return NextResponse.next();
   }
 
   // 2. SAAS ADMIN SECURITY (Bảo vệ phòng điều khiển tổng)
@@ -23,12 +24,12 @@ export async function proxy(req: NextRequest) {
     const hasAuthCookie = req.cookies.has('1hotel_session');
     const role = (req.cookies.get('1hotel_role')?.value || '').toLowerCase();
     
-    // Chỉ Admin/Owner mới được vào SaaS Admin
     if (!hasAuthCookie || (role !== 'admin' && role !== 'owner')) {
+      console.log(`🚫 Proxy: SaaS Admin access denied, redirecting to /login`);
       url.pathname = '/login';
       return NextResponse.redirect(url);
     }
-    return res;
+    return NextResponse.next();
   }
 
   // 3. TENANT AUTHENTICATION (Bảo vệ dữ liệu khách hàng)
@@ -39,14 +40,17 @@ export async function proxy(req: NextRequest) {
     const pathParts = url.pathname.split('/').filter(Boolean);
     if (pathParts.length > 0 && pathParts[0] !== 'login' && pathParts[0] !== 'undefined') {
       const slug = pathParts[0];
+      console.log(`🚫 Proxy: Unauthenticated access to /${slug}, redirecting to /${slug}/login`);
       url.pathname = `/${slug}/login`;
     } else {
+      console.log(`🚫 Proxy: Unauthenticated access, redirecting to /login`);
       url.pathname = '/login';
     }
     return NextResponse.redirect(url);
   }
 
-  return res;
+  console.log(`✅ Proxy: Authenticated path allowed`);
+  return NextResponse.next();
 }
 
 export const config = {

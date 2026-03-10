@@ -19,11 +19,13 @@ import { cashFlowService, Wallet } from '@/services/cashFlowService';
 import WalletCards from '@/app/[slug]/tien/components/WalletCards';
 import { useRouter } from 'next/navigation';
 import { usePermission } from '@/hooks/usePermission';
+import { useAuthStore } from '@/stores/authStore';
 import { PERMISSION_KEYS } from '@/services/permissionService';
 import { ShieldCheck } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const { can, isLoading: isAuthLoading } = usePermission();
   const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [rooms, setRooms] = useState<DashboardRoom[]>([]);
@@ -84,95 +86,47 @@ export default function DashboardPage() {
     return color;
   }, [usedColorsRef, predefinedGroupColors]); // Added dependencies
 
-  // Fetch initial data
-  const fetchData = useCallback(async () => { // Wrapped in useCallback
+  const [settings, setSettings] = useState<any>(null);
+
+  // Fetch initial data using Unified RPC
+  const fetchData = useCallback(async () => {
     if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) return;
 
     try {
       setLoading(true);
       
-      // Reset color maps before assigning new colors
+      // 1. Fetch Dashboard Data & Settings in parallel
+      const [unifiedResult, settingsResult] = await Promise.all([
+        supabase.rpc('fn_get_dashboard_data'),
+        supabase.rpc('get_system_settings')
+      ]);
+
+      if (unifiedResult.error) throw unifiedResult.error;
+      
+      const { rooms: roomsData, bookings: bookingsData, rates: ratesData, wallets: walletsData } = unifiedResult.data;
+      setSettings(settingsResult.data || null);
+
+      // Reset color maps
       masterBookingIdToColorMapRef.current.clear();
       usedColorsRef.current.clear();
       colorIndexRef.current = 0;
-      
-      // 1. Fetch Rooms
-      const { data: roomsData, error: roomsError } = await supabase
-        .from('rooms')
-        .select(`
-          *,
-          category:room_categories(id, name, price_hourly, price_overnight, price_daily)
-        `)
-        .order('room_number', { ascending: true });
-
-      if (roomsError) throw roomsError;
-
-      // 2. Fetch Active Bookings
-      // We want bookings that are NOT checked_out or cancelled
-      // FALLBACK: If RLS is blocking direct 'bookings' access due to missing hotel_id,
-      // we might need to rely on the RPC which has different security context or fix data.
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          customer:customers(full_name, balance)
-        `)
-        .in('status', ['confirmed', 'checked_in', 'occupied']); // Added 'occupied' just in case
-
-      if (bookingsError) throw bookingsError;
-
-      // 2.1 Fetch real-time bills for all active bookings in one bulk RPC
-      // This RPC might return bookings even if RLS on table is tricky
-      let ratesData = [];
-      try {
-        const { data, error: ratesError } = await supabase
-          .rpc('get_dashboard_room_rates');
-        
-        if (ratesError) {
-          console.warn('Dashboard room rates RPC failed, continuing with partial data:', ratesError.message);
-        } else {
-          ratesData = data || [];
-        }
-      } catch (e) {
-        console.warn('Exception in dashboard rates fetch:', e);
-      }
 
       const ratesByBookingId = new Map<string, any>(
         ratesData.map((r: any) => [r.booking_id, r])
       );
 
-      // Map rates to active bookings, and also handle bookings found in rates but not in bookingsData
-      // (This happens if bookings have hotel_id=null and are hidden from normal table SELECT)
-      const activeBookings = [...(bookingsData || [])];
-      
-      // Look for "ghost" bookings in ratesData that aren't in bookingsData
-      ratesData.forEach((rate: any) => {
-        if (!activeBookings.find(b => b.id === rate.booking_id)) {
-          console.log("Found ghost booking from RPC:", rate.booking_id);
-          activeBookings.push({
-            id: rate.booking_id,
-            room_id: rate.room_id,
-            rental_type: rate.rental_type,
-            check_in_at: rate.check_in_at,
-            status: 'checked_in',
-            total_amount: rate.total_amount,
-            is_ghost: true // Flag for debugging
-          });
-        }
-      });
-
-      const processedBookings = activeBookings.map((b: any) => {
+      const processedBookings = bookingsData.map((b: any) => {
         const rate = ratesByBookingId.get(b.id);
         return {
           ...b,
           total_amount: rate?.total_amount ?? b.total_amount ?? 0,
-          check_in_at: rate?.check_in_at ?? b.check_in_actual,
+          check_in_at: rate?.check_in_at ?? b.check_in_actual
         };
       });
 
-      // 3. Merge Data
+      // Merge Data
       const mergedRooms: DashboardRoom[] = roomsData.map((room: any) => {
-        const booking = processedBookings.find(b => b.room_id === room.id);
+        const booking = processedBookings.find((b: any) => b.room_id === room.id);
 
         let dashboardRoom: DashboardRoom = {
           id: room.id,
@@ -182,6 +136,8 @@ export default function DashboardPage() {
           price_hourly: room.category?.price_hourly,
           price_daily: room.category?.price_daily,
           price_overnight: room.category?.price_overnight,
+          base_hourly_limit: room.category?.base_hourly_limit,
+          hourly_unit: room.category?.hourly_unit,
           status: room.status as RoomStatus,
           updated_at: room.updated_at,
           notes: room.notes
@@ -195,9 +151,8 @@ export default function DashboardPage() {
             customer_name: booking.customer?.full_name,
             customer_balance: booking.customer?.balance || 0,
             check_in_at: booking.check_in_at,
-            booking_type: booking.rental_type, // Map rental_type from DB to booking_type in Interface
+            booking_type: booking.rental_type,
             total_amount: booking.total_amount || 0,
-            prepayment: booking.prepayment || 0,
             status: booking.status,
             duration_text: booking.duration_text,
             parent_booking_id: booking.parent_booking_id,
@@ -205,7 +160,7 @@ export default function DashboardPage() {
           };
 
           // Check Group Master Logic
-          const groupMembers = activeBookings.filter((b: any) => b.parent_booking_id === booking.id);
+          const groupMembers = processedBookings.filter((b: any) => b.parent_booking_id === booking.id);
           if (groupMembers.length > 0) {
             dashboardRoom.is_group_master = true;
             dashboardRoom.group_count = groupMembers.length;
@@ -213,7 +168,7 @@ export default function DashboardPage() {
 
           // Check Group Member Logic to find Master Name
           if (dashboardRoom.current_booking.is_group_member && dashboardRoom.current_booking.parent_booking_id) {
-             const masterBooking = activeBookings.find(b => b.id === dashboardRoom.current_booking?.parent_booking_id);
+             const masterBooking = processedBookings.find((b: any) => b.id === dashboardRoom.current_booking?.parent_booking_id);
              if (masterBooking) {
                 const masterRoom = roomsData.find((r: any) => r.id === masterBooking.room_id);
                 if (masterRoom) {
@@ -222,14 +177,11 @@ export default function DashboardPage() {
              }
           }
           
-          // Force status to occupied if there's a booking, to be safe, 
-          // though DB should stay in sync.
           if (dashboardRoom.status === 'available') {
              dashboardRoom.status = 'occupied';
           }
         }
 
-        // Check "Clean Eye" logic
         if (dashboardRoom.status === 'dirty' && room.updated_at) {
           const minutesDirty = differenceInMinutes(new Date(), new Date(room.updated_at));
           if (minutesDirty > 60) {
@@ -246,7 +198,6 @@ export default function DashboardPage() {
           let assignedColor: string;
 
           if (!masterBookingIdToColorMapRef.current.has(masterId)) {
-            // Gán màu mới nếu chưa có
             if (colorIndexRef.current < predefinedGroupColors.length) {
               assignedColor = predefinedGroupColors[colorIndexRef.current];
             } else {
@@ -256,14 +207,12 @@ export default function DashboardPage() {
             usedColorsRef.current.add(assignedColor);
             colorIndexRef.current++;
           } else {
-            // Sử dụng màu đã có
             assignedColor = masterBookingIdToColorMapRef.current.get(masterId)!;
           }
           room.group_color = assignedColor;
 
         } else if (room.current_booking?.is_group_member && room.current_booking.parent_booking_id) {
           const masterId = room.current_booking.parent_booking_id;
-          // Nếu master đã có màu, sử dụng màu đó. Nếu không, gán một màu (fallback, không nên xảy ra nếu master được xử lý trước)
           if (!masterBookingIdToColorMapRef.current.has(masterId)) {
             let assignedColor: string;
             if (colorIndexRef.current < predefinedGroupColors.length) {
@@ -281,14 +230,14 @@ export default function DashboardPage() {
       });
 
       setRooms(roomsWithGroupColors);
+      setWallets(walletsData || []);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', JSON.stringify(error, null, 2));
-      console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [can, getRandomColor]); // Thêm can và getRandomColor vào dependency array
+  }, [can, getRandomColor]);
 
   // --- Central Execution Handler (The Executioner) ---
   const handleAutoExecution = async (request: any) => {
@@ -340,7 +289,7 @@ export default function DashboardPage() {
         
         if (result.success) {
             toast.success("Đã tự động hủy phòng thành công!");
-            // fetchData(); // Removed direct call, rely on real-time
+            fetchData(); // Khôi phục gọi trực tiếp
         } else {
             // Only show error if it's not "already cancelled" (optional, but for now show all)
             toast.error("Lỗi tự động hủy: " + result.message);
@@ -357,32 +306,160 @@ export default function DashboardPage() {
     }
   }, [isAuthLoading, can]);
 
-  // Real-time Subscription
+  // Smart Update Logic based on User Requirements
   useEffect(() => {
-    // Consolidated Subscription
+    if (isAuthLoading || !can(PERMISSION_KEYS.VIEW_DASHBOARD) || !settings) return;
+
+    // 1. Function to calculate next update times for all active rooms
+    const getNextUpdateTimes = () => {
+      const times: number[] = [];
+      const now = new Date();
+      const nowMs = now.getTime();
+      const config = settings; 
+
+      rooms.forEach(room => {
+        if (room.status !== 'occupied' || !room.current_booking) return;
+        
+        const checkIn = new Date(room.current_booking.check_in_at);
+        const bookingType = room.current_booking.booking_type;
+        
+        // SaaS Logic: Prefer category-specific settings (from room object), fallback to global config
+        const graceMinutes = config.grace_minutes || 0;
+        const graceOutEnabled = config.grace_out_enabled;
+
+        if (bookingType === 'hourly') {
+          // Use values from the room (which came from its category)
+          const baseHours = room.base_hourly_limit || config.base_hourly_limit || 1;
+          const hourlyUnit = room.hourly_unit || config.hourly_unit || 60;
+          
+          // Mốc 1: Hết block đầu + ân hạn
+          const firstMarkMs = checkIn.getTime() + (baseHours * 60 + (graceOutEnabled ? graceMinutes : 0)) * 60000;
+          if (firstMarkMs > nowMs) times.push(firstMarkMs);
+
+          // Mốc tiếp theo: Mỗi block tiếp theo + ân hạn (tối đa 12 block tiếp theo để bao phủ 1 ngày)
+          for (let i = 1; i <= 12; i++) {
+            const nextMarkMs = checkIn.getTime() + (baseHours * 60 + i * hourlyUnit + (graceOutEnabled ? graceMinutes : 0)) * 60000;
+            if (nextMarkMs > nowMs) {
+              times.push(nextMarkMs);
+              break; 
+            }
+          }
+
+          // Mốc chuyển Qua đêm (nếu có auto-switch)
+          if (config.auto_overnight_switch && config.overnight_start_time) {
+            const [h, m] = config.overnight_start_time.split(':').map(Number);
+            const overnightStart = new Date();
+            overnightStart.setHours(h, m, 0, 0);
+            if (overnightStart.getTime() > nowMs) times.push(overnightStart.getTime());
+          }
+        } else {
+          // Daily / Overnight Logic
+          const isOvernight = bookingType === 'overnight';
+          // Dùng mốc trả phòng từ cài đặt (SaaS dynamic)
+          const targetTimeStr = isOvernight ? (config.overnight_checkout_time || config.check_out_time) : config.check_out_time;
+          const lateCutoffStr = config.full_day_late_after; 
+          
+          if (targetTimeStr) {
+            const [h, m] = targetTimeStr.split(':').map(Number);
+            const checkOutMark = new Date();
+            checkOutMark.setHours(h, m, 0, 0);
+            
+            // Mốc 1: Giờ trả phòng + ân hạn (Bắt đầu tính phụ thu muộn)
+            const lateStartMs = checkOutMark.getTime() + (graceOutEnabled ? graceMinutes : 0) * 60000;
+            if (lateStartMs > nowMs) times.push(lateStartMs);
+          }
+
+          if (lateCutoffStr) {
+            const [h, m] = lateCutoffStr.split(':').map(Number);
+            const lateCutoffMark = new Date();
+            lateCutoffMark.setHours(h, m, 0, 0);
+            
+            // Mốc 2: Mốc nhảy thêm 1 ngày tiền phòng (Full Day Late)
+            if (lateCutoffMark.getTime() > nowMs) times.push(lateCutoffMark.getTime());
+          }
+
+          // Mốc 3: Night Audit (Mốc reset ngày mới/tính thêm ngày nếu ở tiếp)
+          if (config.night_audit_time) {
+            const [h, m] = config.night_audit_time.split(':').map(Number);
+            const auditMark = new Date();
+            auditMark.setHours(h, m, 0, 0);
+            if (auditMark.getTime() <= nowMs) auditMark.setDate(auditMark.getDate() + 1);
+            times.push(auditMark.getTime());
+          }
+        }
+      });
+
+      // Remove duplicates and sort
+      return Array.from(new Set(times)).sort((a, b) => a - b);
+    };
+
+    const scheduleNextUpdates = () => {
+      const nextTimes = getNextUpdateTimes();
+      if (nextTimes.length === 0) return;
+
+      const nextTargetMs = nextTimes[0];
+      const delayMs = nextTargetMs - new Date().getTime();
+
+      // User's "Safety Surround" logic: Update 2 minutes before, at the mark, and 2 minutes after
+      const surroundDelays = [
+        delayMs - 120000, // 2 mins before
+        delayMs,          // exactly at the mark
+        delayMs + 120000  // 2 mins after
+      ].filter(d => d > 0);
+
+      const timers = surroundDelays.map(d => {
+        return setTimeout(() => {
+          console.log(`Smart Update triggered (surround logic) at ${new Date().toLocaleTimeString()}`);
+          fetchData();
+        }, d);
+      });
+
+      return timers;
+    };
+
+    const timers = scheduleNextUpdates();
+    
+    // Fallback: Still keep a slow polling (e.g. 30 mins) just in case of edge cases
+    const fallbackInterval = setInterval(() => {
+      console.log("Smart Update: Fallback slow refresh...");
+      fetchData();
+    }, 30 * 60 * 1000);
+
+    return () => {
+      timers?.forEach(clearTimeout);
+      clearInterval(fallbackInterval);
+    };
+  }, [isAuthLoading, can, rooms, settings, fetchData]);
+
+  // Real-time Subscription with Debounced Refresh
+  useEffect(() => {
     if (isAuthLoading || !can(PERMISSION_KEYS.VIEW_DASHBOARD)) return;
+
+    let refreshTimeout: NodeJS.Timeout;
+
+    const debouncedFetch = () => {
+      clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        console.log("Realtime event received, debounced refresh starting...");
+        fetchData();
+      }, 1000); // 1 second debounce to group multiple events
+    };
 
     const channel = supabase
       .channel('dashboard_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
-        console.log("Room updated, refreshing...");
-        setTimeout(() => fetchData(), 500);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-        console.log("Booking updated, refreshing...");
-        setTimeout(() => fetchData(), 500);
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, debouncedFetch)
       .subscribe((status) => {
-        console.log("Realtime subscription status:", status);
         if (status === 'SUBSCRIBED') {
             toast.success("Đã kết nối thời gian thực");
         }
       });
 
     return () => {
+      clearTimeout(refreshTimeout);
       supabase.removeChannel(channel);
     };
-  }, [isAuthLoading, can]);
+  }, [isAuthLoading, can, fetchData]);
 
   // Filtering Logic
   const filteredRooms = useMemo(() => {
@@ -479,7 +556,7 @@ export default function DashboardPage() {
       try {
         await updateRoomStatus(room.id, 'available');
         toast.success(`Phòng ${room.name} đã sẵn sàng.`);
-        // fetchData(); // Removed direct call, rely on real-time
+        fetchData(); // Khôi phục gọi trực tiếp
       } catch (e) {
         console.error('Error marking room as clean:', e);
         toast.error('Lỗi khi đánh dấu phòng đã dọn xong.');
@@ -508,6 +585,7 @@ export default function DashboardPage() {
       }
       
       await supabase.from('rooms').update(updates).eq('id', roomId);
+      fetchData(); // Khôi phục gọi trực tiếp để UI cập nhật ngay
     } catch (e) {
       console.error(e);
       toast.error('Lỗi cập nhật trạng thái');
@@ -542,17 +620,20 @@ export default function DashboardPage() {
 
       toast.success('Nhận phòng thành công');
       setIsCheckInOpen(false);
-      // fetchData(); // Removed direct call, rely on real-time
+      fetchData(); // Khôi phục gọi trực tiếp để đảm bảo UI cập nhật ngay lập tức
     } catch (error: any) {
-      console.error('Check-in error details:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
+      // Robust error logging for Next.js 16 / Turbopack
+      const detailedError = error instanceof Error 
+        ? JSON.parse(JSON.stringify(error, Object.getOwnPropertyNames(error)))
+        : error;
+
+      console.error('Check-in error full:', detailedError);
+      
+      const errorMsg = error?.message || error?.details || (typeof error === 'string' ? error : 'Lỗi không xác định');
+      
       await alertDialog({
         title: 'Lỗi nhận phòng',
-        message: error.message || 'Lỗi không xác định',
+        message: errorMsg,
         type: 'error'
       });
     }
@@ -572,6 +653,8 @@ export default function DashboardPage() {
           counts={counts}
           filters={filters}
           onToggle={handleToggleFilter}
+          onRefresh={fetchData}
+          loading={loading}
         />
 
         {/* Room Grid */}
@@ -607,7 +690,7 @@ export default function DashboardPage() {
               <RoomFolioModal
               isOpen={isFolioOpen}
               onClose={() => setIsFolioOpen(false)}
-              onUpdate={() => {}}
+              onUpdate={() => fetchData()}
               room={selectedRoom}
               booking={selectedRoom.current_booking!}
               onGroupRoom={() => {
@@ -620,7 +703,7 @@ export default function DashboardPage() {
               isOpen={isGroupModalOpen}
               onClose={() => setIsGroupModalOpen(false)}
               masterRoom={selectedRoom}
-              onSuccess={() => {}}
+              onSuccess={() => fetchData()}
               rooms={rooms} // Truyền danh sách rooms vào GroupRoomModal
             />
           </>

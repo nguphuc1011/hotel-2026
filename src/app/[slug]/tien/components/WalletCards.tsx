@@ -28,7 +28,7 @@ interface WalletCardsProps {
   onViewExternalDebt: () => void;
 }
 
-export default function WalletCards({ 
+const WalletCards = ({ 
   wallets, 
   loading, 
   selectedWalletId, 
@@ -38,9 +38,7 @@ export default function WalletCards({
   externalDebt,
   onViewCustomerDebt,
   onViewExternalDebt
-}: WalletCardsProps) {
-  const [changes, setChanges] = useState<Record<string, { diff: number }>>({});
-  const prevBalancesRef = useRef<Record<string, number>>({});
+}: WalletCardsProps) => {
   const isMounted = useRef(false);
 
   // Restore state from LocalStorage on mount
@@ -272,4 +270,6 @@ export default function WalletCards({
       </div>
     </>
   );
-}
+};
+
+export default React.memo(WalletCards);

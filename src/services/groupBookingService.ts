@@ -50,7 +50,7 @@ export const groupBookingService = {
   },
 
   async getBookingBill(bookingId: string) {
-    const { data, error } = await supabase.rpc('get_booking_bill_for_frontend', {
+    const { data, error } = await supabase.rpc('calculate_booking_bill', {
       p_booking_id: bookingId,
     });
 

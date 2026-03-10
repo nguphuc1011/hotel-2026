@@ -9,6 +9,8 @@ export interface Room {
   price_hourly?: number;
   price_daily?: number;
   price_overnight?: number;
+  base_hourly_limit?: number; // SaaS Dynamic
+  hourly_unit?: number;       // SaaS Dynamic
   status: RoomStatus;
   clean_status?: 'clean' | 'dirty'; // Sometimes separate from main status
   last_cleaned_at?: string;

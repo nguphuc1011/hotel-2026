@@ -18,6 +18,7 @@ import { MoneyInput } from '@/components/ui/MoneyInput';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { securityService, SecurityAction } from '@/services/securityService';
 import { useSecurity } from '@/hooks/useSecurity';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 
 interface CheckInModalProps {
   isOpen: boolean;
@@ -497,447 +498,476 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
 
   const totalAmount = finalRoomPrice + servicesTotal + surchargeTotal + debt;
 
-  if (!mounted) return null;
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
-  return createPortal(
-        <div className="fixed inset-0 z-[50000] flex flex-col justify-end sm:justify-center items-center backdrop-blur-md bg-slate-900/60">
-            {/* Modal Container */}
-            <div className="w-full h-full sm:w-full sm:max-w-2xl sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] bg-slate-50 flex flex-col shadow-2xl overflow-hidden relative">
-            
-            {/* --- HEADER --- */}
-            <div className="h-16 flex justify-between items-center px-6 bg-white z-50 shrink-0 shadow-sm border-b border-slate-100/50">
+  if (!mounted || !isOpen || !room) return null;
+
+  const ModalContent = (
+    <div className="flex flex-col h-full bg-white relative">
+        {/* --- HEADER (PC only) --- */}
+        {!isMobile && (
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                 <div className="flex items-center gap-3">
-                    <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg uppercase tracking-wider shadow-sm">Check-in</span>
-                    <h2 className="text-lg font-bold text-slate-800">Phòng {room.name}</h2>
+                    <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                        <User className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800 leading-none">Nhận phòng {room.name}</h3>
+                        <p className="text-xs text-slate-500 mt-1 font-medium">{roomCategory?.name || 'Đang thực hiện nhận phòng'}</p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <button
+                    onClick={onClose}
+                    className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
+                >
+                    <X className="w-5 h-5 text-slate-500" />
+                </button>
+            </div>
+        )}
+
+        {/* --- BODY --- */}
+        <div className={cn(
+            "flex-1 p-6 space-y-6 bg-slate-50 relative overflow-y-auto custom-scrollbar",
+            isMobile ? "pb-32" : ""
+        )}>
+            
+            {/* Warning Overlay for non-available rooms */}
+            {room.status !== 'available' && (
+                <div className="absolute inset-0 z-40 bg-slate-50/95 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+                    <div className={cn(
+                        "w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-xl ring-4 ring-white",
+                        room.status === 'repair' ? "bg-rose-100 text-rose-600" : "bg-orange-100 text-orange-600"
+                    )}>
+                        {room.status === 'repair' ? <Wrench className="w-10 h-10" /> : <Brush className="w-10 h-10" />}
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">
+                        {room.status === 'repair' ? 'Phòng đang bảo trì' : 'Phòng chưa dọn dẹp'}
+                    </h3>
+                    <p className="text-slate-500 max-w-xs mb-8 font-medium">
+                        {room.status === 'repair' 
+                            ? 'Phòng đang được sửa chữa. Vui lòng cập nhật trạng thái khi hoàn tất.'
+                            : 'Phòng chưa được dọn dẹp sau khi khách trả phòng.'
+                        }
+                    </p>
+                    
                     {onOpenStatusModal && (
                         <button 
                             onClick={onOpenStatusModal}
-                            className="h-10 px-4 flex items-center gap-2 bg-orange-50 border border-orange-100 hover:bg-orange-100 hover:border-orange-200 text-orange-600 rounded-full transition-all active:scale-95 font-bold text-sm shadow-sm"
-                            title="Đổi trạng thái phòng"
+                            className={cn(
+                                "px-8 py-4 text-white font-bold rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-3",
+                                room.status === 'repair' 
+                                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/30" 
+                                    : "bg-orange-600 hover:bg-orange-700 shadow-orange-500/30"
+                            )}
                         >
-                            <Wrench className="w-4 h-4" />
-                            <span className="hidden sm:inline">Bảo trì/Dọn</span>
+                            {room.status === 'repair' ? <Wrench className="w-5 h-5" /> : <Brush className="w-5 h-5" />}
+                            <span>Cập nhật trạng thái ngay</span>
                         </button>
                     )}
-                    <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
-                        <X className="w-5 h-5 text-slate-500" />
-                    </button>
                 </div>
-            </div>
+            )}
 
-            {/* --- BODY --- */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] bg-slate-50 relative">
-                
-                {/* Warning Overlay for non-available rooms */}
-                {room.status !== 'available' && (
-                    <div className="absolute inset-0 z-40 bg-slate-50/95 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
-                        <div className={cn(
-                            "w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-xl ring-4 ring-white",
-                            room.status === 'repair' ? "bg-rose-100 text-rose-600" : "bg-orange-100 text-orange-600"
-                        )}>
-                            {room.status === 'repair' ? <Wrench className="w-10 h-10" /> : <Brush className="w-10 h-10" />}
-                        </div>
-                        <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">
-                            {room.status === 'repair' ? 'Phòng đang bảo trì' : 'Phòng chưa dọn dẹp'}
-                        </h3>
-                        <p className="text-slate-500 max-w-xs mb-8 font-medium">
-                            {room.status === 'repair' 
-                                ? 'Phòng đang được sửa chữa. Vui lòng cập nhật trạng thái khi hoàn tất.'
-                                : 'Phòng chưa được dọn dẹp sau khi khách trả phòng.'
-                            }
-                        </p>
-                        
-                        {onOpenStatusModal && (
-                            <button 
-                                onClick={onOpenStatusModal}
-                                className={cn(
-                                    "px-8 py-4 text-white font-bold rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-3",
-                                    room.status === 'repair' 
-                                        ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/30" 
-                                        : "bg-orange-600 hover:bg-orange-700 shadow-orange-500/30"
-                                )}
-                            >
-                                {room.status === 'repair' ? <Wrench className="w-5 h-5" /> : <Brush className="w-5 h-5" />}
-                                <span>Cập nhật trạng thái ngay</span>
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* 1. SOURCE & CUSTOMER */}
-                <div className="space-y-4">
-                     {/* Source Icons */}
-                     <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1">
-                         {SOURCES.map(src => (
-                             <div 
-                                key={src.id} 
-                                onClick={() => setSource(src.id)} 
-                                className="group flex flex-col items-center gap-2 cursor-pointer flex-none min-w-[64px]"
-                             >
-                                 <div className={cn(
-                                     "w-14 h-14 rounded-[28px] flex items-center justify-center transition-all duration-300 shadow-sm", 
-                                     source === src.id ? "bg-blue-600 text-white shadow-blue-600/30 scale-105" : "bg-white text-slate-400 hover:bg-white hover:text-blue-500 hover:shadow-md"
-                                 )}>
-                                     <src.icon className="w-6 h-6" strokeWidth={1.5} />
-                                 </div>
-                                 <span className={cn(
-                                     "text-[11px] font-semibold transition-colors text-center leading-tight",
-                                     source === src.id ? "text-blue-700" : "text-slate-500"
-                                 )}>{src.label}</span>
+            {/* 1. SOURCE & CUSTOMER */}
+            <div className="space-y-4">
+                 {/* Source Icons */}
+                 <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1">
+                     {SOURCES.map(src => (
+                         <div 
+                            key={src.id} 
+                            onClick={() => setSource(src.id)} 
+                            className="group flex flex-col items-center gap-2 cursor-pointer flex-none min-w-[64px]"
+                         >
+                             <div className={cn(
+                                 "w-14 h-14 rounded-[28px] flex items-center justify-center transition-all duration-300 shadow-sm", 
+                                 source === src.id ? "bg-blue-600 text-white shadow-blue-600/30 scale-105" : "bg-white text-slate-400 hover:bg-white hover:text-blue-500 hover:shadow-md"
+                             )}>
+                                 <src.icon className="w-6 h-6" strokeWidth={1.5} />
                              </div>
-                         ))}
-                    </div>
-
-                    {/* Customer Search */}
-                    <div className="relative group bg-white rounded-[32px] shadow-sm p-1 transition-shadow hover:shadow-md" ref={searchRef}>
-                        <div className="flex items-center px-4">
-                            <Search className="w-5 h-5 text-slate-400 mr-3" />
-                            <input
-                                type="text"
-                                placeholder="Tìm khách hàng..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full py-4 bg-transparent border-none text-base font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none"
-                            />
-                            {selectedCustomer && (
-                                <button onClick={handleClearCustomer} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
-                                    <X className="w-5 h-5" />
-                                </button>
-                            )}
-                        </div>
-
-                        {selectedCustomer && selectedCustomer.balance < 0 && (
-                            <div className="mx-4 mb-3 p-3 bg-rose-50 rounded-2xl border border-rose-100 flex items-center gap-3 animate-in slide-in-from-top-1">
-                                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                                    <AlertCircle className="w-5 h-5 text-rose-600" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-[10px] font-bold text-rose-500 uppercase tracking-tight">Cảnh báo nợ cũ</div>
-                                    <div className="text-sm font-black text-rose-700">
-                                        Khách đang nợ {Math.abs(selectedCustomer.balance).toLocaleString()}đ
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        
-                        {/* Dropdown Results */}
-                        {customers.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[24px] shadow-xl overflow-hidden z-50 p-1 border border-slate-100">
-                                {customers.map(customer => (
-                                    <div 
-                                        key={customer.id}
-                                        onClick={() => handleCustomerSelect(customer)}
-                                        className="px-4 py-3 hover:bg-blue-50 rounded-xl cursor-pointer flex justify-between items-center group transition-colors"
-                                    >
-                                        <span className="font-bold text-slate-700 group-hover:text-blue-700">{customer.full_name}</span>
-                                        {customer.balance !== 0 && (
-                                            <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", customer.balance < 0 ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600")}>
-                                                {customer.balance.toLocaleString()}
-                                            </span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    
-                    {/* New Customer Info */}
-                    {!selectedCustomer && searchTerm.length > 0 && customers.length === 0 && !isSearching && (
-                        <div className="animate-in slide-in-from-top-2 fade-in duration-300 grid grid-cols-2 gap-3">
-                             <input 
-                                type="tel" 
-                                placeholder="Số điện thoại"
-                                value={newCustomerPhone}
-                                onChange={(e) => setNewCustomerPhone(e.target.value)}
-                                className="bg-white border-none rounded-[24px] px-5 py-4 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm placeholder:font-normal"
-                             />
-                             <input 
-                                type="text" 
-                                placeholder="CCCD/CMND"
-                                value={newCustomerIdCard}
-                                onChange={(e) => setNewCustomerIdCard(e.target.value)}
-                                className="bg-white border-none rounded-[24px] px-5 py-4 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm placeholder:font-normal"
-                             />
-                        </div>
-                    )}
+                             <span className={cn(
+                                 "text-[11px] font-semibold transition-colors text-center leading-tight",
+                                 source === src.id ? "text-blue-700" : "text-slate-500"
+                             )}>{src.label}</span>
+                         </div>
+                     ))}
                 </div>
 
-                {/* 2. RENTAL TYPES (Pills) - KEPT rounded-full */}
-                <div className="flex bg-white rounded-full p-1.5 shadow-sm relative z-10">
-                    {RENTAL_TYPES.filter(type => {
-                        if (type.id === 'overnight') return roomCategory?.overnight_enabled !== false;
-                        return true;
-                    }).map(type => {
-                         const isActive = activeTab === type.id;
-                         return (
-                            <button
-                                key={type.id}
-                                onClick={() => setActiveTab(type.id)}
-                                className={cn(
-                                    "flex-1 flex flex-col items-center justify-center py-3.5 rounded-full transition-all duration-300 relative overflow-hidden",
-                                    isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30" : "text-slate-400 hover:bg-slate-50"
-                                )}
-                            >
-                                <type.icon className={cn("w-4 h-4 mb-1.5", isActive ? "text-white" : "text-slate-400")} />
-                                <span className="text-[10px] font-bold tracking-widest uppercase">{type.label}</span>
-                            </button>
-                         )
-                    })}
-                </div>
-
-                {/* 3. ROOM PRICE */}
-                <div className="bg-white rounded-[40px] p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Giá phòng</span>
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs text-slate-500 font-medium">Giá tuỳ chỉnh</span>
-                            <Switch checked={isCustomPrice} onCheckedChange={setIsCustomPrice} />
-                        </div>
-                    </div>
-                    
-                    <div className="relative">
-                        <MoneyInput
-                            value={isCustomPrice ? customPrice : defaultRoomPrice}
-                            onChange={(val) => isCustomPrice && setCustomPrice(val)}
-                            className={cn(
-                                "text-4xl font-bold text-center w-full py-6 bg-slate-50 rounded-[32px] border-none focus:ring-0 tracking-tight transition-colors",
-                                isCustomPrice ? "text-blue-600 bg-blue-50/50" : "text-slate-800 cursor-not-allowed select-none"
-                            )}
-                            inputClassName="text-4xl font-bold tracking-tight"
-                            disabled={!isCustomPrice}
-                            centered
-                        />
-                        {!isCustomPrice && (
-                            <div className="absolute inset-0 z-10" />
-                        )}
-                    </div>
-                    
-                    {isCustomPrice && (
+                {/* Customer Search */}
+                <div className="relative group bg-white rounded-[32px] shadow-sm p-1 transition-shadow hover:shadow-md" ref={searchRef}>
+                    <div className="flex items-center px-4">
+                        <Search className="w-5 h-5 text-slate-400 mr-3" />
                         <input
                             type="text"
-                            placeholder="Nhập lý do thay đổi giá..."
-                            value={customPriceReason}
-                            onChange={(e) => setCustomPriceReason(e.target.value)}
-                            className="w-full text-sm px-4 py-3 bg-slate-50 rounded-[24px] border-none focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                            placeholder="Tìm khách hàng..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full py-4 bg-transparent border-none text-base font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none"
                         />
+                        {selectedCustomer && (
+                            <button onClick={handleClearCustomer} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
+
+                    {selectedCustomer && selectedCustomer.balance < 0 && (
+                        <div className="mx-4 mb-3 p-3 bg-rose-50 rounded-2xl border border-rose-100 flex items-center gap-3 animate-in slide-in-from-top-1">
+                            <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                                <AlertCircle className="w-5 h-5 text-rose-600" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-[10px] font-bold text-rose-500 uppercase tracking-tight">Cảnh báo nợ cũ</div>
+                                <div className="text-sm font-black text-rose-700">
+                                    Khách đang nợ {Math.abs(selectedCustomer.balance).toLocaleString()}đ
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Dropdown Results */}
+                    {customers.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[24px] shadow-xl overflow-hidden z-[102] p-1 border border-slate-100">
+                            {customers.map(customer => (
+                                <div 
+                                    key={customer.id}
+                                    onClick={() => handleCustomerSelect(customer)}
+                                    className="px-4 py-3 hover:bg-blue-50 rounded-xl cursor-pointer flex justify-between items-center group transition-colors"
+                                >
+                                    <span className="font-bold text-slate-700 group-hover:text-blue-700">{customer.full_name}</span>
+                                    {customer.balance !== 0 && (
+                                        <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", customer.balance < 0 ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600")}>
+                                            {customer.balance.toLocaleString()}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                
+                {/* New Customer Info */}
+                {!selectedCustomer && searchTerm.length > 0 && customers.length === 0 && !isSearching && (
+                    <div className="animate-in slide-in-from-top-2 fade-in duration-300 grid grid-cols-2 gap-3">
+                         <input 
+                            type="tel" 
+                            placeholder="Số điện thoại"
+                            value={newCustomerPhone}
+                            onChange={(e) => setNewCustomerPhone(e.target.value)}
+                            className="bg-white border-none rounded-[24px] px-5 py-4 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm placeholder:font-normal"
+                         />
+                         <input 
+                            type="text" 
+                            placeholder="CCCD/CMND"
+                            value={newCustomerIdCard}
+                            onChange={(e) => setNewCustomerIdCard(e.target.value)}
+                            className="bg-white border-none rounded-[24px] px-5 py-4 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm placeholder:font-normal"
+                         />
+                    </div>
+                )}
+            </div>
+
+            {/* 2. RENTAL TYPES (Pills) - KEPT rounded-full */}
+            <div className="flex bg-white rounded-full p-1.5 shadow-sm relative z-10">
+                {RENTAL_TYPES.filter(type => {
+                    if (type.id === 'overnight') return roomCategory?.overnight_enabled !== false;
+                    return true;
+                }).map(type => {
+                     const isActive = activeTab === type.id;
+                     return (
+                        <button
+                            key={type.id}
+                            onClick={() => setActiveTab(type.id)}
+                            className={cn(
+                                "flex-1 flex flex-col items-center justify-center py-3.5 rounded-full transition-all duration-300 relative overflow-hidden",
+                                isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30" : "text-slate-400 hover:bg-slate-50"
+                            )}
+                        >
+                            <type.icon className={cn("w-4 h-4 mb-1.5", isActive ? "text-white" : "text-slate-400")} />
+                            <span className="text-[10px] font-bold tracking-widest uppercase">{type.label}</span>
+                        </button>
+                     )
+                })}
+            </div>
+
+            {/* 3. ROOM PRICE */}
+            <div className="bg-white rounded-[40px] p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Giá phòng</span>
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-500 font-medium">Giá tuỳ chỉnh</span>
+                        <Switch checked={isCustomPrice} onCheckedChange={setIsCustomPrice} />
+                    </div>
+                </div>
+                
+                <div className="relative">
+                    <MoneyInput
+                        value={isCustomPrice ? customPrice : defaultRoomPrice}
+                        onChange={(val) => isCustomPrice && setCustomPrice(val)}
+                        className={cn(
+                            "text-4xl font-bold text-center w-full py-6 bg-slate-50 rounded-[32px] border-none focus:ring-0 tracking-tight transition-colors",
+                            isCustomPrice ? "text-blue-600 bg-blue-50/50" : "text-slate-800 cursor-not-allowed select-none"
+                        )}
+                        inputClassName="text-4xl font-bold tracking-tight"
+                        disabled={!isCustomPrice}
+                        centered
+                    />
+                    {!isCustomPrice && (
+                        <div className="absolute inset-0 z-10" />
+                    )}
+                </div>
+                
+                {isCustomPrice && (
+                    <input
+                        type="text"
+                        placeholder="Nhập lý do thay đổi giá..."
+                        value={customPriceReason}
+                        onChange={(e) => setCustomPriceReason(e.target.value)}
+                        className="w-full text-sm px-4 py-3 bg-slate-50 rounded-[24px] border-none focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                    />
+                )}
+            </div>
+
+            {/* 4. SERVICES */}
+            <div className="space-y-3">
+                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide px-1">Dịch vụ</h3>
+                
+                <div className="flex gap-3 overflow-x-auto pb-4 pt-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1 snap-x snap-mandatory">
+                    {availableServices.map(service => {
+                        const selected = selectedServices.find(s => s.service.id === service.id);
+                        return (
+                            <ServiceCard
+                                key={service.id}
+                                service={service}
+                                quantity={selected?.quantity || 0}
+                                onAdd={() => handleAddService(service)}
+                                onRemove={() => handleRemoveService(service.id)}
+                            />
+                        );
+                    })}
+                    {availableServices.length === 0 && (
+                        <div className="w-full text-center py-8 text-slate-400 italic">
+                            Không tìm thấy món nào
+                        </div>
                     )}
                 </div>
 
-                {/* 4. SERVICES */}
-                <div className="space-y-3">
-                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide px-1">Dịch vụ</h3>
-                    
-                    <div className="flex gap-3 overflow-x-auto pb-4 pt-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1 snap-x snap-mandatory">
-                        {availableServices.map(service => {
-                            const selected = selectedServices.find(s => s.service.id === service.id);
-                            return (
-                                <ServiceCard
-                                    key={service.id}
-                                    service={service}
-                                    quantity={selected?.quantity || 0}
-                                    onAdd={() => handleAddService(service)}
-                                    onRemove={() => handleRemoveService(service.id)}
-                                />
-                            );
-                        })}
-                        {availableServices.length === 0 && (
-                            <div className="w-full text-center py-8 text-slate-400 italic">
-                                Không tìm thấy món nào
+                <div className="mt-2 flex items-center justify-center gap-6 text-xs text-slate-400 bg-white p-2 rounded-xl border border-slate-100 mx-auto w-fit shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                        Chạm để thêm
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-300"></span>
+                        Giữ để bớt
+                    </div>
+                    {selectedServices.length > 0 && (
+                        <>
+                            <div className="w-px h-3 bg-slate-200"></div>
+                            <div className="flex items-center gap-2 font-medium text-blue-600">
+                                <span>{servicesCount} món</span>
+                                <span>•</span>
+                                <span>{servicesTotal.toLocaleString()}đ</span>
                             </div>
-                        )}
-                    </div>
-
-                    <div className="mt-2 flex items-center justify-center gap-6 text-xs text-slate-400 bg-white p-2 rounded-xl border border-slate-100 mx-auto w-fit shadow-sm">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                            Chạm để thêm
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-red-300"></span>
-                            Giữ để bớt
-                        </div>
-                        {selectedServices.length > 0 && (
-                            <>
-                                <div className="w-px h-3 bg-slate-200"></div>
-                                <div className="flex items-center gap-2 font-medium text-blue-600">
-                                    <span>{servicesCount} món</span>
-                                    <span>•</span>
-                                    <span>{servicesTotal.toLocaleString()}đ</span>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                        </>
+                    )}
                 </div>
+            </div>
 
-                {/* 5. EXTRA PEOPLE */}
-                {roomCategory?.extra_person_enabled && (
-                    <div className="bg-white rounded-[40px] shadow-sm overflow-hidden">
-                        <div className="p-5 flex items-center justify-between bg-slate-50/50 border-b border-slate-100">
-                            <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Thêm người / Phụ thu</span>
-                            <Switch checked={isExtraPeople} onCheckedChange={setIsExtraPeople} />
-                        </div>
-                        
-                        {isExtraPeople && (
-                            <div className="p-5 space-y-5 animate-in slide-in-from-top-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-base font-semibold text-slate-600">Người lớn</span>
-                                    <div className="flex items-center gap-4">
-                                        <button onClick={() => setExtraAdults(Math.max(0, extraAdults - 1))} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors active:scale-95">
-                                            <Minus className="w-5 h-5" />
-                                        </button>
-                                        <span className="w-8 text-center font-bold text-xl text-slate-800">{extraAdults}</span>
-                                        <button onClick={() => setExtraAdults(extraAdults + 1)} className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors active:scale-95">
-                                            <Plus className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-base font-semibold text-slate-600">Trẻ em</span>
-                                    <div className="flex items-center gap-4">
-                                        <button onClick={() => setExtraChildren(Math.max(0, extraChildren - 1))} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors active:scale-95">
-                                            <Minus className="w-5 h-5" />
-                                        </button>
-                                        <span className="w-8 text-center font-bold text-xl text-slate-800">{extraChildren}</span>
-                                        <button onClick={() => setExtraChildren(extraChildren + 1)} className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors active:scale-95">
-                                            <Plus className="w-5 h-5" />
-                                        </button>
-                                    </div>
+            {/* 5. EXTRA PEOPLE */}
+            {roomCategory?.extra_person_enabled && (
+                <div className="bg-white rounded-[40px] shadow-sm overflow-hidden">
+                    <div className="p-5 flex items-center justify-between bg-slate-50/50 border-b border-slate-100">
+                        <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Thêm người / Phụ thu</span>
+                        <Switch checked={isExtraPeople} onCheckedChange={setIsExtraPeople} />
+                    </div>
+                    
+                    {isExtraPeople && (
+                        <div className="p-5 space-y-5 animate-in slide-in-from-top-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-base font-semibold text-slate-600">Người lớn</span>
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => setExtraAdults(Math.max(0, extraAdults - 1))} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors active:scale-95">
+                                        <Minus className="w-5 h-5" />
+                                    </button>
+                                    <span className="w-8 text-center font-bold text-xl text-slate-800">{extraAdults}</span>
+                                    <button onClick={() => setExtraAdults(extraAdults + 1)} className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors active:scale-95">
+                                        <Plus className="w-5 h-5" />
+                                    </button>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                )}
+                            <div className="flex items-center justify-between">
+                                <span className="text-base font-semibold text-slate-600">Trẻ em</span>
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => setExtraChildren(Math.max(0, extraChildren - 1))} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors active:scale-95">
+                                        <Minus className="w-5 h-5" />
+                                    </button>
+                                    <span className="w-8 text-center font-bold text-xl text-slate-800">{extraChildren}</span>
+                                    <button onClick={() => setExtraChildren(extraChildren + 1)} className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors active:scale-95">
+                                        <Plus className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
-                {/* 6. BILL PREVIEW */}
-                <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800 pb-3 border-b border-dashed border-slate-200 uppercase tracking-wide">Tạm tính</h3>
-                    
-                    <div className="space-y-3 text-sm">
+            {/* 6. BILL PREVIEW */}
+            <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 pb-3 border-b border-dashed border-slate-200 uppercase tracking-wide">Tạm tính</h3>
+                
+                <div className="space-y-3 text-sm">
+                    <div className="flex justify-between text-slate-600">
+                        <span>Tiền phòng</span>
+                        <span className="font-mono font-medium">{formatMoney(finalRoomPrice)}</span>
+                    </div>
+                    {servicesTotal > 0 && (
                         <div className="flex justify-between text-slate-600">
-                            <span>Tiền phòng</span>
-                            <span className="font-mono font-medium">{formatMoney(finalRoomPrice)}</span>
+                            <span>Dịch vụ</span>
+                            <span className="font-mono font-medium">{formatMoney(servicesTotal)}</span>
                         </div>
-                        {servicesTotal > 0 && (
-                            <div className="flex justify-between text-slate-600">
-                                <span>Dịch vụ</span>
-                                <span className="font-mono font-medium">{formatMoney(servicesTotal)}</span>
-                            </div>
-                        )}
-                        {surchargeTotal > 0 && (
-                            <div className="flex justify-between text-slate-600">
-                                <span>Phụ thu thêm người</span>
-                                <span className="font-mono font-medium">{formatMoney(surchargeTotal)}</span>
-                            </div>
-                        )}
-                        {debt > 0 && (
-                            <div className="flex justify-between text-rose-500 font-medium">
-                                <span>Nợ cũ</span>
-                                <span className="font-mono">{formatMoney(debt)}</span>
-                            </div>
-                        )}
-                    </div>
+                    )}
+                    {surchargeTotal > 0 && (
+                        <div className="flex justify-between text-slate-600">
+                            <span>Phụ thu thêm người</span>
+                            <span className="font-mono font-medium">{formatMoney(surchargeTotal)}</span>
+                        </div>
+                    )}
+                    {debt > 0 && (
+                        <div className="flex justify-between text-rose-500 font-medium">
+                            <span>Nợ cũ</span>
+                            <span className="font-mono">{formatMoney(debt)}</span>
+                        </div>
+                    )}
+                </div>
 
-                    <div className="border-t border-dashed border-slate-200 pt-4 flex justify-between items-center">
-                        <span className="font-bold text-slate-800">Tổng cộng</span>
-                        <span className="font-bold text-2xl text-blue-700 font-mono tracking-tight">{formatMoney(totalAmount)}</span>
+                <div className="border-t border-dashed border-slate-200 pt-4 flex justify-between items-center">
+                    <span className="font-bold text-slate-800">Tổng cộng</span>
+                    <span className="font-bold text-2xl text-blue-700 font-mono tracking-tight">{formatMoney(totalAmount)}</span>
+                </div>
+            </div>
+
+            {/* 7. PREPAYMENT */}
+            <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4">
+                <div className="flex flex-col gap-3">
+                    <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Thanh toán trước (Cọc)</span>
+                    <div className="flex gap-2">
+                        <MoneyInput
+                            value={deposit}
+                            onChange={setDeposit}
+                            className="flex-1 py-4 px-4 bg-slate-50 rounded-[24px] font-bold text-xl text-slate-800 focus:ring-2 focus:ring-blue-500 border-none outline-none transition-all"
+                            placeholder="0"
+                        />
+                        <button
+                            onClick={() => setDeposit(totalAmount)}
+                            className="px-4 bg-blue-50 text-blue-600 font-bold rounded-[24px] hover:bg-blue-100 transition-colors text-xs uppercase tracking-wide"
+                        >
+                            Full Cọc
+                        </button>
                     </div>
                 </div>
 
-                {/* 7. PREPAYMENT */}
-                <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4">
-                    <div className="flex flex-col gap-3">
-                        <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Thanh toán trước (Cọc)</span>
-                        <div className="flex gap-2">
-                            <MoneyInput
-                                value={deposit}
-                                onChange={setDeposit}
-                                className="flex-1 py-4 px-4 bg-slate-50 rounded-[24px] font-bold text-xl text-slate-800 focus:ring-2 focus:ring-blue-500 border-none outline-none transition-all"
-                                placeholder="0"
-                            />
+                {deposit > 0 && (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phương thức thanh toán cọc</span>
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
                             <button
-                                onClick={() => setDeposit(totalAmount)}
-                                className="px-4 bg-blue-50 text-blue-600 font-bold rounded-[24px] hover:bg-blue-100 transition-colors text-xs uppercase tracking-wide"
+                                type="button"
+                                onClick={() => setPaymentMethod('cash')}
+                                className={cn(
+                                    "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all",
+                                    paymentMethod === 'cash'
+                                        ? "bg-white text-slate-900 shadow-sm"
+                                        : "text-slate-500 hover:text-slate-700"
+                                )}
                             >
-                                Full Cọc
+                                TIỀN MẶT
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod('bank')}
+                                className={cn(
+                                    "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all",
+                                    paymentMethod === 'bank'
+                                        ? "bg-white text-slate-900 shadow-sm"
+                                        : "text-slate-500 hover:text-slate-700"
+                                )}
+                            >
+                                CHUYỂN KHOẢN
                             </button>
                         </div>
                     </div>
-
-                    {deposit > 0 && (
-                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phương thức thanh toán cọc</span>
-                            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentMethod('cash')}
-                                    className={cn(
-                                        "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all",
-                                        paymentMethod === 'cash'
-                                            ? "bg-white text-slate-900 shadow-sm"
-                                            : "text-slate-500 hover:text-slate-700"
-                                    )}
-                                >
-                                    TIỀN MẶT
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentMethod('bank')}
-                                    className={cn(
-                                        "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all",
-                                        paymentMethod === 'bank'
-                                            ? "bg-white text-slate-900 shadow-sm"
-                                            : "text-slate-500 hover:text-slate-700"
-                                    )}
-                                >
-                                    CHUYỂN KHOẢN
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Notes textarea */}
-                <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Ghi chú thêm..."
-                    className="w-full h-24 rounded-[40px] bg-white p-5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 border-none outline-none transition-all resize-none shadow-sm"
-                />
+                )}
             </div>
 
-            {/* --- FOOTER --- */}
-            <div className="p-6 bg-white border-t border-slate-100 flex items-center gap-4 z-50">
-                <button 
-                    onClick={onClose}
-                    className="flex-1 py-4 rounded-[24px] font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider"
-                >
-                    Hủy bỏ
-                </button>
-                <button 
-                    onClick={() => handleSubmit()}
-                    disabled={isSubmitting}
-                    className={cn(
-                        "flex-[2] py-4 rounded-[24px] font-bold text-white uppercase tracking-wider shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-3",
-                        isSubmitting ? "bg-slate-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 active:scale-95"
-                    )}
-                >
-                    {isSubmitting ? (
-                        <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            <span>Đang xử lý...</span>
-                        </>
-                    ) : (
-                        <span>Nhận phòng ngay</span>
-                    )}
-                </button>
-            </div>
-            
-            {/* Security Modals */}
-            {SecurityModals}
-            </div>
-        </div>,
-        document.body
-    )
+            {/* Notes textarea */}
+            <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ghi chú thêm..."
+                className="w-full h-24 rounded-[40px] bg-white p-5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 border-none outline-none transition-all resize-none shadow-sm"
+            />
+        </div>
+
+        {/* --- FOOTER --- */}
+        <div className={cn(
+            "p-6 bg-white border-t border-slate-100 flex items-center gap-4 z-[105] shrink-0",
+            isMobile ? "fixed bottom-0 left-0 right-0" : ""
+        )}>
+            <button 
+                onClick={onClose}
+                className="flex-1 py-4 rounded-[24px] font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider"
+            >
+                Hủy bỏ
+            </button>
+            <button 
+                onClick={() => handleSubmit()}
+                disabled={isSubmitting}
+                className={cn(
+                    "flex-[2] py-4 rounded-[24px] font-bold text-white uppercase tracking-wider shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-3",
+                    isSubmitting ? "bg-slate-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 active:scale-95"
+                )}
+            >
+                {isSubmitting ? (
+                    <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Đang xử lý...</span>
+                    </>
+                ) : (
+                    <span>Nhận phòng ngay</span>
+                )}
+            </button>
+        </div>
+        
+        {/* Security Modals */}
+        {SecurityModals}
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+        <BottomSheet 
+            isOpen={isOpen} 
+            onClose={onClose}
+            title={`Nhận phòng ${room.name}`}
+            description={roomCategory?.name || "Đang thực hiện nhận phòng"}
+        >
+            {ModalContent}
+        </BottomSheet>
+    );
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 max-h-[90vh]">
+        {ModalContent}
+      </div>
+    </div>,
+    document.body
+  );
 }

@@ -43,18 +43,31 @@ interface DashboardHeaderProps {
   };
   filters: FilterState;
   onToggle: (key: keyof FilterState) => void;
+  onRefresh?: () => Promise<void>;
+  loading?: boolean;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
   counts, 
   filters, 
-  onToggle
+  onToggle,
+  onRefresh,
+  loading
 }) => {
   const { user, logout } = useAuth();
   const { can } = usePermission();
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      setIsRefreshing(true);
+      await onRefresh();
+      setTimeout(() => setIsRefreshing(false), 1000);
+    }
+  };
   const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
   const [changePinData, setChangePinData] = useState({
     oldPin: '',
@@ -148,14 +161,31 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     <div className="flex flex-col gap-4 mb-6 animate-fade-in relative z-20">
       {/* Mobile/Desktop Header with User Account */}
       <div className="flex justify-between items-center">
-        {/* Brand/Title */}
-        <div>
-          <h1 className="text-xl font-black tracking-tighter uppercase text-slate-900">
-            Sơ Đồ Phòng
-          </h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:block">
-            Quản lý trực quan
-          </p>
+        {/* Logo & Refresh Section */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-slate-900 rounded-2xl shadow-lg">
+              <Store className="text-white" size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tighter text-slate-900">MANA PMS</h1>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Vương quốc của Bệ Hạ</p>
+            </div>
+          </div>
+
+          {/* Nút Cập Nhật (Refresh) */}
+          <button 
+            onClick={handleRefresh}
+            disabled={loading || isRefreshing}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 bg-white rounded-2xl shadow-sm border border-slate-100",
+              "hover:bg-slate-50 active:scale-95 transition-all duration-200",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
+            )}
+          >
+            <ArrowRightLeft className={cn("text-blue-600", (isRefreshing || loading) && "animate-spin")} size={18} />
+            <span className="hidden md:inline text-sm font-bold text-slate-700">Cập nhật</span>
+          </button>
         </div>
 
         {/* Right Actions: Mobile Filter + Sell Service + User */}
@@ -376,4 +406,4 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   );
 };
 
-export default DashboardHeader;
+export default React.memo(DashboardHeader);

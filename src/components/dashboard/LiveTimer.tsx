@@ -25,20 +25,19 @@ const LiveTimer: React.FC<LiveTimerProps> = ({ checkInAt, mode }) => {
         const s = diffSec % 60;
         setDisplay(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
       } else {
-        // Daily or Overnight
-        // Calculate full hours passed
+        // Daily or Overnight: Display static days as requested
         const diffHours = Math.max(0, differenceInHours(now, checkIn));
-        // Round up to nearest day (e.g. 1h -> 1 day, 25h -> 2 days)
         const diffDays = Math.ceil(diffHours / 24);
         setDisplay(`${Math.max(1, diffDays)} ngày`);
       }
     };
 
-    // Initial update
     updateTime();
 
-    // Set interval based on mode
-    const intervalMs = mode === 'hourly' ? 1000 : 60000; // 1s for hourly, 60s for daily
+    // Only run interval for hourly rooms
+    if (mode !== 'hourly') return;
+
+    const intervalMs = 1000; 
     const timer = setInterval(updateTime, intervalMs);
 
     return () => clearInterval(timer);

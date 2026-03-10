@@ -47,8 +47,17 @@ export default function AppShell({
 
   // Priority: 1. URL Slug, 2. User Profile Slug, 3. Default
   const rawSlug = params?.slug as string;
-  const slug = (rawSlug && rawSlug !== 'undefined') ? rawSlug : (user?.hotel_slug || 'default');
-  
+  // Hydration fix: Ensure slug is stable between server and client
+  const [slug, setSlug] = useState<string>('default');
+
+  useEffect(() => {
+    if (rawSlug && rawSlug !== 'undefined') {
+      setSlug(rawSlug);
+    } else if (user?.hotel_slug) {
+      setSlug(user.hotel_slug);
+    }
+  }, [rawSlug, user?.hotel_slug]);
+
   const { can } = usePermission();
   const [isWalletNotificationOpen, setIsWalletNotificationOpen] = useState(false);
   
@@ -76,8 +85,21 @@ export default function AppShell({
     };
 
     window.addEventListener('pwa-install-available', handlePWAAvailable);
+
+    // 3. Cập nhật Manifest Link động theo Slug hiện tại
+    const updateManifest = () => {
+      let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'manifest';
+        document.head.appendChild(link);
+      }
+      link.href = `/manifest.json?slug=${slug}`;
+    };
+    updateManifest();
+
     return () => window.removeEventListener('pwa-install-available', handlePWAAvailable);
-  }, []);
+  }, [slug]);
 
   const handleInstallApp = async () => {
     const prompt = (window as any).deferredPWAInstallPrompt;
@@ -228,6 +250,10 @@ export default function AppShell({
 
   const homeItem = (mounted ? visibleNavItems : navItems).find(i => i.href === `/${slug}`) || (mounted ? visibleNavItems[0] : navItems[0]);
   const mobileItems = visibleNavItems.filter(i => i.href !== homeItem?.href).slice(0, 4);
+  
+  // Center Dashboard Button
+  const dashboardItem = navItems.find(i => i.href === `/${slug}`);
+
   const leftItems = mobileItems.slice(0, Math.ceil(mobileItems.length / 2));
   const rightItems = mobileItems.slice(Math.ceil(mobileItems.length / 2));
 
@@ -419,102 +445,104 @@ export default function AppShell({
 
 
       {/* Contrast Overlay under Mobile Nav - Subtle Blur Gradient */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white/90 via-white/50 to-transparent pointer-events-none z-40" />
+      {mounted && <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white/90 via-white/50 to-transparent pointer-events-none z-40" />}
 
       {/* Mobile Bottom Nav - Curved Cutout with Floating Center Button */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-24 pointer-events-none flex flex-col justify-end">
-        
-        {/* Main Bar Background with SVG Curve */}
-        <div className="relative w-full h-[70px] pointer-events-auto flex items-end justify-between px-4 pb-2">
+      {mounted && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-24 pointer-events-none flex flex-col justify-end">
           
-          {/* Background Layer using SVG for smooth curve */}
-          <div className="absolute inset-0 flex items-end drop-shadow-[0_-15px_25px_rgba(0,0,0,0.15)] -z-10">
-            <div className="flex-1 h-full bg-white rounded-tl-[24px]" />
-            <svg width="170" height="70" viewBox="0 0 170 70" fill="none" xmlns="http://www.w3.org/2000/svg" className="block shrink-0">
-              <path d="M 0 0 H 35 Q 45 0 45 10 A 40 40 0 0 0 125 10 Q 125 0 135 0 H 170 V 70 H 0 Z" fill="white"/>
-            </svg>
-            <div className="flex-1 h-full bg-white rounded-tr-[24px]" />
+          {/* Main Bar Background with SVG Curve */}
+          <div className="relative w-full h-[70px] pointer-events-auto flex items-end justify-between px-4 pb-2">
+            
+            {/* Background Layer using SVG for smooth curve */}
+            <div className="absolute inset-0 flex items-end drop-shadow-[0_-15px_25px_rgba(0,0,0,0.15)] -z-10">
+              <div className="flex-1 h-full bg-white rounded-tl-[24px]" />
+              <svg width="170" height="70" viewBox="0 0 170 70" fill="none" xmlns="http://www.w3.org/2000/svg" className="block shrink-0">
+                <path d="M 0 0 H 35 Q 45 0 45 10 A 40 40 0 0 0 125 10 Q 125 0 135 0 H 170 V 70 H 0 Z" fill="white"/>
+              </svg>
+              <div className="flex-1 h-full bg-white rounded-tr-[24px]" />
+            </div>
+
+            {/* Left Items */}
+            <div className="flex-1 flex justify-evenly items-center h-full pb-1">
+              {leftItems.map((item) => (
+                <Link 
+                  key={item.href}
+                  href={item.href}
+                  className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+                >
+                  <div className={cn(
+                    "p-2 rounded-2xl transition-all duration-300",
+                    pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                  )}>
+                    {React.cloneElement(item.icon as any, { 
+                      size: 24,
+                      strokeWidth: pathname === item.href ? 2.5 : 2 
+                    })}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-bold transition-colors duration-300",
+                    pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                  )}>
+                    {item.label}
+                  </span>
+                </Link>
+              ))}
+            </div>
+
+            {/* Spacer for Center Button */}
+            <div className="w-20" /> 
+
+            {/* Right Items */}
+            <div className="flex-1 flex justify-evenly items-center h-full pb-1">
+              {rightItems.map((item) => (
+                <Link 
+                  key={item.href}
+                  href={item.href}
+                  className="flex flex-col items-center justify-center active:scale-95 transition-transform"
+                >
+                  <div className={cn(
+                    "p-2 rounded-2xl transition-all duration-300",
+                    pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                  )}>
+                    {React.cloneElement(item.icon as any, { 
+                      size: 24,
+                      strokeWidth: pathname === item.href ? 2.5 : 2 
+                    })}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-bold transition-colors duration-300",
+                    pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
+                  )}>
+                    {item.label}
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
 
-          {/* Left Items */}
-          <div className="flex-1 flex justify-evenly items-center h-full pb-1">
-            {leftItems.map((item) => (
-              <Link 
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center justify-center active:scale-95 transition-transform"
-              >
-                <div className={cn(
-                  "p-2 rounded-2xl transition-all duration-300",
-                  pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
-                )}>
-                  {React.cloneElement(item.icon as any, { 
-                    size: 24,
-                    strokeWidth: pathname === item.href ? 2.5 : 2 
-                  })}
-                </div>
-                <span className={cn(
-                  "text-[10px] font-bold transition-colors duration-300",
-                  pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
-                )}>
-                  {item.label}
-                </span>
-              </Link>
-            ))}
+          {/* Center Floating Button (Sơ đồ) - Positioned in the cutout */}
+          <div className="absolute bottom-[25px] left-1/2 -translate-x-1/2 pointer-events-auto">
+             {homeItem && (
+               <Link 
+                 href={homeItem.href}
+                 className={cn(
+                   "flex items-center justify-center w-[64px] h-[64px] rounded-full shadow-[0_8px_20px_rgba(0,122,255,0.3)] transition-all duration-300 active:scale-95 group",
+                   pathname === homeItem.href 
+                     ? "bg-[#007AFF] text-white" 
+                     : "bg-white text-slate-400 border border-slate-100"
+                 )}
+               >
+                 {React.cloneElement(homeItem.icon as any, { 
+                    size: 28,
+                    strokeWidth: 2.5,
+                    className: "group-hover:scale-110 transition-transform"
+                 })}
+               </Link>
+             )}
           </div>
-
-          {/* Spacer for Center Button */}
-          <div className="w-20" /> 
-
-          {/* Right Items */}
-          <div className="flex-1 flex justify-evenly items-center h-full pb-1">
-            {rightItems.map((item) => (
-              <Link 
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center justify-center active:scale-95 transition-transform"
-              >
-                <div className={cn(
-                  "p-2 rounded-2xl transition-all duration-300",
-                  pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
-                )}>
-                  {React.cloneElement(item.icon as any, { 
-                    size: 24,
-                    strokeWidth: pathname === item.href ? 2.5 : 2 
-                  })}
-                </div>
-                <span className={cn(
-                  "text-[10px] font-bold transition-colors duration-300",
-                  pathname === item.href ? "text-[#007AFF]" : "text-slate-400"
-                )}>
-                  {item.label}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Center Floating Button (Sơ đồ) - Positioned in the cutout */}
-        <div className="absolute bottom-[25px] left-1/2 -translate-x-1/2 pointer-events-auto">
-           {homeItem && (
-             <Link 
-               href={homeItem.href}
-               className={cn(
-                 "flex items-center justify-center w-[64px] h-[64px] rounded-full shadow-[0_8px_20px_rgba(0,122,255,0.3)] transition-all duration-300 active:scale-95 group",
-                 pathname === homeItem.href 
-                   ? "bg-[#007AFF] text-white" 
-                   : "bg-white text-slate-400 border border-slate-100"
-               )}
-             >
-               {React.cloneElement(homeItem.icon as any, { 
-                  size: 28,
-                  strokeWidth: 2.5,
-                  className: "group-hover:scale-110 transition-transform"
-               })}
-             </Link>
-           )}
-        </div>
-      </nav>
+        </nav>
+      )}
     </>
   );
 }

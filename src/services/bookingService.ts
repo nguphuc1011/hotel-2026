@@ -265,8 +265,13 @@ export const bookingService = {
       }
 
       return result;
-    } catch (err) {
-      console.error('Check-in error:', err);
+    } catch (err: any) {
+      // Robust error logging for Next.js 16 / Turbopack
+      const detailedError = err instanceof Error 
+        ? JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)))
+        : err;
+      
+      console.error('Check-in error detailed:', detailedError);
       throw err;
     }
   },
