@@ -158,18 +158,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   ];
 
   return (
-    <div className="flex flex-col gap-4 mb-6 animate-fade-in relative z-20">
+    <div className="flex flex-col gap-2 md:gap-4 mb-1 md:mb-6 animate-fade-in relative z-20 px-2 md:px-0">
       {/* Mobile/Desktop Header with User Account */}
       <div className="flex justify-between items-center">
         {/* Logo & Refresh Section */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200">
-              <Store className="text-white" size={24} />
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
+              <Store className="text-white w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-black tracking-tighter text-slate-900 uppercase">
-                {user?.hotel_name || 'Hệ thống'}
+              <h1 className="text-lg md:text-xl font-black tracking-tighter text-slate-900 uppercase">
+                {user?.hotel_name || ''}
               </h1>
             </div>
           </div>

@@ -647,7 +647,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] p-1 md:p-8 pb-32">
+    <div className="min-h-screen bg-[#F8F9FB] p-0 md:p-8 pb-32">
       <div className="max-w-[1600px] mx-auto">
         <DashboardHeader 
           counts={counts}
@@ -658,7 +658,7 @@ export default function DashboardPage() {
         />
 
         {/* Room Grid */}
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto bg-[#F8F9FB] custom-scrollbar">
+        <div className="flex-1 p-2 md:p-6 overflow-y-auto bg-[#F8F9FB] custom-scrollbar">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>

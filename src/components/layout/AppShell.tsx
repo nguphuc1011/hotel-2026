@@ -360,7 +360,7 @@ export default function AppShell({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-white/40 pb-[max(8rem,env(safe-area-inset-bottom))] md:pb-0">
+      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-white/40 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-0">
         <div className="animate-fade-in">
           {children}
         </div>
@@ -444,18 +444,18 @@ export default function AppShell({
 
       {/* Mobile Bottom Nav - Curved Cutout with Floating Center Button */}
       {mounted && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-24 pointer-events-none flex flex-col justify-end">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-20 pointer-events-none flex flex-col justify-end">
           
           {/* Main Bar Background with SVG Curve */}
-          <div className="relative w-full h-[70px] pointer-events-auto flex items-end justify-between px-4 pb-2">
+          <div className="relative w-full h-[60px] pointer-events-auto flex items-end justify-between px-4 pb-1">
             
             {/* Background Layer using SVG for smooth curve */}
-            <div className="absolute inset-0 flex items-end drop-shadow-[0_-15px_25px_rgba(0,0,0,0.15)] -z-10">
-              <div className="flex-1 h-full bg-white rounded-tl-[24px]" />
-              <svg width="170" height="70" viewBox="0 0 170 70" fill="none" xmlns="http://www.w3.org/2000/svg" className="block shrink-0">
-                <path d="M 0 0 H 35 Q 45 0 45 10 A 40 40 0 0 0 125 10 Q 125 0 135 0 H 170 V 70 H 0 Z" fill="white"/>
+            <div className="absolute inset-0 flex items-end drop-shadow-[0_-10px_20px_rgba(0,0,0,0.1)] -z-10">
+              <div className="flex-1 h-full bg-white rounded-tl-[20px]" />
+              <svg width="150" height="60" viewBox="0 0 150 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="block shrink-0">
+                <path d="M 0 0 H 30 Q 40 0 40 8 A 35 35 0 0 0 110 8 Q 110 0 120 0 H 150 V 60 H 0 Z" fill="white"/>
               </svg>
-              <div className="flex-1 h-full bg-white rounded-tr-[24px]" />
+              <div className="flex-1 h-full bg-white rounded-tr-[20px]" />
             </div>
 
             {/* Left Items */}
@@ -517,19 +517,19 @@ export default function AppShell({
           </div>
 
           {/* Center Floating Button (Sơ đồ) - Positioned in the cutout */}
-          <div className="absolute bottom-[25px] left-1/2 -translate-x-1/2 pointer-events-auto">
+          <div className="absolute bottom-[15px] left-1/2 -translate-x-1/2 pointer-events-auto">
              {homeItem && (
                <Link 
                  href={homeItem.href}
                  className={cn(
-                   "flex items-center justify-center w-[64px] h-[64px] rounded-full shadow-[0_8px_20px_rgba(0,122,255,0.3)] transition-all duration-300 active:scale-95 group",
+                   "flex items-center justify-center w-[56px] h-[56px] rounded-full shadow-[0_6px_15px_rgba(0,122,255,0.3)] transition-all duration-300 active:scale-95 group",
                    pathname === homeItem.href 
                      ? "bg-[#007AFF] text-white" 
                      : "bg-white text-slate-400 border border-slate-100"
                  )}
                >
                  {React.cloneElement(homeItem.icon as any, { 
-                    size: 28,
+                    size: 24,
                     strokeWidth: 2.5,
                     className: "group-hover:scale-110 transition-transform"
                  })}
