@@ -14,7 +14,8 @@ import {
   LogOut,
   Key,
   X,
-  Banknote
+  Banknote,
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -60,6 +61,27 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
+  React.useEffect(() => {
+    if ((window as any).deferredPWAInstallPrompt) {
+      setShowInstallBtn(true);
+    }
+    const handlePWAAvailable = () => setShowInstallBtn(true);
+    window.addEventListener('pwa-install-available', handlePWAAvailable);
+    return () => window.removeEventListener('pwa-install-available', handlePWAAvailable);
+  }, []);
+
+  const handleInstallApp = async () => {
+    const prompt = (window as any).deferredPWAInstallPrompt;
+    if (!prompt) return;
+    prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    if (outcome === 'accepted') {
+      (window as any).deferredPWAInstallPrompt = null;
+      setShowInstallBtn(false);
+    }
+  };
 
   const handleRefresh = async () => {
     if (onRefresh) {
@@ -165,17 +187,17 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       {/* Mobile/Desktop Header with User Account */}
       <div className="flex justify-between items-center">
         {/* Logo & Refresh Section */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 md:gap-4">
           <h1 className="text-base md:text-xl font-black tracking-tighter text-slate-900 uppercase">
             {user?.hotel_name || ''}
           </h1>
 
-          {/* Nút Cập Nhật (Refresh) - Smaller on mobile */}
+          {/* Nút Cập Nhật (Refresh) - Sharp & Clean */}
           <button 
             onClick={handleRefresh}
             disabled={loading || isRefreshing}
             className={cn(
-              "flex items-center justify-center p-1.5 md:px-4 md:py-2 bg-slate-50 md:bg-white rounded-xl md:rounded-2xl border border-slate-100",
+              "flex items-center justify-center p-2 md:px-4 md:py-2 bg-slate-50 md:bg-white rounded-xl md:rounded-2xl border border-slate-100",
               "hover:bg-slate-100 active:scale-95 transition-all duration-200",
               "disabled:opacity-50"
             )}
@@ -183,31 +205,65 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             <ArrowRightLeft className={cn("text-blue-600", (isRefreshing || loading) && "animate-spin")} size={16} />
             <span className="hidden md:inline ml-2 text-sm font-bold text-slate-700">Cập nhật</span>
           </button>
+          
+          {/* Transaction Button (Restore) */}
+          {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
+            <button 
+              onClick={() => setIsTransactionModalOpen(true)}
+              className="w-8 h-8 md:h-10 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl md:rounded-2xl flex items-center justify-center md:gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+              title="Tạo Thu/Chi"
+            >
+              <Banknote size={16} />
+              <span className="hidden md:inline font-bold text-sm">Thu/Chi</span>
+            </button>
+          )}
+
+          {/* Sell Service Button (Restore) */}
+          <button 
+            onClick={() => toast.info('Tính năng đang phát triển')}
+            className="w-8 h-8 md:h-10 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl md:rounded-2xl flex items-center justify-center md:gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+            title="Bán lẻ"
+          >
+            <Store size={16} />
+            <span className="hidden md:inline font-bold text-sm">Bán lẻ</span>
+          </button>
+
+          {/* PWA Install Button (Restore) */}
+          {showInstallBtn && (
+            <button 
+              onClick={handleInstallApp}
+              className="w-8 h-8 md:h-10 md:px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl md:rounded-2xl flex items-center justify-center md:gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+              title="Cài đặt App"
+            >
+              <Download size={16} />
+              <span className="hidden md:inline font-bold text-sm">Cài App</span>
+            </button>
+          )}
         </div>
 
         {/* Right Actions: User + Compact Menu */}
         <div className="flex items-center gap-1.5 md:gap-4">
-          {/* Mobile Filter Toggle - More compact */}
+          {/* Mobile Filter Toggle - Sharp */}
           <button 
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={cn(
-              "md:hidden w-8 h-8 rounded-xl flex items-center justify-center border transition-all",
+              "md:hidden w-9 h-9 rounded-xl flex items-center justify-center border transition-all",
               showMobileFilters 
                 ? "bg-slate-900 text-white border-slate-900" 
                 : "bg-white text-slate-500 border-slate-200"
             )}
           >
-            <Filter size={14} />
+            <Filter size={16} />
           </button>
 
-          {/* User Profile - More compact on mobile */}
+          {/* User Profile */}
           <div className="relative">
             <button 
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="flex items-center gap-2 hover:bg-slate-50 rounded-xl p-1 transition-colors"
             >
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-slate-50 md:bg-white flex items-center justify-center border border-slate-200">
-                <User size={16} className="text-slate-600" />
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-slate-50 md:bg-white flex items-center justify-center border border-slate-200">
+                <User size={18} className="text-slate-600" />
               </div>
             </button>
 
