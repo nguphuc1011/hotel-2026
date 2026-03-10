@@ -49,17 +49,22 @@ export const DEFAULT_ROLES: RolePermission[] = [
 ];
 
 export const permissionService = {
-  async getRolePermissions(roleCode: string): Promise<string[]> {
+  async getRolePermissions(roleCode: string, hotelId?: string): Promise<string[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('role_permissions')
         .select('permissions')
-        .eq('role_code', roleCode)
-        .single();
+        .eq('role_code', roleCode);
+      
+      if (hotelId) {
+        query = query.eq('hotel_id', hotelId);
+      }
+
+      const { data, error } = await query.maybeSingle();
       
       if (error || !data) {
         // Fallback to defaults if table doesn't exist or role not found
-        console.warn('Fetching permissions from DB failed, using defaults:', error?.message);
+        if (error) console.warn('Fetching permissions from DB failed, using defaults:', error.message);
         const defaultRole = DEFAULT_ROLES.find(r => r.role_code === roleCode);
         return defaultRole ? defaultRole.permissions : [];
       }

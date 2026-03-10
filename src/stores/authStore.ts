@@ -98,7 +98,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 3. Get Base Permissions (Role-based only)
       let finalPermissions: string[] = [];
       
-      finalPermissions = await permissionService.getRolePermissions(profile.role);
+      finalPermissions = await permissionService.getRolePermissions(profile.role, profile.hotel_id);
       
       set({ 
         user: userProfile, 
