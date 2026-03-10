@@ -40,6 +40,8 @@ const WalletCards = ({
   onViewExternalDebt
 }: WalletCardsProps) => {
   const isMounted = useRef(false);
+  const [changes, setChanges] = useState<Record<string, { diff: number }>>({});
+  const prevBalancesRef = useRef<Record<string, number>>({});
 
   // Restore state from LocalStorage on mount
   useEffect(() => {
