@@ -506,8 +506,6 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  if (!mounted || !isOpen || !room) return null;
-
   const ModalContent = (
     <div className="flex flex-col h-full bg-white relative">
         {/* --- HEADER (PC only) --- */}
@@ -948,6 +946,8 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
         {SecurityModals}
     </div>
   );
+
+  if (!mounted || !isOpen || !room) return null;
 
   if (isMobile) {
     return (
