@@ -40,10 +40,26 @@ export function PWAServiceWorker() {
       window.dispatchEvent(new CustomEvent('pwa-install-available'));
     };
 
+    // Fix for releasePointerCapture error in Next.js devtools or Radix UI
+    const handlePointerUp = (e: PointerEvent) => {
+      try {
+        if (e.target instanceof Element && e.pointerId !== undefined) {
+          // Check if the pointer is actually being captured before releasing
+          if (e.target.hasPointerCapture(e.pointerId)) {
+            e.target.releasePointerCapture(e.pointerId);
+          }
+        }
+      } catch (err) {
+        // Silently handle the "No active pointer with the given id" error
+      }
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pointerup', handlePointerUp, { capture: true });
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pointerup', handlePointerUp, { capture: true });
     };
   }, []);
 

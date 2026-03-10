@@ -435,18 +435,20 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       {SecurityModals}
       
       <div className="flex flex-col h-full bg-slate-50">
-        {/* Header - Fixed inside BottomSheet content if needed, but BottomSheet already has handle */}
-        <div className="h-14 flex justify-between items-center px-6 bg-white shrink-0 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-                <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider shadow-sm">Folio</span>
-                <h2 className="text-base font-bold text-slate-800">Phòng {room.name}</h2>
-            </div>
-            <div className="flex items-center gap-2">
-                <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
-                    <X className="w-4 h-4 text-slate-500" />
-                </button>
-            </div>
-        </div>
+        {/* Header - PC only */}
+        {!isMobile && (
+          <div className="h-14 flex justify-between items-center px-6 bg-white shrink-0 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                  <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider shadow-sm">Folio</span>
+                  <h2 className="text-base font-bold text-slate-800">Phòng {room.name}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                  <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
+                      <X className="w-4 h-4 text-slate-500" />
+                  </button>
+              </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
             {/* Quick Actions - Scrollable */}
