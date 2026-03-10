@@ -76,6 +76,12 @@ export function BottomSheet({
               <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-slate-200 my-4" />
             )}
             
+            {/* Ẩn Title để Radix UI không báo lỗi Accessibility (SR-only) */}
+            <Drawer.Title className="sr-only">
+              {title || "Modal Content"}
+            </Drawer.Title>
+            {description && <Drawer.Description className="sr-only">{description}</Drawer.Description>}
+            
             {/* Mobile Header - Optional, handled by children if needed */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {children}
