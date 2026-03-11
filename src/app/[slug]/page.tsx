@@ -23,6 +23,20 @@ import { useAuthStore } from '@/stores/authStore';
 import { PERMISSION_KEYS } from '@/services/permissionService';
 import { ShieldCheck } from 'lucide-react';
 
+// --- Group Color Constants ---
+const PREDEFINED_GROUP_COLORS = [
+  '#60A5FA', // Blue-400
+  '#818CF8', // Indigo-400
+  '#A78BFA', // Violet-400
+  '#F472B6', // Pink-400
+  '#FB7185', // Rose-400
+  '#FBBF24', // Amber-400
+  '#34D399', // Emerald-400
+  '#22D3EE', // Cyan-400
+  '#6EE7B7', // Teal-400
+  '#9CA3AF', // Gray-400
+];
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -63,28 +77,15 @@ export default function DashboardPage() {
   const colorIndexRef = useRef(0);
 
   // --- Group Color Assignment ---
-  const predefinedGroupColors = [
-    '#60A5FA', // Blue-400
-    '#818CF8', // Indigo-400
-    '#A78BFA', // Violet-400
-    '#F472B6', // Pink-400
-    '#FB7185', // Rose-400
-    '#FBBF24', // Amber-400
-    '#34D399', // Emerald-400
-    '#22D3EE', // Cyan-400
-    '#6EE7B7', // Teal-400
-    '#9CA3AF', // Gray-400
-  ];
-  
   // Hàm trợ giúp để tạo màu hex ngẫu nhiên
   const getRandomColor = useCallback(() => {
     let color = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
     // Đảm bảo màu được tạo không bị trùng với các màu đã sử dụng hoặc màu định nghĩa trước
-    while (usedColorsRef.current.has(color) || predefinedGroupColors.includes(color)) {
+    while (usedColorsRef.current.has(color) || PREDEFINED_GROUP_COLORS.includes(color)) {
       color = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
     }
     return color;
-  }, [usedColorsRef, predefinedGroupColors]); // Added dependencies
+  }, []); // Dependencies stable
 
   const [settings, setSettings] = useState<any>(null);
 
@@ -198,8 +199,8 @@ export default function DashboardPage() {
           let assignedColor: string;
 
           if (!masterBookingIdToColorMapRef.current.has(masterId)) {
-            if (colorIndexRef.current < predefinedGroupColors.length) {
-              assignedColor = predefinedGroupColors[colorIndexRef.current];
+            if (colorIndexRef.current < PREDEFINED_GROUP_COLORS.length) {
+              assignedColor = PREDEFINED_GROUP_COLORS[colorIndexRef.current];
             } else {
               assignedColor = getRandomColor();
             }
@@ -215,8 +216,8 @@ export default function DashboardPage() {
           const masterId = room.current_booking.parent_booking_id;
           if (!masterBookingIdToColorMapRef.current.has(masterId)) {
             let assignedColor: string;
-            if (colorIndexRef.current < predefinedGroupColors.length) {
-              assignedColor = predefinedGroupColors[colorIndexRef.current];
+            if (colorIndexRef.current < PREDEFINED_GROUP_COLORS.length) {
+              assignedColor = PREDEFINED_GROUP_COLORS[colorIndexRef.current];
             } else {
               assignedColor = getRandomColor();
             }
