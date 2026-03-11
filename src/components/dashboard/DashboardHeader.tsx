@@ -23,7 +23,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { usePermission } from '@/hooks/usePermission';
 import { PERMISSION_KEYS } from '@/services/permissionService';
-import TransactionModal from '@/app/[slug]/tien/components/TransactionModal';
+import TransactionModal from '@/components/cash-flow/TransactionModal';
+import { useParams, useRouter } from 'next/navigation';
 
 export interface FilterState {
   available: boolean;
@@ -56,32 +57,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   loading
 }) => {
   const { user, logout } = useAuth();
+  const router = useRouter();
+  const params = useParams();
+  const slug = params?.slug as string;
   const { can } = usePermission();
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showInstallBtn, setShowInstallBtn] = useState(false);
-
-  React.useEffect(() => {
-    if ((window as any).deferredPWAInstallPrompt) {
-      setShowInstallBtn(true);
-    }
-    const handlePWAAvailable = () => setShowInstallBtn(true);
-    window.addEventListener('pwa-install-available', handlePWAAvailable);
-    return () => window.removeEventListener('pwa-install-available', handlePWAAvailable);
-  }, []);
-
-  const handleInstallApp = async () => {
-    const prompt = (window as any).deferredPWAInstallPrompt;
-    if (!prompt) return;
-    prompt.prompt();
-    const { outcome } = await prompt.userChoice;
-    if (outcome === 'accepted') {
-      (window as any).deferredPWAInstallPrompt = null;
-      setShowInstallBtn(false);
-    }
-  };
 
   const handleRefresh = async () => {
     if (onRefresh) {
@@ -181,20 +164,22 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   return (
     <div className={cn(
-      "flex flex-col gap-2 md:gap-4 mb-2 md:mb-6 animate-fade-in relative z-20 md:px-0",
+      "flex flex-col gap-1 md:gap-4 mb-1 md:mb-6 animate-fade-in relative z-20 md:px-0",
       "md:relative sticky top-0 bg-white/95 backdrop-blur-md md:bg-transparent px-4 py-3 md:p-0 border-b border-slate-100 md:border-none shadow-sm md:shadow-none"
     )}>
       {/* Mobile/Desktop Header with User Account */}
       <div className="flex justify-between items-center">
-        {/* Left Side: Logo, Refresh, and Actions */}
-        <div className="flex items-center gap-2 md:gap-4 flex-1 overflow-x-auto no-scrollbar pb-1 md:pb-0">
-          <div className="flex items-center gap-2 md:gap-3 shrink-0">
-            <div className="flex p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
-              <Store className="text-white w-4 h-4 md:w-6 md:h-6" />
+        {/* Logo & Refresh Section */}
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
+              <Store className="text-white w-5 h-5 md:w-6 md:h-6" />
             </div>
-            <h1 className="text-base md:text-xl font-black tracking-tighter text-slate-900 uppercase whitespace-nowrap">
-              {user?.hotel_name || ''}
-            </h1>
+            <div>
+              <h1 className="text-lg md:text-xl font-black tracking-tighter text-slate-900 uppercase">
+                {user?.hotel_name || ''}
+              </h1>
+            </div>
           </div>
 
           {/* Nút Cập Nhật (Refresh) */}
@@ -202,20 +187,24 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             onClick={handleRefresh}
             disabled={loading || isRefreshing}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 bg-white rounded-2xl shadow-sm border border-slate-100 shrink-0",
+              "flex items-center gap-2 px-4 py-2 bg-white rounded-2xl shadow-sm border border-slate-100",
               "hover:bg-slate-50 active:scale-95 transition-all duration-200",
-              "disabled:opacity-50"
+              "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
             <ArrowRightLeft className={cn("text-blue-600", (isRefreshing || loading) && "animate-spin")} size={18} />
             <span className="hidden md:inline text-sm font-bold text-slate-700">Cập nhật</span>
           </button>
+        </div>
+
+        {/* Right Actions: Mobile Filter + Sell Service + User */}
+        <div className="flex items-center gap-2 md:gap-4">
           
           {/* Mobile Filter Toggle */}
           <button 
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={cn(
-              "md:hidden w-10 h-10 rounded-2xl flex items-center justify-center border shadow-sm transition-all shrink-0",
+              "md:hidden w-10 h-10 rounded-2xl flex items-center justify-center border shadow-sm transition-all",
               showMobileFilters 
                 ? "bg-slate-900 text-white border-slate-900" 
                 : "bg-white text-slate-600 border-slate-200"
@@ -228,7 +217,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
             <button 
               onClick={() => setIsTransactionModalOpen(true)}
-              className="h-10 px-3 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95 shrink-0"
+              className="h-10 px-3 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
             >
               <Banknote size={18} />
               <span className="hidden md:inline font-bold text-sm">Tạo Phiếu Thu/Chi</span>
@@ -238,27 +227,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           {/* Sell Service Button */}
           <button 
             onClick={() => toast.info('Tính năng đang phát triển')}
-            className="h-10 px-3 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 shrink-0"
+            className="h-10 px-3 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
           >
             <Store size={18} />
             <span className="hidden md:inline font-bold text-sm">Bán DV tại quầy</span>
           </button>
 
-          {/* PWA Install Button */}
-          {showInstallBtn && (
-            <button 
-              onClick={handleInstallApp}
-              className="h-10 px-3 md:px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95 shrink-0"
-            >
-              <Download size={18} />
-              <span className="hidden md:inline font-bold text-sm">Cài đặt App</span>
-            </button>
-          )}
-        </div>
-
-        {/* Right Side: User Icon Only on Mobile */}
-        <div className="flex items-center ml-2 shrink-0">
-          <div className="relative">
+          {/* User Profile */}
+          <div className="relative pl-2 border-l border-slate-200">
             <button 
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="flex items-center gap-3 hover:bg-slate-50 rounded-2xl p-1 pr-3 transition-colors"

@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const isLoginPage = pathname.endsWith('/login');
         
         // Slug mismatch check: if logged in but on wrong tenant URL
-        const isSlugMismatch = user && currentSlug && currentSlug !== 'undefined' && user.hotel_slug && user.hotel_slug !== currentSlug;
+        const isSlugMismatch = user && currentSlug && currentSlug !== 'undefined' && user.hotel_slug && user.hotel_slug.toLowerCase() !== currentSlug.toLowerCase();
 
         if (!user && !isLoginPage) {
           if (currentSlug && currentSlug !== 'undefined') {
@@ -130,7 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.cookie = `1hotel_id=${encodeURIComponent(hId)}; path=/; max-age=${60 * 60 * 24 * 7}`;
         
         toast.success(`Xin chào, ${userData.full_name}`);
-        router.push(`/${userData.hotel_slug || ''}`);
+        const targetSlug = userData.hotel_slug || 'default';
+        router.push(`/${targetSlug}`);
         return true;
       } else {
         toast.error(data?.message || 'Đăng nhập thất bại');

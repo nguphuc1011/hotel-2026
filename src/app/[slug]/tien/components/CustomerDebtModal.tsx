@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { customerService, Customer } from '@/services/customerService';
 import { formatMoney } from '@/utils/format';
-import TransactionModal from './TransactionModal';
+import TransactionModal from '@/components/cash-flow/TransactionModal';
 
 interface CustomerDebtModalProps {
   isOpen: boolean;

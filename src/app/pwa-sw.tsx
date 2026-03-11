@@ -20,6 +20,20 @@ export function PWAServiceWorker() {
           .register('/sw.js')
           .then((registration) => {
             console.log('🚀 MANA PMS PWA: Sẵn sàng!', registration.scope);
+            
+            // Tự động cập nhật Service Worker khi có bản mới
+            registration.onupdatefound = () => {
+              const installingWorker = registration.installing;
+              if (installingWorker) {
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed') {
+                    if (navigator.serviceWorker.controller) {
+                      console.log('🔄 Đã có bản cập nhật mới, vui lòng tải lại trang.');
+                    }
+                  }
+                };
+              }
+            };
           })
           .catch((err) => console.error('❌ PWA Error:', err));
       };

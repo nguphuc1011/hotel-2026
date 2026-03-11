@@ -301,10 +301,14 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    if (!isAuthLoading && can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
-      fetchData();
+    if (!isAuthLoading) {
+      if (can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
+        fetchData();
+      } else {
+        setLoading(false);
+      }
     }
-  }, [isAuthLoading, can]);
+  }, [isAuthLoading, can, fetchData]);
 
   // Smart Update Logic based on User Requirements
   useEffect(() => {

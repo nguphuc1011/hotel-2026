@@ -153,7 +153,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
       )}
     >
       {/* Content Container */}
-      <div className="relative z-10 p-5 md:p-6 flex flex-col h-full justify-between">
+      <div className="relative z-10 p-6 flex flex-col h-full justify-between">
         
         {/* Top Row: Room Number & Rental Type */}
         <div className="flex justify-between items-end">

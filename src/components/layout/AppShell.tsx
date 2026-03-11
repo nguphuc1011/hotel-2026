@@ -477,7 +477,7 @@ export default function AppShell({
                     "text-[10px] font-bold transition-colors duration-300 tracking-tight",
                     pathname === item.href ? "text-blue-600" : "text-slate-400"
                   )}>
-                    {item.label === 'THU CHI' ? 'Thu Chi' : item.label === 'KHÁCH HÀNG' ? 'Khách hàng' : item.label}
+                    {item.label}
                   </span>
                 </Link>
               ))}
@@ -507,7 +507,7 @@ export default function AppShell({
                     "text-[10px] font-bold transition-colors duration-300 tracking-tight",
                     pathname === item.href ? "text-blue-600" : "text-slate-400"
                   )}>
-                    {item.label === 'BÁO CÁO' ? 'Báo cáo' : item.label === 'CÀI ĐẶT' ? 'Cài đặt' : item.label}
+                    {item.label}
                   </span>
                 </Link>
               ))}

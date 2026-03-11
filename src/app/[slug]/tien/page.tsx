@@ -29,7 +29,7 @@ import { customerService } from '@/services/customerService';
 import type { Customer } from '@/services/customerService';
 import { cashFlowService } from '@/services/cashFlowService';
 import type { CashFlowTransaction, Wallet } from '@/services/cashFlowService';
-import TransactionModal from './components/TransactionModal';
+import TransactionModal from '@/components/cash-flow/TransactionModal';
 import WalletAdjustmentModal from './components/WalletAdjustmentModal';
 import BookingHistoryModal from './components/BookingHistoryModal';
 import CustomerDebtModal from './components/CustomerDebtModal';
