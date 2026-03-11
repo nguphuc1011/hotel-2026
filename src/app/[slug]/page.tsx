@@ -104,8 +104,16 @@ export default function DashboardPage() {
 
       if (unifiedResult.error) throw unifiedResult.error;
       
-      const { rooms: roomsData, bookings: bookingsData, rates: ratesData, wallets: walletsData } = unifiedResult.data;
-      setSettings(settingsResult.data || null);
+      if (unifiedResult.data) {
+        const { rooms: roomsData, bookings: bookingsData, rates: ratesData, wallets: walletsData } = unifiedResult.data;
+        
+        // 2. Update Settings only if changed (shallow check is enough for most cases, 
+        // but let's be careful with object references from RPC)
+        const newSettings = settingsResult.data || null;
+        setSettings((prev: any) => {
+          if (JSON.stringify(prev) === JSON.stringify(newSettings)) return prev;
+          return newSettings;
+        });
 
       // Reset color maps
       masterBookingIdToColorMapRef.current.clear();
@@ -513,12 +521,12 @@ export default function DashboardPage() {
     );
   }
 
-  const handleToggleFilter = (key: keyof FilterState) => {
+  const handleToggleFilter = useCallback((key: keyof FilterState) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  }, []);
 
   // Handle Room Click
-  const handleRoomClick = (room: DashboardRoom) => {
+  const handleRoomClick = useCallback((room: DashboardRoom) => {
     // If dirty, directly ask to mark as clean
     if (room.status === 'dirty') {
       handleMarkRoomAsClean(room);
@@ -548,7 +556,7 @@ export default function DashboardPage() {
     // If available, open CheckIn
     setSelectedRoomId(room.id);
     setIsCheckInOpen(true);
-  };
+  }, [fetchData]);
 
   const handleMarkRoomAsClean = async (room: DashboardRoom) => {
     const confirmed = await confirmDialog({
