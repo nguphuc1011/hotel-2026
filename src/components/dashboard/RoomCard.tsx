@@ -137,7 +137,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
   const formattedAmount = useMemo(() => {
     const booking = room.current_booking;
     const amount = room.status === 'occupied' && booking
-      ? (booking.amount_to_pay + (booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0))
+      ? ((booking.amount_to_pay || 0) + (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0))
       : (room.status === 'available' ? room.price_daily : null);
 
     if (amount !== undefined && amount !== null) {
