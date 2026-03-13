@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { 
   Users, Search, Plus, Filter, MoreHorizontal, 
   CreditCard, Ban, CheckCircle, ChevronRight, Phone, MapPin, Trash2 
@@ -15,6 +15,8 @@ import { formatMoney } from '@/utils/format';
 
 export default function CustomersPage() {
   const router = useRouter();
+  const params = useParams();
+  const slug = params.slug as string;
   const { confirm: confirmDialog } = useGlobalDialog();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,7 +180,7 @@ export default function CustomersPage() {
                   <tr 
                     key={cust.id} 
                     className="hover:bg-white/50 transition-colors cursor-pointer group"
-                    onClick={() => router.push(`/customers/${cust.id}`)}
+                    onClick={() => router.push(`/${slug}/customers/${cust.id}`)}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
