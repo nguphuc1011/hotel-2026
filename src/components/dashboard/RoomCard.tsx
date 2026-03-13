@@ -222,7 +222,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
             <div className="animate-fade-in flex flex-col gap-1">
               <div className="flex items-center gap-1.5 opacity-90">
                 <User size={12} strokeWidth={2.5} />
-                <p className="text-[11px] font-bold uppercase tracking-wide truncate">
+                <p className="text-[13px] md:text-[11px] font-bold uppercase tracking-wide truncate">
                   {subText}
                 </p>
               </div>
@@ -243,7 +243,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
         <div className="flex items-end justify-between">
           <div className="flex flex-col">
             {/* Duration / Status Text */}
-            <span className="text-[13px] font-bold opacity-80 mb-0.5">
+            <span className="text-[15px] md:text-[13px] font-bold opacity-80 mb-0.5">
               {statusText}
             </span>
             
@@ -251,7 +251,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
             {room.status === 'occupied' || room.status === 'available' ? (
                <span className={cn(
                  "font-bold tracking-normal leading-none",
-                 "text-[22px]"
+                 "text-[26px] md:text-[22px]"
                )}>
                  {formattedAmount || '0 ₫'}
                </span>
