@@ -418,5 +418,18 @@ export const bookingService = {
       console.error('Update booking details error:', JSON.stringify(err, null, 2));
       throw err;
     }
+  },
+
+  async forceUpdateSnapshot(bookingId: string) {
+    try {
+      const { data, error } = await supabase.rpc('fn_update_booking_snapshot', {
+        p_booking_id: bookingId
+      });
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      console.error('Force update snapshot error:', err);
+      throw err;
+    }
   }
 };

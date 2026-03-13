@@ -129,7 +129,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
     }
 
     return { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName };
-  }, [room]);
+  }, [room.status, room.current_booking, room.notes, room.last_cleaned_at, room.is_dirty_overdue]);
 
   const { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName } = display;
 
@@ -278,4 +278,14 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
   );
 };
 
-export default memo(RoomCard);
+export default memo(RoomCard, (prevProps, nextProps) => {
+  // Chỉ re-render nếu các dữ liệu quan trọng thay đổi
+  return (
+    prevProps.room.id === nextProps.room.id &&
+    prevProps.room.status === nextProps.room.status &&
+    prevProps.room.updated_at === nextProps.room.updated_at &&
+    JSON.stringify(prevProps.room.current_booking) === JSON.stringify(nextProps.room.current_booking) &&
+    prevProps.room.group_color === nextProps.room.group_color &&
+    prevProps.room.is_dirty_overdue === nextProps.room.is_dirty_overdue
+  );
+});

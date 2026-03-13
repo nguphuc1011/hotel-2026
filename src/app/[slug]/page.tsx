@@ -701,38 +701,34 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Modals */}
-        {selectedRoom && (
-          <>
-            <CheckInModal
-              isOpen={isCheckInOpen}
-              onClose={() => setIsCheckInOpen(false)}
-              room={selectedRoom}
-              onCheckIn={handleCheckIn}
-              onOpenStatusModal={() => handleOpenStatusModal(selectedRoom!)}
-            />
-            
-              <RoomFolioModal
-              isOpen={isFolioOpen}
-              onClose={() => setIsFolioOpen(false)}
-              onUpdate={() => fetchData()}
-              room={selectedRoom}
-              booking={selectedRoom.current_booking!}
-              onGroupRoom={() => {
-                setIsFolioOpen(false);
-                setIsGroupModalOpen(true);
-              }}
-            />
+        {/* Modals - Level up from conditional block to avoid unmounting when selectedRoom changes slightly */}
+        <CheckInModal
+          isOpen={isCheckInOpen}
+          onClose={() => setIsCheckInOpen(false)}
+          room={selectedRoom!}
+          onCheckIn={handleCheckIn}
+          onOpenStatusModal={() => handleOpenStatusModal(selectedRoom!)}
+        />
+        
+        <RoomFolioModal
+          isOpen={isFolioOpen}
+          onClose={() => setIsFolioOpen(false)}
+          onUpdate={() => fetchData()}
+          room={selectedRoom!}
+          booking={selectedRoom?.current_booking!}
+          onGroupRoom={() => {
+            setIsFolioOpen(false);
+            setIsGroupModalOpen(true);
+          }}
+        />
 
-            <GroupRoomModal
-              isOpen={isGroupModalOpen}
-              onClose={() => setIsGroupModalOpen(false)}
-              masterRoom={selectedRoom}
-              onSuccess={() => fetchData()}
-              rooms={rooms} // Truyền danh sách rooms vào GroupRoomModal
-            />
-          </>
-        )}
+        <GroupRoomModal
+          isOpen={isGroupModalOpen}
+          onClose={() => setIsGroupModalOpen(false)}
+          masterRoom={selectedRoom!}
+          onSuccess={() => fetchData()}
+          rooms={rooms}
+        />
 
         <RoomStatusModal
           isOpen={isStatusModalOpen}

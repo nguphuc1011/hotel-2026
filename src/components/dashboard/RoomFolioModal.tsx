@@ -185,7 +185,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   // Load bill details on open
   useEffect(() => {
     if (isOpen && booking) {
-      loadBill();
+      loadBill(true); // Force snapshot update when opening Folio
       loadServices();
       if (room.is_group_master || booking.is_group_member) {
         loadGroupDetails();
@@ -253,12 +253,15 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   // Tổng tiền DỰ KIẾN (bao gồm cả dịch vụ đang chờ lưu)
   const projectedAmountToPay = officialAmountToPay + pendingServicesTotal;
 
-  const loadBill = async () => {
+  const loadBill = async (force: boolean = false) => {
     if (!booking) return;
     setIsLoading(true);
     try {
+      if (force) {
+        await bookingService.forceUpdateSnapshot(booking.id);
+      }
       const data = await bookingService.calculateBill(booking.id);
-      console.log('Folio Bill Data (after loadBill):', data); // Thêm log này
+      console.log('Folio Bill Data (after loadBill):', data);
       setBill(data);
     } catch (error) {
       console.error('Error loading bill:', error);
