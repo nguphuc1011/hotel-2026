@@ -1,32 +1,33 @@
-
-const { createClient } = require('@supabase/supabase-js');
+const { Client } = require('pg');
 require('dotenv').config({ path: '.env.local' });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; 
+const client = new Client({
+  connectionString: process.env.DATABASE_URL || process.env.DIRECT_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+async function main() {
+  await client.connect();
+  try {
+    console.log('--- RECENT DEPOSIT ATTEMPTS ---');
+    const txRes = await client.query(`
+      SELECT id, customer_id, type, amount, balance_before, balance_after, description, booking_id, created_at
+      FROM public.customer_transactions
+      WHERE type = 'deposit' OR description ILIKE '%cọc%' OR description ILIKE '%deposit%'
+      ORDER BY created_at DESC LIMIT 5
+    `);
+    let output = '--- RECENT DEPOSIT ATTEMPTS ---\n' + JSON.stringify(txRes.rows, null, 2);
+    output += '\n\n--- CASH FLOW FOR DEPOSITS ---\n' + JSON.stringify(cfRes.rows, null, 2);
+    output += '\n\n--- BOOKINGS DEPOSIT CHECK ---\n' + JSON.stringify(bkRes.rows, null, 2);
+    output += '\n\n--- RLS STATUS ---\n' + JSON.stringify(rlsRes.rows, null, 2);
+    
+    fs.writeFileSync('c:/1hotel2/DB_INSPECTION_REPORT.txt', output);
+    console.log('Report saved to DB_INSPECTION_REPORT.txt');
 
-async function inspect() {
-  console.log('--- Inspecting Tables ---');
-
-  const tables = ['settings', 'rooms', 'bookings', 'room_categories', 'customers'];
-  
-  for (const table of tables) {
-    const { data, error } = await supabase
-      .from(table)
-      .select('*')
-      .limit(1);
-      
-    if (error) {
-      console.log(`Error reading ${table}:`, error.message);
-    } else if (data && data.length > 0) {
-      console.log(`\nTable: ${table}`);
-      console.log('Columns:', Object.keys(data[0]).join(', '));
-    } else {
-        console.log(`\nTable: ${table} is empty or has no rows.`);
-    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await client.end();
   }
 }
-
-inspect();
+main();

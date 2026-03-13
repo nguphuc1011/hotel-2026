@@ -35,6 +35,7 @@ export interface FilterState {
 }
 
 interface DashboardHeaderProps {
+  hotelName?: string;
   counts: {
     total: number;
     available: number;
@@ -50,6 +51,7 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
+  hotelName,
   counts, 
   filters, 
   onToggle,
@@ -164,20 +166,20 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   return (
     <div className={cn(
-      "flex flex-col gap-1 md:gap-4 mb-1 md:mb-6 animate-fade-in relative z-20 md:px-0",
-      "md:relative sticky top-0 bg-white/95 backdrop-blur-md md:bg-transparent px-4 py-3 md:p-0 border-b border-slate-100 md:border-none shadow-sm md:shadow-none"
+      "w-full flex flex-col gap-1 md:gap-4 mb-1 md:mb-6 animate-fade-in relative z-20",
+      "md:relative sticky top-0 bg-white md:bg-transparent px-0 py-0 md:p-0 border-b border-slate-100 md:border-none shadow-sm md:shadow-none"
     )}>
       {/* Mobile/Desktop Header with User Account */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center px-2 md:px-0 py-2 md:py-0">
         {/* Logo & Refresh Section */}
         <div className="flex items-center gap-2 md:gap-4">
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="hidden md:flex items-center gap-2 md:gap-3">
             <div className="p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
               <Store className="text-white w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
               <h1 className="text-lg md:text-xl font-black tracking-tighter text-slate-900 uppercase">
-                {user?.hotel_name || ''}
+                {hotelName || ''}
               </h1>
             </div>
           </div>
@@ -187,13 +189,13 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             onClick={handleRefresh}
             disabled={loading || isRefreshing}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 bg-white rounded-2xl shadow-sm border border-slate-100",
-              "hover:bg-slate-50 active:scale-95 transition-all duration-200",
+              "flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-blue-600 md:bg-white text-white md:text-blue-600 rounded-2xl shadow-lg md:shadow-sm border border-transparent md:border-slate-100",
+              "hover:bg-blue-700 md:hover:bg-slate-50 active:scale-95 transition-all duration-200",
               "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
-            <ArrowRightLeft className={cn("text-blue-600", (isRefreshing || loading) && "animate-spin")} size={18} />
-            <span className="hidden md:inline text-sm font-bold text-slate-700">Cập nhật</span>
+            <ArrowRightLeft className={cn((isRefreshing || loading) && "animate-spin")} size={18} />
+            <span className="text-[9px] md:text-sm font-bold uppercase tracking-tight md:text-slate-700">Cập nhật</span>
           </button>
         </div>
 
@@ -204,33 +206,34 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <button 
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={cn(
-              "md:hidden w-10 h-10 rounded-2xl flex items-center justify-center border shadow-sm transition-all",
+              "w-12 h-12 md:w-10 md:h-10 rounded-2xl flex flex-col items-center justify-center border shadow-sm transition-all gap-1",
               showMobileFilters 
                 ? "bg-slate-900 text-white border-slate-900" 
                 : "bg-white text-slate-600 border-slate-200"
             )}
           >
             <Filter size={18} />
+            <span className="md:hidden text-[9px] font-bold uppercase tracking-tight">Lọc</span>
           </button>
 
           {/* Transaction Button */}
           {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
             <button 
               onClick={() => setIsTransactionModalOpen(true)}
-              className="h-10 px-3 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+              className="h-12 md:h-10 px-2 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
             >
               <Banknote size={18} />
-              <span className="hidden md:inline font-bold text-sm">Tạo Phiếu Thu/Chi</span>
+              <span className="text-[9px] md:text-sm font-bold uppercase tracking-tight">Thu Chi</span>
             </button>
           )}
 
           {/* Sell Service Button */}
           <button 
             onClick={() => toast.info('Tính năng đang phát triển')}
-            className="h-10 px-3 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+            className="h-12 md:h-10 px-2 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
           >
             <Store size={18} />
-            <span className="hidden md:inline font-bold text-sm">Bán DV tại quầy</span>
+            <span className="text-[9px] md:text-sm font-bold uppercase tracking-tight">Bán DV</span>
           </button>
 
           {/* User Profile */}

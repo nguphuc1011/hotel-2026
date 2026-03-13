@@ -138,7 +138,7 @@ export const bookingService = {
           
           check_in_at: data.check_in_at,
           check_out_at: data.check_out_at,
-          duration_text: formatDuration(data.duration_hours, data.duration_minutes),
+          duration_text: data.duration_text || formatDuration(data.duration_hours, data.duration_minutes),
           duration_hours: data.duration_hours || 0,
           duration_min: data.duration_minutes || 0,
           
@@ -333,20 +333,30 @@ export const bookingService = {
     amount: number;
     paymentMethod: 'cash' | 'transfer';
     description: string;
+    customerId?: string; // Optional customerId to avoid extra query
     verifiedStaff?: { id: string, name: string };
   }) {
     try {
-      // First get booking to get customer_id
-      const { data: booking, error: bError } = await supabase
-        .from('bookings')
-        .select('customer_id')
-        .eq('id', params.bookingId)
-        .single();
-      
-      if (bError) throw bError;
+      let customerId = params.customerId;
+
+      // If customerId not provided, fetch it (Backward compatibility)
+      if (!customerId) {
+        const { data: booking, error: bError } = await supabase
+          .from('bookings')
+          .select('customer_id')
+          .eq('id', params.bookingId)
+          .single();
+        
+        if (bError) throw bError;
+        customerId = booking.customer_id;
+      }
+
+      if (!customerId) {
+        throw new Error('Không tìm thấy khách hàng cho booking này');
+      }
 
       const { data, error } = await supabase.rpc('adjust_customer_balance', {
-        p_customer_id: booking.customer_id,
+        p_customer_id: customerId,
         p_amount: params.amount,
         p_type: 'deposit',
         p_description: params.description,
@@ -357,11 +367,19 @@ export const bookingService = {
       });
 
       if (error) throw error;
+      
+      // CRITICAL: Check the success field in the returned JSON
+      if (data && data.success === false) {
+        throw new Error(data.message || 'Giao dịch thất bại');
+      }
 
-      // Trigger notification if wallet_changes exists
+      // Suppress wallet notification for simple deposits (user requirement)
+      // Regular toast.success in the UI is sufficient.
+      /*
       if (data && data.wallet_changes && Array.isArray(data.wallet_changes) && data.wallet_changes.length > 0) {
         useWalletNotificationStore.getState().showNotification(data.wallet_changes);
       }
+      */
 
       return data;
     } catch (err: any) {

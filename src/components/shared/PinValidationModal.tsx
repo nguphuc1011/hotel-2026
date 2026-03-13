@@ -80,7 +80,7 @@ export default function PinValidationModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-main/40 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[70000] flex items-center justify-center p-4 bg-main/40 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-accent/10">
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">

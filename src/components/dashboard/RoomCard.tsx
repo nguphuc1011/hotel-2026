@@ -40,6 +40,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
     let subText = 'Trống';
     let isFlashing = false;
     let iconClassName = '';
+    let badgeText: React.ReactNode = null;
 
     if (room.status === 'repair') {
       bgColor = 'bg-[#1e293b]'; // Repair (Xám Đen)
@@ -58,68 +59,72 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
       }
     } else if (room.status === 'occupied' && room.current_booking) {
       const { booking_type, check_in_at, duration_text } = room.current_booking;
+      const isAutoSwitched = booking_type === 'hourly' && duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm'));
+      
       subText = room.current_booking.customer_name || 'Khách vãng lai';
       
       const checkIn = check_in_at ? new Date(check_in_at) : null;
       const isValidDate = checkIn && !isNaN(checkIn.getTime());
 
-      switch (booking_type) {
-        case 'hourly':
-          bgColor = 'bg-[#f59e0b]';
-          textColor = 'text-black';
-          Icon = Clock;
+      // Ưu tiên hiển thị duration_text từ DB nếu có (Dành cho trường hợp nhảy giá trần hoặc phạt muộn)
+      if (duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm'))) {
+          bgColor = 'bg-[#1e40af]';
+          textColor = 'text-white';
+          Icon = duration_text.includes('ngày') ? Sun : Moon;
+          statusText = (
+            <div className="flex items-center gap-1.5">
+              <Calendar size={16} />
+              <span>{duration_text}</span>
+            </div>
+          );
           
-          if (isValidDate && check_in_at) {
-             const isOverLimit = (room.current_booking?.total_amount ?? 0) >= (room.price_daily ?? Number.MAX_SAFE_INTEGER);
-             
-             if (isOverLimit) {
-                // Transform to Daily look
-                bgColor = 'bg-[#1e40af]';
-                textColor = 'text-white';
-                iconClassName = 'text-[#f59e0b]'; // Yellow Icon to indicate hourly origin
-                
-                // Use Daily status text format (Days)
+          // Hiển thị tag GIỜ --> NGÀY màu vàng ở góc phải cho phòng nhảy giá trần
+          if (isAutoSwitched) {
+            badgeText = (
+              <span className="bg-yellow-400 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm animate-pulse border border-yellow-500">
+                GIỜ → NGÀY
+              </span>
+            );
+          } else {
+            badgeText = duration_text.includes('ngày') ? 'NGÀY' : 'ĐÊM';
+          }
+      } else {
+          switch (booking_type) {
+            case 'hourly':
+              bgColor = 'bg-[#f59e0b]';
+              textColor = 'text-black';
+              Icon = Clock;
+              badgeText = 'GIỜ';
+              
+              if (isValidDate && check_in_at) {
+                 statusText = (
+                    <div className="flex items-center gap-1.5">
+                      <Clock size={16} className="animate-pulse" />
+                      <LiveTimer checkInAt={check_in_at} mode="hourly" />
+                    </div>
+                  );
+              } else {
+                statusText = '--:--';
+              }
+              break;
+            case 'daily':
+            case 'overnight':
+              bgColor = 'bg-[#1e40af]';
+              Icon = booking_type === 'daily' ? Sun : Moon;
+              badgeText = booking_type === 'daily' ? 'NGÀY' : 'ĐÊM';
+              
+              if (isValidDate && check_in_at) {
                 statusText = (
                   <div className="flex items-center gap-1.5">
                     <Calendar size={16} />
-                    <LiveTimer checkInAt={check_in_at} mode="daily" />
+                    <LiveTimer checkInAt={check_in_at} mode={booking_type} />
                   </div>
                 );
-             } else {
-                statusText = (
-                  <div className="flex items-center gap-1.5">
-                    <Clock size={16} className="animate-pulse" />
-                    <LiveTimer checkInAt={check_in_at} mode="hourly" />
-                  </div>
-                );
-             }
-          } else {
-            statusText = '--:--';
+              } else {
+                statusText = '--- ngày';
+              }
+              break;
           }
-          break;
-        case 'daily':
-        case 'overnight':
-          bgColor = 'bg-[#1e40af]';
-          Icon = booking_type === 'daily' ? Sun : Moon;
-          
-          if (duration_text) {
-            statusText = (
-              <div className="flex items-center gap-1.5">
-                <Calendar size={16} />
-                <span>{duration_text}</span>
-              </div>
-            );
-          } else if (isValidDate && check_in_at) {
-            statusText = (
-              <div className="flex items-center gap-1.5">
-                <Calendar size={16} />
-                <LiveTimer checkInAt={check_in_at} mode={booking_type} />
-              </div>
-            );
-          } else {
-            statusText = '--- ngày';
-          }
-          break;
       }
     }
 
@@ -130,8 +135,9 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
 
   // Formatting currency
   const formattedAmount = useMemo(() => {
-    const amount = room.status === 'occupied' 
-      ? room.current_booking?.total_amount 
+    const booking = room.current_booking;
+    const amount = room.status === 'occupied' && booking
+      ? (booking.amount_to_pay + (booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0))
       : (room.status === 'available' ? room.price_daily : null);
 
     if (amount !== undefined && amount !== null) {

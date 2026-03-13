@@ -5,7 +5,7 @@ import { Plus, Filter, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, T
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { cashFlowService, CashFlowTransaction, CashFlowStats, Wallet } from '@/services/cashFlowService';
-import TransactionModal from './components/TransactionModal';
+import TransactionModal from '@/components/cash-flow/TransactionModal';
 import WalletCards from './components/WalletCards';
 import BookingHistoryModal from './components/BookingHistoryModal';
 import CustomerDebtModal from './components/CustomerDebtModal';

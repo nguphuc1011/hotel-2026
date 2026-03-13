@@ -15,6 +15,7 @@ interface BillBreakdownProps {
   surcharge?: number;
   onSurchargeChange?: (val: number) => void;
   hideSummary?: boolean;
+  pendingServicesTotal?: number;
 }
 
 export default function BillBreakdown({ 
@@ -26,7 +27,8 @@ export default function BillBreakdown({
   discount,
   onDiscountChange,
   surcharge,
-  onSurchargeChange
+  onSurchargeChange,
+  pendingServicesTotal = 0
 }: BillBreakdownProps) {
   const customerBalance = bill.customer_balance ?? 0;
   const isCustomerInDebt = customerBalance < 0;
@@ -93,12 +95,19 @@ export default function BillBreakdown({
           </div>
         </div>
 
-        {bill.service_total > 0 && (
+        {(bill.service_total > 0 || pendingServicesTotal > 0) && (
           <div className="flex flex-col">
             <div className="flex justify-between items-center">
-                <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Dịch vụ</span>
+                <div className="flex flex-row items-baseline gap-1">
+                    <span className={cn("text-xs font-bold uppercase tracking-wider", labelColor)}>Dịch vụ</span>
+                    {pendingServicesTotal > 0 && (
+                        <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 animate-pulse")}>
+                            MỚI
+                        </span>
+                    )}
+                </div>
                 <span className={cn("font-black text-sm", isDark ? "text-white" : "text-slate-900")}>
-                {formatMoney(bill.service_total)}
+                {formatMoney(bill.service_total + pendingServicesTotal)}
                 </span>
             </div>
           </div>
@@ -182,7 +191,7 @@ export default function BillBreakdown({
 
         {bill.deposit_amount > 0 && (
           <div className={cn("pt-2 border-t flex justify-between items-center", borderColor)}>
-            <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-blue-300" : "text-blue-500")}>Đã cọc</span>
+            <span className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-blue-300" : "text-blue-500")}>Thu trước</span>
             <span className={cn("font-black", isDark ? "text-blue-300" : "text-blue-600")}>
               -{formatMoney(bill.deposit_amount)}
             </span>

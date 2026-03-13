@@ -16,7 +16,10 @@ import {
   ShieldCheck,
   Building2,
   Smartphone,
-  Download
+  Download,
+  RefreshCw,
+  Home,
+  Filter
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
@@ -39,15 +42,12 @@ export default function AppShell({
   const params = useParams();
   const { user, fetchUser } = useAuthStore();
   
-  // Prevent hydration mismatch by using a mounted state
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Priority: 1. URL Slug, 2. User Profile Slug, 3. Default
   const rawSlug = params?.slug as string;
-  // Hydration fix: Ensure slug is stable between server and client
   const [slug, setSlug] = useState<string>('default');
 
   useEffect(() => {
@@ -70,12 +70,10 @@ export default function AppShell({
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // 1. Kiểm tra iOS
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
     setIsIOS(isIOSDevice && !isStandalone);
 
-    // 2. Kiểm tra nếu có sẵn lời mời cài đặt trong biến global
     if ((window as any).deferredPWAInstallPrompt) {
       setShowInstallBtn(true);
     }
@@ -86,7 +84,6 @@ export default function AppShell({
 
     window.addEventListener('pwa-install-available', handlePWAAvailable);
 
-    // 3. Cập nhật Manifest Link động theo Slug hiện tại
     const updateManifest = () => {
       let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
       if (!link) {
@@ -210,7 +207,6 @@ export default function AppShell({
   };
 
 
-  // Don't show shell on login page or SaaS Admin
   if (pathname === `/${slug}/login` || pathname === '/login' || pathname.startsWith('/saas-admin')) {
     return <>{children}</>;
   }
@@ -223,7 +219,6 @@ export default function AppShell({
     { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: `/${slug}/settings`, permission: PERMISSION_KEYS.VIEW_SETTINGS },
   ];
 
-  // SaaS Admin Link (Only for authorized users)
   const saasAdminItem = user?.hotels?.features?.saas_admin_access ? {
     icon: <ShieldCheck size={24} />,
     label: 'Quản trị SaaS',
@@ -231,7 +226,6 @@ export default function AppShell({
     isSpecial: true
   } : null;
 
-  // Feature Toggle Check
   const filteredNavItems = navItems.filter(item => {
     if (item.href.endsWith('/reports') && user?.hotels?.features?.advanced_reports === false) {
       return false;
@@ -241,47 +235,43 @@ export default function AppShell({
 
   const visibleNavItems = filteredNavItems.filter(item => !item.permission || can(item.permission));
 
-  // Combined Items for sidebar
   const finalSidebarItems = mounted ? (() => {
     const items = [...visibleNavItems];
     if (saasAdminItem) items.push(saasAdminItem);
     return items;
-  })() : visibleNavItems; // Render basic items during SSR to match initial client state
+  })() : visibleNavItems; 
 
   const homeItem = (mounted ? visibleNavItems : navItems).find(i => i.href === `/${slug}`) || (mounted ? visibleNavItems[0] : navItems[0]);
   const mobileItems = visibleNavItems.filter(i => i.href !== homeItem?.href).slice(0, 4);
   
-  // Center Dashboard Button
-  const dashboardItem = navItems.find(i => i.href === `/${slug}`);
-
   const leftItems = mobileItems.slice(0, Math.ceil(mobileItems.length / 2));
   const rightItems = mobileItems.slice(Math.ceil(mobileItems.length / 2));
 
   return (
-    <>
+    <div className="flex w-full h-screen overflow-hidden bg-white">
       <WalletNotificationModal />
-      {/* PC Sidebar - Airy Glassmorphism */}
-      <aside className="hidden md:flex flex-col w-72 h-screen glass border-r border-white/40 z-50">
-        <div className="p-10">
+      {/* PC Sidebar */}
+      <aside className="hidden md:flex flex-col w-72 h-full bg-white border-r border-slate-100 z-50">
+        <div className="p-8">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2 text-accent">
+            <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2 text-blue-600">
               {hotelName || 'Hệ thống'}
             </h1>
           </div>
         </div>
         
-        <nav className="flex-1 px-6 space-y-2">
+        <nav className="flex-1 px-4 space-y-1">
           {finalSidebarItems.map((item) => (
             <Link 
               key={item.href} 
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-500 font-bold text-[15px]",
+                "flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 font-bold text-sm",
                 pathname === item.href 
-                  ? "bg-accent text-white shadow-xl shadow-accent/20 scale-[1.02]" 
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
                   : (item as any).isSpecial 
-                    ? "text-emerald-500 hover:bg-emerald-50 bg-emerald-50/50"
-                    : "text-muted hover:bg-accent/5 hover:text-accent"
+                    ? "text-emerald-500 hover:bg-emerald-50"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-blue-600"
               )}
             >
               {item.icon}
@@ -291,7 +281,6 @@ export default function AppShell({
         </nav>
 
         <div className="p-6 border-t border-white/20 relative" ref={userMenuRef}>
-          {/* PWA Install Button (Android/Chrome) */}
           {showInstallBtn && (
             <button 
               onClick={handleInstallApp}
@@ -307,7 +296,6 @@ export default function AppShell({
             </button>
           )}
 
-          {/* iOS Install Guide */}
           {isIOS && (
             <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 mb-4 animate-in fade-in slide-in-from-bottom-2">
               <div className="flex items-center gap-2 mb-2">
@@ -360,8 +348,8 @@ export default function AppShell({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-white/40 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-0">
-        <div className="animate-fade-in">
+      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-[#F8F9FB] pt-0 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-0">
+        <div className="w-full">
           {children}
         </div>
       </main>
@@ -439,24 +427,11 @@ export default function AppShell({
       )}
 
 
-      {/* Contrast Overlay under Mobile Nav - Subtle Blur Gradient */}
-      {mounted && <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white/90 via-white/50 to-transparent pointer-events-none z-40" />}
-
-      {/* Mobile Bottom Nav - Clean Curved Cutout from Image 2 */}
+      {/* Mobile Bottom Nav */}
       {mounted && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-[70px] pointer-events-none flex flex-col justify-end">
-          
-          {/* Main Bar Background */}
-          <div className="relative w-full h-[65px] pointer-events-auto flex items-center justify-between px-2 bg-white rounded-t-[24px] shadow-[0_-10px_30px_rgba(0,0,0,0.06)]">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-[75px] flex items-end">
+          <div className="relative w-full h-[65px] flex items-center justify-between px-4 bg-white/90 backdrop-blur-xl rounded-t-[24px] shadow-[0_-10px_30px_rgba(0,0,0,0.1)] border-t border-white/40">
             
-            {/* Cutout Area SVG */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[100px] h-full -z-10">
-               <svg width="100" height="20" viewBox="0 0 100 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M 0 0 H 15 C 25 0 28 2 32 8 A 24 24 0 0 0 68 8 C 72 2 75 0 85 0 H 100 V 20 H 0 Z" fill="white"/>
-               </svg>
-            </div>
-
-            {/* Left Items */}
             <div className="flex-1 flex justify-around items-center h-full">
               {leftItems.map((item) => (
                 <Link 
@@ -466,16 +441,16 @@ export default function AppShell({
                 >
                   <div className={cn(
                     "w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-300",
-                    pathname === item.href ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                    pathname === item.href ? "text-accent" : "text-slate-400 group-hover:text-slate-600"
                   )}>
                     {React.cloneElement(item.icon as any, { 
-                      size: 18,
+                      size: 20,
                       strokeWidth: 2
                     })}
                   </div>
                   <span className={cn(
                     "text-[10px] font-bold transition-colors duration-300 tracking-tight",
-                    pathname === item.href ? "text-blue-600" : "text-slate-400"
+                    pathname === item.href ? "text-accent" : "text-slate-400"
                   )}>
                     {item.label}
                   </span>
@@ -483,10 +458,34 @@ export default function AppShell({
               ))}
             </div>
 
-            {/* Spacer for Center Button */}
-            <div className="w-[80px]" /> 
+            {homeItem && (
+               <Link 
+                 href={homeItem.href}
+                 className="flex flex-col items-center justify-center active:scale-95 transition-all group px-4 relative -top-2"
+               >
+                 <div className={cn(
+                   "w-[54px] h-[54px] flex items-center justify-center rounded-2xl transition-all duration-300 shadow-xl relative overflow-hidden",
+                   pathname === homeItem.href 
+                     ? "bg-accent text-white shadow-accent/30" 
+                     : "bg-white/40 backdrop-blur-md text-slate-500 border border-white/60 shadow-sm"
+                 )}>
+                   {/* Transparent border effect */}
+                   <div className="absolute inset-0 rounded-2xl border-[1.5px] border-white/30 pointer-events-none" />
+                   
+                   {React.cloneElement(homeItem.icon as any, { 
+                      size: 26,
+                      strokeWidth: 2.5
+                   })}
+                 </div>
+                 <span className={cn(
+                   "text-[10px] font-bold transition-colors duration-300 tracking-tight mt-1",
+                   pathname === homeItem.href ? "text-accent" : "text-slate-400"
+                 )}>
+                   {homeItem.label}
+                 </span>
+               </Link>
+             )}
 
-            {/* Right Items */}
             <div className="flex-1 flex justify-around items-center h-full">
               {rightItems.map((item) => (
                 <Link 
@@ -496,16 +495,16 @@ export default function AppShell({
                 >
                   <div className={cn(
                     "w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-300",
-                    pathname === item.href ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                    pathname === item.href ? "text-accent" : "text-slate-400 group-hover:text-slate-600"
                   )}>
                     {React.cloneElement(item.icon as any, { 
-                      size: 18,
+                      size: 20,
                       strokeWidth: 2
                     })}
                   </div>
                   <span className={cn(
                     "text-[10px] font-bold transition-colors duration-300 tracking-tight",
-                    pathname === item.href ? "text-blue-600" : "text-slate-400"
+                    pathname === item.href ? "text-accent" : "text-slate-400"
                   )}>
                     {item.label}
                   </span>
@@ -514,31 +513,8 @@ export default function AppShell({
             </div>
 
           </div>
-
-          {/* Center Floating Button (Sơ đồ) */}
-          <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 pointer-events-auto z-50">
-             {homeItem && (
-               <Link 
-                 href={homeItem.href}
-                 className={cn(
-                   "flex items-center justify-center w-[54px] h-[54px] rounded-full shadow-[0_8px_20px_rgba(37,99,235,0.25)] transition-all duration-300 active:scale-90 group relative overflow-hidden",
-                   pathname === homeItem.href 
-                     ? "bg-blue-600 text-white" 
-                     : "bg-white text-slate-400 border-2 border-slate-50 shadow-md"
-                 )}
-               >
-                 <div className="flex flex-col items-center justify-center">
-                   {React.cloneElement(homeItem.icon as any, { 
-                      size: 22,
-                      strokeWidth: 2.5,
-                      className: "transition-transform"
-                   })}
-                 </div>
-               </Link>
-             )}
-          </div>
         </nav>
       )}
-    </>
+    </div>
   );
 }

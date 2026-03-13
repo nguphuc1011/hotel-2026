@@ -10,16 +10,17 @@ import { cn } from '@/lib/utils';
 interface DepositModalProps {
   isOpen: boolean;
   onClose: () => void;
-  bookingId: string;
+  bookingId: string | undefined;
   bill?: BookingBill | null;
+  customerId?: string; // Add customerId to props
   onSuccess: () => void;
   verifiedStaff?: { id: string, name: string };
 }
 
-export default function DepositModal({ isOpen, onClose, bookingId, bill, onSuccess, verifiedStaff }: DepositModalProps) {
+export default function DepositModal({ isOpen, onClose, bookingId, bill, customerId: propCustomerId, onSuccess, verifiedStaff }: DepositModalProps) {
   const [amount, setAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
-  const [description, setDescription] = useState('Thanh toán trước');
+  const [description, setDescription] = useState('Thu trước');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const remainingAmount = bill ? (bill.amount_to_pay + (bill.customer_balance < 0 ? Math.abs(bill.customer_balance) : 0)) : 0;
@@ -37,6 +38,7 @@ export default function DepositModal({ isOpen, onClose, bookingId, bill, onSucce
         amount,
         paymentMethod,
         description,
+        customerId: propCustomerId || bill?.customer_id, // Use prop or bill
         verifiedStaff
       });
       toast.success('Đã nhận tiền thành công');
@@ -49,10 +51,10 @@ export default function DepositModal({ isOpen, onClose, bookingId, bill, onSucce
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !bookingId) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[70000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div className="flex items-center gap-3">
@@ -60,7 +62,7 @@ export default function DepositModal({ isOpen, onClose, bookingId, bill, onSucce
               <Wallet className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-800 leading-none">Thanh toán trước</h3>
+              <h3 className="text-lg font-bold text-slate-800 leading-none">Thu trước</h3>
               <p className="text-xs text-slate-500 mt-1 font-medium">Nạp tiền vào tài khoản phòng</p>
             </div>
           </div>

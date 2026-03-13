@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Plus, Minus, AlertCircle, MessageSquare, User, Users, ShieldCheck, KeyRound, Link, Unlink } from 'lucide-react';
+import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Calendar, Plus, Minus, AlertCircle, MessageSquare, User, Users, ShieldCheck, KeyRound, Link, Unlink, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +15,7 @@ import CancellationPenaltyModal from './CancellationPenaltyModal';
 import EditBookingModal from './folio/EditBookingModal';
 import ChangeRoomModal from './folio/ChangeRoomModal';
 import DepositModal from './folio/DepositModal';
+import LiveTimer from './LiveTimer';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { toast } from 'sonner';
 import TransferGroupMasterModal from './TransferGroupMasterModal';
@@ -27,7 +28,7 @@ interface RoomFolioModalProps {
   isOpen: boolean;
   onClose: () => void;
   room: DashboardRoom;
-  booking: Booking;
+  booking?: Booking;
   onUpdate: () => void;
   onGroupRoom?: () => void;
   pendingApproval?: {
@@ -116,42 +117,39 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [isTransferGroupMasterModalOpen, setIsTransferGroupMasterModalOpen] = useState(false);
 
   const handleTransferGroupMaster = () => {
-    setIsTransferGroupMasterModalOpen(true);
+    verify('folio_transfer_master', () => {
+      setIsTransferGroupMasterModalOpen(true);
+    }, {
+      room_id: room.id,
+      room_number: room.name,
+      booking_id: booking?.id?.slice(0, 8)
+    });
   };
 
   const handleUngroupRoom = async (bookingId: string) => {
-    try {
-      const { groupBookingService } = await import('@/services/groupBookingService');
-      await groupBookingService.ungroupRoom(bookingId);
-      toast.success('Đã tách phòng khỏi nhóm thành công');
-      onUpdate(); // Refresh data
-    } catch (error) {
-      console.error('Ungroup error:', error);
-      toast.error('Tách phòng thất bại');
-    }
+    verify('folio_ungroup_room', async () => {
+      try {
+        const { groupBookingService } = await import('@/services/groupBookingService');
+        await groupBookingService.ungroupRoom(bookingId);
+        toast.success('Đã tách phòng khỏi nhóm thành công');
+        onUpdate(); // Refresh dashboard data
+        onClose();  // Close the current folio modal
+      } catch (error) {
+        console.error('Ungroup error:', error);
+        toast.error('Tách phòng thất bại');
+      }
+    }, {
+      room_id: room.id,
+      room_number: room.name,
+      customer_name: booking?.customer_name || 'Khách lẻ',
+      booking_id: bookingId?.slice(0, 8)
+    });
   };
   const [mounted, setMounted] = useState(false);
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [internalPendingApproval] = useState<any>(null);
   const [groupDetails, setGroupDetails] = useState<any>(null); // State mới cho chi tiết nhóm
-
-  const customerBalance = bill?.customer_balance ?? 0;
-  const hasCustomerBalance = customerBalance !== 0;
-  const isCustomerInDebt = customerBalance < 0;
-  
-  // Tổng cộng cần thanh toán bao gồm cả nợ cũ
-  const amountToPayWithDebt = bill ? (bill.amount_to_pay + (isCustomerInDebt ? Math.abs(customerBalance) : 0)) : 0;
-  
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Service State
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
   const [bookingServices, setBookingServices] = useState<BookingServiceItem[]>([]);
   const [serviceSearch, setServiceSearch] = useState('');
@@ -168,7 +166,16 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [cancellationStaff, setCancellationStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
+
   const { verify, SecurityModals } = useSecurity();
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -186,7 +193,68 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     }
   }, [isOpen, booking]);
 
+  // Real-time listener for this specific booking
+  useEffect(() => {
+    if (!isOpen || !booking?.id) return;
+
+    const channel = supabase
+      .channel(`folio-${booking.id}`)
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'booking_services',
+          filter: `booking_id=eq.${booking.id}`
+        }, 
+        () => {
+          console.log('Real-time Folio Update: Services changed');
+          loadServices();
+          loadBill();
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'bookings',
+          filter: `id=eq.${booking.id}`
+        },
+        () => {
+          console.log('Real-time Folio Update: Booking changed');
+          loadBill();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen, booking?.id]);
+
+  // Early return if no booking to prevent crashes
+  // MUST BE AFTER ALL HOOKS
+  if (!booking && isOpen) {
+    return null;
+  }
+
+  // Use booking prop as source of truth for the big number
+  // It's calculated by the parent (Dashboard) and updated via timer/real-time
+  const displayAmountToPay = bill?.amount_to_pay ?? booking?.amount_to_pay ?? 0;
+  const displayCustomerBalance = bill?.customer_balance ?? booking?.customer_balance ?? 0;
+  const isCustomerInDebt = displayCustomerBalance < 0;
+
+  // Tạm tính tổng tiền bao gồm cả dịch vụ chưa lưu
+  const pendingServicesTotal = pendingServices.reduce((sum, item) => sum + (item.quantity * item.price_at_time), 0);
+  
+  // Tổng tiền ĐÃ LƯU vào Folio (bao gồm nợ cũ nếu có)
+  // Logic: Lấy số tiền còn lại của Booking + Nợ cũ khách hàng
+  const officialAmountToPay = displayAmountToPay + (isCustomerInDebt ? Math.abs(displayCustomerBalance) : 0);
+  
+  // Tổng tiền DỰ KIẾN (bao gồm cả dịch vụ đang chờ lưu)
+  const projectedAmountToPay = officialAmountToPay + pendingServicesTotal;
+
   const loadBill = async () => {
+    if (!booking) return;
     setIsLoading(true);
     try {
       const data = await bookingService.calculateBill(booking.id);
@@ -200,6 +268,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const loadGroupDetails = async () => {
+    if (!booking) return;
     try {
       const data = await groupBookingService.getGroupDetails(booking.id);
       if (data.is_group) {
@@ -217,6 +286,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const loadServices = async () => {
+      if (!booking) return;
       const [services, currentServices] = await Promise.all([
           serviceService.getServices(),
           serviceService.getBookingServices(booking.id)
@@ -226,6 +296,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleAddService = async (service: Service) => {
+      if (!booking) return;
       // Just add to pending list
       const tempId = 'pending-' + Date.now() + Math.random();
       const newItem: BookingServiceItem = {
@@ -242,7 +313,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleSaveServices = async () => {
-      if (pendingServices.length === 0) return;
+      if (!booking || pendingServices.length === 0) return;
       
       // Security Check
       verify('folio_add_service', async (staffId, staffName) => {
@@ -322,6 +393,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleConfirmCancelWithPenalty = async (penaltyAmount: number, paymentMethod: string, reason: string) => {
+    if (!booking) return;
     // Step 2: Verify permission with full data
     verify('checkin_cancel_booking', async (staffId, staffName) => {
       // Step 3: Execute Cancellation after Approval
@@ -358,7 +430,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     }, {
       room_id: room.id, // Critical for dashboard matching
       room_number: room.name || 'N/A',
-      customer_name: booking.customer_name || 'Khách vãng lai',
+      customer_name: booking?.customer_name || 'Khách vãng lai',
       booking_id: booking?.id?.slice(0, 8),
       full_booking_id: booking?.id, // For auto-finalize execution
       reason: reason,
@@ -373,6 +445,11 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     verify('folio_change_room', (staffId, staffName) => {
       setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
       setShowChangeRoomModal(true);
+    }, {
+      room_id: room.id,
+      room_number: room.name,
+      customer_name: booking?.customer_name || 'Khách vãng lai',
+      booking_id: booking?.id?.slice(0, 8)
     });
   };
 
@@ -380,6 +457,11 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     verify('folio_edit_booking', (staffId, staffName) => {
       setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
       setShowEditModal(true);
+    }, {
+      room_id: room.id,
+      room_number: room.name,
+      customer_name: booking?.customer_name || 'Khách vãng lai',
+      booking_id: booking?.id?.slice(0, 8)
     });
   };
 
@@ -448,7 +530,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
             {/* Quick Actions - Scrollable */}
             <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-2">
                 <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => handleChangeRoom()} />
@@ -457,7 +539,17 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                 {groupDetails && groupDetails.is_group && groupDetails.master_id === booking?.id && groupDetails.rooms && groupDetails.rooms.length > 1 && (
                   <QuickActionButton icon={KeyRound} label="Chuyển chủ nhóm" onClick={handleTransferGroupMaster} />
                 )}
-                <QuickActionButton icon={DollarSign} label="Nạp tiền" onClick={() => setShowDepositModal(true)} />
+                <QuickActionButton icon={DollarSign} label="Thu trước" onClick={() => {
+                  verify('folio_deposit', (staffId, staffName) => {
+                    setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
+                    setShowDepositModal(true);
+                  }, {
+                    room_id: room.id,
+                    room_number: room.name,
+                    customer_name: booking?.customer_name || 'Khách lẻ',
+                    booking_id: booking?.id?.slice(0, 8)
+                  });
+                }} />
                 <QuickActionButton icon={Printer} label="In phiếu" onClick={() => {}} />
                 
                 <QuickActionButton 
@@ -486,19 +578,44 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                         </div>
                     </div>
 
-                    <div className="flex justify-center items-center gap-3 mb-6 h-10">
-                        <div className="text-4xl font-bold tracking-tight flex items-center h-full">
-                            {bill ? formatMoney(amountToPayWithDebt) : '---'}
+                    <div className="flex flex-col items-center gap-1 mb-6">
+                        <div className="flex justify-center items-center gap-3 h-10">
+                            <button 
+                                onClick={() => {
+                                    loadBill();
+                                    loadServices();
+                                    onUpdate();
+                                }}
+                                className={cn(
+                                    "p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90",
+                                    isLoading && "animate-spin"
+                                )}
+                                title="Làm mới"
+                            >
+                                <RefreshCw className="w-5 h-5 opacity-50" />
+                            </button>
+                            <div className="text-4xl font-bold tracking-tight flex items-center h-full">
+                                {bill || (booking && booking.total_amount !== undefined) ? formatMoney(officialAmountToPay) : '---'}
+                            </div>
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowAuditTrail(true);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-full border border-white/50 text-lg font-black text-white hover:bg-white/10 transition-all"
+                            >
+                                !
+                            </button>
                         </div>
-                        <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowAuditTrail(true);
-                            }}
-                            className="w-8 h-8 flex items-center justify-center rounded-full border border-white/50 text-lg font-black text-white hover:bg-white/10 transition-all"
-                        >
-                            !
-                        </button>
+                        
+                        {pendingServicesTotal > 0 && (
+                            <div className="flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full backdrop-blur-md animate-in slide-in-from-top-2 duration-300">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-100">Dự kiến:</span>
+                                <span className="text-sm font-black text-yellow-300">
+                                    {formatMoney(projectedAmountToPay)}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center border-t border-white/20 pt-4 mb-2">
@@ -543,39 +660,35 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                     {bill?.rental_type === 'hourly' ? 'Theo Giờ' : 
                                      bill?.rental_type === 'overnight' ? 'Qua Đêm' : 
                                      bill?.rental_type === 'daily' ? 'Theo Ngày' : 
-                                     booking?.booking_type === 'hourly' ? 'Theo Giờ' :
-                                     booking?.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày'}
+                                     (booking ? (booking.booking_type === 'hourly' ? 'Theo Giờ' : booking.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày') : '---')}
                                 </div>
                             </div>
                             <div className="font-bold text-lg leading-tight">
                                 {(() => {
-                                    if (!bill) return '--';
+                                    if (!bill?.check_in_at) return '--';
                                     
-                                    // Robust Duration Display Logic
-                                    if (bill.rental_type === 'daily') {
-                                        if (bill.duration_hours) {
-                                            const days = Math.ceil(bill.duration_hours / 24);
-                                            return `${Math.max(1, days)} ngày`;
-                                        }
-                                        if (bill.check_in_at) {
-                                            const start = new Date(bill.check_in_at);
-                                            const end = bill.check_out_at ? new Date(bill.check_out_at) : new Date();
-                                            const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                                            const days = Math.ceil(hours / 24);
-                                            return `${Math.max(1, days)} ngày`;
-                                        }
-                                        return '1 ngày';
+                                    // Prefer business-logic duration from DB for Daily/Overnight
+                                    if (bill.duration_text && (bill.rental_type === 'daily' || bill.rental_type === 'overnight')) {
+                                        return (
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <Calendar className="w-4 h-4 text-white/60" />
+                                                <span className="text-xl text-yellow-300">{bill.duration_text}</span>
+                                            </div>
+                                        );
                                     }
 
-                                    if (bill.rental_type === 'overnight') {
-                                        if (bill.duration_hours && bill.duration_hours > 24) {
-                                            const nights = Math.ceil(bill.duration_hours / 24);
-                                            return `${nights} đêm`;
-                                        }
-                                        return '1 đêm';
-                                    }
+                                    const mode = bill.rental_type === 'hourly' ? 'hourly' : 
+                                                 bill.rental_type === 'overnight' ? 'overnight' : 'daily';
                                     
-                                    return bill.duration_text;
+                                    return (
+                                        <div className="flex items-center justify-center gap-1.5">
+                                            {mode === 'hourly' ? <Clock className="w-4 h-4 text-white/60" /> : <Calendar className="w-4 h-4 text-white/60" />}
+                                            <LiveTimer 
+                                                checkInAt={bill.check_in_at} 
+                                                mode={mode} 
+                                            />
+                                        </div>
+                                    );
                                 })()}
                             </div>
                         </div>
@@ -593,6 +706,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                     isDark={true}
                                     className="pt-2"
                                     hideAuditLog={true}
+                                    pendingServicesTotal={pendingServicesTotal}
                                 />
                             )}
                         </div>
@@ -634,6 +748,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                                 member={member} 
                                                 groupColor={room.group_color || '#4A5568'}
                                                 isMaster={member.is_master}
+                                                onUngroup={handleUngroupRoom}
                                             />
                                         ))}
                                     </div>
@@ -655,17 +770,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                             
                             <button
                                 className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
-                                onClick={async () => {
-                                    try {
-                                        const { groupBookingService } = await import('@/services/groupBookingService');
-                                        await groupBookingService.ungroupRoom(booking?.id);
-                                        toast.success('Đã tách phòng khỏi nhóm thành công');
-                                        onUpdate();
-                                    } catch (error) {
-                                        console.error('Ungroup error:', error);
-                                        toast.error('Tách phòng thất bại');
-                                    }
-                                }}
+                                onClick={() => handleUngroupRoom(booking?.id!)}
                             >
                                 <Unlink className="w-3 h-3" />
                                 Tách nhóm
@@ -772,7 +877,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                             {formatMoney(item.total_price)}
                                         </div>
                                         <button 
-                                            onClick={() => handleRemoveService(item.service_id)}
+                                            onClick={() => handleRemoveService(item.id)}
                                             disabled={!!processingServiceId}
                                             className="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors active:scale-90"
                                         >
@@ -790,12 +895,13 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
         {/* Floating Footer */}
         <div className={cn(
-            isMobile ? "fixed" : "absolute",
-            "bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-6 py-6 z-[110]"
+            "shrink-0 bg-white border-t border-slate-100 px-6 py-6 z-[110]",
+            isMobile && "fixed bottom-0 left-0 right-0 pb-[max(1.5rem,env(safe-area-inset-bottom))] rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
         )}>
             {pendingServices.length > 0 ? (
                 <div className="flex gap-3">
                     <button 
+                        type="button"
                         onClick={() => setPendingServices([])}
                         disabled={isSaving}
                         className="w-20 bg-slate-100 hover:bg-slate-200 text-slate-600 h-12 rounded-2xl font-bold text-xs shadow-sm active:scale-[0.98] transition-all"
@@ -803,6 +909,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                         HỦY
                     </button>
                     <button 
+                        type="button"
                         onClick={() => handleSaveServices()}
                         disabled={isSaving}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-2xl font-bold text-base shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 animate-pulse"
@@ -822,12 +929,14 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             ) : (
                 <div className="flex gap-3">
                     <button
+                        type="button"
                         onClick={onClose}
                         className="w-24 bg-slate-100 hover:bg-slate-200 text-slate-700 h-12 rounded-2xl font-bold text-xs shadow-sm active:scale-[0.98] transition-all"
                     >
                         ĐÓNG
                     </button>
                     <button 
+                        type="button"
                         onClick={() => setShowPaymentModal(true)}
                         className="flex-1 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-2xl font-bold text-base shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
@@ -866,7 +975,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             setShowEditModal(false);
             setEditStaff(undefined);
           }}
-          booking={booking}
+          booking={booking!}
           room={room}
           verifiedStaff={editStaff}
           onSuccess={() => {
@@ -881,7 +990,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             setShowChangeRoomModal(false);
             setEditStaff(undefined);
           }}
-          bookingId={booking?.id} 
+          bookingId={booking?.id!} 
           currentRoomName={room.name} 
           verifiedStaff={editStaff} 
           onSuccess={() => { 
@@ -893,11 +1002,14 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
         <DepositModal 
           isOpen={showDepositModal}
           onClose={() => setShowDepositModal(false)}
-          bookingId={booking?.id} 
+          bookingId={booking?.id!} 
+          customerId={booking?.customer_id}
           bill={bill}
+          verifiedStaff={editStaff}
           onSuccess={() => {
             loadBill();
             onUpdate();
+            onClose(); // Auto close Folio after deposit success
           }}
         />
 
@@ -910,9 +1022,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
               onClose();
             }}
             oldMasterBooking={{
-              id: booking?.id,
+              id: booking?.id!,
               room_name: room.name,
-              customer_name: bill?.customer_name || 'Khách vãng lai'
+              customer_name: bill?.customer_name || 'Khách lẻ'
             } as any}
             childBookings={groupDetails.rooms
               .filter((m: any) => m.booking_id !== booking?.id)

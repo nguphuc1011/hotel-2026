@@ -10,7 +10,7 @@ import { Room } from '@/types/dashboard';
 interface ChangeRoomModalProps {
   isOpen: boolean;
   onClose: () => void;
-  bookingId: string;
+  bookingId: string | undefined;
   currentRoomName: string;
   onSuccess: () => void;
   verifiedStaff?: { id: string, name: string };
@@ -46,7 +46,7 @@ export default function ChangeRoomModal({ isOpen, onClose, bookingId, currentRoo
   };
 
   const handleSubmit = async () => {
-    if (!selectedRoomId) {
+    if (!selectedRoomId || !bookingId) {
       toast.error('Vui lòng chọn phòng mới');
       return;
     }
@@ -64,7 +64,7 @@ export default function ChangeRoomModal({ isOpen, onClose, bookingId, currentRoo
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !bookingId) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">

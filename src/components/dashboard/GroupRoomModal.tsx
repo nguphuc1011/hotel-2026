@@ -19,6 +19,7 @@ import { groupBookingService } from '@/services/groupBookingService';
 import { formatMoney } from '@/utils/format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useSecurity } from '@/hooks/useSecurity';
 
 interface GroupRoomModalProps {
   isOpen: boolean;
@@ -47,6 +48,7 @@ export default function GroupRoomModal({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const { verify, SecurityModals } = useSecurity();
 
   // Fetch available rooms (checked_in, not same as master, not already grouped)
   const fetchRooms = useCallback(async () => {
@@ -128,30 +130,36 @@ export default function GroupRoomModal({
   const handleSubmit = async () => {
     if (selectedRooms.length === 0) return;
     
-    setIsSubmitting(true);
-    try {
-      if (!masterRoom.current_booking?.id) {
-          throw new Error("Phòng chính không hợp lệ");
-      }
-      
-      const result: { success: boolean; message?: string; data?: any } = await groupBookingService.groupRooms(
-        masterRoom.current_booking.id,
-        selectedRooms
-      );
+    verify('folio_group_rooms', async () => {
+      setIsSubmitting(true);
+      try {
+        if (!masterRoom.current_booking?.id) {
+            throw new Error("Phòng chính không hợp lệ");
+        }
+        
+        const result: { success: boolean; message?: string; data?: any } = await groupBookingService.groupRooms(
+          masterRoom.current_booking.id,
+          selectedRooms
+        );
 
-      if (result.success) {
-        toast.success(`Đã gộp ${selectedRooms.length} phòng vào nhóm thành công!`);
-        onSuccess();
-        onClose();
-      } else {
-        toast.error(result.message || 'Có lỗi xảy ra khi gộp phòng');
+        if (result.success) {
+          toast.success(`Đã gộp ${selectedRooms.length} phòng vào nhóm thành công!`);
+          onSuccess();
+          onClose();
+        } else {
+          toast.error(result.message || 'Có lỗi xảy ra khi gộp phòng');
+        }
+      } catch (error) {
+        console.error('Group rooms error:', error);
+        toast.error('Gộp phòng thất bại');
+      } finally {
+        setIsSubmitting(false);
       }
-    } catch (error) {
-      console.error('Group rooms error:', error);
-      toast.error('Gộp phòng thất bại');
-    } finally {
-      setIsSubmitting(false);
-    }
+    }, {
+      master_room: masterRoom.name,
+      child_rooms_count: selectedRooms.length,
+      child_room_ids: selectedRooms
+    });
   };
 
   if (!isOpen) return null;
@@ -163,7 +171,8 @@ export default function GroupRoomModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[50000] flex flex-col justify-end sm:justify-center items-center backdrop-blur-md bg-slate-900/60">
-      <div className="w-full h-full sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] bg-slate-50 flex flex-col shadow-2xl overflow-hidden relative">
+      {SecurityModals}
+      <div className="w-full h-[95vh] sm:w-full sm:max-w-xl sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] bg-slate-50 flex flex-col shadow-2xl overflow-hidden relative">
         
         {/* Header */}
         <div className="h-16 flex justify-between items-center px-6 bg-white z-50 shrink-0 shadow-sm border-b border-slate-100/50">

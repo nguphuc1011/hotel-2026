@@ -29,7 +29,9 @@ export interface Booking {
   check_out_at?: string;
   booking_type: BookingType;
   total_amount?: number; // Calculated amount
+  amount_to_pay?: number; // Calculated amount (total - deposit)
   prepayment?: number;
+  deposit_amount?: number; // Actual deposit from DB
   custom_price?: number; // New: Manual price override
   status: 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
   notes?: string;

@@ -12,7 +12,7 @@ import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 interface EditBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  booking: Booking;
+  booking: Booking | null | undefined;
   room: Room;
   onSuccess: () => void;
   verifiedStaff?: { id: string, name: string };
@@ -51,7 +51,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
 
   // Initialize data when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && booking) {
       // Customer
       setCustomerName(booking.customer_name || '');
       // Don't trigger search immediately on open
@@ -186,7 +186,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !booking) return null;
 
   const debt = selectedCustomer && selectedCustomer.balance < 0 ? Math.abs(selectedCustomer.balance) : 0;
 

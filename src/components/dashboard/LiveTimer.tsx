@@ -24,11 +24,14 @@ const LiveTimer: React.FC<LiveTimerProps> = ({ checkInAt, mode }) => {
         const m = Math.floor((diffSec % 3600) / 60);
         const s = diffSec % 60;
         setDisplay(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-      } else {
-        // Daily or Overnight: Display static days as requested
+      } else if (mode === 'daily') {
         const diffHours = Math.max(0, differenceInHours(now, checkIn));
         const diffDays = Math.ceil(diffHours / 24);
         setDisplay(`${Math.max(1, diffDays)} ngày`);
+      } else if (mode === 'overnight') {
+        const diffHours = Math.max(0, differenceInHours(now, checkIn));
+        const diffDays = Math.ceil(diffHours / 24);
+        setDisplay(`${Math.max(1, diffDays)} đêm`);
       }
     };
 

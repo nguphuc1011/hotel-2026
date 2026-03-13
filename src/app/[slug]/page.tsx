@@ -107,142 +107,146 @@ export default function DashboardPage() {
       if (unifiedResult.data) {
         const { rooms: roomsData, bookings: bookingsData, rates: ratesData, wallets: walletsData } = unifiedResult.data;
         
-        // 2. Update Settings only if changed (shallow check is enough for most cases, 
-        // but let's be careful with object references from RPC)
+        // 2. Update Settings only if changed
         const newSettings = settingsResult.data || null;
         setSettings((prev: any) => {
           if (JSON.stringify(prev) === JSON.stringify(newSettings)) return prev;
           return newSettings;
         });
 
-      // Reset color maps
-      masterBookingIdToColorMapRef.current.clear();
-      usedColorsRef.current.clear();
-      colorIndexRef.current = 0;
+        // Reset color maps
+        masterBookingIdToColorMapRef.current.clear();
+        usedColorsRef.current.clear();
+        colorIndexRef.current = 0;
 
-      const ratesByBookingId = new Map<string, any>(
-        ratesData.map((r: any) => [r.booking_id, r])
-      );
+        const ratesByBookingId = new Map<string, any>(
+          ratesData.map((r: any) => [r.booking_id, r])
+        );
 
-      const processedBookings = bookingsData.map((b: any) => {
-        const rate = ratesByBookingId.get(b.id);
-        return {
-          ...b,
-          total_amount: rate?.total_amount ?? b.total_amount ?? 0,
-          check_in_at: rate?.check_in_at ?? b.check_in_actual
-        };
-      });
+        const processedBookings = bookingsData.map((b: any) => {
+          const rate = ratesByBookingId.get(b.id);
+          const total_amount = rate?.total_amount ?? b.total_amount ?? 0;
+          return {
+            ...b,
+            total_amount: total_amount,
+            amount_to_pay: total_amount - (b.deposit_amount || 0),
+            customer_balance: b.customer?.balance || 0,
+            check_in_at: rate?.check_in_at ?? b.check_in_actual,
+            duration_text: rate?.duration_text // PASS DURATION TEXT FROM RATE
+          };
+        });
 
-      // Merge Data
-      const mergedRooms: DashboardRoom[] = roomsData.map((room: any) => {
-        const booking = processedBookings.find((b: any) => b.room_id === room.id);
+        // Merge Data
+        const mergedRooms: DashboardRoom[] = roomsData.map((room: any) => {
+          const booking = processedBookings.find((b: any) => b.room_id === room.id);
 
-        let dashboardRoom: DashboardRoom = {
-          id: room.id,
-          name: room.room_number || room.name,
-          category_id: room.category_id,
-          category_name: room.category?.name,
-          price_hourly: room.category?.price_hourly,
-          price_daily: room.category?.price_daily,
-          price_overnight: room.category?.price_overnight,
-          base_hourly_limit: room.category?.base_hourly_limit,
-          hourly_unit: room.category?.hourly_unit,
-          status: room.status as RoomStatus,
-          updated_at: room.updated_at,
-          notes: room.notes
-        };
-
-        if (booking) {
-          dashboardRoom.current_booking = {
-            id: booking.id,
-            room_id: booking.room_id,
-            customer_id: booking.customer_id,
-            customer_name: booking.customer?.full_name,
-            customer_balance: booking.customer?.balance || 0,
-            check_in_at: booking.check_in_at,
-            booking_type: booking.rental_type,
-            total_amount: booking.total_amount || 0,
-            status: booking.status,
-            duration_text: booking.duration_text,
-            parent_booking_id: booking.parent_booking_id,
-            is_group_member: !!booking.parent_booking_id
+          let dashboardRoom: DashboardRoom = {
+            id: room.id,
+            name: room.room_number || room.name,
+            category_id: room.category_id,
+            category_name: room.category?.name,
+            price_hourly: room.category?.price_hourly,
+            price_daily: room.category?.price_daily,
+            price_overnight: room.category?.price_overnight,
+            base_hourly_limit: room.category?.base_hourly_limit,
+            hourly_unit: room.category?.hourly_unit,
+            status: room.status as RoomStatus,
+            updated_at: room.updated_at,
+            notes: room.notes
           };
 
-          // Check Group Master Logic
-          const groupMembers = processedBookings.filter((b: any) => b.parent_booking_id === booking.id);
-          if (groupMembers.length > 0) {
-            dashboardRoom.is_group_master = true;
-            dashboardRoom.group_count = groupMembers.length;
-          }
+          if (booking) {
+            dashboardRoom.current_booking = {
+              id: booking.id,
+              room_id: booking.room_id,
+              customer_id: booking.customer_id,
+              customer_name: booking.customer?.full_name,
+              customer_balance: booking.customer?.balance || 0,
+              check_in_at: booking.check_in_at,
+              booking_type: booking.rental_type,
+              total_amount: booking.total_amount || 0,
+              amount_to_pay: booking.amount_to_pay || 0,
+              status: booking.status,
+              duration_text: booking.duration_text,
+              parent_booking_id: booking.parent_booking_id,
+              is_group_member: !!booking.parent_booking_id
+            };
 
-          // Check Group Member Logic to find Master Name
-          if (dashboardRoom.current_booking.is_group_member && dashboardRoom.current_booking.parent_booking_id) {
-             const masterBooking = processedBookings.find((b: any) => b.id === dashboardRoom.current_booking?.parent_booking_id);
-             if (masterBooking) {
-                const masterRoom = roomsData.find((r: any) => r.id === masterBooking.room_id);
-                if (masterRoom) {
-                   dashboardRoom.current_booking.master_room_name = masterRoom.room_number || masterRoom.name;
-                }
-             }
-          }
-          
-          if (dashboardRoom.status === 'available') {
-             dashboardRoom.status = 'occupied';
-          }
-        }
-
-        if (dashboardRoom.status === 'dirty' && room.updated_at) {
-          const minutesDirty = differenceInMinutes(new Date(), new Date(room.updated_at));
-          if (minutesDirty > 60) {
-            dashboardRoom.is_dirty_overdue = true;
-          }
-        }
-
-        return dashboardRoom;
-      });
-
-      const roomsWithGroupColors = mergedRooms.map(room => {
-        if (room.is_group_master && room.current_booking?.id) {
-          const masterId = room.current_booking.id;
-          let assignedColor: string;
-
-          if (!masterBookingIdToColorMapRef.current.has(masterId)) {
-            if (colorIndexRef.current < PREDEFINED_GROUP_COLORS.length) {
-              assignedColor = PREDEFINED_GROUP_COLORS[colorIndexRef.current];
-            } else {
-              assignedColor = getRandomColor();
+            // Check Group Master Logic
+            const groupMembers = processedBookings.filter((b: any) => b.parent_booking_id === booking.id);
+            if (groupMembers.length > 0) {
+              dashboardRoom.is_group_master = true;
+              dashboardRoom.group_count = groupMembers.length;
             }
-            masterBookingIdToColorMapRef.current.set(masterId, assignedColor);
-            usedColorsRef.current.add(assignedColor);
-            colorIndexRef.current++;
-          } else {
-            assignedColor = masterBookingIdToColorMapRef.current.get(masterId)!;
-          }
-          room.group_color = assignedColor;
 
-        } else if (room.current_booking?.is_group_member && room.current_booking.parent_booking_id) {
-          const masterId = room.current_booking.parent_booking_id;
-          if (!masterBookingIdToColorMapRef.current.has(masterId)) {
+            // Check Group Member Logic to find Master Name
+            if (dashboardRoom.current_booking.is_group_member && dashboardRoom.current_booking.parent_booking_id) {
+               const masterBooking = processedBookings.find((b: any) => b.id === dashboardRoom.current_booking?.parent_booking_id);
+               if (masterBooking) {
+                  const masterRoom = roomsData.find((r: any) => r.id === masterBooking.room_id);
+                  if (masterRoom) {
+                     dashboardRoom.current_booking.master_room_name = masterRoom.room_number || masterRoom.name;
+                  }
+               }
+            }
+            
+            if (dashboardRoom.status === 'available') {
+               dashboardRoom.status = 'occupied';
+            }
+          }
+
+          if (dashboardRoom.status === 'dirty' && room.updated_at) {
+            const minutesDirty = differenceInMinutes(new Date(), new Date(room.updated_at));
+            if (minutesDirty > 60) {
+              dashboardRoom.is_dirty_overdue = true;
+            }
+          }
+
+          return dashboardRoom;
+        });
+
+        const roomsWithGroupColors = mergedRooms.map(room => {
+          if (room.is_group_master && room.current_booking?.id) {
+            const masterId = room.current_booking.id;
             let assignedColor: string;
-            if (colorIndexRef.current < PREDEFINED_GROUP_COLORS.length) {
-              assignedColor = PREDEFINED_GROUP_COLORS[colorIndexRef.current];
+
+            if (!masterBookingIdToColorMapRef.current.has(masterId)) {
+              if (colorIndexRef.current < PREDEFINED_GROUP_COLORS.length) {
+                assignedColor = PREDEFINED_GROUP_COLORS[colorIndexRef.current];
+              } else {
+                assignedColor = getRandomColor();
+              }
+              masterBookingIdToColorMapRef.current.set(masterId, assignedColor);
+              usedColorsRef.current.add(assignedColor);
+              colorIndexRef.current++;
             } else {
-              assignedColor = getRandomColor();
+              assignedColor = masterBookingIdToColorMapRef.current.get(masterId)!;
             }
-            masterBookingIdToColorMapRef.current.set(masterId, assignedColor);
-            usedColorsRef.current.add(assignedColor);
-            colorIndexRef.current++;
+            room.group_color = assignedColor;
+
+          } else if (room.current_booking?.is_group_member && room.current_booking.parent_booking_id) {
+            const masterId = room.current_booking.parent_booking_id;
+            if (!masterBookingIdToColorMapRef.current.has(masterId)) {
+              let assignedColor: string;
+              if (colorIndexRef.current < PREDEFINED_GROUP_COLORS.length) {
+                assignedColor = PREDEFINED_GROUP_COLORS[colorIndexRef.current];
+              } else {
+                assignedColor = getRandomColor();
+              }
+              masterBookingIdToColorMapRef.current.set(masterId, assignedColor);
+              usedColorsRef.current.add(assignedColor);
+              colorIndexRef.current++;
+            }
+            room.group_color = masterBookingIdToColorMapRef.current.get(masterId);
           }
-          room.group_color = masterBookingIdToColorMapRef.current.get(masterId);
-        }
-        return room;
-      });
+          return room;
+        });
 
-      setRooms(roomsWithGroupColors);
-      setWallets(walletsData || []);
-
+        setRooms(roomsWithGroupColors);
+        setWallets(walletsData || []);
+      }
     } catch (error) {
-      console.error('Error fetching dashboard data:', JSON.stringify(error, null, 2));
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
@@ -462,6 +466,7 @@ export default function DashboardPage() {
       .channel('dashboard_updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, debouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_services' }, debouncedFetch)
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
             toast.success("Đã kết nối thời gian thực");
@@ -500,26 +505,6 @@ export default function DashboardPage() {
       repair: rooms.filter(r => r.status === 'repair').length,
     };
   }, [rooms]);
-
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-      </div>
-    );
-  }
-
-  if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
-          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
-          <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
-        </div>
-      </div>
-    );
-  }
 
   const handleToggleFilter = useCallback((key: keyof FilterState) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }));
@@ -607,6 +592,8 @@ export default function DashboardPage() {
 
   const handleCheckIn = async (bookingData: any) => {
     try {
+      console.log('Booking Data received in handleCheckIn:', bookingData);
+      
       // Resolve customer: use selected, otherwise default to "Khách vãng lai"
       let customerId = bookingData.customer_id || null;
       if (!customerId) {
@@ -620,15 +607,17 @@ export default function DashboardPage() {
         rental_type: bookingData.rental_type,
         customer_id: customerId,
         deposit: bookingData.deposit || 0,
+        payment_method: bookingData.payment_method || 'cash',
         services: bookingData.services || [],
         customer_name: bookingData.customer_name,
         notes: bookingData.notes,
-        // Optional fields that might be ignored by backend if not supported yet
         extra_adults: bookingData.extra_adults,
         extra_children: bookingData.extra_children,
         custom_price: bookingData.custom_price,
         custom_price_reason: bookingData.custom_price_reason,
-        verifiedStaff: user ? { id: user.id, name: user.full_name } : undefined
+        source: bookingData.source || 'direct',
+        verified_by_staff_id: bookingData.verified_by_staff_id,
+        verified_by_staff_name: bookingData.verified_by_staff_name
       });
 
       toast.success('Nhận phòng thành công');
@@ -659,10 +648,31 @@ export default function DashboardPage() {
     setIsStatusModalOpen(true);
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+      </div>
+    );
+  }
+
+  if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+          <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#F8F9FB] p-0 md:p-8 pb-32">
-      <div className="max-w-[1600px] mx-auto">
+    <div className="min-h-screen bg-[#F8F9FB] pb-32">
+      <div className="w-full px-0 md:px-8 py-0 md:py-6">
         <DashboardHeader 
+          hotelName={settings?.hotel_name}
           counts={counts}
           filters={filters}
           onToggle={handleToggleFilter}
@@ -671,13 +681,13 @@ export default function DashboardPage() {
         />
 
         {/* Room Grid */}
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto bg-[#F8F9FB] custom-scrollbar">
+        <div className="w-full px-4 md:px-0 mt-4 md:mt-6">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 md:gap-6 pb-20">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-8 4xl:grid-cols-10 gap-4 md:gap-6 pb-20">
                {filteredRooms.map((room) => (
                  <RoomCard 
                    key={room.id} 

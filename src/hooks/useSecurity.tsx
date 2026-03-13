@@ -34,7 +34,7 @@ export function useSecurity(hookOptions?: { onMinimize?: () => void }): UseSecur
       console.log(`Security Check: ${action} -> ${policy}`);
 
       if (policy === 'ALLOW') {
-        onSuccess(user?.id || 'system_allow', user?.full_name || 'System Allow');
+        onSuccess(user?.id || undefined, user?.full_name || 'Hệ thống (Tự động)');
         return;
       }
 

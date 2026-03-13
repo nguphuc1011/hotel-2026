@@ -508,7 +508,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
   const totalAmount = finalRoomPrice + servicesTotal + surchargeTotal + debt;
 
   const ModalContent = (
-    <div className="flex flex-col h-full bg-white relative">
+    <div className="flex flex-col h-full bg-white overflow-hidden">
         {/* --- HEADER --- */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
             <div className="flex items-center gap-3">
@@ -521,6 +521,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
                 </div>
             </div>
             <button
+                type="button"
                 onClick={onClose}
                 className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
             >
@@ -529,10 +530,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
         </div>
 
         {/* --- BODY --- */}
-        <div className={cn(
-            "flex-1 p-6 space-y-6 bg-slate-50 relative overflow-y-auto custom-scrollbar",
-            isMobile ? "pb-32" : ""
-        )}>
+        <div className="flex-1 p-6 space-y-6 bg-slate-50 relative overflow-y-auto custom-scrollbar">
             
             {/* Warning Overlay for non-available rooms */}
             {room.status !== 'available' && (
@@ -555,6 +553,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
                     
                     {onOpenStatusModal && (
                         <button 
+                            type="button"
                             onClick={onOpenStatusModal}
                             className={cn(
                                 "px-8 py-4 text-white font-bold rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-3",
@@ -606,7 +605,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
                             className="w-full py-4 bg-transparent border-none text-base font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none"
                         />
                         {selectedCustomer && (
-                            <button onClick={handleClearCustomer} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
+                            <button type="button" onClick={handleClearCustomer} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         )}
@@ -678,6 +677,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
                      return (
                         <button
                             key={type.id}
+                            type="button"
                             onClick={() => setActiveTab(type.id)}
                             className={cn(
                                 "flex-1 flex flex-col items-center justify-center py-3.5 rounded-full transition-all duration-300 relative overflow-hidden",
@@ -788,11 +788,11 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
                             <div className="flex items-center justify-between">
                                 <span className="text-base font-semibold text-slate-600">Người lớn</span>
                                 <div className="flex items-center gap-4">
-                                    <button onClick={() => setExtraAdults(Math.max(0, extraAdults - 1))} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors active:scale-95">
+                                    <button type="button" onClick={() => setExtraAdults(Math.max(0, extraAdults - 1))} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors active:scale-95">
                                         <Minus className="w-5 h-5" />
                                     </button>
                                     <span className="w-8 text-center font-bold text-xl text-slate-800">{extraAdults}</span>
-                                    <button onClick={() => setExtraAdults(extraAdults + 1)} className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors active:scale-95">
+                                    <button type="button" onClick={() => setExtraAdults(extraAdults + 1)} className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors active:scale-95">
                                         <Plus className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -800,11 +800,11 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
                             <div className="flex items-center justify-between">
                                 <span className="text-base font-semibold text-slate-600">Trẻ em</span>
                                 <div className="flex items-center gap-4">
-                                    <button onClick={() => setExtraChildren(Math.max(0, extraChildren - 1))} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors active:scale-95">
+                                    <button type="button" onClick={() => setExtraChildren(Math.max(0, extraChildren - 1))} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors active:scale-95">
                                         <Minus className="w-5 h-5" />
                                     </button>
                                     <span className="w-8 text-center font-bold text-xl text-slate-800">{extraChildren}</span>
-                                    <button onClick={() => setExtraChildren(extraChildren + 1)} className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors active:scale-95">
+                                    <button type="button" onClick={() => setExtraChildren(extraChildren + 1)} className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors active:scale-95">
                                         <Plus className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -861,6 +861,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
                             placeholder="0"
                         />
                         <button
+                            type="button"
                             onClick={() => setDeposit(totalAmount)}
                             className="px-4 bg-blue-50 text-blue-600 font-bold rounded-[24px] hover:bg-blue-100 transition-colors text-xs uppercase tracking-wide"
                         >
@@ -912,17 +913,16 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
         </div>
 
         {/* --- FOOTER --- */}
-        <div className={cn(
-            "p-6 bg-white border-t border-slate-100 flex items-center gap-4 z-[105] shrink-0",
-            isMobile ? "fixed bottom-0 left-0 right-0" : ""
-        )}>
+        <div className="p-6 bg-white border-t border-slate-100 flex items-center gap-4 shrink-0">
             <button 
+                type="button"
                 onClick={onClose}
                 className="flex-1 py-4 rounded-[24px] font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider"
             >
                 Hủy bỏ
             </button>
             <button 
+                type="button"
                 onClick={() => handleSubmit()}
                 disabled={isSubmitting}
                 className={cn(
@@ -956,7 +956,9 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
             title={`Nhận phòng ${room.name}`}
             description={roomCategory?.name || "Đang thực hiện nhận phòng"}
         >
-            {ModalContent}
+            <div className="flex flex-col h-[85vh]">
+                {ModalContent}
+            </div>
         </BottomSheet>
     );
   }

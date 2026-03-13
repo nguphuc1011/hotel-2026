@@ -805,8 +805,13 @@ CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid, p_no
 
     -- 4. Services
     SELECT 
-        COALESCE(SUM(quantity * price_at_time), 0),
-        COALESCE(jsonb_agg(jsonb_build_object('name', s.name, 'quantity', bs.quantity, 'price', bs.price_at_time, 'total', bs.quantity * bs.price_at_time)), '[]'::jsonb)
+        COALESCE(SUM(bs.quantity * COALESCE(NULLIF(bs.price_at_time, 0), s.price)), 0),
+        COALESCE(jsonb_agg(jsonb_build_object(
+            'name', s.name, 
+            'quantity', bs.quantity, 
+            'price', COALESCE(NULLIF(bs.price_at_time, 0), s.price), 
+            'total', bs.quantity * COALESCE(NULLIF(bs.price_at_time, 0), s.price)
+        )), '[]'::jsonb)
     INTO v_service_total, v_service_items
     FROM public.booking_services bs
     JOIN public.services s ON bs.service_id = s.id
@@ -814,6 +819,11 @@ CREATE OR REPLACE FUNCTION public.calculate_booking_bill(p_booking_id uuid, p_no
 
     IF v_service_total > 0 THEN
         v_audit_trail := array_append(v_audit_trail, format('Dịch vụ: %s', public.fn_format_money_vi(v_service_total)));
+    END IF;
+
+    -- [NEW] Include Prepayments in Audit Trail
+    IF v_deposit > 0 THEN
+        v_audit_trail := array_append(v_audit_trail, format('Thu trước: -%s', public.fn_format_money_vi(v_deposit)));
     END IF;
 
     v_total_amount := COALESCE((v_room_res->>'amount')::numeric, 0) + 
@@ -981,6 +991,58 @@ END;
 $$;
 
 --------------------------------------------------------------------------------
+-- 8.5. SERVICE USAGE
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.register_service_usage(
+    p_booking_id uuid,
+    p_service_id uuid,
+    p_quantity integer,
+    p_notes text DEFAULT NULL
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_hotel_id uuid;
+    v_service record;
+    v_new_id uuid;
+BEGIN
+    -- 1. Get Hotel ID from Booking
+    SELECT hotel_id INTO v_hotel_id FROM public.bookings WHERE id = p_booking_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Booking not found'; END IF;
+
+    -- 2. Get Service Price and Cost
+    SELECT price, cost_price, name INTO v_service FROM public.services WHERE id = p_service_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Service not found'; END IF;
+
+    -- 3. Insert Usage
+    INSERT INTO public.booking_services (
+        booking_id, 
+        service_id, 
+        quantity, 
+        price_at_time, 
+        cost_price_at_time, 
+        hotel_id, 
+        status
+    ) VALUES (
+        p_booking_id, 
+        p_service_id, 
+        p_quantity, 
+        v_service.price, 
+        COALESCE(v_service.cost_price, 0), 
+        v_hotel_id, 
+        'active'
+    ) RETURNING id INTO v_new_id;
+
+    RETURN json_build_object(
+        'success', true, 
+        'id', v_new_id, 
+        'message', format('Đã thêm %s (%sx)', v_service.name, p_quantity)
+    );
+END; $$;
+
+--------------------------------------------------------------------------------
 -- 9. CATEGORY MANAGEMENT
 --------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_room_categories()
@@ -1018,29 +1080,76 @@ CREATE OR REPLACE FUNCTION public.handle_service_inventory()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $$
-DECLARE v_new_stock integer;
+DECLARE 
+    v_new_stock integer;
+    v_current_price numeric;
+    v_current_cost numeric;
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        UPDATE public.services SET stock_quantity = stock_quantity - NEW.quantity WHERE id = NEW.service_id AND track_inventory = true RETURNING stock_quantity INTO v_new_stock;
-        IF FOUND THEN INSERT INTO public.inventory_logs (service_id, type, quantity, balance_before, balance_after, reference_id, notes) VALUES (NEW.service_id, 'SALE', -NEW.quantity, v_new_stock + NEW.quantity, v_new_stock, NEW.booking_id, 'Xuất bán cho phòng'); END IF;
-    ELSIF (TG_OP = 'UPDATE') THEN
-        IF (OLD.status = 'active' AND (NEW.status = 'returned' OR NEW.status = 'voided')) THEN
-            UPDATE public.services SET stock_quantity = stock_quantity + OLD.quantity WHERE id = OLD.service_id AND track_inventory = true RETURNING stock_quantity INTO v_new_stock;
-            IF FOUND THEN INSERT INTO public.inventory_logs (service_id, type, quantity, balance_before, balance_after, reference_id, notes) VALUES (OLD.service_id, 'RETURN', OLD.quantity, v_new_stock - OLD.quantity, v_new_stock, OLD.booking_id, 'Hoàn kho do ' || CASE WHEN NEW.status = 'returned' THEN 'khách trả' ELSE 'hủy món' END); END IF;
+        -- 1. Snapshot Price and Cost
+        SELECT price, cost_price INTO v_current_price, v_current_cost 
+        FROM public.services WHERE id = NEW.service_id;
+        
+        NEW.price_at_time := COALESCE(NULLIF(NEW.price_at_time, 0), v_current_price, 0);
+        NEW.cost_price_at_time := COALESCE(NULLIF(NEW.cost_price_at_time, 0), v_current_cost, 0);
+
+        -- 2. Trừ kho
+        UPDATE public.services 
+        SET stock_quantity = stock_quantity - NEW.quantity 
+        WHERE id = NEW.service_id AND track_inventory = true 
+        RETURNING stock_quantity INTO v_new_stock;
+        
+        IF FOUND THEN 
+            INSERT INTO public.inventory_logs (service_id, type, quantity, balance_before, balance_after, reference_id, notes) 
+            VALUES (NEW.service_id, 'SALE', -NEW.quantity, v_new_stock + NEW.quantity, v_new_stock, NEW.booking_id, 'Xuất bán cho phòng'); 
         END IF;
+
+    ELSIF (TG_OP = 'UPDATE') THEN
+        -- Nếu thay đổi số lượng, ta cần điều chỉnh kho
+        IF (OLD.quantity <> NEW.quantity) THEN
+             UPDATE public.services 
+             SET stock_quantity = stock_quantity + (OLD.quantity - NEW.quantity)
+             WHERE id = NEW.service_id AND track_inventory = true;
+        END IF;
+
+        IF (OLD.status = 'active' AND (NEW.status = 'returned' OR NEW.status = 'voided')) THEN
+            UPDATE public.services 
+            SET stock_quantity = stock_quantity + OLD.quantity 
+            WHERE id = OLD.service_id AND track_inventory = true 
+            RETURNING stock_quantity INTO v_new_stock;
+            
+            IF FOUND THEN 
+                INSERT INTO public.inventory_logs (service_id, type, quantity, balance_before, balance_after, reference_id, notes) 
+                VALUES (OLD.service_id, 'RETURN', OLD.quantity, v_new_stock - OLD.quantity, v_new_stock, OLD.booking_id, 'Hoàn kho do ' || CASE WHEN NEW.status = 'returned' THEN 'khách trả' ELSE 'hủy món' END); 
+            END IF;
+        END IF;
+
     ELSIF (TG_OP = 'DELETE') THEN
          IF OLD.status = 'active' THEN
-            UPDATE public.services SET stock_quantity = stock_quantity + OLD.quantity WHERE id = OLD.service_id AND track_inventory = true RETURNING stock_quantity INTO v_new_stock;
-            IF FOUND THEN INSERT INTO public.inventory_logs (service_id, type, quantity, balance_before, balance_after, reference_id, notes) VALUES (OLD.service_id, 'RETURN', OLD.quantity, v_new_stock - OLD.quantity, v_new_stock, OLD.booking_id, 'Hoàn kho do xóa khỏi phòng'); END IF;
+            UPDATE public.services 
+            SET stock_quantity = stock_quantity + OLD.quantity 
+            WHERE id = OLD.service_id AND track_inventory = true 
+            RETURNING stock_quantity INTO v_new_stock;
+            
+            IF FOUND THEN 
+                INSERT INTO public.inventory_logs (service_id, type, quantity, balance_before, balance_after, reference_id, notes) 
+                VALUES (OLD.service_id, 'RETURN', OLD.quantity, v_new_stock - OLD.quantity, v_new_stock, OLD.booking_id, 'Hoàn kho do xóa khỏi phòng'); 
+            END IF;
          END IF;
          RETURN OLD;
     END IF;
-    RETURN NULL;
+    RETURN NEW;
 END; $$;
 
 --------------------------------------------------------------------------------
 -- 11. TRIGGERS
 --------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS tr_handle_service_inventory ON public.booking_services;
 CREATE TRIGGER tr_handle_service_inventory
-AFTER INSERT OR UPDATE OR DELETE ON public.booking_services
+BEFORE INSERT OR UPDATE ON public.booking_services
+FOR EACH ROW EXECUTE FUNCTION public.handle_service_inventory();
+
+DROP TRIGGER IF EXISTS tr_handle_service_inventory_delete ON public.booking_services;
+CREATE TRIGGER tr_handle_service_inventory_delete
+AFTER DELETE ON public.booking_services
 FOR EACH ROW EXECUTE FUNCTION public.handle_service_inventory();

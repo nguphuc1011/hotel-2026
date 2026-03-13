@@ -26,6 +26,7 @@ export default function WalletNotificationModal() {
   if (!isOpen && !visible) return null;
 
   const getWalletDisplayName = (name: string) => {
+    if (!name) return 'Ví không xác định';
     const mapping: Record<string, string> = {
       'CASH': 'Tiền mặt',
       'BANK': 'Ngân hàng',
