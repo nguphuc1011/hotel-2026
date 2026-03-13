@@ -56,7 +56,6 @@ export default function ChangeRoomModal({ isOpen, onClose, bookingId, currentRoo
       await bookingService.changeRoom(bookingId, selectedRoomId, reason, verifiedStaff);
       toast.success('Đổi phòng thành công');
       onSuccess();
-      onClose();
     } catch (error: any) {
       toast.error(error.message || 'Lỗi khi đổi phòng');
     } finally {

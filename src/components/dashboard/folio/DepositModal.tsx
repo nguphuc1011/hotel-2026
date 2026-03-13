@@ -45,7 +45,6 @@ export default function DepositModal({ isOpen, onClose, bookingId, bill, custome
       });
       toast.success('Đã nhận tiền thành công');
       onSuccess();
-      onClose();
     } catch (error: any) {
       toast.error(error.message || 'Lỗi khi nhận tiền');
     } finally {

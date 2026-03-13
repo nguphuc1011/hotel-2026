@@ -179,7 +179,6 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
       
       toast.success('Cập nhật thông tin thành công');
       onSuccess();
-      onClose();
     } catch (error: any) {
       console.error('Update booking error:', error);
       toast.error(error.message || 'Lỗi khi cập nhật');
