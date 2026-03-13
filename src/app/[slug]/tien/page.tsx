@@ -323,9 +323,6 @@ export default function MoneyPage() {
                 LIVE
               </span>
             </h1>
-            <p className="text-slate-500 font-medium text-base">
-              Quản trị dòng tiền thông minh & minh bạch
-            </p>
           </div>
           
           <div className="flex items-center gap-3 hidden md:flex">
