@@ -26,6 +26,8 @@ export default function DepositModal({ isOpen, onClose, bookingId, bill, custome
   const remainingAmount = bill ? (bill.amount_to_pay + (bill.customer_balance < 0 ? Math.abs(bill.customer_balance) : 0)) : 0;
 
   const handleSubmit = async () => {
+    if (!bookingId) return;
+
     if (amount <= 0) {
       toast.error('Vui lòng nhập số tiền hợp lệ');
       return;
@@ -34,7 +36,7 @@ export default function DepositModal({ isOpen, onClose, bookingId, bill, custome
     setIsSubmitting(true);
     try {
       await bookingService.addDeposit({
-        bookingId,
+        bookingId: bookingId as string,
         amount,
         paymentMethod,
         description,
