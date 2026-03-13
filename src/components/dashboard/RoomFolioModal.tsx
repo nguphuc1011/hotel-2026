@@ -979,9 +979,10 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           room={room}
           verifiedStaff={editStaff}
           onSuccess={() => {
+            setShowEditModal(false); // Close sub-modal first
             loadBill();
             onUpdate();
-            onClose(); // Auto close Folio after edit success
+            onClose(); // Then close Folio
           }}
         />
 
@@ -995,8 +996,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           currentRoomName={room.name} 
           verifiedStaff={editStaff} 
           onSuccess={() => { 
+            setShowChangeRoomModal(false); // Close sub-modal first
             onUpdate();
-            onClose(); // Auto close Folio after change room success
+            onClose(); // Then close Folio
           }}
         />
 
@@ -1008,9 +1010,10 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           bill={bill}
           verifiedStaff={editStaff}
           onSuccess={() => {
+            setShowDepositModal(false); // Close sub-modal first
             loadBill();
             onUpdate();
-            onClose(); // Auto close Folio after deposit success
+            onClose(); // Then close Folio
           }}
         />
 
@@ -1019,8 +1022,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             isOpen={isTransferGroupMasterModalOpen}
             onClose={() => setIsTransferGroupMasterModalOpen(false)}
             onSuccess={() => {
+              setIsTransferGroupMasterModalOpen(false); // Close sub-modal first
               onUpdate();
-              onClose(); // Auto close Folio after master transfer success
+              onClose(); // Then close Folio
             }}
             oldMasterBooking={{
               id: booking?.id!,

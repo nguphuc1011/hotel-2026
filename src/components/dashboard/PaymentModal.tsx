@@ -410,11 +410,15 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
     // ];
 
   return createPortal(
-    <div className="fixed inset-0 z-[60000] flex flex-col justify-end sm:justify-center items-center backdrop-blur-md bg-slate-900/60">
+    <div className="fixed inset-0 z-[70000] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-200">
+      <div 
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" 
+        onClick={onClose}
+      />
       {SecurityModals}
       
       {/* Modal Container - Matches CheckInModal rounded-[40px] */}
-      <div className="w-full h-full sm:w-full sm:max-w-2xl sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] bg-slate-50 flex flex-col shadow-2xl overflow-hidden relative transition-all duration-300">
+      <div className="relative w-full h-full sm:w-full sm:max-w-2xl sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] bg-slate-50 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 z-[70001] animate-in zoom-in-95 duration-300">
         
         {/* --- HEADER --- */}
         <div className="h-16 flex justify-between items-center px-6 bg-white z-50 shrink-0 shadow-sm border-b border-slate-100/50">

@@ -82,8 +82,12 @@ export default function CancellationPenaltyModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[65000] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-[70000] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div 
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" 
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 z-[70001]">
         {/* Header */}
         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div className="flex items-center gap-3">

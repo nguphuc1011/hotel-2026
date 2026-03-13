@@ -192,8 +192,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
   const debt = selectedCustomer && selectedCustomer.balance < 0 ? Math.abs(selectedCustomer.balance) : 0;
 
   return createPortal(
-    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 max-h-[90vh]">
+    <div className="fixed inset-0 z-[70000] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div 
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 z-[70001] max-h-[90vh]">
         {/* Header */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <div className="flex items-center gap-3">
