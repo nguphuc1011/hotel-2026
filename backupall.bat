@@ -1,39 +1,77 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Lấy ngày giờ chuẩn không phụ thuộc quốc gia (ISO format)
+:: ===========================================================
+:: SCRIPT SAO LƯU TOÀN DIỆN (CODE & DATABASE) - 1HOTEL2
+:: ===========================================================
+
+:: 1. Cấu hình thời gian và thư mục
 for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set datetime=%%I
-set TIMESTAMP=!datetime:~0,4!!datetime:~4,2!!datetime:~6,2!_!datetime:~8,2!!datetime:~10,2!
+set timestamp=%datetime:~0,4%-%datetime:~4,2%-%datetime:~6,2%_%datetime:~8,2%-%datetime:~10,2%
+set backup_dir=C:\1hotel2_backups
 
-set DB_FILE=backup_db_%TIMESTAMP%.sql
-set PROJECT_FILE=backup_project_%TIMESTAMP%.zip
+echo ---------------------------------------------------------
+echo [ BUOC 1: DAT TEN BAN SAO LUU ]
+echo ---------------------------------------------------------
+set /p user_tag="[?] Nhap ten/ghi chu cho ban backup nay (Enter de bo qua): "
 
-echo [1/2] Dang backup Database tu Supabase...
-:: Su dung npx supabase db dump (Dung link direct connect tu .env.local)
-:: Password: OtFg7MFJFy5qd9lu
-call npx supabase db dump --db-url "postgresql://postgres.udakzychndpndkevktlf:OtFg7MFJFy5qd9lu@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres" -f %DB_FILE%
-
-if %ERRORLEVEL% NEQ 0 (
-    echo [LOI] Khong the dump Database. Vui long kiem tra ket noi internet.
-    pause
-    exit /b %ERRORLEVEL%
-)
-
-echo [2/2] Dang backup Project Code (Nen folder)...
-:: Su dung powershell de nen folder project (loai bo node_modules, .next, .git va cac file backup cu)
-powershell -Command "Compress-Archive -Path * -DestinationPath %PROJECT_FILE% -Force -Exclude ('node_modules', '.next', '.git', '*.zip', '*.sql', '.vercel')"
-
-if %ERRORLEVEL% NEQ 0 (
-    echo [LOI] Khong the nen file du an.
-    pause
-    exit /b %ERRORLEVEL%
+if "!user_tag!"=="" (
+    set filename=1hotel2_full_backup_%timestamp%
+) else (
+    set filename=1hotel2_!user_tag!_%timestamp%
 )
 
 echo.
-echo === BACKUP HOAN TAT ===
-echo 1. Database: %DB_FILE%
-echo 2. Code: %PROJECT_FILE%
-echo =======================
-echo File duoc luu tai: %cd%
+echo [*] Ten file se la: !filename!
+echo.
 
+echo ---------------------------------------------------------
+echo [ BUOC 2: DANG KHOI TAO QUA TRINH SAO LUU... ]
+echo ---------------------------------------------------------
+
+:: 2. Tạo thư mục lưu trữ nếu chưa có
+if not exist "%backup_dir%" (
+    mkdir "%backup_dir%"
+    echo [+] Da tao thu muc sao luu tai: %backup_dir%
+)
+
+:: 3. Sao lưu Database (Sử dụng pg_dump trực tiếp, KHÔNG CẦN DOCKER)
+echo [*] Dang tai du lieu tu Supabase...
+set PGPASSWORD=OtFg7MFJFy5qd9lu
+set PGHOST=aws-1-ap-southeast-1.pooler.supabase.com
+set PGPORT=5432
+set PGUSER=postgres.udakzychndpndkevktlf
+set PGDATABASE=postgres
+
+:: Thử tìm pg_dump trong các đường dẫn phổ biến
+set PGDUMP_EXE=pg_dump.exe
+if exist "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" set PGDUMP_EXE="C:\Program Files\PostgreSQL\18\bin\pg_dump.exe"
+if exist "C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" set PGDUMP_EXE="C:\Program Files\PostgreSQL\17\bin\pg_dump.exe"
+if exist "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" set PGDUMP_EXE="C:\Program Files\PostgreSQL\16\bin\pg_dump.exe"
+
+:: Chạy lệnh backup
+%PGDUMP_EXE% -h %PGHOST% -p %PGPORT% -U %PGUSER% -d %PGDATABASE% -F c -f "%backup_dir%\%filename%.dump"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo [!] LOI: Khong the chay pg_dump. 
+    echo [!] GIAI PHAP: Hay dam bao ban da cai PostgreSQL (https://www.postgresql.org/download/windows/)
+) else (
+    echo [V] Da sao luu Database thanh cong: %filename%.dump
+)
+
+:: 4. Sao lưu Source Code (Dùng lệnh tar có sẵn của Windows - CHINH XAC & GON)
+echo [*] Dang nen Source Code (chi lay cac thu muc quan trong)...
+:: Chi lay src, public, scripts, db_scripts, db va cac file cau hinh
+tar -acf "%backup_dir%\%filename%_code.zip" src public scripts db_scripts db package.json next.config.ts tsconfig.json .env.local
+
+if %ERRORLEVEL% EQU 0 (
+    echo [V] Da sao luu Source Code thanh cong: %filename%_code.zip
+) else (
+    echo [X] LOI: Khong the nen Source Code.
+)
+
+echo ---------------------------------------------------------
+echo QUA TRINH HOAN TAT!
+echo File cua ban nam tai: %backup_dir%
+echo ---------------------------------------------------------
 pause

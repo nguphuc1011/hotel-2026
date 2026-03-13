@@ -137,7 +137,14 @@ export default function DashboardPage() {
             amount_to_pay: total_amount - (b.deposit_amount || 0),
             customer_balance: b.customer?.balance || 0,
             check_in_at: rate?.check_in_at ?? b.check_in_actual,
-            duration_text: rate?.duration_text // PASS DURATION TEXT FROM RATE
+            duration_text: rate?.duration_text,
+            pricing_ladder: rate?.pricing_ladder,
+            service_total: rate?.service_total ?? 0,
+            surcharge_amount: rate?.surcharge_amount ?? 0,
+            extra_person_charge: rate?.extra_person_charge ?? 0, // THÊM EXTRA PERSON
+            discount_amount: rate?.discount_amount ?? 0, // THÊM DISCOUNT
+            custom_surcharge: rate?.custom_surcharge ?? 0, // THÊM CUSTOM SURCHARGE
+            explanation: rate?.explanation // THÊM GIẢI THÍCH
           };
         });
 
@@ -151,6 +158,7 @@ export default function DashboardPage() {
             category_id: room.category_id,
             category_name: room.category?.name,
             price_hourly: room.category?.price_hourly,
+            price_next_hour: room.category?.price_next_hour, // THÊM PRICENEXTHOUR
             price_daily: room.category?.price_daily,
             price_overnight: room.category?.price_overnight,
             base_hourly_limit: room.category?.base_hourly_limit,
@@ -171,10 +179,18 @@ export default function DashboardPage() {
               booking_type: booking.rental_type,
               total_amount: booking.total_amount || 0,
               amount_to_pay: booking.amount_to_pay || 0,
+              deposit_amount: booking.deposit_amount || 0, // THÊM DEPOSIT
               status: booking.status,
               duration_text: booking.duration_text,
               parent_booking_id: booking.parent_booking_id,
-              is_group_member: !!booking.parent_booking_id
+              is_group_member: !!booking.parent_booking_id,
+              pricing_ladder: booking.pricing_ladder,
+              service_total: booking.service_total || 0,
+              surcharge_amount: booking.surcharge_amount || 0,
+              extra_person_charge: booking.extra_person_charge || 0, // THÊM EXTRA PERSON
+              discount_amount: booking.discount_amount || 0, // THÊM DISCOUNT
+              custom_surcharge: booking.custom_surcharge || 0, // THÊM CUSTOM SURCHARGE
+              explanation: booking.explanation // THÊM GIẢI THÍCH
             };
 
             // Check Group Master Logic
@@ -595,7 +611,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCheckIn = async (bookingData: any) => {
+  const handleCheckIn = useCallback(async (bookingData: any) => {
     try {
       console.log('Booking Data received in handleCheckIn:', bookingData);
       
@@ -646,14 +662,14 @@ export default function DashboardPage() {
         type: 'error'
       });
     }
-  };
+  }, [fetchData, alertDialog]);
 
-  const handleOpenStatusModal = (room: DashboardRoom) => {
+  const handleOpenStatusModal = useCallback((room: DashboardRoom) => {
     setIsCheckInOpen(false);
     setSelectedRoomForStatus(room);
     setInitialStatusForModal(room.status);
     setIsStatusModalOpen(true);
-  };
+  }, []);
 
   if (isAuthLoading) {
     return (
@@ -700,6 +716,7 @@ export default function DashboardPage() {
                    key={room.id} 
                    room={room} 
                    onClick={handleRoomClick}
+                   onStatusChange={handleOpenStatusModal}
                  />
                ))}
              </div>
@@ -718,7 +735,7 @@ export default function DashboardPage() {
         <RoomFolioModal
           isOpen={isFolioOpen}
           onClose={() => setIsFolioOpen(false)}
-          onUpdate={() => fetchData()}
+          onUpdate={() => fetchData(true)}
           room={selectedRoom!}
           booking={selectedRoom?.current_booking!}
           onGroupRoom={() => {

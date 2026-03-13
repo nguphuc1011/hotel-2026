@@ -19,6 +19,7 @@ interface ChangeRoomModalProps {
 export default function ChangeRoomModal({ isOpen, onClose, bookingId, currentRoomName, onSuccess, verifiedStaff }: ChangeRoomModalProps) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
+  const [priceMode, setPriceMode] = useState<'KEEP_OLD' | 'USE_NEW'>('USE_NEW');
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,7 +54,7 @@ export default function ChangeRoomModal({ isOpen, onClose, bookingId, currentRoo
 
     setIsSubmitting(true);
     try {
-      await bookingService.changeRoom(bookingId, selectedRoomId, reason, verifiedStaff);
+      await bookingService.changeRoom(bookingId, selectedRoomId, reason, verifiedStaff, priceMode);
       toast.success('Đổi phòng thành công');
       onSuccess();
     } catch (error: any) {
@@ -112,6 +113,34 @@ export default function ChangeRoomModal({ isOpen, onClose, bookingId, currentRoo
                 ))}
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="text-sm font-bold text-slate-700 mb-2 block">Áp dụng giá</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPriceMode('USE_NEW')}
+                className={`p-3 rounded-xl border-2 text-sm font-bold transition-all ${
+                  priceMode === 'USE_NEW'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-slate-100 text-slate-500 hover:border-slate-200'
+                }`}
+              >
+                Theo phòng mới
+              </button>
+              <button
+                type="button"
+                onClick={() => setPriceMode('KEEP_OLD')}
+                className={`p-3 rounded-xl border-2 text-sm font-bold transition-all ${
+                  priceMode === 'KEEP_OLD'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-slate-100 text-slate-500 hover:border-slate-200'
+                }`}
+              >
+                Giữ giá cũ
+              </button>
+            </div>
           </div>
 
           <div>

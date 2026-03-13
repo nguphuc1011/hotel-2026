@@ -311,13 +311,14 @@ export const bookingService = {
     }
   },
 
-  async changeRoom(bookingId: string, newRoomId: string, reason?: string, verifiedStaff?: { id: string, name: string }) {
+  async changeRoom(bookingId: string, newRoomId: string, reason?: string, verifiedStaff?: { id: string, name: string }, priceMode: 'KEEP_OLD' | 'USE_NEW' = 'USE_NEW') {
     try {
       const { data, error } = await supabase.rpc('change_room', {
         p_booking_id: bookingId,
         p_new_room_id: newRoomId,
         p_reason: reason || null,
-        p_staff_id: verifiedStaff?.id || null
+        p_staff_id: verifiedStaff?.id || null,
+        p_price_mode: priceMode
       });
 
       if (error) throw error;

@@ -22,7 +22,6 @@ import TransferGroupMasterModal from './TransferGroupMasterModal';
 import { SecurityAction } from '@/services/securityService';
 import { useSecurity } from '@/hooks/useSecurity';
 import { groupBookingService } from '@/services/groupBookingService';
-import { BottomSheet } from '@/components/ui/BottomSheet';
 
 interface RoomFolioModalProps {
   isOpen: boolean;
@@ -116,17 +115,33 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [isTransferGroupMasterModalOpen, setIsTransferGroupMasterModalOpen] = useState(false);
 
+  // --- PERSISTENCE LOGIC (Anti-Flicker) ---
+  const [lastData, setLastData] = useState<{room: DashboardRoom, booking: Booking | undefined} | null>(null);
+
+  useEffect(() => {
+    if (isOpen && room) {
+      setLastData({ room, booking });
+    }
+  }, [isOpen, room, booking]);
+
+  // Use cached data during closing animation
+  const activeRoom = room || lastData?.room;
+  const activeBooking = booking || lastData?.booking;
+  // ----------------------------------------
+
   const handleTransferGroupMaster = () => {
+    if (!activeRoom || !activeBooking) return;
     verify('folio_transfer_master', () => {
       setIsTransferGroupMasterModalOpen(true);
     }, {
-      room_id: room.id,
-      room_number: room.name,
-      booking_id: booking?.id?.slice(0, 8)
+      room_id: activeRoom.id,
+      room_number: activeRoom.name,
+      booking_id: activeBooking?.id?.slice(0, 8)
     });
   };
 
   const handleUngroupRoom = async (bookingId: string) => {
+    if (!activeRoom) return;
     verify('folio_ungroup_room', async () => {
       try {
         const { groupBookingService } = await import('@/services/groupBookingService');
@@ -139,9 +154,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
         toast.error('Tách phòng thất bại');
       }
     }, {
-      room_id: room.id,
-      room_number: room.name,
-      customer_name: booking?.customer_name || 'Khách lẻ',
+      room_id: activeRoom.id,
+      room_number: activeRoom.name,
+      customer_name: activeBooking?.customer_name || 'Khách lẻ',
       booking_id: bookingId?.slice(0, 8)
     });
   };
@@ -184,27 +199,27 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
   // Load bill details on open
   useEffect(() => {
-    if (isOpen && booking) {
+    if (isOpen && activeBooking?.id) {
       loadBill(true); // Force snapshot update when opening Folio
       loadServices();
-      if (room.is_group_master || booking.is_group_member) {
+      if (activeRoom?.is_group_master || activeBooking.is_group_member) {
         loadGroupDetails();
       }
     }
-  }, [isOpen, booking]);
+  }, [isOpen, activeBooking?.id]); // Only trigger on ID change, not object reference change
 
   // Real-time listener for this specific booking
   useEffect(() => {
-    if (!isOpen || !booking?.id) return;
+    if (!isOpen || !activeBooking?.id) return;
 
     const channel = supabase
-      .channel(`folio-${booking.id}`)
+      .channel(`folio-${activeBooking.id}`)
       .on('postgres_changes', 
         { 
           event: '*', 
           schema: 'public', 
           table: 'booking_services',
-          filter: `booking_id=eq.${booking.id}`
+          filter: `booking_id=eq.${activeBooking.id}`
         }, 
         () => {
           console.log('Real-time Folio Update: Services changed');
@@ -217,7 +232,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           event: 'UPDATE',
           schema: 'public',
           table: 'bookings',
-          filter: `id=eq.${booking.id}`
+          filter: `id=eq.${activeBooking.id}`
         },
         () => {
           console.log('Real-time Folio Update: Booking changed');
@@ -229,22 +244,12 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isOpen, booking?.id]);
-
-  // Early return if modal is closed or data is missing
-  if (!isOpen || !room) {
-    return null;
-  }
-
-  // Early return if no booking to prevent crashes
-  if (!booking) {
-    return null;
-  }
+  }, [isOpen, activeBooking?.id]);
 
   // Use booking prop as source of truth for the big number
   // It's calculated by the parent (Dashboard) and updated via timer/real-time
-  const displayAmountToPay = bill?.amount_to_pay ?? booking?.amount_to_pay ?? 0;
-  const displayCustomerBalance = bill?.customer_balance ?? booking?.customer_balance ?? 0;
+  const displayAmountToPay = bill?.amount_to_pay ?? activeBooking?.amount_to_pay ?? 0;
+  const displayCustomerBalance = bill?.customer_balance ?? activeBooking?.customer_balance ?? 0;
   const isCustomerInDebt = displayCustomerBalance < 0;
 
   // Tạm tính tổng tiền bao gồm cả dịch vụ chưa lưu
@@ -258,13 +263,18 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const projectedAmountToPay = officialAmountToPay + pendingServicesTotal;
 
   const loadBill = async (force: boolean = false) => {
-    if (!booking) return;
-    setIsLoading(true);
+    if (!activeBooking) return;
+    
+    // Only show full loading spinner if we don't have any bill data yet
+    if (!bill) {
+      setIsLoading(true);
+    }
+
     try {
       if (force) {
-        await bookingService.forceUpdateSnapshot(booking.id);
+        await bookingService.forceUpdateSnapshot(activeBooking.id);
       }
-      const data = await bookingService.calculateBill(booking.id);
+      const data = await bookingService.calculateBill(activeBooking.id);
       console.log('Folio Bill Data (after loadBill):', data);
       setBill(data);
     } catch (error) {
@@ -275,9 +285,9 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const loadGroupDetails = async () => {
-    if (!booking) return;
+    if (!activeBooking) return;
     try {
-      const data = await groupBookingService.getGroupDetails(booking.id);
+      const data = await groupBookingService.getGroupDetails(activeBooking.id);
       if (data.is_group) {
         console.log('Group Details loaded:', data); // Thêm log để kiểm tra dữ liệu
         setGroupDetails(data);
@@ -293,22 +303,22 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const loadServices = async () => {
-      if (!booking) return;
+      if (!activeBooking) return;
       const [services, currentServices] = await Promise.all([
           serviceService.getServices(),
-          serviceService.getBookingServices(booking.id)
+          serviceService.getBookingServices(activeBooking.id)
       ]);
       setAvailableServices(services);
       setBookingServices(currentServices);
   };
 
   const handleAddService = async (service: Service) => {
-      if (!booking) return;
+      if (!activeBooking) return;
       // Just add to pending list
       const tempId = 'pending-' + Date.now() + Math.random();
       const newItem: BookingServiceItem = {
           id: tempId,
-          booking_id: booking.id,
+          booking_id: activeBooking.id,
           service_id: service.id,
           quantity: 1,
           price_at_time: service.price,
@@ -320,7 +330,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleSaveServices = async () => {
-      if (!booking || pendingServices.length === 0) return;
+      if (!activeBooking || pendingServices.length === 0) return;
       
       // Security Check
       verify('folio_add_service', async (staffId, staffName) => {
@@ -328,7 +338,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
         try {
             // Process sequentially to ensure order
             for (const item of pendingServices) {
-               await serviceService.addServiceToBooking(booking.id, item.service_id, 1, item.price_at_time);
+               await serviceService.addServiceToBooking(activeBooking.id, item.service_id, 1, item.price_at_time);
             }
             
             setPendingServices([]);
@@ -400,14 +410,14 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleConfirmCancelWithPenalty = async (penaltyAmount: number, paymentMethod: string, reason: string) => {
-    if (!booking) return;
+    if (!activeBooking) return;
     // Step 2: Verify permission with full data
     verify('checkin_cancel_booking', async (staffId, staffName) => {
       // Step 3: Execute Cancellation after Approval
       setIsLoading(true);
       try {
         const result = await bookingService.cancelBooking(
-          booking?.id, 
+          activeBooking?.id, 
           staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined,
           penaltyAmount,
           paymentMethod,
@@ -435,11 +445,11 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
         setCancellationStaff(undefined);
       }
     }, {
-      room_id: room.id, // Critical for dashboard matching
-      room_number: room.name || 'N/A',
-      customer_name: booking?.customer_name || 'Khách vãng lai',
-      booking_id: booking?.id?.slice(0, 8),
-      full_booking_id: booking?.id, // For auto-finalize execution
+      room_id: activeRoom?.id, // Critical for dashboard matching
+      room_number: activeRoom?.name || 'N/A',
+      customer_name: activeBooking?.customer_name || 'Khách vãng lai',
+      booking_id: activeBooking?.id?.slice(0, 8),
+      full_booking_id: activeBooking?.id, // For auto-finalize execution
       reason: reason,
       penalty_amount: penaltyAmount,
       payment_method: paymentMethod
@@ -449,26 +459,28 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const handleChangeRoom = async () => {
+    if (!activeRoom || !activeBooking) return;
     verify('folio_change_room', (staffId, staffName) => {
       setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
       setShowChangeRoomModal(true);
     }, {
-      room_id: room.id,
-      room_number: room.name,
-      customer_name: booking?.customer_name || 'Khách vãng lai',
-      booking_id: booking?.id?.slice(0, 8)
+      room_id: activeRoom.id,
+      room_number: activeRoom.name,
+      customer_name: activeBooking?.customer_name || 'Khách vãng lai',
+      booking_id: activeBooking?.id?.slice(0, 8)
     });
   };
 
   const handleEditBooking = async () => {
+    if (!activeRoom || !activeBooking) return;
     verify('folio_edit_booking', (staffId, staffName) => {
       setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
       setShowEditModal(true);
     }, {
-      room_id: room.id,
-      room_number: room.name,
-      customer_name: booking?.customer_name || 'Khách vãng lai',
-      booking_id: booking?.id?.slice(0, 8)
+      room_id: activeRoom.id,
+      room_number: activeRoom.name,
+      customer_name: activeBooking?.customer_name || 'Khách vãng lai',
+      booking_id: activeBooking?.id?.slice(0, 8)
     });
   };
 
@@ -517,563 +529,552 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   };
 
   const ModalContent = (
-    <div className={cn(
-      "flex flex-col h-full bg-slate-50 overflow-hidden",
-      !isMobile && "rounded-[48px] shadow-2xl w-[90vw] max-w-[800px] h-[95vh] max-h-[850px] relative border-[12px] border-white/50 backdrop-blur-xl"
-    )}>
-      {SecurityModals}
-      
-      <div className="flex flex-col h-full bg-slate-50">
-        {/* Header */}
-        <div className="h-14 flex justify-between items-center px-6 bg-white shrink-0 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-                <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider shadow-sm">Folio</span>
-                <h2 className="text-base font-bold text-slate-800">Phòng {room.name}</h2>
-            </div>
-            <div className="flex items-center gap-2">
-                <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
-                    <X className="w-4 h-4 text-slate-500" />
-                </button>
-            </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
-            {/* Quick Actions - Scrollable */}
-            <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-2">
-                <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => handleChangeRoom()} />
-                <QuickActionButton icon={Edit3} label="Sửa thông tin" onClick={() => handleEditBooking()} />
-                <QuickActionButton icon={Users} label="Gộp phòng" onClick={() => onGroupRoom?.()} />
-                {groupDetails && groupDetails.is_group && groupDetails.master_id === booking?.id && groupDetails.rooms && groupDetails.rooms.length > 1 && (
-                  <QuickActionButton icon={KeyRound} label="Chuyển chủ nhóm" onClick={handleTransferGroupMaster} />
-                )}
-                <QuickActionButton icon={DollarSign} label="Thu trước" onClick={() => {
-                  verify('folio_deposit', (staffId, staffName) => {
-                    setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
-                    setShowDepositModal(true);
-                  }, {
-                    room_id: room.id,
-                    room_number: room.name,
-                    customer_name: booking?.customer_name || 'Khách lẻ',
-                    booking_id: booking?.id?.slice(0, 8)
-                  });
-                }} />
-                <QuickActionButton icon={Printer} label="In phiếu" onClick={() => {}} />
-                
-                <QuickActionButton 
-                  icon={Trash2} 
-                  label="Huỷ phòng" 
-                  onClick={() => handleCancelBooking()} 
-                  variant="danger" 
-                />
-            </div>
-
-            {/* Main Toggle Card */}
-            <div 
-                onClick={() => setShowDetails(!showDetails)}
-                className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-lg shadow-blue-900/20 cursor-pointer transition-all duration-300"
-            >
-                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
-
-                <div className="relative z-10">
-                    <div className="flex justify-center items-center mb-1 relative">
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-100">Cần thanh toán</span>
-                        <div className={cn(
-                            "absolute right-0 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md",
-                            showDetails ? "bg-white text-blue-600" : "text-white"
-                        )}>
-                            {showDetails ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-1 mb-6">
-                        <div className="flex justify-center items-center gap-3 h-10">
-                            <button 
-                                onClick={() => {
-                                    loadBill();
-                                    loadServices();
-                                    onUpdate();
-                                }}
-                                className={cn(
-                                    "p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90",
-                                    isLoading && "animate-spin"
-                                )}
-                                title="Làm mới"
-                            >
-                                <RefreshCw className="w-5 h-5 opacity-50" />
-                            </button>
-                            <div className="text-4xl font-bold tracking-tight flex items-center h-full">
-                                {bill || (booking && booking.total_amount !== undefined) ? formatMoney(officialAmountToPay) : '---'}
-                            </div>
-                            <button 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowAuditTrail(true);
-                                }}
-                                className="w-8 h-8 flex items-center justify-center rounded-full border border-white/50 text-lg font-black text-white hover:bg-white/10 transition-all"
-                            >
-                                !
-                            </button>
-                        </div>
-                        
-                        {pendingServicesTotal > 0 && (
-                            <div className="flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full backdrop-blur-md animate-in slide-in-from-top-2 duration-300">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-100">Dự kiến:</span>
-                                <span className="text-sm font-black text-yellow-300">
-                                    {formatMoney(projectedAmountToPay)}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center border-t border-white/20 pt-4 mb-2">
-                        <div className="flex-1 text-center border-r border-white/20 pr-2">
-                            <div className="font-bold text-lg leading-tight mb-1 flex items-center justify-center gap-2">
-                                <div className="bg-blue-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold text-blue-100 uppercase tracking-wider border border-blue-400/30">
-                                    Vào
-                                </div>
-                                {(() => {
-                                    if (!bill?.check_in_at) return '--';
-                                    const date = new Date(bill.check_in_at);
-                                    const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                                    const dateStr = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-                                    const isHourly = bill.rental_type === 'hourly';
-                                    
-                                    const primary = isHourly ? timeStr : dateStr;
-                                    const secondary = isHourly ? dateStr : timeStr;
-
-                                    return (
-                                        <span>
-                                            <span className="font-bold text-xl text-yellow-300">
-                                                {primary}
-                                            </span>
-                                            <span className="font-bold text-white/80 text-sm ml-1">
-                                                {secondary}
-                                            </span>
-                                        </span>
-                                    );
-                                })()}
-                            </div>
-                            <div className="flex items-center justify-center gap-1.5 min-h-[20px]">
-                                <User className="w-3.5 h-3.5 text-blue-200" />
-                                <div className="text-sm font-bold text-white">
-                                    {bill?.customer_name || 'Khách lẻ'}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex-1 text-center pl-2">
-                            <div className="flex items-center justify-center gap-2 mb-1">
-                                <div className="text-xs font-bold uppercase tracking-wider text-blue-200">Đã ở</div>
-                                <div className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white border border-white/40 bg-white/10 uppercase tracking-wider whitespace-nowrap">
-                                    {bill?.rental_type === 'hourly' ? 'Theo Giờ' : 
-                                     bill?.rental_type === 'overnight' ? 'Qua Đêm' : 
-                                     bill?.rental_type === 'daily' ? 'Theo Ngày' : 
-                                     (booking ? (booking.booking_type === 'hourly' ? 'Theo Giờ' : booking.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày') : '---')}
-                                </div>
-                            </div>
-                            <div className="font-bold text-lg leading-tight">
-                                {(() => {
-                                    if (!bill?.check_in_at) return '--';
-                                    
-                                    // Prefer business-logic duration from DB for Daily/Overnight
-                                    if (bill.duration_text && (bill.rental_type === 'daily' || bill.rental_type === 'overnight')) {
-                                        return (
-                                            <div className="flex items-center justify-center gap-1.5">
-                                                <Calendar className="w-4 h-4 text-white/60" />
-                                                <span className="text-xl text-yellow-300">{bill.duration_text}</span>
-                                            </div>
-                                        );
-                                    }
-
-                                    const mode = bill.rental_type === 'hourly' ? 'hourly' : 
-                                                 bill.rental_type === 'overnight' ? 'overnight' : 'daily';
-                                    
-                                    return (
-                                        <div className="flex items-center justify-center gap-1.5">
-                                            {mode === 'hourly' ? <Clock className="w-4 h-4 text-white/60" /> : <Calendar className="w-4 h-4 text-white/60" />}
-                                            <LiveTimer 
-                                                checkInAt={bill.check_in_at} 
-                                                mode={mode} 
-                                            />
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Expandable Details Section - Inside Card */}
-                    <div className={cn(
-                        "grid transition-all duration-300 ease-in-out overflow-hidden",
-                        showDetails ? "grid-rows-[1fr] opacity-100 mt-4 border-t border-white/20 pt-4" : "grid-rows-[0fr] opacity-0"
-                    )}>
-                        <div className="min-h-0 space-y-4">
-                            {bill && (
-                                <BillBreakdown 
-                                    bill={bill} 
-                                    isDark={true}
-                                    className="pt-2"
-                                    hideAuditLog={true}
-                                    pendingServicesTotal={pendingServicesTotal}
-                                />
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Unified Group Room Info */}
-            {(groupDetails && groupDetails.is_group && groupDetails.rooms && groupDetails.rooms.length > 0) || booking?.is_group_member ? (
-                <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-4 space-y-3">
-                    {groupDetails && groupDetails.is_group && groupDetails.rooms && groupDetails.rooms.length > 0 ? (
-                        <>
-                            <button 
-                                className="flex items-center justify-between w-full group"
-                                onClick={() => setShowGroupRooms(!showGroupRooms)}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <Users className="w-5 h-5 text-blue-600" />
-                                    <h3 className="text-lg font-bold text-slate-800">
-                                        Phòng gộp ({groupDetails.rooms.length})
-                                    </h3>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-base font-bold text-blue-600">
-                                        {formatMoney(groupDetails.total_group_amount || 0)}
-                                    </span>
-                                    <ChevronDown 
-                                        className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showGroupRooms ? 'rotate-180' : ''}`}
-                                    />
-                                </div>
-                            </button>
-                            
-                            {showGroupRooms && (
-                                <div className="animate-in fade-in duration-200">
-                                    <div className="grid grid-cols-2 gap-3 mt-3">
-                                        {groupDetails.rooms.map((member: any) => (
-                                            <GroupedRoomMemberCard 
-                                                key={member.booking_id} 
-                                                member={member} 
-                                                groupColor={room.group_color || '#4A5568'}
-                                                isMaster={member.is_master}
-                                                onUngroup={handleUngroupRoom}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    ) : booking?.is_group_member ? (
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                    <Link className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <div className="font-bold text-blue-700 text-base">
-                                        Đã gộp vào phòng {groupDetails?.master_room_name || groupDetails?.rooms?.find((r: any) => r.is_master)?.room_name || 'chính'}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <button
-                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
-                                onClick={() => handleUngroupRoom(booking?.id!)}
-                            >
-                                <Unlink className="w-3 h-3" />
-                                Tách nhóm
-                            </button>
-                        </div>
-                    ) : null}
-                </div>
-            ) : null}
-
-            <div className="space-y-3 pt-2">
-                <div className="flex overflow-x-auto pb-4 pt-2 gap-3 snap-x hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    {filteredServices.map(service => {
-                        const qty = getServiceQuantity(service.id);
-                        const isOutOfStock = (service.stock_quantity || 0) <= 0;
-                        
-                        return (
-                            <ServiceCard 
-                                key={service.id}
-                                service={service}
-                                quantity={qty}
-                                isProcessing={processingServiceId === service.id}
-                                onAdd={() => !isOutOfStock && handleAddService(service)}
-                                onRemove={() => handleRemoveService(service.id)}
-                            />
-                        );
-                    })}
-                </div>
-
-                <div className="mt-2 flex items-center justify-center gap-6 text-[10px] text-slate-400 bg-white p-2 rounded-xl border border-slate-100 mx-auto w-fit shadow-sm">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                        Chạm: thêm
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-red-300"></span>
-                        Giữ: bớt
-                    </div>
-                    {pendingServices.length > 0 && (
-                        <>
-                            <div className="w-px h-3 bg-slate-200"></div>
-                            <div className="flex items-center gap-2 font-medium text-blue-600">
-                                <span>{pendingServices.length} món</span>
-                                <span>•</span>
-                                <span>{formatMoney(pendingServices.reduce((sum, item) => sum + (item.quantity * item.price_at_time), 0))}</span>
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                <div className="mt-4">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Dịch vụ đã dùng</h3>
-                    <div className="bg-white rounded-[24px] border border-slate-100 divide-y divide-slate-100 shadow-sm">
-                        {bookingServices.length === 0 && pendingServices.length === 0 ? (
-                            <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
-                                <Coffee className="w-6 h-6 opacity-20" />
-                                <span className="text-xs">Chưa dùng dịch vụ nào</span>
-                            </div>
-                        ) : (
-                            <>
-                            {Object.values(pendingServices.reduce((acc, item) => {
-                                if (!acc[item.service_id]) {
-                                    acc[item.service_id] = { ...item, quantity: 0, total_price: 0 };
-                                }
-                                acc[item.service_id].quantity += item.quantity;
-                                acc[item.service_id].total_price += item.quantity * item.price_at_time;
-                                return acc;
-                            }, {} as Record<string, BookingServiceItem>)).map((item) => (
-                                <div key={`pending-${item.service_id}`} className="p-3 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors border-l-4 border-transparent">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
-                                            {item.quantity}x
-                                        </div>
-                                        <div>
-                                            <div className="font-medium text-slate-900 text-sm">{item.service?.name}</div>
-                                            <div className="text-[10px] text-blue-600 font-medium">Chờ lưu...</div>
-                                        </div>
-                                    </div>
-                                    <div className="font-bold text-blue-600 text-sm">
-                                        {formatMoney(item.total_price)}
-                                    </div>
-                                </div>
-                            ))}
-
-                            {Object.values(bookingServices.reduce((acc, item) => {
-                                if (!acc[item.service_id]) {
-                                    acc[item.service_id] = { ...item, quantity: 0, total_price: 0 };
-                                }
-                                acc[item.service_id].quantity += item.quantity;
-                                acc[item.service_id].total_price += item.quantity * item.price_at_time;
-                                return acc;
-                            }, {} as Record<string, BookingServiceItem>)).map((item) => (
-                                <div key={item.service_id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
-                                            {item.quantity}x
-                                        </div>
-                                        <div>
-                                            <div className="font-medium text-slate-900 text-sm">{item.service?.name}</div>
-                                            <div className="text-[10px] text-slate-500">{formatMoney(item.price_at_time)}</div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="font-bold text-slate-700 text-sm">
-                                            {formatMoney(item.total_price)}
-                                        </div>
-                                        <button 
-                                            onClick={() => handleRemoveService(item.id)}
-                                            disabled={!!processingServiceId}
-                                            className="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors active:scale-90"
-                                        >
-                                            <Minus className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            </>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {/* Floating Footer */}
-        <div className={cn(
-            "shrink-0 bg-white border-t border-slate-100 px-6 py-6 z-[110]",
-            isMobile && "fixed bottom-0 left-0 right-0 pb-[max(1.5rem,env(safe-area-inset-bottom))] rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
-        )}>
-            {pendingServices.length > 0 ? (
-                <div className="flex gap-3">
-                    <button 
-                        type="button"
-                        onClick={() => setPendingServices([])}
-                        disabled={isSaving}
-                        className="w-20 bg-slate-100 hover:bg-slate-200 text-slate-600 h-12 rounded-2xl font-bold text-xs shadow-sm active:scale-[0.98] transition-all"
-                    >
-                        HỦY
-                    </button>
-                    <button 
-                        type="button"
-                        onClick={() => handleSaveServices()}
-                        disabled={isSaving}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-2xl font-bold text-base shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 animate-pulse"
-                    >
-                        {isSaving ? (
-                            <span>Đang lưu...</span>
-                        ) : (
-                            <>
-                                <span>LƯU CẬP NHẬT</span>
-                                <div className="bg-white text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                                    {pendingServices.length}
-                                </div>
-                            </>
-                        )}
-                    </button>
-                </div>
-            ) : (
-                <div className="flex gap-3">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="w-24 bg-slate-100 hover:bg-slate-200 text-slate-700 h-12 rounded-2xl font-bold text-xs shadow-sm active:scale-[0.98] transition-all"
-                    >
-                        ĐÓNG
-                    </button>
-                    <button 
-                        type="button"
-                        onClick={() => setShowPaymentModal(true)}
-                        className="flex-1 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-2xl font-bold text-base shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                    >
-                        <span>THANH TOÁN</span>
-                        <ChevronRight className="w-5 h-5" />
-                    </button>
-                </div>
-            )}
-        </div>
-
-        <AuditTrailModal />
-        <CancellationPenaltyModal 
-          isOpen={showPenaltyModal}
-          onClose={() => setShowPenaltyModal(false)}
-          roomName={room.name}
-          customerName={bill?.customer_name || 'Khách lẻ'}
-          bill={bill}
-          onConfirm={handleConfirmCancelWithPenalty}
-          isLoading={isLoading}
-        />
-        {bill && (
-            <PaymentModal 
-                isOpen={showPaymentModal}
-                onClose={() => setShowPaymentModal(false)}
-                bill={bill}
-                onSuccess={() => {
-                    onUpdate();
-                    onClose();
-                }}
-            />
-        )}
-
-        <EditBookingModal 
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditStaff(undefined);
-          }}
-          booking={booking!}
-          room={room}
-          verifiedStaff={editStaff}
-          onSuccess={() => {
-            setShowEditModal(false); // Close sub-modal first
-            loadBill();
-            onUpdate();
-            onClose(); // Then close Folio
-          }}
-        />
-
-        <ChangeRoomModal 
-          isOpen={showChangeRoomModal}
-          onClose={() => {
-            setShowChangeRoomModal(false);
-            setEditStaff(undefined);
-          }}
-          bookingId={booking?.id!} 
-          currentRoomName={room.name} 
-          verifiedStaff={editStaff} 
-          onSuccess={() => { 
-            setShowChangeRoomModal(false); // Close sub-modal first
-            onUpdate();
-            onClose(); // Then close Folio
-          }}
-        />
-
-        <DepositModal 
-          isOpen={showDepositModal}
-          onClose={() => setShowDepositModal(false)}
-          bookingId={booking?.id!} 
-          customerId={booking?.customer_id}
-          bill={bill}
-          verifiedStaff={editStaff}
-          onSuccess={() => {
-            setShowDepositModal(false); // Close sub-modal first
-            loadBill();
-            onUpdate();
-            onClose(); // Then close Folio
-          }}
-        />
-
-        {groupDetails && groupDetails.is_group && groupDetails.master_id === booking?.id && (
-          <TransferGroupMasterModal
-            isOpen={isTransferGroupMasterModalOpen}
-            onClose={() => setIsTransferGroupMasterModalOpen(false)}
-            onSuccess={() => {
-              setIsTransferGroupMasterModalOpen(false); // Close sub-modal first
-              onUpdate();
-              onClose(); // Then close Folio
-            }}
-            oldMasterBooking={{
-              id: booking?.id!,
-              room_name: room.name,
-              customer_name: bill?.customer_name || 'Khách lẻ'
-            } as any}
-            childBookings={groupDetails.rooms
-              .filter((m: any) => m.booking_id !== booking?.id)
-              .map((m: any) => ({
-                id: m.booking_id,
-                room_name: m.room_name,
-                customer_name: m.customer_name
-              })) as any}
-          />
-        )}
+    <div className="flex-1 flex flex-col min-h-0 bg-slate-50 overflow-hidden relative">
+      {/* Header */}
+      <div className="h-14 flex justify-between items-center px-6 bg-white shrink-0 border-b border-slate-100 z-10">
+          <div className="flex items-center gap-3">
+              <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider shadow-sm">Folio</span>
+              <h2 className="text-base font-bold text-slate-800">Phòng {activeRoom?.name}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
+                  <X className="w-4 h-4 text-slate-500" />
+              </button>
+          </div>
       </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Quick Actions - Scrollable */}
+          <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-2">
+              <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => handleChangeRoom()} />
+              <QuickActionButton icon={Edit3} label="Sửa thông tin" onClick={() => handleEditBooking()} />
+              <QuickActionButton icon={Users} label="Gộp phòng" onClick={() => onGroupRoom?.()} />
+              {groupDetails && groupDetails.is_group && groupDetails.master_id === activeBooking?.id && groupDetails.rooms && groupDetails.rooms.length > 1 && (
+                <QuickActionButton icon={KeyRound} label="Chuyển chủ nhóm" onClick={handleTransferGroupMaster} />
+              )}
+              <QuickActionButton icon={DollarSign} label="Thu trước" onClick={() => {
+                verify('folio_deposit', (staffId, staffName) => {
+                  setEditStaff(staffId ? { id: staffId, name: staffName || 'Nhân viên' } : undefined);
+                  setShowDepositModal(true);
+                }, {
+                  room_id: activeRoom?.id,
+                  room_number: activeRoom?.name,
+                  customer_name: activeBooking?.customer_name || 'Khách lẻ',
+                  booking_id: activeBooking?.id?.slice(0, 8)
+                });
+              }} />
+              <QuickActionButton icon={Printer} label="In phiếu" onClick={() => {}} />
+              
+              <QuickActionButton 
+                icon={Trash2} 
+                label="Huỷ phòng" 
+                onClick={() => handleCancelBooking()} 
+                variant="danger" 
+              />
+          </div>
+
+          {/* Main Toggle Card */}
+          <div 
+              onClick={() => setShowDetails(!showDetails)}
+              className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-lg shadow-blue-900/20 cursor-pointer transition-all duration-300"
+          >
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+
+              <div className="relative z-10">
+                  <div className="flex justify-center items-center mb-1 relative">
+                      <span className="text-xs font-bold uppercase tracking-wider text-blue-100">Cần thanh toán</span>
+                      <div className={cn(
+                          "absolute right-0 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md",
+                          showDetails ? "bg-white text-blue-600" : "text-white"
+                      )}>
+                          {showDetails ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </div>
+                  </div>
+
+                  <div className="flex flex-col items-center gap-1 mb-6">
+                      <div className="flex justify-center items-center gap-3 h-10">
+                          <button 
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  loadBill();
+                                  loadServices();
+                                  onUpdate();
+                              }}
+                              className={cn(
+                                  "p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90",
+                                  isLoading && "animate-spin"
+                              )}
+                              title="Làm mới"
+                          >
+                              <RefreshCw className="w-5 h-5 opacity-50" />
+                          </button>
+                          <div className="text-4xl font-bold tracking-tight flex items-center h-full">
+                              {bill || (activeBooking && activeBooking.total_amount !== undefined) ? formatMoney(officialAmountToPay) : '---'}
+                          </div>
+                          <button 
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowAuditTrail(true);
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-full border border-white/50 text-lg font-black text-white hover:bg-white/10 transition-all"
+                          >
+                              !
+                          </button>
+                      </div>
+                      
+                      {pendingServicesTotal > 0 && (
+                          <div className="flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full backdrop-blur-md animate-in slide-in-from-top-2 duration-300">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-100">Dự kiến:</span>
+                              <span className="text-sm font-black text-yellow-300">
+                                  {formatMoney(projectedAmountToPay)}
+                              </span>
+                          </div>
+                      )}
+                  </div>
+
+                  <div className="flex items-center border-t border-white/20 pt-4 mb-2">
+                      <div className="flex-1 text-center border-r border-white/20 pr-2">
+                          <div className="font-bold text-lg leading-tight mb-1 flex items-center justify-center gap-2">
+                              <div className="bg-blue-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold text-blue-100 uppercase tracking-wider border border-blue-400/30">
+                                  Vào
+                              </div>
+                              {(() => {
+                                  if (!bill?.check_in_at) return '--';
+                                  const date = new Date(bill.check_in_at);
+                                  const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                                  const dateStr = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+                                  const isHourly = bill.rental_type === 'hourly';
+                                  
+                                  const primary = isHourly ? timeStr : dateStr;
+                                  const secondary = isHourly ? dateStr : timeStr;
+
+                                  return (
+                                      <span>
+                                          <span className="font-bold text-xl text-yellow-300">
+                                              {primary}
+                                          </span>
+                                          <span className="font-bold text-white/80 text-sm ml-1">
+                                              {secondary}
+                                          </span>
+                                      </span>
+                                  );
+                              })()}
+                          </div>
+                          <div className="flex items-center justify-center gap-1.5 min-h-[20px]">
+                              <User className="w-3.5 h-3.5 text-blue-200" />
+                              <div className="text-sm font-bold text-white">
+                                  {bill?.customer_name || 'Khách lẻ'}
+                              </div>
+                          </div>
+                      </div>
+                      <div className="flex-1 text-center pl-2">
+                          <div className="flex items-center justify-center gap-2 mb-1">
+                              <div className="text-xs font-bold uppercase tracking-wider text-blue-200">Đã ở</div>
+                              <div className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white border border-white/40 bg-white/10 uppercase tracking-wider whitespace-nowrap">
+                                  {bill?.rental_type === 'hourly' ? 'Theo Giờ' : 
+                                   bill?.rental_type === 'overnight' ? 'Qua Đêm' : 
+                                   bill?.rental_type === 'daily' ? 'Theo Ngày' : 
+                                   (activeBooking ? (activeBooking.booking_type === 'hourly' ? 'Theo Giờ' : activeBooking.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày') : '---')}
+                              </div>
+                          </div>
+                          <div className="font-bold text-lg leading-tight">
+                              {(() => {
+                                  if (!bill?.check_in_at) return '--';
+                                  
+                                  // Prefer business-logic duration from DB for Daily/Overnight
+                                  if (bill.duration_text && (bill.rental_type === 'daily' || bill.rental_type === 'overnight')) {
+                                      return (
+                                          <div className="flex items-center justify-center gap-1.5">
+                                              <Calendar className="w-4 h-4 text-white/60" />
+                                              <span className="text-xl text-yellow-300">{bill.duration_text}</span>
+                                          </div>
+                                      );
+                                  }
+
+                                  const mode = bill.rental_type === 'hourly' ? 'hourly' : 
+                                               bill.rental_type === 'overnight' ? 'overnight' : 'daily';
+                                  
+                                  return (
+                                      <div className="flex items-center justify-center gap-1.5">
+                                          {mode === 'hourly' ? <Clock className="w-4 h-4 text-white/60" /> : <Calendar className="w-4 h-4 text-white/60" />}
+                                          <LiveTimer 
+                                              checkInAt={bill.check_in_at} 
+                                              mode={mode} 
+                                          />
+                                      </div>
+                                  );
+                              })()}
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* Expandable Details Section - Inside Card */}
+                  <div className={cn(
+                      "grid transition-all duration-300 ease-in-out overflow-hidden",
+                      showDetails ? "grid-rows-[1fr] opacity-100 mt-4 border-t border-white/20 pt-4" : "grid-rows-[0fr] opacity-0"
+                  )}>
+                      <div className="min-h-0 space-y-4">
+                          {bill && (
+                              <BillBreakdown 
+                                  bill={bill} 
+                                  isDark={true}
+                                  className="pt-2"
+                                  hideAuditLog={true}
+                                  pendingServicesTotal={pendingServicesTotal}
+                              />
+                          )}
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          {/* Unified Group Room Info */}
+          {(groupDetails && groupDetails.is_group && groupDetails.rooms && groupDetails.rooms.length > 0) || activeBooking?.is_group_member ? (
+              <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-4 space-y-3">
+                  {groupDetails && groupDetails.is_group && groupDetails.rooms && groupDetails.rooms.length > 0 ? (
+                      <>
+                          <button 
+                              className="flex items-center justify-between w-full group"
+                              onClick={() => setShowGroupRooms(!showGroupRooms)}
+                          >
+                              <div className="flex items-center gap-2">
+                                  <Users className="w-5 h-5 text-blue-600" />
+                                  <h3 className="text-lg font-bold text-slate-800">
+                                      Phòng gộp ({groupDetails.rooms.length})
+                                  </h3>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                  <span className="text-base font-bold text-blue-600">
+                                      {formatMoney(groupDetails.total_group_amount || 0)}
+                                  </span>
+                                  <ChevronDown 
+                                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showGroupRooms ? 'rotate-180' : ''}`}
+                                  />
+                              </div>
+                          </button>
+                          
+                          {showGroupRooms && (
+                              <div className="animate-in fade-in duration-200">
+                                  <div className="grid grid-cols-2 gap-3 mt-3">
+                                      {groupDetails.rooms.map((member: any) => (
+                                          <GroupedRoomMemberCard 
+                                              key={member.booking_id} 
+                                              member={member} 
+                                              groupColor={activeRoom?.group_color || '#4A5568'}
+                                              isMaster={member.is_master}
+                                              onUngroup={handleUngroupRoom}
+                                          />
+                                      ))}
+                                  </div>
+                              </div>
+                          )}
+                      </>
+                  ) : activeBooking?.is_group_member ? (
+                      <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                  <Link className="w-5 h-5" />
+                              </div>
+                              <div>
+                                  <div className="font-bold text-blue-700 text-base">
+                                      Đã gộp vào phòng {groupDetails?.master_room_name || groupDetails?.rooms?.find((r: any) => r.is_master)?.room_name || 'chính'}
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <button
+                              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                              onClick={() => handleUngroupRoom(activeBooking?.id!)}
+                          >
+                              <Unlink className="w-3 h-3" />
+                              Tách nhóm
+                          </button>
+                      </div>
+                  ) : null}
+              </div>
+          ) : null}
+
+          <div className="space-y-3 pt-2">
+              <div className="flex overflow-x-auto pb-4 pt-2 gap-3 snap-x hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {filteredServices.map(service => {
+                      const qty = getServiceQuantity(service.id);
+                      const isOutOfStock = (service.stock_quantity || 0) <= 0;
+                      
+                      return (
+                          <ServiceCard 
+                              key={service.id}
+                              service={service}
+                              quantity={qty}
+                              isProcessing={processingServiceId === service.id}
+                              onAdd={() => !isOutOfStock && handleAddService(service)}
+                              onRemove={() => handleRemoveService(service.id)}
+                          />
+                      );
+                  })}
+              </div>
+
+              <div className="mt-2 flex items-center justify-center gap-6 text-[10px] text-slate-400 bg-white p-2 rounded-xl border border-slate-100 mx-auto w-fit shadow-sm">
+                  <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                      Chạm: thêm
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-300"></span>
+                      Giữ: bớt
+                  </div>
+                  {pendingServices.length > 0 && (
+                      <>
+                          <div className="w-px h-3 bg-slate-200"></div>
+                          <div className="flex items-center gap-2 font-medium text-blue-600">
+                              <span>{pendingServices.length} món</span>
+                              <span>•</span>
+                              <span>{formatMoney(pendingServices.reduce((sum, item) => sum + (item.quantity * item.price_at_time), 0))}</span>
+                          </div>
+                      </>
+                  )}
+              </div>
+
+              <div className="mt-4">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Dịch vụ đã dùng</h3>
+                  <div className="bg-white rounded-[24px] border border-slate-100 divide-y divide-slate-100 shadow-sm">
+                      {bookingServices.length === 0 && pendingServices.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
+                              <Coffee className="w-6 h-6 opacity-20" />
+                              <span className="text-xs">Chưa dùng dịch vụ nào</span>
+                          </div>
+                      ) : (
+                          <>
+                          {Object.values(pendingServices.reduce((acc, item) => {
+                              if (!acc[item.service_id]) {
+                                  acc[item.service_id] = { ...item, quantity: 0, total_price: 0 };
+                              }
+                              acc[item.service_id].quantity += item.quantity;
+                              acc[item.service_id].total_price += item.quantity * item.price_at_time;
+                              return acc;
+                          }, {} as Record<string, BookingServiceItem>)).map((item) => (
+                              <div key={`pending-${item.service_id}`} className="p-3 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors border-l-4 border-transparent">
+                                  <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                                          {item.quantity}x
+                                      </div>
+                                      <div>
+                                          <div className="font-medium text-slate-900 text-sm">{item.service?.name}</div>
+                                          <div className="text-[10px] text-blue-600 font-medium">Chờ lưu...</div>
+                                      </div>
+                                  </div>
+                                  <div className="font-bold text-blue-600 text-sm">
+                                      {formatMoney(item.total_price)}
+                                  </div>
+                              </div>
+                          ))}
+
+                          {Object.values(bookingServices.reduce((acc, item) => {
+                              if (!acc[item.service_id]) {
+                                  acc[item.service_id] = { ...item, quantity: 0, total_price: 0 };
+                              }
+                              acc[item.service_id].quantity += item.quantity;
+                              acc[item.service_id].total_price += item.quantity * item.price_at_time;
+                              return acc;
+                          }, {} as Record<string, BookingServiceItem>)).map((item) => (
+                              <div key={item.service_id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                                  <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
+                                          {item.quantity}x
+                                      </div>
+                                      <div>
+                                          <div className="font-medium text-slate-900 text-sm">{item.service?.name}</div>
+                                          <div className="text-[10px] text-slate-500">{formatMoney(item.price_at_time)}</div>
+                                      </div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                      <div className="font-bold text-slate-700 text-sm">
+                                          {formatMoney(item.total_price)}
+                                      </div>
+                                      <button 
+                                          onClick={() => handleRemoveService(item.id)}
+                                          disabled={!!processingServiceId}
+                                          className="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors active:scale-90"
+                                      >
+                                          <Minus className="w-3.5 h-3.5" />
+                                      </button>
+                                  </div>
+                              </div>
+                          ))}
+                          </>
+                      )}
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      {/* Footer */}
+      <div className="shrink-0 bg-white border-t border-slate-100 px-6 py-6 z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+          {pendingServices.length > 0 ? (
+              <div className="flex gap-3">
+                  <button 
+                      type="button"
+                      onClick={() => setPendingServices([])}
+                      disabled={isSaving}
+                      className="w-20 bg-slate-100 hover:bg-slate-200 text-slate-600 h-12 rounded-2xl font-bold text-xs shadow-sm active:scale-[0.98] transition-all"
+                  >
+                      HỦY
+                  </button>
+                  <button 
+                      type="button"
+                      onClick={() => handleSaveServices()}
+                      disabled={isSaving}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-2xl font-bold text-base shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 animate-pulse"
+                  >
+                      {isSaving ? (
+                          <span>Đang lưu...</span>
+                      ) : (
+                          <>
+                              <span>LƯU CẬP NHẬT</span>
+                              <div className="bg-white text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                  {pendingServices.length}
+                              </div>
+                          </>
+                      )}
+                  </button>
+              </div>
+          ) : (
+              <div className="flex gap-3">
+                  <button
+                      type="button"
+                      onClick={onClose}
+                      className="w-24 bg-slate-100 hover:bg-slate-200 text-slate-700 h-12 rounded-2xl font-bold text-xs shadow-sm active:scale-[0.98] transition-all"
+                  >
+                      ĐÓNG
+                  </button>
+                  <button 
+                      type="button"
+                      onClick={() => setShowPaymentModal(true)}
+                      className="flex-1 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-2xl font-bold text-base shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                      <span>THANH TOÁN</span>
+                      <ChevronRight className="w-5 h-5" />
+                  </button>
+              </div>
+          )}
+      </div>
+
+      <AuditTrailModal />
+      <CancellationPenaltyModal 
+        isOpen={showPenaltyModal}
+        onClose={() => setShowPenaltyModal(false)}
+        roomName={activeRoom?.name || 'N/A'}
+        customerName={bill?.customer_name || 'Khách lẻ'}
+        bill={bill}
+        onConfirm={handleConfirmCancelWithPenalty}
+        isLoading={isLoading}
+      />
+      {bill && (
+          <PaymentModal 
+              isOpen={showPaymentModal}
+              onClose={() => setShowPaymentModal(false)}
+              bill={bill}
+              onSuccess={() => {
+                  onUpdate();
+                  onClose();
+              }}
+          />
+      )}
+
+      <EditBookingModal 
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditStaff(undefined);
+        }}
+        booking={activeBooking!}
+        room={activeRoom!}
+        verifiedStaff={editStaff}
+        onSuccess={() => {
+          setShowEditModal(false); // Close sub-modal first
+          loadBill();
+          onUpdate();
+          onClose(); // Then close Folio
+        }}
+      />
+
+      <ChangeRoomModal 
+        isOpen={showChangeRoomModal}
+        onClose={() => {
+          setShowChangeRoomModal(false);
+          setEditStaff(undefined);
+        }}
+        bookingId={activeBooking?.id!} 
+        currentRoomName={activeRoom?.name || 'N/A'} 
+        verifiedStaff={editStaff} 
+        onSuccess={() => { 
+          setShowChangeRoomModal(false); // Close sub-modal first
+          onUpdate();
+          onClose(); // Then close Folio
+        }}
+      />
+
+      <DepositModal 
+        isOpen={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
+        bookingId={activeBooking?.id!} 
+        customerId={activeBooking?.customer_id}
+        bill={bill}
+        verifiedStaff={editStaff}
+        onSuccess={() => {
+          setShowDepositModal(false); // Close sub-modal first
+          loadBill();
+          onUpdate();
+          onClose(); // Then close Folio
+        }}
+      />
+
+      {groupDetails && groupDetails.is_group && groupDetails.master_id === activeBooking?.id && (
+        <TransferGroupMasterModal
+          isOpen={isTransferGroupMasterModalOpen}
+          onClose={() => setIsTransferGroupMasterModalOpen(false)}
+          onSuccess={() => {
+            setIsTransferGroupMasterModalOpen(false); // Close sub-modal first
+            onUpdate();
+            onClose(); // Then close Folio
+          }}
+          oldMasterBooking={{
+            id: activeBooking?.id!,
+            room_name: activeRoom?.name,
+            customer_name: bill?.customer_name || 'Khách lẻ'
+          } as any}
+          childBookings={groupDetails.rooms
+            .filter((m: any) => m.booking_id !== activeBooking?.id)
+            .map((m: any) => ({
+              id: m.booking_id,
+              room_name: m.room_name,
+              customer_name: m.customer_name
+            })) as any}
+        />
+      )}
     </div>
   );
 
-  if (!mounted || !isOpen || !room || !booking) return null;
-
-  if (isMobile) {
-    return (
-      <BottomSheet 
-        isOpen={isOpen} 
-        onClose={onClose} 
-        title={`Phòng ${room.name}`}
-        maxHeight="96vh"
-        maxWidth="720px"
-      >
-        {ModalContent}
-      </BottomSheet>
-    );
-  }
+  // --- FINAL RENDER LOGIC (Anti-Flicker) ---
+  if (!mounted || (!isOpen && !lastData)) return null;
+  if (!activeRoom || !activeBooking) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[60000] flex items-center justify-center p-4">
+    <div className={cn(
+      "fixed inset-0 z-[60000] flex items-center justify-center p-0 md:p-4 transition-all duration-300",
+      isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+    )}>
       <div 
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
       />
-      {ModalContent}
+      
+      <div className={cn(
+        "relative w-full h-full md:h-auto md:max-h-[95vh] md:max-w-[800px] bg-white md:rounded-[48px] shadow-2xl overflow-hidden flex flex-col transition-all duration-300 transform",
+        isOpen ? "translate-y-0 opacity-100 scale-100" : "translate-y-10 md:translate-y-0 md:scale-95 opacity-0"
+      )}>
+        {SecurityModals}
+        {ModalContent}
+      </div>
     </div>,
     document.body
   );

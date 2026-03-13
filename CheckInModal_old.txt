@@ -1,0 +1,1 @@
+how HEAD\~3:src/components/dashboard/CheckInModal.tsx

@@ -7,6 +7,7 @@ export interface Room {
   category_id: string;
   category_name?: string; // e.g., "VIP", "Standard"
   price_hourly?: number;
+  price_next_hour?: number; // THÊM TRƯỜNG NÀY
   price_daily?: number;
   price_overnight?: number;
   base_hourly_limit?: number; // SaaS Dynamic
@@ -16,6 +17,11 @@ export interface Room {
   last_cleaned_at?: string;
   updated_at?: string;
   notes?: string;
+}
+
+export interface PricingLadderPoint {
+  time: string;
+  amount: number;
 }
 
 export interface Booking {
@@ -39,6 +45,13 @@ export interface Booking {
   parent_booking_id?: string;
   is_group_member?: boolean;
   master_room_name?: string; // e.g. "101" if this booking belongs to master room 101
+  pricing_ladder?: PricingLadderPoint[];
+  service_total?: number;
+  surcharge_amount?: number;
+  extra_person_charge?: number;
+  discount_amount?: number;
+  custom_surcharge?: number;
+  explanation?: string[];
 }
 
 export interface DashboardRoom extends Room {

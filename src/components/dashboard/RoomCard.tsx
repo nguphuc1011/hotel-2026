@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, memo } from 'react';
+import React, { useMemo, memo, useState, useEffect } from 'react';
 import { 
   Sun, 
   Moon, 
@@ -16,7 +16,8 @@ import {
   User,
   Users,
   Link,
-  Crown
+  Crown,
+  RefreshCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardRoom } from '@/types/dashboard';
@@ -24,13 +25,85 @@ import { format } from 'date-fns';
 import LiveTimer from './LiveTimer';
 
 import { formatMoney, getContrastTextColor } from '@/utils/format';
+import { calculateLiveRoomCharge } from '@/utils/billing';
 
 interface RoomCardProps {
   room: DashboardRoom;
   onClick: (room: DashboardRoom) => void;
+  onStatusChange?: (room: DashboardRoom) => void;
 }
 
-const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
+const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, onStatusChange }) => {
+  // Live Amount Calculation (FE Approximation)
+  const [liveAmount, setLiveAmount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (room.status !== 'occupied' || !room.current_booking) {
+      setLiveAmount(null);
+      return;
+    }
+
+    const updateLiveAmount = () => {
+      const { current_booking: booking } = room;
+      if (!booking?.check_in_at) return;
+
+      const now = new Date();
+      let totalAmount = 0; // Tổng tiền (gồm phòng + dịch vụ + phụ thu)
+      let usingLadder = false;
+
+      // 1. Try to use Pricing Ladder from Snapshot (Most Accurate)
+      if (booking.pricing_ladder && booking.pricing_ladder.length > 0) {
+        // Find the latest point that is <= now
+        const currentPoint = [...booking.pricing_ladder]
+          .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+          .find(p => new Date(p.time) <= now);
+        
+        if (currentPoint) {
+          totalAmount = currentPoint.amount; // Ladder đã bao gồm dịch vụ và phụ thu
+          usingLadder = true;
+        }
+      } 
+      
+      if (!usingLadder) {
+        // 2. Fallback to FE Approximation
+        const roomCharge = calculateLiveRoomCharge({
+          checkInAt: booking.check_in_at,
+          rentalType: booking.booking_type,
+          prices: {
+            hourly: room.price_hourly || 0,
+            price_next_hour: room.price_next_hour || 0, // THÊM TRƯỜNG NÀY
+            daily: room.price_daily || 0,
+            overnight: room.price_overnight || 0,
+            base_hourly_limit: room.base_hourly_limit || 1,
+            hourly_unit: room.hourly_unit || 60,
+          }
+        });
+        // Cộng thêm dịch vụ, phụ thu, người thêm, giảm giá nếu fallback
+        totalAmount = roomCharge 
+          + (booking.service_total || 0) 
+          + (booking.surcharge_amount || 0) 
+          + (booking.extra_person_charge || 0)
+          + (booking.custom_surcharge || 0)
+          - (booking.discount_amount || 0);
+      }
+
+      // 3. Combine with other static components (Deposit, Debt)
+      // Note: Debt là khi balance < 0. Deposit là deposit_amount.
+      const finalToPay = totalAmount 
+        - (booking.deposit_amount || 0) 
+        + (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0);
+        
+      setLiveAmount(finalToPay);
+    };
+
+    updateLiveAmount();
+    
+    // For hourly rooms, update every minute to reflect live pricing
+    const interval = room.current_booking?.booking_type === 'hourly' ? 60000 : 300000;
+    const timer = setInterval(updateLiveAmount, interval);
+    return () => clearInterval(timer);
+  }, [room.status, room.current_booking, room.price_hourly, room.price_daily, room.price_overnight, room.base_hourly_limit, room.hourly_unit]);
+
   // Determine display properties based on status and booking
   const display = useMemo(() => {
     let bgColor = 'bg-[#155e75]'; // Default: Available (Xanh Teal)
@@ -135,16 +208,24 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick }) => {
 
   // Formatting currency
   const formattedAmount = useMemo(() => {
+    // Ưu tiên dùng số tiền tính toán trực tiếp tại FE (Live) để UI mượt mà
+    if (liveAmount !== null) {
+      return formatMoney(liveAmount);
+    }
+
     const booking = room.current_booking;
     const amount = room.status === 'occupied' && booking
-      ? ((booking.amount_to_pay || 0) + (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0))
+      ? (
+          (booking.amount_to_pay || 0) + 
+          (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0)
+        )
       : (room.status === 'available' ? room.price_daily : null);
 
     if (amount !== undefined && amount !== null) {
       return formatMoney(amount);
     }
     return null;
-  }, [room.status, room.current_booking, room.price_daily]);
+  }, [room.status, room.current_booking, room.price_daily, liveAmount]);
 
   return (
     <div 

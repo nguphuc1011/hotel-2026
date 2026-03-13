@@ -41,13 +41,13 @@ export function BottomSheet({
     // 🖥️ PC VERSION: Center Modal
     if (!isOpen) return null;
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      <div className="fixed inset-0 z-[60000] flex items-center justify-center p-4 sm:p-6">
         <div 
           className="fixed inset-0 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200" 
           onClick={onClose}
         />
         <div 
-          className="relative bg-white w-full rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 fade-in duration-300 z-[101]"
+          className="relative bg-white w-full rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 fade-in duration-300 z-[60001]"
           style={{ maxWidth, maxHeight: "90vh" }}
         >
           {/* PC Content - Header is handled by children if needed */}
@@ -63,10 +63,10 @@ export function BottomSheet({
   return (
     <Drawer.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[100]" />
+        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[60000]" />
         <Drawer.Content 
           className={cn(
-            "bg-white flex flex-col rounded-t-[32px] fixed bottom-0 left-0 right-0 z-[101] outline-none",
+            "bg-white flex flex-col rounded-t-[32px] fixed bottom-0 left-0 right-0 z-[60001] outline-none",
             "max-h-[var(--max-height)]"
           )}
           style={{ "--max-height": maxHeight } as React.CSSProperties}
