@@ -155,6 +155,8 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
 
     setIsSubmitting(true);
     try {
+      if (!booking) return;
+
       const payload = {
         bookingId: booking.id,
         customerName,
