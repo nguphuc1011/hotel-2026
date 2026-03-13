@@ -219,7 +219,7 @@ export default function CategoriesPage() {
               <button 
                 onClick={handleSaveCategories}
                 disabled={saving}
-                className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-slate-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hidden md:flex bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-2xl font-bold items-center gap-3 shadow-lg shadow-slate-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" /> : <Save size={20} />}
                 <span>Lưu thay đổi</span>
@@ -861,6 +861,20 @@ export default function CategoriesPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Mobile Fixed Footer */}
+      {activeTab === 'categories' && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-slate-100 md:hidden z-50">
+          <button 
+            onClick={handleSaveCategories}
+            disabled={saving}
+            className="w-full h-14 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-lg shadow-slate-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" /> : <Save size={20} />}
+            <span>Lưu thay đổi</span>
+          </button>
         </div>
       )}
     </div>
