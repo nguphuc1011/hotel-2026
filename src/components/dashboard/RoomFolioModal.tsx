@@ -231,9 +231,13 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     };
   }, [isOpen, booking?.id]);
 
+  // Early return if modal is closed or data is missing
+  if (!isOpen || !room) {
+    return null;
+  }
+
   // Early return if no booking to prevent crashes
-  // MUST BE AFTER ALL HOOKS
-  if (!booking && isOpen) {
+  if (!booking) {
     return null;
   }
 

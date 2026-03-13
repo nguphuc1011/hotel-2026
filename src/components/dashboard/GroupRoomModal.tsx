@@ -50,6 +50,10 @@ export default function GroupRoomModal({
   const [searchTerm, setSearchTerm] = useState('');
   const { verify, SecurityModals } = useSecurity();
 
+  if (!isOpen || !masterRoom) {
+    return null;
+  }
+
   // Fetch available rooms (checked_in, not same as master, not already grouped)
   const fetchRooms = useCallback(async () => {
     setIsLoading(true);

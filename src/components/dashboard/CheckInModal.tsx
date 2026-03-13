@@ -228,6 +228,10 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
   
   // Security Hook
   const { verify, SecurityModals } = useSecurity();
+
+  if (!isOpen || !room) {
+    return null;
+  }
   
   // New State
   const [source, setSource] = useState('direct');
