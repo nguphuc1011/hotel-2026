@@ -89,12 +89,17 @@ export default function DashboardPage() {
 
   const [settings, setSettings] = useState<any>(null);
 
-  // Fetch initial data using Unified RPC
-  const fetchData = useCallback(async () => {
+  // Fetch Dashboard Data
+  const fetchData = useCallback(async (isSilent = false) => {
     if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) return;
 
     try {
-      setLoading(true);
+      // Only show full-screen loader if we have no rooms yet (initial load)
+      if (!isSilent && rooms.length === 0) {
+        setLoading(true);
+      }
+      
+      console.log(`[Dashboard] Fetching data (isSilent: ${isSilent}) at ${new Date().toLocaleTimeString()}`);
       
       // 1. Fetch Dashboard Data & Settings in parallel
       const [unifiedResult, settingsResult] = await Promise.all([
@@ -250,7 +255,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [can, getRandomColor]);
+  }, [can, getRandomColor, rooms.length]);
 
   // --- Central Execution Handler (The Executioner) ---
   const handleAutoExecution = async (request: any) => {
@@ -427,7 +432,7 @@ export default function DashboardPage() {
       const timers = surroundDelays.map(d => {
         return setTimeout(() => {
           console.log(`Smart Update triggered (surround logic) at ${new Date().toLocaleTimeString()}`);
-          fetchData();
+          fetchData(true); // Silent update
         }, d);
       });
 
@@ -457,19 +462,19 @@ export default function DashboardPage() {
     const debouncedFetch = () => {
       clearTimeout(refreshTimeout);
       refreshTimeout = setTimeout(() => {
-        console.log("Realtime event received, debounced refresh starting...");
-        fetchData();
-      }, 1000); // 1 second debounce to group multiple events
+        console.log('Real-time Update triggered at', new Date().toLocaleTimeString());
+        fetchData(true); // Silent update
+      }, 1000);
     };
 
     const channel = supabase
       .channel('dashboard_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, debouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, debouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_services' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => debouncedFetch())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => debouncedFetch())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_services' }, () => debouncedFetch())
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-            toast.success("Đã kết nối thời gian thực");
+            console.log('Real-time: Connected to dashboard_updates');
         }
       });
 
