@@ -228,14 +228,15 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-6 pb-32">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
         <div>
-            <h1 className="text-4xl md:text-5xl font-black-italic tracking-tighter uppercase italic text-slate-800">
-                Bức tranh tài chính
-            </h1>
-            <p className="text-slate-400 font-bold text-sm tracking-tight mt-2 uppercase tracking-[0.1em]">
-                Theo dõi sức khỏe dòng tiền & Lợi nhuận
-            </p>
+          <h1 className="text-4xl font-black tracking-tighter text-slate-900 flex items-center gap-3">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700">Báo cáo</span>
+            <span className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full font-bold tracking-wide border border-emerald-100 shadow-sm flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              TÀI CHÍNH
+            </span>
+          </h1>
         </div>
 
         {/* Date Filter */}

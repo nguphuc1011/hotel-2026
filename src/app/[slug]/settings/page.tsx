@@ -36,10 +36,18 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-8 pb-32">
-      <header className="mb-8">
-        <h1 className="text-5xl font-black-italic tracking-tighter uppercase italic text-accent">Cài đặt</h1>
-        <p className="text-muted font-bold text-sm tracking-tight mt-4 uppercase tracking-[0.1em]">Cấu hình hệ thống MANA PMS</p>
-      </header>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+        <div>
+          <h1 className="text-4xl font-black tracking-tighter text-slate-900 flex items-center gap-3">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700">Cài đặt</span>
+            <span className="text-xs bg-orange-50 text-orange-600 px-3 py-1 rounded-full font-bold tracking-wide border border-orange-100 shadow-sm flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></div>
+              HỆ THỐNG
+            </span>
+          </h1>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Main Bento Large */}

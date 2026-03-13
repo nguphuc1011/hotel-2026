@@ -981,6 +981,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           onSuccess={() => {
             loadBill();
             onUpdate();
+            onClose(); // Auto close Folio after edit success
           }}
         />
 
@@ -995,7 +996,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           verifiedStaff={editStaff} 
           onSuccess={() => { 
             onUpdate();
-            onClose();
+            onClose(); // Auto close Folio after change room success
           }}
         />
 
@@ -1019,7 +1020,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             onClose={() => setIsTransferGroupMasterModalOpen(false)}
             onSuccess={() => {
               onUpdate();
-              onClose();
+              onClose(); // Auto close Folio after master transfer success
             }}
             oldMasterBooking={{
               id: booking?.id!,

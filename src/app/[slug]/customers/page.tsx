@@ -91,20 +91,22 @@ export default function CustomersPage() {
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-main flex items-center gap-3">
-            <Users className="text-accent" size={32} />
-            Khách hàng
+          <h1 className="text-4xl font-black tracking-tighter text-slate-900 flex items-center gap-3">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700">Khách hàng</span>
+            <span className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-bold tracking-wide border border-blue-100 shadow-sm flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+              HỒ SƠ
+            </span>
           </h1>
-          <p className="text-muted font-medium mt-1">Quản lý hồ sơ, công nợ và lịch sử khách hàng</p>
         </div>
         
         <button 
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 bg-accent hover:bg-accent/90 text-white px-5 py-3 rounded-2xl font-bold shadow-lg shadow-accent/20 transition-all active:scale-95"
+          className="h-14 px-8 bg-accent hover:bg-accent/90 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-accent/20 flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
         >
-          <Plus size={20} />
+          <Plus size={24} />
           Thêm khách mới
         </button>
       </div>
