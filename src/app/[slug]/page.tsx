@@ -605,7 +605,7 @@ export default function DashboardPage() {
       await bookingService.checkIn({
         room_id: bookingData.room_id,
         rental_type: bookingData.rental_type,
-        customer_id: customerId,
+        customer_id: customerId || undefined,
         deposit: bookingData.deposit || 0,
         payment_method: bookingData.payment_method || 'cash',
         services: bookingData.services || [],
@@ -616,8 +616,10 @@ export default function DashboardPage() {
         custom_price: bookingData.custom_price,
         custom_price_reason: bookingData.custom_price_reason,
         source: bookingData.source || 'direct',
-        verified_by_staff_id: bookingData.verified_by_staff_id,
-        verified_by_staff_name: bookingData.verified_by_staff_name
+        verifiedStaff: bookingData.verified_by_staff_id ? {
+          id: bookingData.verified_by_staff_id,
+          name: bookingData.verified_by_staff_name || ''
+        } : undefined
       });
 
       toast.success('Nhận phòng thành công');
