@@ -56,27 +56,34 @@ export default function GeneralSettingsPage() {
   if (!settings) return <div className="p-8">Không có dữ liệu cấu hình.</div>;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-32 font-sans">
+    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-40 font-sans">
       <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 md:mb-12">
           <div className="space-y-2">
             <button 
               onClick={() => router.back()}
-              className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mb-2 font-bold"
+              className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mb-4 font-bold"
             >
               <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-slate-300 group-hover:bg-slate-50 transition-all">
                 <ChevronLeft size={16} />
               </div>
-              <span>Quay lại</span>
+              <span className="text-xs font-black uppercase tracking-widest">Quay lại</span>
             </button>
-            <h1 className="text-4xl font-black tracking-tighter text-slate-900">
-              Cấu hình chung
-            </h1>
-            <p className="text-slate-500 font-medium text-base">
-              Thông tin cơ bản về khách sạn của bạn
-            </p>
+            <div className="flex items-center gap-4 mb-2">
+               <div className="w-14 h-14 rounded-2xl bg-slate-200 text-slate-700 flex items-center justify-center shadow-sm">
+                 <Building2 size={28} />
+               </div>
+               <div>
+                  <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                    Cấu hình chung
+                  </h1>
+                  <p className="text-slate-500 font-medium text-base md:text-lg mt-1">
+                    Thông tin cơ bản về khách sạn của bạn
+                  </p>
+               </div>
+            </div>
           </div>
           
           <button 

@@ -328,7 +328,7 @@ export default function ServicesPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-32 font-sans">
+    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-40 font-sans">
       <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
       
       {/* Header */}
@@ -349,7 +349,7 @@ export default function ServicesPage() {
                </div>
                <div>
                   <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-                      Quản lý Dịch vụ & Kho
+                      Kho và Dịch vụ
                   </h1>
                   <p className="text-slate-500 font-medium text-base md:text-lg mt-1">
                       Thiết lập menu, giá bán và quản lý tồn kho

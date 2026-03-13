@@ -184,11 +184,11 @@ export default function CategoriesPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]"><div className="animate-spin w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full"></div></div>;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-32 font-sans">
+    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-40 font-sans">
       <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 md:mb-12">
           <div className="space-y-2">
             <button 
               onClick={() => router.back()}
@@ -204,22 +204,22 @@ export default function CategoriesPage() {
                  <LayoutGrid size={28} />
                </div>
                <div>
-                  <h1 className="text-4xl font-black tracking-tighter text-slate-900">
-                    Quản lý Phòng & Giá
+                  <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                    Quản lý Phòng
                   </h1>
-                  <p className="text-slate-500 font-medium text-base mt-1">
+                  <p className="text-slate-500 font-medium text-base md:text-lg mt-1">
                     Thiết lập hạng phòng, giá và danh sách phòng
                   </p>
                </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3">
             {activeTab === 'categories' && (
               <button 
                 onClick={handleSaveCategories}
                 disabled={saving}
-                className="hidden md:flex bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-2xl font-bold items-center gap-3 shadow-lg shadow-slate-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-slate-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" /> : <Save size={20} />}
                 <span>Lưu thay đổi</span>
@@ -240,32 +240,48 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white p-1.5 rounded-[24px] shadow-sm border border-slate-100 inline-flex gap-1 w-full md:w-auto overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('categories')}
-            className={cn(
-              "px-6 py-3 rounded-[20px] font-bold text-sm flex items-center gap-2 transition-all whitespace-nowrap",
-              activeTab === 'categories' 
-                ? "bg-slate-900 text-white shadow-md" 
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-            )}
-          >
-            <LayoutGrid size={18} strokeWidth={2.5} />
-            Hạng phòng & Giá
-          </button>
-          <button
-            onClick={() => setActiveTab('rooms')}
-            className={cn(
-              "px-6 py-3 rounded-[20px] font-bold text-sm flex items-center gap-2 transition-all whitespace-nowrap",
-              activeTab === 'rooms' 
-                ? "bg-slate-900 text-white shadow-md" 
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-            )}
-          >
-            <List size={18} strokeWidth={2.5} />
-            Danh sách phòng
-          </button>
+        {/* Tabs & Mobile Actions */}
+        <div className="flex flex-col gap-4">
+          <div className="bg-white p-1.5 rounded-[24px] shadow-sm border border-slate-100 inline-flex gap-1 w-full md:w-auto overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('categories')}
+              className={cn(
+                "px-6 py-3 rounded-[20px] font-bold text-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap flex-1 md:flex-none",
+                activeTab === 'categories' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              <LayoutGrid size={18} strokeWidth={2.5} />
+              Hạng phòng & Giá
+            </button>
+            <button
+              onClick={() => setActiveTab('rooms')}
+              className={cn(
+                "px-6 py-3 rounded-[20px] font-bold text-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap flex-1 md:flex-none",
+                activeTab === 'rooms' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              <List size={18} strokeWidth={2.5} />
+              Danh sách phòng
+            </button>
+          </div>
+
+          {/* Mobile "Add Room" button below tabs */}
+          {activeTab === 'rooms' && (
+            <button
+              onClick={() => {
+                setEditingRoom({ status: 'available' });
+                setIsRoomModalOpen(true);
+              }}
+              className="md:hidden w-full py-4 bg-white border border-slate-200 text-slate-900 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-all"
+            >
+              <Plus size={20} />
+              <span>Thêm phòng mới</span>
+            </button>
+          )}
         </div>
 
         {/* Content Area */}

@@ -130,32 +130,34 @@ export default function PricingPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]"><div className="animate-spin w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full"></div></div>;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-32 font-sans">
+    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-40 font-sans">
       <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 md:mb-12">
           <div className="space-y-2">
             <button 
               onClick={() => router.back()}
-              className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mb-2 font-bold"
+              className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mb-4 font-bold"
             >
               <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-slate-300 group-hover:bg-slate-50 transition-all">
                 <ChevronLeft size={16} />
               </div>
               <span className="text-xs font-black uppercase tracking-widest">Quay lại</span>
             </button>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-2xl border border-slate-200 flex items-center justify-center shadow-sm text-slate-900">
-                <Settings2 size={24} strokeWidth={2} />
-              </div>
-              <h1 className="text-4xl font-black tracking-tighter text-slate-900">
-                Cấu hình giá
-              </h1>
+            <div className="flex items-center gap-4 mb-2">
+               <div className="w-14 h-14 rounded-2xl bg-slate-200 text-slate-700 flex items-center justify-center shadow-sm">
+                 <Settings2 size={28} />
+               </div>
+               <div>
+                  <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                    Cấu hình giá
+                  </h1>
+                  <p className="text-slate-500 font-medium text-base md:text-lg mt-1">
+                    Thiết lập bảng giá, giờ giấc và các chính sách phụ thu
+                  </p>
+               </div>
             </div>
-            <p className="text-slate-500 font-medium text-base pl-16">
-              Thiết lập bảng giá, giờ giấc và các chính sách phụ thu
-            </p>
           </div>
           
           <button 
@@ -171,15 +173,15 @@ export default function PricingPage() {
         {/* Navigation Tabs */}
         <div className="bg-white p-1.5 rounded-[24px] shadow-sm border border-slate-100 inline-flex gap-1 w-full md:w-auto overflow-x-auto">
           {[
-            { id: 'times', label: 'Giờ giấc & Qua đêm', icon: Clock },
-            { id: 'policies', label: 'Chính sách phụ thu', icon: ShieldCheck },
+            { id: 'times', label: 'Giờ giấc', icon: Clock },
+            { id: 'policies', label: 'Phụ thu', icon: ShieldCheck },
             { id: 'vat', label: 'Thuế & Phí', icon: Percent },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setSubTab(tab.id)}
               className={cn(
-                "px-6 py-3 rounded-[20px] font-bold text-sm flex items-center gap-2 transition-all whitespace-nowrap",
+                "px-6 py-3 rounded-[20px] font-bold text-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap flex-1 md:flex-none",
                 subTab === tab.id 
                   ? "bg-slate-900 text-white shadow-md" 
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
