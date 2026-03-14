@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { bookingService } from '@/services/bookingService';
 import { customerService, Customer } from '@/services/customerService';
 import { Booking, Room } from '@/types/dashboard';
+import { formatMoney } from '@/utils/format';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { cn } from '@/lib/utils';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
@@ -192,13 +193,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
   const debt = selectedCustomer && selectedCustomer.balance < 0 ? Math.abs(selectedCustomer.balance) : 0;
 
   return createPortal(
-    <div className="fixed inset-0 z-[70000] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div 
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 z-[70001] max-h-[90vh]">
-        {/* Header */}
+    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className={cn(
+        "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+        "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full md:h-auto md:max-w-lg md:rounded-[32px] md:zoom-in-95 md:max-h-[90vh] md:mt-0"
+      )}>
+        {/* --- HEADER --- */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-200">
@@ -214,165 +214,194 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
               <p className="text-xs text-slate-500 mt-1 font-medium">Booking #{booking.id.slice(0, 8)}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center hover:bg-slate-200 rounded-full transition-colors">
+          <button 
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
+          >
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
 
-        {/* Search Section - Fixed at top of body to avoid clipping */}
-        <div className="px-6 pt-6 pb-2 shrink-0 z-50 relative" ref={searchRef}>
-             <label className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-2">
+        {/* --- BODY --- */}
+        <div className="flex-1 p-6 space-y-6 bg-slate-50 relative overflow-y-auto custom-scrollbar">
+          
+          {/* 1. CUSTOMER SEARCH */}
+          <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4 relative z-50" ref={searchRef}>
+            <label className="text-sm font-bold text-slate-700 uppercase tracking-wide px-1 flex items-center gap-2">
               <User className="w-4 h-4" /> Tên khách hàng
             </label>
-            <div className="relative">
-                <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => {
-                        setCustomerName(e.target.value);
-                        setSearchTerm(e.target.value);
-                        // If clearing manually, don't show results? No, typing empty means clear.
-                        // But if typing something, show results.
-                        // We rely on effect for showing results, but we can optimistically show if we have them?
-                        // Better rely on effect to keep state consistent.
-                    }}
-                    onFocus={() => {
-                        if (customers.length > 0 && searchTerm) setShowSearchResults(true);
-                    }}
-                    className="w-full p-3 pl-10 pr-10 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 outline-none font-medium"
-                    placeholder="Nhập tên để tìm kiếm..."
-                />
-                <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                
-                {searchTerm && (
-                    <button 
-                        onClick={handleClearSearch}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"
-                    >
-                        {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                    </button>
+            <div className="relative group bg-slate-50 rounded-[24px] p-1 transition-shadow hover:shadow-md border border-slate-100">
+                <div className="flex items-center px-4">
+                    <Search className="w-5 h-5 text-slate-400 mr-3" />
+                    <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => {
+                            setCustomerName(e.target.value);
+                            setSearchTerm(e.target.value);
+                        }}
+                        onFocus={() => {
+                            if (customers.length > 0 && searchTerm) setShowSearchResults(true);
+                        }}
+                        className="w-full py-4 bg-transparent border-none text-base font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none"
+                        placeholder="Tìm hoặc nhập tên khách..."
+                    />
+                    {searchTerm && (
+                        <button 
+                            onClick={handleClearSearch}
+                            className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                        >
+                            {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                        </button>
+                    )}
+                </div>
+
+                {/* Dropdown Results */}
+                {showSearchResults && customers.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[24px] shadow-xl overflow-hidden z-[102] p-1 border border-slate-100">
+                        {customers.map(cust => (
+                            <div 
+                                key={cust.id}
+                                onClick={() => handleSelectCustomer(cust)}
+                                className="px-4 py-3 hover:bg-amber-50 rounded-xl cursor-pointer flex justify-between items-center group transition-colors"
+                            >
+                                <div>
+                                    <div className="font-bold text-slate-700 group-hover:text-amber-700">{cust.full_name}</div>
+                                    <div className="text-xs text-slate-400">{cust.phone || 'Không có SĐT'}</div>
+                                </div>
+                                {cust.balance < 0 && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">
+                                        Nợ: {formatMoney(Math.abs(cust.balance))}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
-
-            {/* Search Results Dropdown - Absolute but relative to this container */}
-            {showSearchResults && customers.length > 0 && (
-                <div className="absolute top-full left-6 right-6 mt-1 bg-white rounded-xl shadow-2xl border border-slate-100 max-h-48 overflow-y-auto z-[100]">
-                    {customers.map(cust => (
-                        <div 
-                            key={cust.id}
-                            onClick={() => handleSelectCustomer(cust)}
-                            className="p-3 hover:bg-amber-50 cursor-pointer border-b border-slate-50 last:border-none flex justify-between items-center"
-                        >
-                            <div>
-                                <div className="font-bold text-slate-800">{cust.full_name}</div>
-                                <div className="text-xs text-slate-500">{cust.phone || 'Không có SĐT'}</div>
-                            </div>
-                            {cust.balance < 0 && (
-                                <span className="text-xs font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg">
-                                    Nợ: {Math.abs(cust.balance).toLocaleString()}
-                                </span>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
             
             {/* Debt Warning */}
             {debt > 0 && (
-                <div className="flex items-center gap-3 p-3 mt-2 bg-rose-50 text-rose-700 rounded-xl border border-rose-100 animate-in slide-in-from-top-2">
-                    <AlertCircle className="w-5 h-5 shrink-0" />
-                    <div className="text-xs">
-                        <span className="font-bold block">Cảnh báo nợ xấu</span>
-                        Khách đang nợ <span className="font-black text-rose-800">{debt.toLocaleString()}đ</span>
+                <div className="flex items-center gap-4 p-5 bg-rose-50 text-rose-700 rounded-[32px] border border-rose-100 shadow-sm animate-in slide-in-from-top-2">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                        <AlertCircle className="w-6 h-6 text-rose-600" />
+                    </div>
+                    <div className="flex-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">Cảnh báo nợ cũ</span>
+                        <div className="text-sm font-bold leading-tight">
+                            Khách đang nợ <span className="font-black text-rose-800 text-lg">{formatMoney(debt)}</span>
+                        </div>
                     </div>
                 </div>
             )}
-        </div>
-
-        {/* Scrollable Form Content */}
-        <div className="p-6 pt-2 space-y-5 overflow-y-auto">
-          {/* Check-in Time */}
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-              <Calendar className="w-4 h-4" /> Giờ vào
-            </label>
-            <input
-              type="datetime-local"
-              value={checkInAt}
-              onChange={(e) => setCheckInAt(e.target.value)}
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 outline-none font-medium"
-            />
           </div>
 
-          {/* Price */}
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-              <DollarSign className="w-4 h-4" /> Giá phòng
+          {/* 2. CHECK-IN TIME */}
+          <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4">
+            <label className="text-sm font-bold text-slate-700 uppercase tracking-wide px-1 flex items-center gap-2">
+              <Calendar className="w-4 h-4" /> Thời gian nhận phòng
             </label>
-            <MoneyInput
-              value={customPrice || 0}
-              onChange={setCustomPrice}
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 outline-none font-bold text-amber-600"
-            />
-            <div className="flex gap-2 mt-2">
-                <button 
-                    onClick={() => setPriceApplyMode('all')}
-                    className={cn(
-                        "flex-1 py-2 text-xs font-bold rounded-lg border transition-all",
-                        priceApplyMode === 'all' 
-                        ? 'bg-amber-50 border-amber-500 text-amber-700' 
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300'
-                    )}
-                >
-                    Áp dụng từ đầu
-                </button>
-                <button 
-                    onClick={() => {
-                        setPriceApplyMode('future');
-                        toast.info("Tính năng đang phát triển, tạm thời áp dụng từ đầu");
-                    }}
-                    className={cn(
-                        "flex-1 py-2 text-xs font-bold rounded-lg border transition-all",
-                        priceApplyMode === 'future' 
-                        ? 'bg-amber-50 border-amber-500 text-amber-700' 
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300'
-                    )}
-                >
-                    Áp dụng từ hôm nay
-                </button>
+            <div className="relative group bg-slate-50 rounded-[24px] p-1 border border-slate-100">
+                <input
+                    type="datetime-local"
+                    value={checkInAt}
+                    onChange={(e) => setCheckInAt(e.target.value)}
+                    className="w-full py-4 px-5 bg-transparent border-none text-base font-bold text-slate-800 focus:ring-0 outline-none"
+                />
             </div>
           </div>
 
-          {/* Notes */}
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Ghi chú phòng</label>
-            <textarea
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 outline-none resize-none"
-              rows={2}
-              placeholder="Nhập ghi chú..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+          {/* 3. ROOM PRICE */}
+          <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4">
+            <label className="text-sm font-bold text-slate-700 uppercase tracking-wide px-1 flex items-center gap-2">
+              <DollarSign className="w-4 h-4" /> Đơn giá phòng mới
+            </label>
+            <div className="relative">
+                <MoneyInput
+                    value={customPrice || 0}
+                    onChange={setCustomPrice}
+                    className="w-full py-6 px-4 bg-slate-50 rounded-[32px] text-4xl font-bold text-amber-600 focus:ring-0 border-none outline-none transition-all tracking-tight"
+                    inputClassName="text-4xl font-bold tracking-tight text-center"
+                    centered
+                    align="center"
+                />
+            </div>
+            <div className="flex bg-slate-50 rounded-full p-1.5 shadow-sm border border-slate-100 mt-2">
+                {[
+                    { id: 'all', label: 'ÁP DỤNG TỪ ĐẦU' },
+                    { id: 'future', label: 'CHỈ TỪ HÔM NAY' },
+                ].map((mode) => {
+                    const isActive = priceApplyMode === mode.id;
+                    return (
+                        <button 
+                            key={mode.id}
+                            type="button"
+                            onClick={() => {
+                                if (mode.id === 'future') {
+                                    toast.info("Tính năng đang phát triển, tạm thời áp dụng từ đầu");
+                                    setPriceApplyMode('all');
+                                } else {
+                                    setPriceApplyMode('all');
+                                }
+                            }}
+                            className={cn(
+                                "flex-1 py-3.5 rounded-full transition-all duration-300 font-black text-[10px] tracking-widest uppercase",
+                                isActive ? "bg-amber-500 text-white shadow-lg shadow-amber-500/30" : "text-slate-400 hover:bg-slate-100"
+                            )}
+                        >
+                            {mode.label}
+                        </button>
+                    );
+                })}
+            </div>
           </div>
 
-          {/* Reason */}
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Lý do thay đổi (Bắt buộc)</label>
-            <textarea
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 outline-none resize-none"
-              rows={2}
-              placeholder="Nhập lý do..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
+          {/* 4. NOTES & REASON */}
+          <div className="space-y-6">
+            <div className="space-y-3">
+                <label className="text-sm font-bold text-slate-700 uppercase tracking-wide px-1">Ghi chú phòng</label>
+                <textarea
+                    className="w-full h-24 rounded-[32px] bg-white p-5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-amber-500 border-none outline-none transition-all resize-none shadow-sm"
+                    rows={2}
+                    placeholder="Nhập ghi chú phòng..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                />
+            </div>
+
+            <div className="space-y-3">
+                <label className="text-sm font-bold text-rose-600 uppercase tracking-wide px-1 flex items-center gap-2">
+                    Lý do thay đổi <span className="text-[10px] bg-rose-100 px-2 py-0.5 rounded-full font-black">BẮT BUỘC</span>
+                </label>
+                <textarea
+                    className="w-full h-24 rounded-[32px] bg-white p-5 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:ring-2 focus:ring-rose-500 border-2 border-rose-100 outline-none transition-all resize-none shadow-sm"
+                    rows={2}
+                    placeholder="Vì sao bạn thay đổi các thông tin nhạy cảm này?"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                />
+            </div>
           </div>
 
+        </div>
+
+        {/* --- FOOTER --- */}
+        <div className="p-6 bg-white border-t border-slate-100 flex items-center gap-4 shrink-0">
+          <button 
+            onClick={onClose}
+            className="flex-1 py-4 rounded-[24px] font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider"
+          >
+            Hủy bỏ
+          </button>
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || !reason}
-            className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-lg shadow-amber-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className={cn(
+                "flex-[2] py-4 rounded-[24px] font-bold text-white uppercase tracking-wider shadow-lg shadow-amber-600/30 transition-all flex items-center justify-center gap-3",
+                isSubmitting || !reason ? "bg-slate-300 cursor-not-allowed shadow-none" : "bg-amber-500 hover:bg-amber-600 active:scale-95"
+            )}
           >
-            {isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}
+            {isSubmitting ? 'Đang lưu...' : 'Xác nhận thay đổi'}
           </button>
         </div>
       </div>

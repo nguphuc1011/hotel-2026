@@ -95,9 +95,11 @@ export default function DashboardPage() {
 
     try {
       // Only show full-screen loader if we have no rooms yet (initial load)
-      if (!isSilent && rooms.length === 0) {
-        setLoading(true);
-      }
+      // Use functional state check to avoid rooms dependency
+      setLoading(prevLoading => {
+        if (!isSilent && rooms.length === 0) return true;
+        return prevLoading;
+      });
       
       console.log(`[Dashboard] Fetching data (isSilent: ${isSilent}) at ${new Date().toLocaleTimeString()}`);
       
@@ -271,7 +273,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [can, getRandomColor, rooms.length]);
+  }, [can, getRandomColor]); // Remove rooms.length dependency
 
   // --- Central Execution Handler (The Executioner) ---
   const handleAutoExecution = async (request: any) => {
@@ -334,15 +336,12 @@ export default function DashboardPage() {
     }
   };
 
+  // Initial Load
   useEffect(() => {
-    if (!isAuthLoading) {
-      if (can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
-        fetchData();
-      } else {
-        setLoading(false);
-      }
+    if (can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
+      fetchData();
     }
-  }, [isAuthLoading, can, fetchData]);
+  }, [can]); // Only re-run when permission changes, NOT when fetchData changes
 
   // Smart Update Logic based on User Requirements
   useEffect(() => {
@@ -604,7 +603,7 @@ export default function DashboardPage() {
       }
       
       await supabase.from('rooms').update(updates).eq('id', roomId);
-      fetchData(); // Khôi phục gọi trực tiếp để UI cập nhật ngay
+      // Removed direct fetchData() - Realtime subscription will trigger debouncedFetch()
     } catch (e) {
       console.error(e);
       toast.error('Lỗi cập nhật trạng thái');
@@ -645,7 +644,7 @@ export default function DashboardPage() {
 
       toast.success('Nhận phòng thành công');
       setIsCheckInOpen(false);
-      fetchData(); // Khôi phục gọi trực tiếp để đảm bảo UI cập nhật ngay lập tức
+      // Removed direct fetchData() - Realtime subscription will trigger debouncedFetch()
     } catch (error: any) {
       // Robust error logging for Next.js 16 / Turbopack
       const detailedError = error instanceof Error 

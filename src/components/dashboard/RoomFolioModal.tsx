@@ -1059,18 +1059,12 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   if (!activeRoom || !activeBooking) return null;
 
   return createPortal(
-    <div className={cn(
-      "fixed inset-0 z-[60000] flex items-center justify-center p-0 md:p-4 transition-all duration-300",
-      isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-    )}>
-      <div 
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
-        onClick={onClose}
-      />
-      
+    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200">
       <div className={cn(
-        "relative w-full h-full md:h-auto md:max-h-[95vh] md:max-w-[800px] bg-white md:rounded-[48px] shadow-2xl overflow-hidden flex flex-col transition-all duration-300 transform",
-        isOpen ? "translate-y-0 opacity-100 scale-100" : "translate-y-10 md:translate-y-0 md:scale-95 opacity-0"
+        "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+        isMobile 
+          ? "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full" 
+          : "max-w-[800px] rounded-[32px] zoom-in-95 max-h-[90vh]"
       )}>
         {SecurityModals}
         {ModalContent}

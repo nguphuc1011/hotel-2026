@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, X, Loader2, User, Phone, CreditCard, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatMoney } from '@/utils/format';
 import { customerService, Customer } from '@/services/customerService';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 
@@ -144,114 +145,136 @@ export default function CustomerSelectionModal({ isOpen, onClose, onSelect }: Cu
     if (!isOpen || !mounted) return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[70000] flex items-center justify-center backdrop-blur-sm bg-slate-900/40 p-4">
-            <div className="w-full max-w-lg h-[550px] bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col">
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-                    <h3 className="text-lg font-bold text-slate-800">Chọn khách hàng</h3>
+        <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className={cn(
+                "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+                "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full md:h-auto md:max-w-lg md:rounded-[32px] md:zoom-in-95 md:max-h-[90vh] md:mt-0"
+            )}>
+                {/* --- HEADER --- */}
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                            <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-800 leading-none">Chọn khách hàng</h3>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">Tìm hoặc tạo khách hàng mới</p>
+                        </div>
+                    </div>
                     <button 
                         onClick={onClose}
-                        className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+                        className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
                     >
-                        <X size={18} />
+                        <X className="w-5 h-5 text-slate-500" />
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+                {/* --- BODY --- */}
+                <div className="flex-1 p-6 space-y-6 bg-slate-50 relative overflow-y-auto custom-scrollbar">
                     
                     {/* Warning / Explanation */}
-                    <div className="bg-orange-50 rounded-2xl p-4 flex gap-3 border border-orange-100">
-                        <AlertCircle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
-                        <div className="text-sm text-orange-800">
-                            <span className="font-bold block mb-1">Yêu cầu chọn khách hàng</span>
-                            Khách vãng lai không được phép ghi nợ. Vui lòng chọn khách hàng có sẵn hoặc tạo mới để tiếp tục thanh toán.
+                    <div className="bg-orange-50 rounded-[32px] p-6 flex gap-4 border border-orange-100 shadow-sm animate-in slide-in-from-top-2">
+                        <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center shrink-0">
+                            <AlertCircle className="w-6 h-6 text-orange-600" />
+                        </div>
+                        <div className="text-sm text-orange-800 flex-1 leading-tight">
+                            <span className="font-black block mb-1 uppercase tracking-widest text-[10px]">Yêu cầu chọn khách hàng</span>
+                            <p className="font-bold">Khách vãng lai không được phép ghi nợ. Vui lòng chọn khách hàng có sẵn hoặc tạo mới để tiếp tục.</p>
                         </div>
                     </div>
 
-                    <div className="relative" ref={searchRef}>
-                        <div className="flex items-center bg-slate-50 rounded-[24px] border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-sm">
-                            <Search className="w-5 h-5 text-slate-400 mr-3" />
-                            <input
-                                type="text"
-                                placeholder="Tìm tên, SĐT, CCCD..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="flex-1 bg-transparent border-none outline-none text-base font-semibold text-slate-800 placeholder:text-slate-400"
-                                autoFocus
-                            />
-                            {isSearching && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
-                        </div>
-
-                        {/* Dropdown Results */}
-                        {customers.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[24px] shadow-xl overflow-hidden z-50 p-1 border border-slate-100 max-h-[300px] overflow-y-auto">
-                                {customers.map(customer => (
-                                    <button 
-                                        key={customer.id}
-                                        onClick={() => handleSelectExisting(customer)}
-                                        disabled={isSubmitting}
-                                        className="w-full px-4 py-3 hover:bg-blue-50 rounded-xl flex justify-between items-center group transition-colors text-left"
-                                    >
-                                        <div>
-                                            <div className="font-bold text-slate-700 group-hover:text-blue-700">{customer.full_name}</div>
-                                            <div className="text-xs text-slate-400 font-medium mt-0.5">
-                                                {customer.phone || 'Không có SĐT'} • {customer.id_card || 'Không có CCCD'}
-                                            </div>
-                                        </div>
-                                        {customer.balance !== 0 && (
-                                            <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", customer.balance < 0 ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600")}>
-                                                {customer.balance.toLocaleString()}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
+                    <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4 relative z-50" ref={searchRef}>
+                        <label className="text-sm font-bold text-slate-700 uppercase tracking-wide px-1 flex items-center gap-2">
+                            <Search className="w-4 h-4" /> Tìm kiếm khách hàng
+                        </label>
+                        <div className="relative group bg-slate-50 rounded-[24px] p-1 transition-shadow hover:shadow-md border border-slate-100">
+                            <div className="flex items-center px-4">
+                                <Search className="w-5 h-5 text-slate-400 mr-3" />
+                                <input
+                                    type="text"
+                                    placeholder="Tìm tên, SĐT, CCCD..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full py-4 bg-transparent border-none text-base font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none"
+                                    autoFocus
+                                />
+                                {isSearching && <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />}
                             </div>
-                        )}
+
+                            {/* Dropdown Results */}
+                            {customers.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[24px] shadow-xl overflow-hidden z-[102] p-1 border border-slate-100 max-h-[300px] overflow-y-auto">
+                                    {customers.map(customer => (
+                                        <button 
+                                            key={customer.id}
+                                            onClick={() => handleSelectExisting(customer)}
+                                            disabled={isSubmitting}
+                                            className="w-full px-4 py-3 hover:bg-blue-50 rounded-xl flex justify-between items-center group transition-colors text-left"
+                                        >
+                                            <div>
+                                                <div className="font-bold text-slate-700 group-hover:text-blue-700">{customer.full_name}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">
+                                                    {customer.phone || 'N/A'} • {customer.id_card || 'N/A'}
+                                                </div>
+                                            </div>
+                                            {customer.balance !== 0 && (
+                                                <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest", customer.balance < 0 ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600")}>
+                                                    {formatMoney(customer.balance)}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* New Customer Form (Show if no results or explicit typing) */}
+                    {/* New Customer Form */}
                     {searchTerm.length > 0 && customers.length === 0 && (
-                        <div className="space-y-4 animate-in slide-in-from-top-2 fade-in duration-300">
-                            <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-wide px-1">
-                                <User size={14} />
+                        <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4 animate-in slide-in-from-top-2 fade-in duration-300">
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-wide px-1">
+                                <User size={14} className="text-blue-500" />
                                 <span>Tạo khách hàng mới</span>
                             </div>
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="relative">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input 
-                                        type="tel" 
-                                        placeholder="Số điện thoại"
-                                        value={newCustomerPhone}
-                                        onChange={(e) => setNewCustomerPhone(e.target.value)}
-                                        className="w-full bg-slate-50 border-none rounded-[20px] pl-10 pr-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
-                                    />
+                                <div className="relative group bg-slate-50 rounded-[24px] p-1 border border-slate-100">
+                                    <div className="flex items-center px-4">
+                                        <Phone className="w-4 h-4 text-slate-400 mr-3" />
+                                        <input 
+                                            type="tel" 
+                                            placeholder="Số điện thoại"
+                                            value={newCustomerPhone}
+                                            onChange={(e) => setNewCustomerPhone(e.target.value)}
+                                            className="w-full py-3.5 bg-transparent border-none text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="relative">
-                                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="CCCD/CMND"
-                                        value={newCustomerIdCard}
-                                        onChange={(e) => setNewCustomerIdCard(e.target.value)}
-                                        className="w-full bg-slate-50 border-none rounded-[20px] pl-10 pr-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
-                                    />
+                                <div className="relative group bg-slate-50 rounded-[24px] p-1 border border-slate-100">
+                                    <div className="flex items-center px-4">
+                                        <CreditCard className="w-4 h-4 text-slate-400 mr-3" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="CCCD/CMND"
+                                            value={newCustomerIdCard}
+                                            onChange={(e) => setNewCustomerIdCard(e.target.value)}
+                                            className="w-full py-3.5 bg-transparent border-none text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             <button
                                 onClick={handleCreateAndSelect}
                                 disabled={isSubmitting}
-                                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] font-bold shadow-lg shadow-blue-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] font-bold shadow-lg shadow-blue-600/30 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-wider"
                             >
                                 {isSubmitting ? (
                                     <Loader2 className="w-5 h-5 animate-spin" />
                                 ) : (
                                     <>
                                         <User className="w-5 h-5" />
-                                        <span>Tạo khách hàng & Chọn</span>
+                                        <span>Tạo & Chọn khách hàng</span>
                                     </>
                                 )}
                             </button>
@@ -260,11 +283,23 @@ export default function CustomerSelectionModal({ isOpen, onClose, onSelect }: Cu
                     
                     {/* Empty State / Prompt */}
                     {!searchTerm && (
-                        <div className="text-center py-8 opacity-40">
-                            <Search className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                            <p className="text-sm font-medium text-slate-500">Nhập tên hoặc số điện thoại để tìm kiếm</p>
+                        <div className="text-center py-12 px-6 animate-in fade-in duration-500 opacity-40">
+                            <div className="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center mx-auto mb-4">
+                                <Search className="w-10 h-10 text-slate-400" />
+                            </div>
+                            <p className="text-sm font-bold text-slate-500 leading-relaxed uppercase tracking-widest">Nhập tên hoặc số điện thoại<br/>để tìm kiếm khách hàng</p>
                         </div>
                     )}
+                </div>
+
+                {/* --- FOOTER --- */}
+                <div className="p-6 bg-white border-t border-slate-100 flex items-center gap-4 shrink-0">
+                    <button 
+                        onClick={onClose}
+                        className="w-full py-4 rounded-[24px] font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider"
+                    >
+                        Hủy bỏ
+                    </button>
                 </div>
             </div>
         </div>,

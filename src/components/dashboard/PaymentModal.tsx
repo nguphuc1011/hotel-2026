@@ -410,29 +410,34 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
     // ];
 
   return createPortal(
-    <div className="fixed inset-0 z-[70000] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-200">
-      <div 
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" 
-        onClick={onClose}
-      />
-      {SecurityModals}
-      
-      {/* Modal Container - Matches CheckInModal rounded-[40px] */}
-      <div className="relative w-full h-full sm:w-full sm:max-w-2xl sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] bg-slate-50 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 z-[70001] animate-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className={cn(
+        "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+        "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full md:h-auto md:max-w-2xl md:rounded-[32px] md:zoom-in-95 md:max-h-[90vh] md:mt-0"
+      )}>
+        {SecurityModals}
         
         {/* --- HEADER --- */}
-        <div className="h-16 flex justify-between items-center px-6 bg-white z-50 shrink-0 shadow-sm border-b border-slate-100/50">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg uppercase tracking-wider shadow-sm">Thanh toán</span>
-            <h2 className="text-lg font-bold text-slate-800">Phòng {bill.room_number}</h2>
+            <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+              <Banknote className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 leading-none">Thanh toán phòng {bill.room_number}</h3>
+              <p className="text-xs text-slate-500 mt-1 font-medium">{bill.customer_name} • {bill.booking_id.slice(0, 8)}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
+          <button 
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
+          >
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
 
         {/* --- BODY --- */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 relative" ref={scrollAreaRef}>
+        <div className="flex-1 p-6 space-y-6 bg-slate-50 relative overflow-y-auto custom-scrollbar" ref={scrollAreaRef}>
           
           {/* 1. TOTAL AMOUNT & BREAKDOWN */}
           <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4 relative z-20">
@@ -454,11 +459,11 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
                        <button
                           onClick={() => setShowBreakdown(!showBreakdown)}
                           className={cn(
-                              "w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm",
+                              "w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm",
                               showBreakdown ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
                           )}
                        >
-                          <span className="font-black font-serif text-lg leading-none">!</span>
+                          <Calculator className="w-5 h-5" />
                        </button>
 
                        {/* Breakdown Tooltip (Popover Style) */}
@@ -504,9 +509,9 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
 
                 {/* GROUP BILL DETAILS */}
                 {(bill.is_group_bill && !bill.master_booking_id) && (bill.is_group_bill || groupChildren.length > 0) && (
-                  <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 text-left space-y-3">
+                  <div className="bg-indigo-50/50 p-5 rounded-[32px] border border-indigo-100 text-left space-y-4 shadow-sm">
                     <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+                      <h4 className="text-[11px] font-black uppercase tracking-widest text-indigo-600">
                         Chọn phòng trong đoàn
                       </h4>
                       <div className="flex items-center gap-2">
@@ -514,28 +519,28 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
                           type="button"
                           onClick={() => setSelectedChildIds(groupChildren.map(m => m.booking_id))}
                           disabled={isGroupLoading || groupChildren.length === 0}
-                          className="text-[10px] font-bold px-2 py-1 rounded-full bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+                          className="text-[10px] font-bold px-3 py-1.5 rounded-full bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50 transition-all active:scale-95 shadow-sm"
                         >
-                          Chọn tất cả
+                          Tất cả
                         </button>
                         <button
                           type="button"
                           onClick={() => setSelectedChildIds([])}
                           disabled={isGroupLoading}
-                          className="text-[10px] font-bold px-2 py-1 rounded-full bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+                          className="text-[10px] font-bold px-3 py-1.5 rounded-full bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 transition-all active:scale-95 shadow-sm"
                         >
-                          Bỏ chọn
+                          Bỏ
                         </button>
                       </div>
                     </div>
 
                     {isGroupLoading ? (
-                      <div className="text-xs text-slate-500 py-4 flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Đang tải danh sách phòng...
+                      <div className="text-xs text-slate-500 py-8 flex flex-col items-center justify-center gap-3 bg-white rounded-2xl border border-dashed border-indigo-200">
+                        <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+                        <span className="font-medium">Đang tải danh sách phòng...</span>
                       </div>
                     ) : groupChildren.length === 0 ? (
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-slate-500 py-4 text-center bg-white rounded-2xl border border-dashed border-slate-200">
                         Không có phòng con trong đoàn.
                       </div>
                     ) : (
@@ -554,35 +559,35 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
                                 );
                               }}
                               className={cn(
-                                "w-full flex items-center justify-between gap-3 p-3 rounded-xl border transition-colors",
+                                "w-full flex items-center justify-between gap-3 p-4 rounded-2xl border transition-all duration-300",
                                 isChecked
-                                  ? "bg-white border-indigo-200"
+                                  ? "bg-white border-indigo-500 shadow-md scale-[1.02] z-10"
                                   : "bg-white/60 border-slate-200 opacity-70 hover:opacity-100"
                               )}
                             >
                               <div className="flex items-center gap-3 min-w-0">
                                 <div
                                   className={cn(
-                                    "w-5 h-5 rounded-md border-2 flex items-center justify-center flex-none",
+                                    "w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-none transition-all",
                                     isChecked ? "bg-indigo-600 border-indigo-600" : "bg-white border-slate-300"
                                   )}
                                 >
-                                  {isChecked && <div className="w-2.5 h-2.5 bg-white rounded-sm" />}
+                                  {isChecked && <div className="w-2.5 h-2.5 bg-white rounded-full" />}
                                 </div>
                                 <div className="min-w-0">
                                   <div className="text-sm font-bold text-slate-800 truncate">{member.room_name}</div>
                                 </div>
                               </div>
-                              <div className="text-sm font-black text-slate-800 flex-none">
+                              <div className="text-sm font-black text-slate-800 flex-none font-mono">
                                 {formatMoney(Number((member as any).payable_amount || 0))}
                               </div>
                             </button>
                           );
                         })}
 
-                        <div className="border-t border-indigo-200 pt-2 flex items-center justify-between font-bold text-indigo-700">
-                          <span className="text-xs uppercase tracking-wider">Tổng chọn</span>
-                          <span>{formatMoney(selectedGroupPayableTotal || 0)}</span>
+                        <div className="mt-4 pt-4 border-t border-indigo-200 flex items-center justify-between font-bold text-indigo-700">
+                          <span className="text-xs uppercase tracking-widest">Tổng cộng đã chọn</span>
+                          <span className="text-lg font-black font-mono">{formatMoney(selectedGroupPayableTotal || 0)}</span>
                         </div>
                       </div>
                     )}
@@ -593,35 +598,35 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
               <div className="px-4 pb-2 space-y-3">
                   <div className="flex justify-between items-center text-sm">
                       <span className="font-medium text-slate-600">Tiền phòng</span>
-                      <span className="font-bold text-slate-800">{formatMoney(bill.total_amount || 0)}</span>
+                      <span className="font-bold text-slate-800 font-mono">{formatMoney(bill.total_amount || 0)}</span>
                   </div>
                   { (bill.group_total || 0) > 0 && (
                       <div className="flex justify-between items-center text-sm">
                           <span className="font-medium text-slate-600">Tổng gộp</span>
-                          <span className="font-bold text-slate-800">{formatMoney(bill.group_total || 0)}</span>
+                          <span className="font-bold text-slate-800 font-mono">{formatMoney(bill.group_total || 0)}</span>
                       </div>
                   )}
                   {surcharge > 0 && (
                       <div className="flex justify-between items-center text-sm">
                           <span className="font-medium text-slate-600">Phụ phí khác</span>
-                          <span className="font-bold text-slate-800">{formatMoney(surcharge)}</span>
+                          <span className="font-bold text-slate-800 font-mono">{formatMoney(surcharge)}</span>
                       </div>
                   )}
                   {discount > 0 && (
                       <div className="flex justify-between items-center text-sm">
                           <span className="font-medium text-rose-600">Giảm giá</span>
-                          <span className="font-bold text-rose-600">-{formatMoney(discount)}</span>
+                          <span className="font-bold text-rose-600 font-mono">-{formatMoney(discount)}</span>
                       </div>
                   )}
                   {oldDebt > 0 && (
                       <div className="flex justify-between items-center text-sm">
                           <span className="font-medium text-rose-600">Nợ cũ</span>
-                          <span className="font-bold text-rose-600">{formatMoney(oldDebt)}</span>
+                          <span className="font-bold text-rose-600 font-mono">{formatMoney(oldDebt)}</span>
                       </div>
                   )}
-                  <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
-                      <span className="text-base font-bold text-slate-800">Tổng cộng</span>
-                      <span className="text-xl font-black text-blue-600">{formatMoney(finalTotalToPay)}</span>
+                  <div className="border-t border-slate-200 pt-4 flex justify-between items-center">
+                      <span className="text-base font-bold text-slate-800 uppercase tracking-wide">Tổng cộng</span>
+                      <span className="text-2xl font-black text-blue-700 font-mono tracking-tight">{formatMoney(finalTotalToPay)}</span>
                   </div>
               </div>
           </div>
@@ -630,7 +635,7 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
           <div className="bg-white rounded-[40px] shadow-sm p-6 space-y-4">
               <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Phương thức thanh toán</span>
               
-              <div className="flex bg-slate-100/50 rounded-full p-1.5 shadow-sm relative z-10">
+              <div className="flex bg-slate-50 rounded-full p-1.5 shadow-sm relative z-10 border border-slate-100">
                   {[
                       { id: 'CASH', label: 'TIỀN MẶT', icon: Banknote },
                       { id: 'TRANSFER', label: 'CHUYỂN KHOẢN', icon: CreditCard },
@@ -662,33 +667,33 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
                   <MoneyInput
                       value={amountPaid}
                       onChange={setAmountPaid}
-                      className="w-full py-4 px-4 bg-slate-50 rounded-xl text-3xl font-bold text-slate-800 focus:ring-2 focus:ring-slate-200 border-none outline-none transition-all text-center placeholder:text-slate-300"
-                      inputClassName="text-3xl font-bold"
+                      className="w-full py-6 px-4 bg-slate-50 rounded-[32px] text-4xl font-bold text-slate-800 focus:ring-0 border-none outline-none transition-all tracking-tight"
+                      inputClassName="text-4xl font-bold tracking-tight text-center"
                       placeholder="0"
                       autoFocus
                       centered
                       align="center"
                   />
                   {amountPaid < finalTotalToPay && amountPaid > 0 && (
-                      <div className="absolute top-1/2 -translate-y-1/2 right-4 text-xs font-bold text-rose-500 animate-in fade-in bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 shadow-sm">
+                      <div className="absolute top-1/2 -translate-y-1/2 right-6 text-[10px] font-black text-rose-600 animate-in fade-in bg-white px-3 py-1.5 rounded-full border border-rose-100 shadow-sm uppercase tracking-widest">
                           Thiếu {formatMoney(finalTotalToPay - amountPaid)}
                       </div>
                   )}
                </div>
                
-               <div className="flex gap-2 mt-2 overflow-x-auto pb-1 no-scrollbar">
+               <div className="flex gap-2 mt-2 overflow-x-auto pb-1 no-scrollbar snap-x snap-mandatory">
                    {[0, 100000, 200000, 500000].map(val => (
                        <button
                           key={val}
                           onClick={() => setAmountPaid(val)}
-                          className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-500 font-bold text-xs hover:bg-slate-100 transition-colors whitespace-nowrap px-2"
+                          className="flex-1 py-3.5 rounded-2xl bg-slate-50 text-slate-600 font-bold text-xs hover:bg-slate-100 transition-all active:scale-95 whitespace-nowrap px-4 shadow-sm border border-slate-100 snap-start"
                        >
-                          {val === 0 ? '0đ' : `${val/1000}k`}
+                          {val === 0 ? 'Xoá' : `${val/1000}k`}
                        </button>
                    ))}
                    <button
                       onClick={() => setAmountPaid(finalTotalToPay)}
-                      className="flex-1 py-3 rounded-xl bg-blue-50 text-blue-600 font-bold text-xs hover:bg-blue-100 transition-colors whitespace-nowrap px-2"
+                      className="flex-1 py-3.5 rounded-2xl bg-blue-50 text-blue-700 font-bold text-xs hover:bg-blue-100 transition-all active:scale-95 whitespace-nowrap px-4 shadow-sm border border-blue-100 snap-start"
                    >
                       Đủ
                    </button>
@@ -698,41 +703,45 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
           {/* 4. BALANCE / DEBT STATUS */}
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              {balanceDiff < 0 ? (
-                <div className="p-6 bg-rose-50 rounded-[32px] border border-rose-100 space-y-4">
+                <div className="p-6 bg-rose-50 rounded-[40px] border border-rose-100 space-y-4 shadow-sm">
                   <div className="flex items-center gap-4 text-rose-600">
-                    <AlertCircle className="w-8 h-8" />
+                    <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                        <AlertCircle className="w-6 h-6" />
+                    </div>
                     <div>
-                      <h4 className="font-bold">Khách còn thiếu</h4>
-                      <p className="text-xs opacity-80">Sẽ được ghi vào công nợ khách hàng</p>
+                      <h4 className="font-bold text-sm uppercase tracking-wide">Khách còn thiếu</h4>
+                      <p className="text-[11px] font-medium opacity-70">Sẽ được ghi vào công nợ khách hàng</p>
                     </div>
                   </div>
-                  <div className="text-3xl font-black text-rose-600 text-center">
+                  <div className="text-3xl font-black text-rose-700 text-center font-mono tracking-tight bg-white py-4 rounded-[24px] shadow-inner">
                     {formatMoney(Math.abs(balanceDiff))}
                   </div>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Nhập lý do nợ (Bắt buộc)..."
-                    className="w-full bg-white border-2 border-rose-100 rounded-[24px] p-4 text-sm font-medium focus:border-rose-400 focus:ring-4 focus:ring-rose-100 outline-none transition-all"
+                    className="w-full bg-white border-none rounded-[24px] p-5 text-sm font-medium focus:ring-2 focus:ring-rose-200 outline-none transition-all shadow-sm placeholder:text-rose-200"
                     rows={2}
                   />
                 </div>
               ) : balanceDiff > 0 ? (
-                 <div className="p-6 bg-emerald-50 rounded-[32px] border border-emerald-100 space-y-4">
+                 <div className="p-6 bg-emerald-50 rounded-[40px] border border-emerald-100 space-y-4 shadow-sm">
                   <div className="flex items-center gap-4 text-emerald-600">
-                    <Wallet className="w-8 h-8" />
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0">
+                        <Wallet className="w-6 h-6" />
+                    </div>
                     <div>
-                      <h4 className="font-bold">Tiền thừa trả khách</h4>
-                      <p className="text-xs opacity-80">Vui lòng trả lại tiền thừa cho khách</p>
+                      <h4 className="font-bold text-sm uppercase tracking-wide">Tiền thừa trả khách</h4>
+                      <p className="text-[11px] font-medium opacity-70">Vui lòng trả lại tiền thừa cho khách</p>
                     </div>
                   </div>
-                  <div className="text-3xl font-black text-emerald-600 text-center">
+                  <div className="text-3xl font-black text-emerald-700 text-center font-mono tracking-tight bg-white py-4 rounded-[24px] shadow-inner">
                     {formatMoney(balanceDiff)}
                   </div>
                 </div>
               ) : (
-                <div className="p-6 bg-white rounded-[32px] border border-slate-100 text-center shadow-sm">
-                    <span className="font-bold text-slate-400">Đã thanh toán đủ</span>
+                <div className="p-6 bg-white rounded-[40px] border border-slate-100 text-center shadow-sm">
+                    <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Đã thanh toán đủ</span>
                 </div>
               )}
           </div>
@@ -740,28 +749,23 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
            {/* Notes if not debt */}
            {!isDebt && (
              <div className="space-y-3">
-                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Ghi chú thêm</span>
-                <div className="bg-white rounded-[24px] p-2 shadow-sm border border-slate-100 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
-                        <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <input 
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Ghi chú hóa đơn (tùy chọn)..."
-                        className="flex-1 bg-transparent border-none focus:ring-0 text-sm font-medium text-slate-700 placeholder:text-slate-300"
-                    />
-                </div>
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">Ghi chú thêm</span>
+                <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Ghi chú hóa đơn (tùy chọn)..."
+                    className="w-full h-24 rounded-[32px] bg-white p-5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 border-none outline-none transition-all resize-none shadow-sm"
+                />
              </div>
            )}
 
         </div>
 
         {/* --- FOOTER --- */}
-        <div className="p-4 sm:p-6 bg-white border-t border-slate-100 shrink-0 z-50">
+        <div className="p-6 bg-white border-t border-slate-100 shrink-0">
           {error && (
-            <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold flex items-center gap-3 animate-in slide-in-from-bottom-2">
-                <AlertCircle className="w-5 h-5 shrink-0" />
+            <div className="mb-4 p-4 bg-rose-50 text-rose-600 rounded-[24px] text-sm font-bold flex items-center gap-3 animate-in slide-in-from-bottom-2 border border-rose-100">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
                 {error}
             </div>
           )}

@@ -48,11 +48,12 @@ export default function GroupRoomModal({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [mounted, setMounted] = useState(false);
   const { verify, SecurityModals } = useSecurity();
 
-  if (!isOpen || !masterRoom) {
-    return null;
-  }
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Fetch available rooms (checked_in, not same as master, not already grouped)
   const fetchRooms = useCallback(async () => {
@@ -166,23 +167,30 @@ export default function GroupRoomModal({
     });
   };
 
-  if (!isOpen) return null;
-
+  const searchTermLower = searchTerm.toLowerCase();
   const filteredRooms = availableRooms.filter(r => 
-    r.room_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    r.room_name?.toLowerCase().includes(searchTermLower) ||
+    r.customer_name?.toLowerCase().includes(searchTermLower)
   );
 
+  if (!mounted || !isOpen) return null;
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   return createPortal(
-    <div className="fixed inset-0 z-[50000] flex flex-col justify-end sm:justify-center items-center backdrop-blur-md bg-slate-900/60">
-      {SecurityModals}
-      <div className="w-full h-[95vh] sm:w-full sm:max-w-xl sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] bg-slate-50 flex flex-col shadow-2xl overflow-hidden relative">
-        
+    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className={cn(
+        "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+        isMobile 
+          ? "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full" 
+          : "max-w-xl rounded-[32px] zoom-in-95 max-h-[90vh]"
+      )}>
+        {SecurityModals}
         {/* Header */}
-        <div className="h-16 flex justify-between items-center px-6 bg-white z-50 shrink-0 shadow-sm border-b border-slate-100/50">
+        <div className="h-16 flex justify-between items-center px-6 bg-white shrink-0 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg uppercase tracking-wider shadow-sm">Gộp Phòng</span>
-            <h2 className="text-lg font-bold text-slate-800"></h2>
+            <h2 className="text-lg font-bold text-slate-800">Phòng {masterRoom.name}</h2>
           </div>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
             <X className="w-5 h-5 text-slate-500" />
@@ -190,7 +198,7 @@ export default function GroupRoomModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] bg-slate-50 relative">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
           {/* Search */}
           <div className="relative group bg-white rounded-[32px] shadow-sm p-1 transition-shadow hover:shadow-md">
             <div className="flex items-center px-4">
@@ -206,9 +214,12 @@ export default function GroupRoomModal({
           </div>
 
           {/* List */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+          <div className="space-y-2 pr-2">
             {isLoading ? (
-              <div className="text-center py-8 text-slate-400">Đang tải danh sách...</div>
+              <div className="text-center py-8 text-slate-400 flex flex-col items-center gap-2">
+                <Loader2 className="w-8 h-8 animate-spin" />
+                <span>Đang tải danh sách...</span>
+              </div>
             ) : filteredRooms.length === 0 ? (
               <div className="text-center py-8 flex flex-col items-center text-slate-400">
                 <AlertCircle className="w-8 h-8 mb-2 opacity-50" />
@@ -216,7 +227,7 @@ export default function GroupRoomModal({
                 <p className="text-xs mt-1">(Chỉ hiển thị các phòng đang có khách và chưa thuộc nhóm nào)</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {filteredRooms.map((room: any) => {
                   const isSelected = selectedRooms.includes(room.id);
                   return (
@@ -227,7 +238,7 @@ export default function GroupRoomModal({
                         "cursor-pointer p-4 rounded-[32px] border-2 transition-all duration-200 relative group flex flex-col items-center justify-center text-center",
                         isSelected 
                           ? 'border-blue-500 bg-blue-50/50' 
-                          : 'border-slate-100 hover:border-blue-200 bg-white'
+                          : 'border-slate-100 hover:border-blue-200 bg-white shadow-sm'
                       )}
                     >
                       <div className="flex flex-col items-center justify-center mb-2">
@@ -236,15 +247,15 @@ export default function GroupRoomModal({
                         </span>
                       </div>
                       
-                      <div className="text-sm text-slate-600 mb-1 truncate">
+                      <div className="text-sm text-slate-600 mb-1 truncate w-full">
                         {room.customer_name || 'Khách vãng lai'}
                       </div>
                       
                       <div className="text-xs font-medium text-slate-400">
-                        Tạm tính: {formatMoney(room.amount || 0)}
+                        {formatMoney(room.amount || 0)}
                       </div>
                       {isSelected && (
-                        <div className="absolute top-2 right-2 bg-blue-500 text-white p-1 rounded-full">
+                        <div className="absolute top-3 right-3 bg-blue-500 text-white p-1 rounded-full shadow-sm">
                           <CheckCircle2 size={12} />
                         </div>
                       )}
@@ -257,13 +268,13 @@ export default function GroupRoomModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-white border-t border-slate-100 flex items-center gap-4 z-50">
-          <div className="text-sm text-slate-500 flex-1">
+        <div className="p-6 bg-white border-t border-slate-100 flex items-center gap-4 shrink-0">
+          <div className="hidden sm:block text-sm text-slate-500 flex-1">
             Đã chọn: <span className="font-bold text-slate-900">{selectedRooms.length}</span> phòng
           </div>
           <button 
             onClick={onClose}
-            className="flex-1 py-4 rounded-[24px] font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider"
+            className="flex-1 py-4 rounded-[24px] font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider text-sm"
           >
             Hủy bỏ
           </button>
@@ -271,7 +282,7 @@ export default function GroupRoomModal({
             onClick={handleSubmit} 
             disabled={selectedRooms.length === 0 || isSubmitting}
             className={cn(
-                "flex-[2] py-4 rounded-[24px] font-bold text-white uppercase tracking-wider shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-3",
+                "flex-[2] py-4 rounded-[24px] font-bold text-white uppercase tracking-wider shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-3 text-sm",
                 isSubmitting ? "bg-slate-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 active:scale-95"
             )}
           >
@@ -282,13 +293,12 @@ export default function GroupRoomModal({
                 </>
             ) : (
                 <>
-                    <span>Xác nhận gộp</span>
+                    <span>Xác nhận gộp ({selectedRooms.length})</span>
                     <ArrowRight className="w-5 h-5" />
                 </>
             )}
           </button>
         </div>
-
       </div>
     </div>,
     document.body

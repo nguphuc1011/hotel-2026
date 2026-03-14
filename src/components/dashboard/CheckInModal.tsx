@@ -709,7 +709,7 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
                             "text-4xl font-bold text-center w-full py-6 bg-slate-50 rounded-[32px] border-none focus:ring-0 tracking-tight transition-colors",
                             isCustomPrice ? "text-blue-600 bg-blue-50/50" : "text-slate-800 cursor-not-allowed select-none"
                         )}
-                        inputClassName="text-4xl font-bold tracking-tight"
+                        inputClassName="text-4xl font-bold tracking-tight text-center"
                         disabled={!isCustomPrice}
                         centered
                     />
@@ -948,24 +948,14 @@ export default function CheckInModal({ isOpen, onClose, room, onCheckIn, onOpenS
 
   if (!mounted || !isOpen || !room) return null;
 
-  if (isMobile) {
-    return (
-        <BottomSheet 
-            isOpen={isOpen} 
-            onClose={onClose}
-            title={`Nhận phòng ${room.name}`}
-            description={roomCategory?.name || "Đang thực hiện nhận phòng"}
-        >
-            <div className="flex flex-col h-[85vh]">
-                {ModalContent}
-            </div>
-        </BottomSheet>
-    );
-  }
-
   return createPortal(
     <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 max-h-[90vh]">
+      <div className={cn(
+        "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+        isMobile 
+          ? "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full" 
+          : "max-w-2xl rounded-[32px] zoom-in-95 max-h-[90vh]"
+      )}>
         {ModalContent}
       </div>
     </div>,

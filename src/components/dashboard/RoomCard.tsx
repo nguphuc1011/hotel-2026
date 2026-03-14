@@ -52,14 +52,23 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, onStatusChange }) =>
       let usingLadder = false;
 
       // 1. Try to use Pricing Ladder from Snapshot (Most Accurate)
-      if (booking.pricing_ladder && booking.pricing_ladder.length > 0) {
-        // Find the latest point that is <= now
-        const currentPoint = [...booking.pricing_ladder]
-          .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-          .find(p => new Date(p.time) <= now);
+      if (booking.pricing_ladder && Array.isArray(booking.pricing_ladder) && booking.pricing_ladder.length > 0) {
+        // Find all points that are in the past or now
+        const nowMs = now.getTime();
+        const pastPoints = booking.pricing_ladder.filter(p => new Date(p.time).getTime() <= nowMs + 2000); // 2s buffer for safety
         
-        if (currentPoint) {
-          totalAmount = currentPoint.amount; // Ladder đã bao gồm dịch vụ và phụ thu
+        if (pastPoints.length > 0) {
+          // The current point is the one with the maximum time (latest among past points)
+          const currentPoint = pastPoints.reduce((prev, curr) => {
+            return new Date(curr.time).getTime() > new Date(prev.time).getTime() ? curr : prev;
+          });
+          
+          totalAmount = currentPoint.amount;
+          usingLadder = true;
+        } else {
+          // If all points are in the future, use the first point as initial price
+          // (Usually shouldn't happen if ladder starts at check-in)
+          totalAmount = booking.pricing_ladder[0].amount;
           usingLadder = true;
         }
       } 
@@ -98,10 +107,9 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, onStatusChange }) =>
 
     updateLiveAmount();
     
-    // For hourly rooms, update every minute to reflect live pricing
-    const interval = room.current_booking?.booking_type === 'hourly' ? 60000 : 300000;
-    const timer = setInterval(updateLiveAmount, interval);
-    return () => clearInterval(timer);
+    // Update every 10 seconds for a more "live" feel
+    const interval = setInterval(updateLiveAmount, 10000);
+    return () => clearInterval(interval);
   }, [room.status, room.current_booking, room.price_hourly, room.price_daily, room.price_overnight, room.base_hourly_limit, room.hourly_unit]);
 
   // Determine display properties based on status and booking
@@ -334,7 +342,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, onStatusChange }) =>
                  "font-bold tracking-normal leading-none",
                  "text-[24px] md:text-[22px]"
                )}>
-                 {formattedAmount || '0 ₫'}
+                 {formattedAmount !== null ? formattedAmount : '0 ₫'}
                </span>
             ) : (
               <span className="text-[14px] font-medium opacity-60">
