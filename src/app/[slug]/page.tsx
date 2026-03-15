@@ -603,7 +603,7 @@ export default function DashboardPage() {
       }
       
       await supabase.from('rooms').update(updates).eq('id', roomId);
-      // Removed direct fetchData() - Realtime subscription will trigger debouncedFetch()
+      fetchData(true); // Khôi phục gọi trực tiếp để UI cập nhật tức thì
     } catch (e) {
       console.error(e);
       toast.error('Lỗi cập nhật trạng thái');
@@ -644,7 +644,10 @@ export default function DashboardPage() {
 
       toast.success('Nhận phòng thành công');
       setIsCheckInOpen(false);
-      // Removed direct fetchData() - Realtime subscription will trigger debouncedFetch()
+      
+      // Khôi phục gọi trực tiếp fetchData để UI cập nhật tức thì sau khi Check-in
+      // (Bên cạnh cơ chế Real-time để đảm bảo trải nghiệm người dùng tốt nhất)
+      fetchData(true); 
     } catch (error: any) {
       // Robust error logging for Next.js 16 / Turbopack
       const detailedError = error instanceof Error 
@@ -714,6 +717,7 @@ export default function DashboardPage() {
                  <RoomCard 
                    key={room.id} 
                    room={room} 
+                   settings={settings}
                    onClick={handleRoomClick}
                    onStatusChange={handleOpenStatusModal}
                  />

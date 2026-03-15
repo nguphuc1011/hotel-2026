@@ -158,15 +158,35 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
     try {
       if (!booking) return;
 
+      let finalCustomerId = selectedCustomer?.id;
+
+      // Handle New Customer Creation (Same as CheckInModal)
+      // Logic: If no customer selected AND name is typed AND name is different from original
+      const isNewName = searchTerm.trim() && searchTerm !== booking.customer_name;
+      
+      if (!finalCustomerId && isNewName && !selectedCustomer) {
+          console.log('Creating new customer for name:', searchTerm);
+          const newCustomer = await customerService.createCustomer({
+              full_name: searchTerm,
+              balance: 0
+          });
+          if (newCustomer) {
+              finalCustomerId = newCustomer.id;
+              toast.success(`Đã tạo khách hàng mới: ${newCustomer.full_name}`);
+          } else {
+              console.error('Failed to create new customer');
+          }
+      }
+
       const payload = {
         bookingId: booking.id,
-        customerName,
+        customerName: finalCustomerId ? undefined : customerName,
         checkInAt: new Date(checkInAt).toISOString(),
         customPrice,
         priceApplyMode,
         reason,
         notes,
-        customerId: selectedCustomer?.id,
+        customerId: finalCustomerId,
         verifiedStaff
       };
       
@@ -193,11 +213,17 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
   const debt = selectedCustomer && selectedCustomer.balance < 0 ? Math.abs(selectedCustomer.balance) : 0;
 
   return createPortal(
-    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className={cn(
-        "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
-        "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full md:h-auto md:max-w-lg md:rounded-[32px] md:zoom-in-95 md:max-h-[90vh] md:mt-0"
-      )}>
+    <div 
+      className="fixed inset-0 z-[70000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className={cn(
+          "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+          "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full md:h-auto md:max-w-lg md:rounded-[32px] md:zoom-in-95 md:max-h-[90vh] md:mt-0"
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* --- HEADER --- */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <div className="flex items-center gap-3">

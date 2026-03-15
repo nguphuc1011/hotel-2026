@@ -29,11 +29,12 @@ import { calculateLiveRoomCharge } from '@/utils/billing';
 
 interface RoomCardProps {
   room: DashboardRoom;
+  settings?: any;
   onClick: (room: DashboardRoom) => void;
   onStatusChange?: (room: DashboardRoom) => void;
 }
 
-const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, onStatusChange }) => {
+const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusChange }) => {
   // Live Amount Calculation (FE Approximation)
   const [liveAmount, setLiveAmount] = useState<number | null>(null);
 
@@ -48,47 +49,41 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, onStatusChange }) =>
       if (!booking?.check_in_at) return;
 
       const now = new Date();
-      let totalAmount = 0; // Tổng tiền (gồm phòng + dịch vụ + phụ thu)
+      const nowTime = now.getTime();
+      let totalAmount = 0;
       let usingLadder = false;
 
-      // 1. Try to use Pricing Ladder from Snapshot (Most Accurate)
+      // 1. ƯU TIÊN SỐ 1: Sử dụng Thang giá (Pricing Ladder) từ DB - GIẢM TẢI HỆ THỐNG
       if (booking.pricing_ladder && Array.isArray(booking.pricing_ladder) && booking.pricing_ladder.length > 0) {
-        // Find all points that are in the past or now
-        const nowMs = now.getTime();
-        const pastPoints = booking.pricing_ladder.filter(p => new Date(p.time).getTime() <= nowMs + 2000); // 2s buffer for safety
-        
-        if (pastPoints.length > 0) {
-          // The current point is the one with the maximum time (latest among past points)
-          const currentPoint = pastPoints.reduce((prev, curr) => {
-            return new Date(curr.time).getTime() > new Date(prev.time).getTime() ? curr : prev;
-          });
-          
+        // Tìm mốc giá mới nhất trong QUÁ KHỨ (hoặc hiện tại)
+        const currentPoint = booking.pricing_ladder
+          .filter(p => new Date(p.time).getTime() <= nowTime)
+          .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
+
+        if (currentPoint) {
           totalAmount = currentPoint.amount;
           usingLadder = true;
-        } else {
-          // If all points are in the future, use the first point as initial price
-          // (Usually shouldn't happen if ladder starts at check-in)
-          totalAmount = booking.pricing_ladder[0].amount;
-          usingLadder = true;
+          // console.log(`[LADDER] Room ${room.name} using point: ${currentPoint.time} -> ${currentPoint.amount}`);
         }
       } 
-      
+
+      // 2. FALLBACK: Nếu thang giá lỗi hoặc không có điểm phù hợp, mới tính toán ở FE
       if (!usingLadder) {
-        // 2. Fallback to FE Approximation
-        const roomCharge = calculateLiveRoomCharge({
+        totalAmount = calculateLiveRoomCharge({
           checkInAt: booking.check_in_at,
           rentalType: booking.booking_type,
           prices: {
             hourly: room.price_hourly || 0,
-            price_next_hour: room.price_next_hour || 0, // THÊM TRƯỜNG NÀY
+            price_next_hour: room.price_next_hour || 0,
             daily: room.price_daily || 0,
             overnight: room.price_overnight || 0,
             base_hourly_limit: room.base_hourly_limit || 1,
             hourly_unit: room.hourly_unit || 60,
-          }
+          },
+          settings: settings
         });
-        // Cộng thêm dịch vụ, phụ thu, người thêm, giảm giá nếu fallback
-        totalAmount = roomCharge 
+        // Cộng thêm các thành phần động khác
+        totalAmount = totalAmount 
           + (booking.service_total || 0) 
           + (booking.surcharge_amount || 0) 
           + (booking.extra_person_charge || 0)
@@ -96,8 +91,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, onStatusChange }) =>
           - (booking.discount_amount || 0);
       }
 
-      // 3. Combine with other static components (Deposit, Debt)
-      // Note: Debt là khi balance < 0. Deposit là deposit_amount.
+      // 3. Kết hợp với Thu trước và Nợ cũ (Static)
       const finalToPay = totalAmount 
         - (booking.deposit_amount || 0) 
         + (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0);
@@ -110,7 +104,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, onStatusChange }) =>
     // Update every 10 seconds for a more "live" feel
     const interval = setInterval(updateLiveAmount, 10000);
     return () => clearInterval(interval);
-  }, [room.status, room.current_booking, room.price_hourly, room.price_daily, room.price_overnight, room.base_hourly_limit, room.hourly_unit]);
+  }, [room.status, room.current_booking, room.price_hourly, room.price_daily, room.price_overnight, room.base_hourly_limit, room.hourly_unit, settings]);
 
   // Determine display properties based on status and booking
   const display = useMemo(() => {

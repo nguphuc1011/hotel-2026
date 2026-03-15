@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
 
 interface Hotel {
   id: string;
@@ -32,6 +34,7 @@ interface Hotel {
 }
 
 export default function SaaSAdminPage() {
+  const { can, isLoading: isAuthLoading } = usePermission();
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -220,8 +223,32 @@ export default function SaaSAdminPage() {
     h.slug?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!can(PERMISSION_KEYS.VIEW_SAAS_ADMIN)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-4">
+        <ShieldCheck size={64} className="text-blue-500 mb-6 opacity-20" />
+        <h1 className="text-2xl font-black uppercase tracking-tighter mb-2">Truy cập bị từ chối</h1>
+        <p className="text-slate-400 font-medium">Bạn không có quyền quản trị hệ thống SaaS.</p>
+        <button 
+          onClick={() => window.history.back()}
+          className="mt-8 px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black uppercase tracking-widest transition-all"
+        >
+          Quay lại
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 pb-32">
+    <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8 pb-32">
       <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-3 mb-2">

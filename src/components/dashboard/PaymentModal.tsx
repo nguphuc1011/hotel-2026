@@ -410,11 +410,17 @@ export default function PaymentModal({ isOpen, onClose, bill, onSuccess }: Payme
     // ];
 
   return createPortal(
-    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className={cn(
-        "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
-        "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full md:h-auto md:max-w-2xl md:rounded-[32px] md:zoom-in-95 md:max-h-[90vh] md:mt-0"
-      )}>
+    <div 
+      className="fixed inset-0 z-[70000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className={cn(
+          "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+          "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full md:h-auto md:max-w-2xl md:rounded-[32px] md:zoom-in-95 md:max-h-[90vh] md:mt-0"
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
         {SecurityModals}
         
         {/* --- HEADER --- */}

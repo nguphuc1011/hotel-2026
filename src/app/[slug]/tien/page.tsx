@@ -306,7 +306,7 @@ export default function MoneyPage() {
     }
   };
 
-  const canViewExtraFunds = can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS) || can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS_RECEIVABLE);
+  const canViewExtraFunds = can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS);
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-32 font-sans">
@@ -341,22 +341,27 @@ export default function MoneyPage() {
               </button>
             )}
 
-            <button 
-              onClick={() => setIsAdjustmentModalOpen(true)}
-              className="bg-white hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 border border-slate-200 active:scale-95 transition-all duration-300"
-            >
-              <AlertTriangle size={18} className="text-amber-500" />
-              <span>Điều chỉnh</span>
-            </button>
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="group bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-slate-200 active:scale-95 transition-all duration-300"
-            >
-              <div className="bg-white/20 p-1 rounded-lg group-hover:rotate-90 transition-transform duration-500">
-                <Plus size={18} />
-              </div>
-              <span>Tạo phiếu mới</span>
-            </button>
+            {can(PERMISSION_KEYS.FINANCE_ADJUST_WALLET) && (
+              <button 
+                onClick={() => setIsAdjustmentModalOpen(true)}
+                className="bg-white hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 border border-slate-200 active:scale-95 transition-all duration-300"
+              >
+                <AlertTriangle size={18} className="text-amber-500" />
+                <span>Điều chỉnh</span>
+              </button>
+            )}
+            
+            {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="group bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-slate-200 active:scale-95 transition-all duration-300"
+              >
+                <div className="bg-white/20 p-1 rounded-lg group-hover:rotate-90 transition-transform duration-500">
+                  <Plus size={18} />
+                </div>
+                <span>Tạo phiếu mới</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -482,43 +487,45 @@ export default function MoneyPage() {
           )}
 
           {/* DEBT CARDS - In-Row */}
-          <div className={cn(
-              "bento-card p-8 bg-white border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-rose-100 hover:shadow-xl hover:shadow-rose-50 transition-all duration-500",
-              can(PERMISSION_KEYS.VIEW_MONEY_BALANCE_BANK) ? "md:col-span-3" : "md:col-span-4"
-          )}
-               onClick={() => setIsCustomerDebtModalOpen(true)}>
-            <div className="relative z-10 flex flex-col h-full justify-between">
-              <div>
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform duration-300">
-                    <Users size={28} />
+          {can(PERMISSION_KEYS.VIEW_MONEY_DEBT_LIST) && (
+            <div className={cn(
+                "bento-card p-8 bg-white border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-rose-100 hover:shadow-xl hover:shadow-rose-50 transition-all duration-500",
+                can(PERMISSION_KEYS.VIEW_MONEY_BALANCE_BANK) ? "md:col-span-3" : "md:col-span-4"
+            )}
+                 onClick={() => setIsCustomerDebtModalOpen(true)}>
+              <div className="relative z-10 flex flex-col h-full justify-between">
+                <div>
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform duration-300">
+                      <Users size={28} />
+                    </div>
+                    <div>
+                      <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Khách Nợ</span>
+                      <span className="font-bold text-slate-700">Phải Thu</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="block font-bold uppercase tracking-widest text-xs text-slate-400 mb-1">Khách Nợ</span>
-                    <span className="font-bold text-slate-700">Phải Thu</span>
+                  
+                  <div className="flex items-baseline gap-1 text-rose-600">
+                     <span className="text-4xl font-black tracking-tighter">
+                        {formatMoney(Math.abs(customerDebt)).replace('₫', '')}
+                     </span>
+                     <span className="text-xl font-bold text-rose-300">₫</span>
                   </div>
                 </div>
-                
-                <div className="flex items-baseline gap-1 text-rose-600">
-                   <span className="text-4xl font-black tracking-tighter">
-                      {formatMoney(Math.abs(customerDebt)).replace('₫', '')}
-                   </span>
-                   <span className="text-xl font-bold text-rose-300">₫</span>
-                </div>
-              </div>
 
-              <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-center">
-                 <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-rose-500 transition-colors">Xem chi tiết</span>
-                 <div className="h-8 w-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-all duration-300">
-                    <ArrowUpRight size={16} />
-                 </div>
+                <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-center">
+                   <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-rose-500 transition-colors">Xem chi tiết</span>
+                   <div className="h-8 w-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-all duration-300">
+                      <ArrowUpRight size={16} />
+                   </div>
+                </div>
+              </div>
+              
+              <div className="absolute -right-8 -bottom-8 text-rose-500 opacity-[0.03] transform rotate-12 group-hover:rotate-0 transition-all duration-700">
+                <Users size={200} strokeWidth={1} />
               </div>
             </div>
-            
-            <div className="absolute -right-8 -bottom-8 text-rose-500 opacity-[0.03] transform rotate-12 group-hover:rotate-0 transition-all duration-700">
-              <Users size={200} strokeWidth={1} />
-            </div>
-          </div>
+          )}
 
           {/* EXTRA FUNDS - TOGGLEABLE */}
           {showExtraFunds && (
@@ -553,7 +560,7 @@ export default function MoneyPage() {
               )}
 
               {/* RECEIVABLE WALLET - Công Nợ Tạm */}
-              {(can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS) || can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS_RECEIVABLE)) && (
+              {can(PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS) && (
                 <div className="md:col-span-4 bento-card p-6 bg-white border border-slate-100 relative overflow-hidden group hover:border-orange-100 hover:shadow-xl hover:shadow-orange-50 transition-all duration-500">
                   <div className="relative z-10 flex flex-col h-full justify-between">
                     <div className="flex items-center gap-4 mb-4">
@@ -616,152 +623,154 @@ export default function MoneyPage() {
         </div>
 
         {/* --- TRANSACTION LIST --- */}
-        <div className="glass rounded-[32px] shadow-sm border border-slate-100/60 overflow-hidden min-h-[500px] flex flex-col">
-          <div className="p-6 md:p-8 border-b border-slate-50 flex items-center justify-between bg-white/50 backdrop-blur-sm">
-            <div>
-               <h3 className="font-black text-xl text-slate-800 flex items-center gap-3">
-                 <div className="bg-slate-100 p-2 rounded-xl text-slate-500">
-                   <History size={20} />
-                 </div>
-                 Chi tiết dòng tiền
-               </h3>
-               <p className="text-slate-400 text-sm font-medium mt-1 ml-11">
-                 Danh sách giao dịch thu chi trong kỳ
-               </p>
-            </div>
-            <div className="px-4 py-2 bg-slate-100 rounded-full text-xs font-bold text-slate-500">
-              {transactions.length} giao dịch
-            </div>
-          </div>
-
-          <div className="flex-1 bg-white/40">
-            {loading ? (
-              <div className="h-full flex flex-col items-center justify-center p-12 text-slate-300 gap-4">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
-                <span className="text-sm font-medium">Đang đồng bộ dữ liệu...</span>
+        {can(PERMISSION_KEYS.VIEW_MONEY_TRANSACTION_HISTORY) && (
+          <div className="glass rounded-[32px] shadow-sm border border-slate-100/60 overflow-hidden min-h-[500px] flex flex-col">
+            <div className="p-6 md:p-8 border-b border-slate-50 flex items-center justify-between bg-white/50 backdrop-blur-sm">
+              <div>
+                 <h3 className="font-black text-xl text-slate-800 flex items-center gap-3">
+                   <div className="bg-slate-100 p-2 rounded-xl text-slate-500">
+                     <History size={20} />
+                   </div>
+                   Chi tiết dòng tiền
+                 </h3>
+                 <p className="text-slate-400 text-sm font-medium mt-1 ml-11">
+                   Danh sách giao dịch thu chi trong kỳ
+                 </p>
               </div>
-            ) : transactions.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center p-12 text-slate-300 gap-4">
-                <div className="p-6 bg-slate-50 rounded-full">
-                  <Search size={48} className="opacity-40" />
+              <div className="px-4 py-2 bg-slate-100 rounded-full text-xs font-bold text-slate-500">
+                {transactions.length} giao dịch
+              </div>
+            </div>
+
+            <div className="flex-1 bg-white/40">
+              {loading ? (
+                <div className="h-full flex flex-col items-center justify-center p-12 text-slate-300 gap-4">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
+                  <span className="text-sm font-medium">Đang đồng bộ dữ liệu...</span>
                 </div>
-                <p className="font-medium text-slate-400">Chưa phát sinh giao dịch nào</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-50">
-                {transactions.map((tx) => {
-                  const dateObj = new Date(tx.occurred_at);
-                  const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
-                  const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }); // Short date for list
+              ) : transactions.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center p-12 text-slate-300 gap-4">
+                  <div className="p-6 bg-slate-50 rounded-full">
+                    <Search size={48} className="opacity-40" />
+                  </div>
+                  <p className="font-medium text-slate-400">Chưa phát sinh giao dịch nào</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {transactions.map((tx) => {
+                    const dateObj = new Date(tx.occurred_at);
+                    const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }); // Short date for list
 
-                  return (
-                  <div
-                    key={tx.id}
-                    onClick={() => tx.ref_id ? setHistoryModal({ open: true, bookingId: tx.ref_id }) : null}
-                    className="group bg-white rounded-2xl border border-slate-100 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-50/50 transition-all duration-300 cursor-pointer overflow-hidden flex items-stretch min-h-[72px]"
-                  >
-                    
-                    {/* Left: Time & Flow Indicator */}
-                    <div className="flex items-stretch">
-                       <div className={cn(
-                         "w-[6px] transition-colors duration-300",
-                         tx.flow_type === 'IN' ? "bg-emerald-500 group-hover:bg-emerald-400" : "bg-rose-500 group-hover:bg-rose-400"
-                       )} />
-                       
-                       <div className="px-4 flex flex-col justify-center items-center bg-slate-50/50 border-r border-slate-100 min-w-[80px]">
-                          <span className="text-sm font-black text-slate-700 leading-none mb-1">{timeStr}</span>
-                          <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">{dateStr}</span>
-                       </div>
-                    </div>
+                    return (
+                    <div
+                      key={tx.id}
+                      onClick={() => tx.ref_id ? setHistoryModal({ open: true, bookingId: tx.ref_id }) : null}
+                      className="group bg-white rounded-2xl border border-slate-100 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-50/50 transition-all duration-300 cursor-pointer overflow-hidden flex items-stretch min-h-[72px]"
+                    >
+                      
+                      {/* Left: Time & Flow Indicator */}
+                      <div className="flex items-stretch">
+                         <div className={cn(
+                           "w-[6px] transition-colors duration-300",
+                           tx.flow_type === 'IN' ? "bg-emerald-500 group-hover:bg-emerald-400" : "bg-rose-500 group-hover:bg-rose-400"
+                         )} />
+                         
+                         <div className="px-4 flex flex-col justify-center items-center bg-slate-50/50 border-r border-slate-100 min-w-[80px]">
+                            <span className="text-sm font-black text-slate-700 leading-none mb-1">{timeStr}</span>
+                            <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">{dateStr}</span>
+                         </div>
+                      </div>
 
-                    {/* Middle: Content */}
-                    <div className="flex-1 px-5 py-3 flex flex-col justify-center min-w-0">
-                      <div className="mb-0.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {tx.category}
-                        </span>
+                      {/* Middle: Content */}
+                      <div className="flex-1 px-5 py-3 flex flex-col justify-center min-w-0">
+                        <div className="mb-0.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            {tx.category}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <span className="font-bold text-slate-800 text-[14px] leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
+                              {(() => {
+                                const parts = [];
+                                if (tx.customer_name) parts.push(tx.customer_name);
+                                if (tx.room_name) parts.push(`P.${tx.room_name}`);
+                                
+                                let action = tx.description || '';
+                                // Simplify Booking actions
+                                if (tx.category === 'Tiền phòng' || tx.category === 'Tiền cọc') {
+                                   if (action.toLowerCase().includes('checkout') || action.toLowerCase().includes('thanh toán phòng')) action = 'Trả phòng';
+                                   else if (action.toLowerCase().includes('cọc')) action = 'Cọc phòng';
+                                   else if (action.toLowerCase().includes('nhận phòng')) action = 'Nhận phòng';
+                                }
+                                
+                                // Remove redundant room info from description if we already have room_name
+                                if (tx.room_name) {
+                                   action = action.replace(new RegExp(`Phòng ${tx.room_name}`, 'gi'), '')
+                                                  .replace(new RegExp(`${tx.room_name}`, 'gi'), '')
+                                                  .replace(/\(\)/g, '')
+                                                  .trim();
+                                }
+                                
+                                // Append action
+                                if (action && action !== tx.category) {
+                                  parts.push(action);
+                                } else if (parts.length === 0) {
+                                  parts.push(tx.description || tx.category);
+                                } else {
+                                  parts.push(tx.category); // Fallback if action is empty but we have room/customer
+                                }
+                                
+                                return parts.join(' - ');
+                              })()}
+                          </span>
+                        </div>
                       </div>
                       
-                      <div className="flex items-center">
-                        <span className="font-bold text-slate-800 text-[14px] leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
-                            {(() => {
-                              const parts = [];
-                              if (tx.customer_name) parts.push(tx.customer_name);
-                              if (tx.room_name) parts.push(`P.${tx.room_name}`);
-                              
-                              let action = tx.description || '';
-                              // Simplify Booking actions
-                              if (tx.category === 'Tiền phòng' || tx.category === 'Tiền cọc') {
-                                 if (action.toLowerCase().includes('checkout') || action.toLowerCase().includes('thanh toán phòng')) action = 'Trả phòng';
-                                 else if (action.toLowerCase().includes('cọc')) action = 'Cọc phòng';
-                                 else if (action.toLowerCase().includes('nhận phòng')) action = 'Nhận phòng';
-                              }
-                              
-                              // Remove redundant room info from description if we already have room_name
-                              if (tx.room_name) {
-                                 action = action.replace(new RegExp(`Phòng ${tx.room_name}`, 'gi'), '')
-                                                .replace(new RegExp(`${tx.room_name}`, 'gi'), '')
-                                                .replace(/\(\)/g, '')
-                                                .trim();
-                              }
-                              
-                              // Append action
-                              if (action && action !== tx.category) {
-                                parts.push(action);
-                              } else if (parts.length === 0) {
-                                parts.push(tx.description || tx.category);
-                              } else {
-                                parts.push(tx.category); // Fallback if action is empty but we have room/customer
-                              }
-                              
-                              return parts.join(' - ');
-                            })()}
-                        </span>
+                      {/* Right: Amount & Payment Method */}
+                      <div className="px-5 py-3 flex flex-col justify-center items-end border-l border-slate-50 min-w-[140px] bg-slate-50/30">
+                         <div className="flex items-center gap-2">
+                           <span className={cn(
+                             "font-black tracking-tighter text-lg",
+                             tx.flow_type === 'IN' ? "text-emerald-600" : "text-rose-600"
+                           )}>
+                             {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
+                           </span>
+                         </div>
+                         
+                         <div className="mt-1 flex items-center gap-2 justify-end w-full">
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 truncate max-w-[80px]">
+                              <User size={10} />
+                              <span className="truncate">{tx.staff_name || tx.verified_by_staff_name || 'Hệ thống'}</span>
+                            </div>
+                            
+                            <span className={cn(
+                               "text-[10px] uppercase font-bold px-2 py-0.5 rounded text-center border inline-block min-w-[36px]",
+                               (!tx.payment_method_code || tx.payment_method_code?.toLowerCase() === 'cash') 
+                                 ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                                 : "bg-blue-50 text-blue-700 border-blue-100"
+                             )}>
+                               {(() => {
+                                 const code = (tx.payment_method_code || 'cash').toLowerCase();
+                                 if (code === 'cash') return 'TM';
+                                 if (code === 'pos') return 'POS';
+                                 if (code === 'credit') return 'CN';
+                                 return 'CK';
+                               })()}
+                             </span>
+                         </div>
+
+                         {/* Actions disabled: Audit Only Policy */}
                       </div>
                     </div>
-                    
-                    {/* Right: Amount & Payment Method */}
-                    <div className="px-5 py-3 flex flex-col justify-center items-end border-l border-slate-50 min-w-[140px] bg-slate-50/30">
-                       <div className="flex items-center gap-2">
-                         <span className={cn(
-                           "font-black tracking-tighter text-lg",
-                           tx.flow_type === 'IN' ? "text-emerald-600" : "text-rose-600"
-                         )}>
-                           {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
-                         </span>
-                       </div>
-                       
-                       <div className="mt-1 flex items-center gap-2 justify-end w-full">
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 truncate max-w-[80px]">
-                            <User size={10} />
-                            <span className="truncate">{tx.staff_name || tx.verified_by_staff_name || 'Hệ thống'}</span>
-                          </div>
-                          
-                          <span className={cn(
-                             "text-[10px] uppercase font-bold px-2 py-0.5 rounded text-center border inline-block min-w-[36px]",
-                             (!tx.payment_method_code || tx.payment_method_code?.toLowerCase() === 'cash') 
-                               ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
-                               : "bg-blue-50 text-blue-700 border-blue-100"
-                           )}>
-                             {(() => {
-                               const code = (tx.payment_method_code || 'cash').toLowerCase();
-                               if (code === 'cash') return 'TM';
-                               if (code === 'pos') return 'POS';
-                               if (code === 'credit') return 'CN';
-                               return 'CK';
-                             })()}
-                           </span>
-                       </div>
-
-                       {/* Actions disabled: Audit Only Policy */}
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
 
@@ -787,12 +796,14 @@ export default function MoneyPage() {
       />
 
       {/* Floating Action Button for Mobile */}
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="md:hidden fixed bottom-24 right-4 z-50 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl shadow-slate-900/30 flex items-center justify-center active:scale-90 transition-all duration-300 hover:bg-slate-800"
-      >
-        <Plus size={24} strokeWidth={2.5} />
-      </button>
+      {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="md:hidden fixed bottom-24 right-4 z-50 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl shadow-slate-900/30 flex items-center justify-center active:scale-90 transition-all duration-300 hover:bg-slate-800"
+        >
+          <Plus size={24} strokeWidth={2.5} />
+        </button>
+      )}
 
       <CustomerDebtModal 
         isOpen={isCustomerDebtModalOpen} 

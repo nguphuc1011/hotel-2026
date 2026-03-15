@@ -5,11 +5,11 @@ export function usePermission(permissionCode?: string) {
   const { user, permissions, modularSettings, isLoading, fetchUser, hasPermission } = useAuthStore();
 
   useEffect(() => {
-    // Only fetch if not loaded yet (or implement smarter re-fetch logic)
-    if (!user && isLoading) {
+    // Luôn fetch nếu chưa có user để tránh trường hợp bị "treo" quyền hạn sau khi login
+    if (!user) {
       fetchUser();
     }
-  }, []);
+  }, [user, fetchUser]);
 
   // Stabilize 'can' function to prevent infinite loops in useEffect dependencies
   const can = useCallback((code: string) => hasPermission(code), [hasPermission, user, permissions, modularSettings]);

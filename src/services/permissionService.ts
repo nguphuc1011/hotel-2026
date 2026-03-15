@@ -13,7 +13,6 @@ export const PERMISSION_KEYS = {
   VIEW_MONEY_BALANCE_BANK: 'view_money_balance_bank',
   VIEW_MONEY_REVENUE: 'view_money_revenue',
   VIEW_MONEY_EXTRA_FUNDS: 'view_money_extra_funds', // Shows Escrow/Receivable/Revenue blocks
-  VIEW_MONEY_EXTRA_FUNDS_RECEIVABLE: 'view_money_extra_funds_receivable', // Specific for debt
   CREATE_TRANSACTION: 'create_transaction',
 
   // Dashboard
@@ -23,6 +22,25 @@ export const PERMISSION_KEYS = {
   VIEW_SETTINGS: 'view_settings',
   VIEW_REPORTS: 'view_reports',
   MANAGE_PERMISSIONS: 'manage_permissions',
+  
+  // Settings Detailed
+  VIEW_SETTINGS_GENERAL: 'view_settings_general',
+  VIEW_SETTINGS_PRICING: 'view_settings_pricing',
+  VIEW_SETTINGS_CATEGORIES: 'view_settings_categories',
+  VIEW_SETTINGS_SERVICES: 'view_settings_services',
+  VIEW_SETTINGS_CASH_FLOW: 'view_settings_cash_flow',
+  VIEW_SETTINGS_SYSTEM: 'view_settings_system',
+  
+  // Customers
+  VIEW_CUSTOMERS: 'view_customers',
+  
+  // Money Page Extended
+  VIEW_MONEY_TRANSACTION_HISTORY: 'view_money_transaction_history',
+  VIEW_MONEY_DEBT_LIST: 'view_money_debt_list',
+  FINANCE_ADJUST_WALLET: 'finance_adjust_wallet',
+  
+  // SaaS Admin
+  VIEW_SAAS_ADMIN: 'view_saas_admin',
 } as const;
 
 export const DEFAULT_ROLES: RolePermission[] = [
@@ -89,7 +107,7 @@ export const permissionService = {
     return data as RolePermission[];
   },
 
-  async updateRolePermissions(roleCode: string, permissions: string[]) {
+  async updateRolePermissions(roleCode: string, permissions: string[], hotelId: string) {
     // Find role name from DEFAULT_ROLES to satisfy NOT NULL constraint
     const roleDef = DEFAULT_ROLES.find(r => r.role_code === roleCode);
     const roleName = roleDef ? roleDef.role_name : roleCode;
@@ -100,7 +118,10 @@ export const permissionService = {
         role_code: roleCode, 
         role_name: roleName,
         permissions,
+        hotel_id: hotelId,
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'role_code, hotel_id'
       });
       
     if (error) throw error;

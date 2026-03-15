@@ -214,12 +214,12 @@ export default function AppShell({
   const navItems = [
     { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: `/${slug}`, permission: PERMISSION_KEYS.VIEW_DASHBOARD },
     { icon: <Banknote size={24} />, label: 'Thu Chi', href: `/${slug}/tien`, permission: PERMISSION_KEYS.VIEW_MONEY },
-    { icon: <Users size={24} />, label: 'Khách hàng', href: `/${slug}/customers` },
+    { icon: <Users size={24} />, label: 'Khách hàng', href: `/${slug}/customers`, permission: PERMISSION_KEYS.VIEW_CUSTOMERS },
     { icon: <ClipboardList size={24} />, label: 'Báo cáo', href: `/${slug}/reports`, permission: PERMISSION_KEYS.VIEW_REPORTS },
     { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: `/${slug}/settings`, permission: PERMISSION_KEYS.VIEW_SETTINGS },
   ];
 
-  const saasAdminItem = user?.hotels?.features?.saas_admin_access ? {
+  const saasAdminItem = can(PERMISSION_KEYS.VIEW_SAAS_ADMIN) ? {
     icon: <ShieldCheck size={24} />,
     label: 'Quản trị SaaS',
     href: '/saas-admin',

@@ -1,6 +1,21 @@
 
 import { supabase } from '@/lib/supabase';
 
+// Helper to safely format errors for logging
+const formatError = (err: any) => {
+    if (!err) return 'Unknown error (null/undefined)';
+    if (typeof err === 'object') {
+        try {
+            // Handle native Error objects and Supabase error objects
+            const plain = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+            return JSON.stringify(plain, null, 2);
+        } catch (e) {
+            return String(err);
+        }
+    }
+    return String(err);
+};
+
 export interface Customer {
   id: string;
   full_name: string;
@@ -70,7 +85,7 @@ export const customerService = {
         limit
       };
     } catch (err) {
-      console.error('Error fetching customers:', err);
+      console.error('Error fetching customers:', formatError(err));
       return { data: [], total: 0, page: 1, limit: 20 };
     }
   },
@@ -86,7 +101,7 @@ export const customerService = {
       if (error) throw error;
       return data as Customer;
     } catch (err) {
-      console.error('Error fetching customer:', err);
+      console.error('Error fetching customer:', formatError(err));
       return null;
     }
   },
@@ -95,8 +110,14 @@ export const customerService = {
     try {
       // Clean undefined and empty strings
       const payload: any = { ...customer };
-      if (!payload.balance) payload.balance = 0;
+      if (payload.balance === undefined) payload.balance = 0;
       
+      // Auto-inject hotel_id from localStorage if not provided (SaaS pattern)
+      if (!payload.hotel_id && typeof window !== 'undefined') {
+        const user = JSON.parse(localStorage.getItem('1hotel_user') || '{}');
+        if (user?.hotel_id) payload.hotel_id = user.hotel_id;
+      }
+
       // Convert empty strings to null for fields that might have UNIQUE constraints
       if (payload.id_card === '') payload.id_card = null;
       if (payload.phone === '') payload.phone = null;
@@ -109,18 +130,12 @@ export const customerService = {
         .single();
 
       if (error) {
-        console.error('Supabase error creating customer:', error);
+        console.error('Supabase error creating customer:', formatError(error));
         throw error;
       }
       return data as Customer;
     } catch (err: any) {
-      console.error('Error creating customer:', {
-        message: err.message,
-        details: err.details,
-        hint: err.hint,
-        code: err.code,
-        payload: customer
-      });
+      console.error('Error creating customer:', formatError(err));
       return null;
     }
   },
@@ -144,7 +159,7 @@ export const customerService = {
       if (error) throw error;
       return data as Customer;
     } catch (err) {
-      console.error('Error updating customer:', err);
+      console.error('Error updating customer:', formatError(err));
       return null;
     }
   },
@@ -160,7 +175,7 @@ export const customerService = {
       if (error) throw error;
       return data as CustomerTransaction[];
     } catch (err) {
-      console.error('Error fetching transactions:', err);
+      console.error('Error fetching transactions:', formatError(err));
       return [];
     }
   },
@@ -205,22 +220,13 @@ export const customerService = {
 
       return bookings;
     } catch (err: any) {
-      console.error('Error fetching customer bookings:', {
-        message: err.message,
-        details: err.details,
-        hint: err.hint,
-        code: err.code
-      });
+      console.error('Error fetching customer bookings:', formatError(err));
       return [];
     }
   },
 
   async deleteCustomer(id: string): Promise<{ success: boolean; message: string }> {
     try {
-      // Check if customer has transactions or bookings to prevent accidental data loss or FK error
-      // Actually let the DB enforce FK, but we can catch it.
-      // Or we can check first for better UX
-      
       const { error } = await supabase
         .from('customers')
         .delete()
@@ -234,7 +240,7 @@ export const customerService = {
       }
       return { success: true, message: 'Xóa khách hàng thành công' };
     } catch (err) {
-      console.error('Error deleting customer:', err);
+      console.error('Error deleting customer:', formatError(err));
       return { success: false, message: 'Lỗi khi xóa khách hàng' };
     }
   },
@@ -261,7 +267,7 @@ export const customerService = {
       if (error) throw error;
       return data; // { success, new_balance, message }
     } catch (err: any) {
-      console.error('Error adjusting balance:', err.message || err);
+      console.error('Error adjusting balance:', formatError(err));
       return { success: false, message: err.message || 'Lỗi hệ thống' };
     }
   },
@@ -283,7 +289,7 @@ export const customerService = {
       const created = await this.createCustomer({ full_name: WALK_IN_NAME, balance: 0 });
       return created;
     } catch (err) {
-      console.error('Error getting/creating walk-in customer:', err);
+      console.error('Error getting/creating walk-in customer:', formatError(err));
       return null;
     }
   },
@@ -299,7 +305,7 @@ export const customerService = {
       if (error) throw error;
       return data as Customer[];
     } catch (err) {
-      console.error('Error fetching debtors:', err);
+      console.error('Error fetching debtors:', formatError(err));
       return [];
     }
   }

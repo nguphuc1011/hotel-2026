@@ -163,7 +163,6 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [mounted, setMounted] = useState(false);
   const [bill, setBill] = useState<BookingBill | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [internalPendingApproval] = useState<any>(null);
   const [groupDetails, setGroupDetails] = useState<any>(null); // State mới cho chi tiết nhóm
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
   const [bookingServices, setBookingServices] = useState<BookingServiceItem[]>([]);
@@ -179,7 +178,6 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   const [showGroupRooms, setShowGroupRooms] = useState(false);
   const [editStaff, setEditStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showDepositModal, setShowDepositModal] = useState(false);
-  const [cancellationStaff, setCancellationStaff] = useState<{ id: string, name: string } | undefined>(undefined);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
 
   const { verify, SecurityModals } = useSecurity();
@@ -200,7 +198,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   // Load bill details on open
   useEffect(() => {
     if (isOpen && activeBooking?.id) {
-      loadBill(true); // Force snapshot update when opening Folio
+      loadBill(); // Remove true (force) parameter
       loadServices();
       if (activeRoom?.is_group_master || activeBooking.is_group_member) {
         loadGroupDetails();
@@ -262,7 +260,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
   // Tổng tiền DỰ KIẾN (bao gồm cả dịch vụ đang chờ lưu)
   const projectedAmountToPay = officialAmountToPay + pendingServicesTotal;
 
-  const loadBill = async (force: boolean = false) => {
+  const loadBill = async () => {
     if (!activeBooking) return;
     
     // Only show full loading spinner if we don't have any bill data yet
@@ -271,9 +269,6 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     }
 
     try {
-      if (force) {
-        await bookingService.forceUpdateSnapshot(activeBooking.id);
-      }
       const data = await bookingService.calculateBill(activeBooking.id);
       console.log('Folio Bill Data (after loadBill):', data);
       setBill(data);
@@ -442,7 +437,6 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       } finally {
         setIsLoading(false);
         setShowPenaltyModal(false);
-        setCancellationStaff(undefined);
       }
     }, {
       room_id: activeRoom?.id, // Critical for dashboard matching
@@ -528,29 +522,39 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
     );
   };
 
+  // --- FINAL RENDER LOGIC ---
+  if (!mounted || !isOpen) return null;
+  if (!activeRoom || !activeBooking) return null;
+
   const ModalContent = (
-    <div className="flex-1 flex flex-col min-h-0 bg-slate-50 overflow-hidden relative">
+    <div className="flex flex-col h-full bg-white overflow-hidden">
       {/* Header */}
-      <div className="h-14 flex justify-between items-center px-6 bg-white shrink-0 border-b border-slate-100 z-10">
+      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <div className="flex items-center gap-3">
-              <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider shadow-sm">Folio</span>
-              <h2 className="text-base font-bold text-slate-800">Phòng {activeRoom?.name}</h2>
+              <div className="w-10 h-10 rounded-2xl bg-slate-900 flex items-center justify-center shadow-lg shadow-slate-200">
+                  <span className="text-white text-[10px] font-bold uppercase tracking-wider">Folio</span>
+              </div>
+              <div>
+                  <h3 className="text-lg font-bold text-slate-800 leading-none">Phòng {activeRoom?.name}</h3>
+                  <p className="text-xs text-slate-500 mt-1 font-medium">{bill?.customer_name || 'Khách lẻ'}</p>
+              </div>
           </div>
-          <div className="flex items-center gap-2">
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-95">
-                  <X className="w-4 h-4 text-slate-500" />
-              </button>
-          </div>
+          <button 
+              onClick={onClose} 
+              className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full transition-all active:scale-95 border border-slate-200 shadow-sm"
+          >
+              <X className="w-5 h-5 text-slate-500" />
+          </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 custom-scrollbar">
           {/* Quick Actions - Scrollable */}
-          <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1 mb-2">
+          <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden px-1">
               <QuickActionButton icon={LogOut} label="Đổi phòng" onClick={() => handleChangeRoom()} />
               <QuickActionButton icon={Edit3} label="Sửa thông tin" onClick={() => handleEditBooking()} />
               <QuickActionButton icon={Users} label="Gộp phòng" onClick={() => onGroupRoom?.()} />
               {groupDetails && groupDetails.is_group && groupDetails.master_id === activeBooking?.id && groupDetails.rooms && groupDetails.rooms.length > 1 && (
-                <QuickActionButton icon={KeyRound} label="Chuyển chủ nhóm" onClick={handleTransferGroupMaster} />
+                <QuickActionButton icon={KeyRound} label="Chuyển chủ" onClick={handleTransferGroupMaster} />
               )}
               <QuickActionButton icon={DollarSign} label="Thu trước" onClick={() => {
                 verify('folio_deposit', (staffId, staffName) => {
@@ -576,23 +580,23 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           {/* Main Toggle Card */}
           <div 
               onClick={() => setShowDetails(!showDetails)}
-              className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-lg shadow-blue-900/20 cursor-pointer transition-all duration-300"
+              className="relative overflow-hidden rounded-[40px] bg-gradient-to-br from-blue-600 to-blue-700 p-8 text-white shadow-xl shadow-blue-900/20 cursor-pointer transition-all duration-300 group"
           >
-              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none group-hover:scale-110 transition-transform duration-500" />
 
               <div className="relative z-10">
-                  <div className="flex justify-center items-center mb-1 relative">
-                      <span className="text-xs font-bold uppercase tracking-wider text-blue-100">Cần thanh toán</span>
+                  <div className="flex justify-center items-center mb-2 relative">
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-100/80">Cần thanh toán</span>
                       <div className={cn(
-                          "absolute right-0 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md",
-                          showDetails ? "bg-white text-blue-600" : "text-white"
+                          "absolute right-0 w-10 h-10 flex items-center justify-center bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md border border-white/20",
+                          showDetails ? "bg-white text-blue-600 shadow-lg" : "text-white"
                       )}>
-                          {showDetails ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                          {showDetails ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
                       </div>
                   </div>
 
-                  <div className="flex flex-col items-center gap-1 mb-6">
-                      <div className="flex justify-center items-center gap-3 h-10">
+                  <div className="flex flex-col items-center gap-1 mb-8">
+                      <div className="flex justify-center items-center gap-4">
                           <button 
                               onClick={(e) => {
                                   e.stopPropagation();
@@ -601,14 +605,14 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                   onUpdate();
                               }}
                               className={cn(
-                                  "p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90",
+                                  "p-2.5 rounded-full hover:bg-white/10 transition-all active:scale-90 border border-white/10",
                                   isLoading && "animate-spin"
                               )}
                               title="Làm mới"
                           >
-                              <RefreshCw className="w-5 h-5 opacity-50" />
+                              <RefreshCw className="w-5 h-5 opacity-60" />
                           </button>
-                          <div className="text-4xl font-bold tracking-tight flex items-center h-full">
+                          <div className="text-5xl font-black tracking-tighter flex items-center tabular-nums">
                               {bill || (activeBooking && activeBooking.total_amount !== undefined) ? formatMoney(officialAmountToPay) : '---'}
                           </div>
                           <button 
@@ -616,26 +620,26 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                   e.stopPropagation();
                                   setShowAuditTrail(true);
                               }}
-                              className="w-8 h-8 flex items-center justify-center rounded-full border border-white/50 text-lg font-black text-white hover:bg-white/10 transition-all"
+                              className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-white/30 text-lg font-black text-white hover:bg-white/20 transition-all active:scale-95"
                           >
                               !
                           </button>
                       </div>
                       
                       {pendingServicesTotal > 0 && (
-                          <div className="flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full backdrop-blur-md animate-in slide-in-from-top-2 duration-300">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-100">Dự kiến:</span>
-                              <span className="text-sm font-black text-yellow-300">
+                          <div className="flex items-center gap-2 px-4 py-2 bg-white/20 rounded-2xl backdrop-blur-md animate-in slide-in-from-top-2 duration-300 border border-white/10 mt-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-blue-100">Dự kiến:</span>
+                              <span className="text-lg font-black text-yellow-300 tabular-nums">
                                   {formatMoney(projectedAmountToPay)}
                               </span>
                           </div>
                       )}
                   </div>
 
-                  <div className="flex items-center border-t border-white/20 pt-4 mb-2">
-                      <div className="flex-1 text-center border-r border-white/20 pr-2">
-                          <div className="font-bold text-lg leading-tight mb-1 flex items-center justify-center gap-2">
-                              <div className="bg-blue-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold text-blue-100 uppercase tracking-wider border border-blue-400/30">
+                  <div className="flex items-center border-t border-white/10 pt-6 mb-2">
+                      <div className="flex-1 text-center border-r border-white/10 pr-2">
+                          <div className="font-bold text-lg leading-tight mb-2 flex items-center justify-center gap-2">
+                              <div className="bg-blue-500/30 px-2 py-0.5 rounded-lg text-[10px] font-black text-blue-100 uppercase tracking-widest border border-blue-400/20">
                                   Vào
                               </div>
                               {(() => {
@@ -649,44 +653,43 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                   const secondary = isHourly ? dateStr : timeStr;
 
                                   return (
-                                      <span>
-                                          <span className="font-bold text-xl text-yellow-300">
+                                      <span className="tabular-nums">
+                                          <span className="font-black text-2xl text-yellow-300">
                                               {primary}
                                           </span>
-                                          <span className="font-bold text-white/80 text-sm ml-1">
+                                          <span className="font-bold text-white/70 text-sm ml-2">
                                               {secondary}
                                           </span>
                                       </span>
                                   );
                               })()}
                           </div>
-                          <div className="flex items-center justify-center gap-1.5 min-h-[20px]">
-                              <User className="w-3.5 h-3.5 text-blue-200" />
-                              <div className="text-sm font-bold text-white">
+                          <div className="flex items-center justify-center gap-2 bg-white/10 py-1.5 px-3 rounded-full w-fit mx-auto border border-white/5">
+                              <User className="w-4 h-4 text-blue-200" />
+                              <div className="text-sm font-black text-white truncate max-w-[120px]">
                                   {bill?.customer_name || 'Khách lẻ'}
                               </div>
                           </div>
                       </div>
                       <div className="flex-1 text-center pl-2">
-                          <div className="flex items-center justify-center gap-2 mb-1">
-                              <div className="text-xs font-bold uppercase tracking-wider text-blue-200">Đã ở</div>
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white border border-white/40 bg-white/10 uppercase tracking-wider whitespace-nowrap">
-                                  {bill?.rental_type === 'hourly' ? 'Theo Giờ' : 
-                                   bill?.rental_type === 'overnight' ? 'Qua Đêm' : 
-                                   bill?.rental_type === 'daily' ? 'Theo Ngày' : 
-                                   (activeBooking ? (activeBooking.booking_type === 'hourly' ? 'Theo Giờ' : activeBooking.booking_type === 'overnight' ? 'Qua Đêm' : 'Theo Ngày') : '---')}
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                              <div className="text-[10px] font-black uppercase tracking-[0.15em] text-blue-200/80">Thời gian ở</div>
+                              <div className="px-2 py-0.5 rounded-lg text-[10px] font-black text-white border border-white/20 bg-white/10 uppercase tracking-widest whitespace-nowrap">
+                                  {bill?.rental_type === 'hourly' ? 'Giờ' : 
+                                   bill?.rental_type === 'overnight' ? 'Đêm' : 
+                                   bill?.rental_type === 'daily' ? 'Ngày' : 
+                                   (activeBooking ? (activeBooking.booking_type === 'hourly' ? 'Giờ' : activeBooking.booking_type === 'overnight' ? 'Đêm' : 'Ngày') : '---')}
                               </div>
                           </div>
-                          <div className="font-bold text-lg leading-tight">
+                          <div className="font-black text-2xl leading-tight tabular-nums text-yellow-300">
                               {(() => {
                                   if (!bill?.check_in_at) return '--';
                                   
-                                  // Prefer business-logic duration from DB for Daily/Overnight
                                   if (bill.duration_text && (bill.rental_type === 'daily' || bill.rental_type === 'overnight')) {
                                       return (
-                                          <div className="flex items-center justify-center gap-1.5">
-                                              <Calendar className="w-4 h-4 text-white/60" />
-                                              <span className="text-xl text-yellow-300">{bill.duration_text}</span>
+                                          <div className="flex items-center justify-center gap-2">
+                                              <Calendar className="w-5 h-5 text-white/60" />
+                                              <span>{bill.duration_text}</span>
                                           </div>
                                       );
                                   }
@@ -695,8 +698,8 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                                bill.rental_type === 'overnight' ? 'overnight' : 'daily';
                                   
                                   return (
-                                      <div className="flex items-center justify-center gap-1.5">
-                                          {mode === 'hourly' ? <Clock className="w-4 h-4 text-white/60" /> : <Calendar className="w-4 h-4 text-white/60" />}
+                                      <div className="flex items-center justify-center gap-2">
+                                          {mode === 'hourly' ? <Clock className="w-5 h-5 text-white/60" /> : <Calendar className="w-5 h-5 text-white/60" />}
                                           <LiveTimer 
                                               checkInAt={bill.check_in_at} 
                                               mode={mode} 
@@ -710,8 +713,8 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
                   {/* Expandable Details Section - Inside Card */}
                   <div className={cn(
-                      "grid transition-all duration-300 ease-in-out overflow-hidden",
-                      showDetails ? "grid-rows-[1fr] opacity-100 mt-4 border-t border-white/20 pt-4" : "grid-rows-[0fr] opacity-0"
+                      "grid transition-all duration-500 ease-in-out overflow-hidden",
+                      showDetails ? "grid-rows-[1fr] opacity-100 mt-6 border-t border-white/10 pt-6" : "grid-rows-[0fr] opacity-0"
                   )}>
                       <div className="min-h-0 space-y-4">
                           {bill && (
@@ -730,32 +733,37 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
 
           {/* Unified Group Room Info */}
           {(groupDetails && groupDetails.is_group && groupDetails.rooms && groupDetails.rooms.length > 0) || activeBooking?.is_group_member ? (
-              <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-4 space-y-3">
+              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6 space-y-4">
                   {groupDetails && groupDetails.is_group && groupDetails.rooms && groupDetails.rooms.length > 0 ? (
                       <>
                           <button 
                               className="flex items-center justify-between w-full group"
                               onClick={() => setShowGroupRooms(!showGroupRooms)}
                           >
-                              <div className="flex items-center gap-2">
-                                  <Users className="w-5 h-5 text-blue-600" />
-                                  <h3 className="text-lg font-bold text-slate-800">
+                              <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
+                                      <Users className="w-5 h-5 text-blue-600" />
+                                  </div>
+                                  <h3 className="text-lg font-black text-slate-800 tracking-tight">
                                       Phòng gộp ({groupDetails.rooms.length})
                                   </h3>
                               </div>
-                              <div className="flex items-center gap-2">
-                                  <span className="text-base font-bold text-blue-600">
+                              <div className="flex items-center gap-3">
+                                  <span className="text-lg font-black text-blue-600 tabular-nums">
                                       {formatMoney(groupDetails.total_group_amount || 0)}
                                   </span>
-                                  <ChevronDown 
-                                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showGroupRooms ? 'rotate-180' : ''}`}
-                                  />
+                                  <div className={cn(
+                                      "w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 transition-transform duration-300",
+                                      showGroupRooms ? "rotate-180 bg-blue-50 text-blue-600" : "text-slate-400"
+                                  )}>
+                                      <ChevronDown className="w-5 h-5" />
+                                  </div>
                               </div>
                           </button>
                           
                           {showGroupRooms && (
-                              <div className="animate-in fade-in duration-200">
-                                  <div className="grid grid-cols-2 gap-3 mt-3">
+                              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                  <div className="grid grid-cols-2 gap-4 mt-4">
                                       {groupDetails.rooms.map((member: any) => (
                                           <GroupedRoomMemberCard 
                                               key={member.booking_id} 
@@ -771,34 +779,37 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                       </>
                   ) : activeBooking?.is_group_member ? (
                       <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                  <Link className="w-5 h-5" />
+                          <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                  <Link className="w-6 h-6" />
                               </div>
                               <div>
-                                  <div className="font-bold text-blue-700 text-base">
+                                  <div className="font-black text-blue-700 text-base leading-tight">
                                       Đã gộp vào phòng {groupDetails?.master_room_name || groupDetails?.rooms?.find((r: any) => r.is_master)?.room_name || 'chính'}
                                   </div>
+                                  <div className="text-xs text-blue-500 font-bold uppercase tracking-widest mt-1">Phòng con</div>
                               </div>
                           </div>
                           
                           <button
-                              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black rounded-xl transition-all flex items-center gap-2 active:scale-95 border border-red-100"
                               onClick={() => handleUngroupRoom(activeBooking?.id!)}
                           >
-                              <Unlink className="w-3 h-3" />
-                              Tách nhóm
+                              <Unlink className="w-4 h-4" />
+                              TÁCH NHÓM
                           </button>
                       </div>
                   ) : null}
               </div>
           ) : null}
 
-          <div className="space-y-3 pt-2">
-              <div className="flex overflow-x-auto pb-4 pt-2 gap-3 snap-x hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="space-y-4">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Dịch vụ & Tiện ích</h3>
+              
+              <div className="flex overflow-x-auto pb-6 pt-2 gap-4 snap-x hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1">
                   {filteredServices.map(service => {
                       const qty = getServiceQuantity(service.id);
-                      const isOutOfStock = (service.stock_quantity || 0) <= 0;
+                      const isOutOfStock = (service.track_inventory ? (service.stock_quantity || 0) <= 0 : false);
                       
                       return (
                           <ServiceCard 
@@ -813,34 +824,40 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                   })}
               </div>
 
-              <div className="mt-2 flex items-center justify-center gap-6 text-[10px] text-slate-400 bg-white p-2 rounded-xl border border-slate-100 mx-auto w-fit shadow-sm">
+              <div className="flex items-center justify-center gap-8 text-[10px] font-black text-slate-400 bg-white py-3 px-6 rounded-2xl border border-slate-100 mx-auto w-fit shadow-sm uppercase tracking-widest">
                   <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                      <div className="w-2 h-2 rounded-full bg-slate-300 shadow-inner"></div>
                       Chạm: thêm
                   </div>
                   <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-red-300"></span>
+                      <div className="w-2 h-2 rounded-full bg-red-400 shadow-inner"></div>
                       Giữ: bớt
                   </div>
                   {pendingServices.length > 0 && (
                       <>
-                          <div className="w-px h-3 bg-slate-200"></div>
-                          <div className="flex items-center gap-2 font-medium text-blue-600">
-                              <span>{pendingServices.length} món</span>
-                              <span>•</span>
-                              <span>{formatMoney(pendingServices.reduce((sum, item) => sum + (item.quantity * item.price_at_time), 0))}</span>
+                          <div className="w-px h-4 bg-slate-200"></div>
+                          <div className="flex items-center gap-2 text-blue-600">
+                              <span className="bg-blue-50 px-2 py-0.5 rounded-md">{pendingServices.length} món</span>
+                              <span className="text-slate-300">•</span>
+                              <span className="tabular-nums">{formatMoney(pendingServices.reduce((sum, item) => sum + (item.quantity * item.price_at_time), 0))}</span>
                           </div>
                       </>
                   )}
               </div>
 
-              <div className="mt-4">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Dịch vụ đã dùng</h3>
-                  <div className="bg-white rounded-[24px] border border-slate-100 divide-y divide-slate-100 shadow-sm">
+              <div className="mt-8">
+                  <div className="flex items-center justify-between mb-3 px-1">
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Dịch vụ đã dùng</h3>
+                      <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{bookingServices.length} món</div>
+                  </div>
+                  
+                  <div className="bg-white rounded-[32px] border border-slate-100 divide-y divide-slate-50 shadow-sm overflow-hidden">
                       {bookingServices.length === 0 && pendingServices.length === 0 ? (
-                          <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
-                              <Coffee className="w-6 h-6 opacity-20" />
-                              <span className="text-xs">Chưa dùng dịch vụ nào</span>
+                          <div className="p-12 text-center flex flex-col items-center gap-3">
+                              <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-1">
+                                  <Coffee className="w-8 h-8 text-slate-200" />
+                              </div>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Chưa dùng dịch vụ</span>
                           </div>
                       ) : (
                           <>
@@ -852,17 +869,17 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                               acc[item.service_id].total_price += item.quantity * item.price_at_time;
                               return acc;
                           }, {} as Record<string, BookingServiceItem>)).map((item) => (
-                              <div key={`pending-${item.service_id}`} className="p-3 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors border-l-4 border-transparent">
-                                  <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                              <div key={`pending-${item.service_id}`} className="p-4 flex items-center justify-between bg-blue-50/30 border-l-4 border-blue-500 animate-in slide-in-from-left-2">
+                                  <div className="flex items-center gap-4">
+                                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-lg shadow-blue-200">
                                           {item.quantity}x
                                       </div>
                                       <div>
-                                          <div className="font-medium text-slate-900 text-sm">{item.service?.name}</div>
-                                          <div className="text-[10px] text-blue-600 font-medium">Chờ lưu...</div>
+                                          <div className="font-black text-slate-800 text-sm tracking-tight">{item.service?.name}</div>
+                                          <div className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-0.5">Chờ lưu...</div>
                                       </div>
                                   </div>
-                                  <div className="font-bold text-blue-600 text-sm">
+                                  <div className="font-black text-blue-600 text-base tabular-nums">
                                       {formatMoney(item.total_price)}
                                   </div>
                               </div>
@@ -876,26 +893,26 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                               acc[item.service_id].total_price += item.quantity * item.price_at_time;
                               return acc;
                           }, {} as Record<string, BookingServiceItem>)).map((item) => (
-                              <div key={item.service_id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                                  <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
+                              <div key={item.service_id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                                  <div className="flex items-center gap-4">
+                                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black text-sm group-hover:bg-white group-hover:shadow-sm transition-all">
                                           {item.quantity}x
                                       </div>
                                       <div>
-                                          <div className="font-medium text-slate-900 text-sm">{item.service?.name}</div>
-                                          <div className="text-[10px] text-slate-500">{formatMoney(item.price_at_time)}</div>
+                                          <div className="font-black text-slate-800 text-sm tracking-tight">{item.service?.name}</div>
+                                          <div className="text-[10px] text-slate-400 font-bold tabular-nums mt-0.5">{formatMoney(item.price_at_time)}</div>
                                       </div>
                                   </div>
-                                  <div className="flex items-center gap-3">
-                                      <div className="font-bold text-slate-700 text-sm">
+                                  <div className="flex items-center gap-4">
+                                      <div className="font-black text-slate-700 text-base tabular-nums">
                                           {formatMoney(item.total_price)}
                                       </div>
                                       <button 
                                           onClick={() => handleRemoveService(item.id)}
                                           disabled={!!processingServiceId}
-                                          className="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors active:scale-90"
+                                          className="w-9 h-9 rounded-full bg-slate-50 text-slate-300 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-all active:scale-90 border border-transparent hover:border-red-100"
                                       >
-                                          <Minus className="w-3.5 h-3.5" />
+                                          <Minus className="w-4 h-4" />
                                       </button>
                                   </div>
                               </div>
@@ -908,29 +925,32 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       </div>
 
       {/* Footer */}
-      <div className="shrink-0 bg-white border-t border-slate-100 px-6 py-6 z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+      <div className="shrink-0 bg-white border-t border-slate-100 px-8 py-8 z-10 shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
           {pendingServices.length > 0 ? (
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                   <button 
                       type="button"
                       onClick={() => setPendingServices([])}
                       disabled={isSaving}
-                      className="w-20 bg-slate-100 hover:bg-slate-200 text-slate-600 h-12 rounded-2xl font-bold text-xs shadow-sm active:scale-[0.98] transition-all"
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 h-14 rounded-[24px] font-black text-xs shadow-sm active:scale-[0.98] transition-all uppercase tracking-widest"
                   >
-                      HỦY
+                      HỦY BỎ
                   </button>
                   <button 
                       type="button"
                       onClick={() => handleSaveServices()}
                       disabled={isSaving}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-2xl font-bold text-base shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 animate-pulse"
+                      className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white h-14 rounded-[24px] font-black text-base shadow-xl shadow-blue-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 animate-pulse-subtle"
                   >
                       {isSaving ? (
-                          <span>Đang lưu...</span>
+                          <span className="flex items-center gap-2">
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                              ĐANG LƯU...
+                          </span>
                       ) : (
                           <>
-                              <span>LƯU CẬP NHẬT</span>
-                              <div className="bg-white text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                              <span>LƯU DỊCH VỤ</span>
+                              <div className="bg-white text-blue-600 text-[10px] px-2 py-0.5 rounded-lg font-black shadow-sm">
                                   {pendingServices.length}
                               </div>
                           </>
@@ -938,21 +958,21 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                   </button>
               </div>
           ) : (
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                   <button
                       type="button"
                       onClick={onClose}
-                      className="w-24 bg-slate-100 hover:bg-slate-200 text-slate-700 h-12 rounded-2xl font-bold text-xs shadow-sm active:scale-[0.98] transition-all"
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 h-14 rounded-[24px] font-black text-xs shadow-sm active:scale-[0.98] transition-all uppercase tracking-widest"
                   >
-                      ĐÓNG
+                      ĐÓNG LẠI
                   </button>
                   <button 
                       type="button"
                       onClick={() => setShowPaymentModal(true)}
-                      className="flex-1 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-2xl font-bold text-base shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      className="flex-[2] bg-slate-900 hover:bg-slate-800 text-white h-14 rounded-[24px] font-black text-base shadow-xl shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                   >
                       <span>THANH TOÁN</span>
-                      <ChevronRight className="w-5 h-5" />
+                      <ChevronRight className="w-6 h-6" />
                   </button>
               </div>
           )}
@@ -1013,22 +1033,26 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
         }}
       />
 
-      <DepositModal 
-        isOpen={showDepositModal}
-        onClose={() => setShowDepositModal(false)}
-        bookingId={activeBooking?.id!} 
-        customerId={activeBooking?.customer_id}
-        bill={bill}
-        verifiedStaff={editStaff}
-        onSuccess={() => {
-          setShowDepositModal(false); // Close sub-modal first
-          loadBill();
-          onUpdate();
-          onClose(); // Then close Folio
-        }}
-      />
+      {showDepositModal && activeBooking && activeRoom && (
+        <DepositModal 
+          isOpen={showDepositModal}
+          onClose={() => {
+            setShowDepositModal(false);
+            setEditStaff(undefined);
+          }}
+          bookingId={activeBooking.id}
+          customerId={activeBooking.customer_id}
+          bill={bill}
+          verifiedStaff={editStaff}
+          onSuccess={() => {
+            setShowDepositModal(false);
+            loadBill();
+            onUpdate();
+          }}
+        />
+      )}
 
-      {groupDetails && groupDetails.is_group && groupDetails.master_id === activeBooking?.id && (
+      {isTransferGroupMasterModalOpen && activeBooking && activeRoom && (
         <TransferGroupMasterModal
           isOpen={isTransferGroupMasterModalOpen}
           onClose={() => setIsTransferGroupMasterModalOpen(false)}
@@ -1051,22 +1075,25 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
             })) as any}
         />
       )}
+
+      {SecurityModals}
     </div>
   );
 
-  // --- FINAL RENDER LOGIC (Anti-Flicker) ---
-  if (!mounted || (!isOpen && !lastData)) return null;
-  if (!activeRoom || !activeBooking) return null;
-
   return createPortal(
-    <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200">
-      <div className={cn(
-        "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
-        isMobile 
-          ? "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full" 
-          : "max-w-[800px] rounded-[32px] zoom-in-95 max-h-[90vh]"
-      )}>
-        {SecurityModals}
+    <div 
+      className="fixed inset-0 z-[60000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className={cn(
+          "w-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in duration-300",
+          isMobile 
+            ? "h-[92vh] mt-auto rounded-t-[40px] slide-in-from-bottom-full" 
+            : "max-w-[800px] rounded-[40px] zoom-in-95 max-h-[90vh]"
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
         {ModalContent}
       </div>
     </div>,

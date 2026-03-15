@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/authStore';
 
 interface User {
   id: string;
@@ -40,6 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const params = useParams();
   const currentSlug = params?.slug as string;
+
+  const { fetchUser } = useAuthStore();
 
   useEffect(() => {
     setMounted(true);
@@ -128,6 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.cookie = `1hotel_session=1; path=/; max-age=${60 * 60 * 24 * 7}`;
         document.cookie = `1hotel_role=${encodeURIComponent(role)}; path=/; max-age=${60 * 60 * 24 * 7}`;
         document.cookie = `1hotel_id=${encodeURIComponent(hId)}; path=/; max-age=${60 * 60 * 24 * 7}`;
+        
+        // Cập nhật authStore ngay lập tức để đồng bộ quyền hạn
+        await fetchUser();
         
         toast.success(`Xin chào, ${userData.full_name}`);
         const targetSlug = userData.hotel_slug || 'default';

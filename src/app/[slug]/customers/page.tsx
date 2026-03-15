@@ -12,11 +12,15 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { formatMoney } from '@/utils/format';
+import { usePermission } from '@/hooks/usePermission';
+import { PERMISSION_KEYS } from '@/services/permissionService';
+import { ShieldCheck } from 'lucide-react';
 
 export default function CustomersPage() {
   const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
+  const { can, isLoading: isAuthLoading } = usePermission();
   const { confirm: confirmDialog } = useGlobalDialog();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,10 +50,12 @@ export default function CustomersPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadCustomers();
+      if (can(PERMISSION_KEYS.VIEW_CUSTOMERS)) {
+        loadCustomers();
+      }
     }, 500);
     return () => clearTimeout(timer);
-  }, [search, isBanned]);
+  }, [search, isBanned, can]);
 
   const handleCreate = async () => {
     if (!newCustomer.full_name) {
@@ -87,6 +93,26 @@ export default function CustomersPage() {
       toast.error(res.message);
     }
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+      </div>
+    );
+  }
+
+  if (!can(PERMISSION_KEYS.VIEW_CUSTOMERS)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
+          <p className="text-slate-500">Vui lòng liên hệ quản lý.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-6">

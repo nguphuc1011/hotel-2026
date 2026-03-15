@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { PERMISSION_METADATA } from '@/constants/permissions';
 import { permissionService, RolePermission, PERMISSION_KEYS } from '@/services/permissionService';
 import { usePermission } from '@/hooks/usePermission';
+import { useAuthStore } from '@/stores/authStore';
 
 interface Staff {
   id: string;
@@ -63,6 +64,7 @@ export default function StaffSettingsPage() {
   const router = useRouter();
   const { slug } = useParams();
   const { can, isLoading: isAuthLoading } = usePermission();
+  const { user } = useAuthStore();
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [securityMatrix, setSecurityMatrix] = useState<SecurityMatrixItem[]>([]);
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
@@ -411,7 +413,8 @@ export default function StaffSettingsPage() {
     }
 
     try {
-      await permissionService.updateRolePermissions(roleCode, newPermissions);
+      if (!user?.hotel_id) throw new Error('Không tìm thấy thông tin khách sạn');
+      await permissionService.updateRolePermissions(roleCode, newPermissions, user.hotel_id);
       
       // Update local state
       setRolePermissions(prev => prev.map(r => 

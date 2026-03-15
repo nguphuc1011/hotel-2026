@@ -30,21 +30,40 @@ export function calculateLiveRoomCharge(params: LiveCalculationParams): number {
   
   const elapsedMin = Math.max(0, differenceInMinutes(now, checkIn));
   const graceMin = settings?.grace_out_enabled ? (settings.grace_minutes || 0) : 0;
+  const isGraceOutEnabled = settings?.grace_out_enabled ?? false;
 
   if (rentalType === 'hourly') {
-    const baseMin = (prices.base_hourly_limit || 1) * 60;
+    const hourlyUnit = prices.hourly_unit || 60;
+    const baseHourlyLimit = prices.base_hourly_limit || 1;
+    const firstBlockMin = baseHourlyLimit * hourlyUnit;
     
-    // Within base period (+ grace)
-    if (elapsedMin <= baseMin + graceMin) {
+    // 1. Block đầu
+    if (elapsedMin <= firstBlockMin) {
       return prices.hourly;
     }
+
+    // 2. Kiểm tra ân hạn cho block đầu
+    const extraAfterFirstBlock = elapsedMin - firstBlockMin;
+    if (isGraceOutEnabled && extraAfterFirstBlock <= graceMin) {
+      return prices.hourly;
+    }
+
+    // 3. Tính các block tiếp theo (Mỗi block đều có ân hạn riêng theo logic DB)
+    // Logic DB: v_next_blocks := FLOOR(v_remaining_min / v_hourly_unit);
+    //           v_remainder_min := MOD(v_remaining_min, v_hourly_unit);
+    //           IF v_remainder_min > grace THEN v_next_blocks += 1;
     
-    // Extra units
-    const extraMin = elapsedMin - baseMin;
-    const units = Math.ceil(extraMin / (prices.hourly_unit || 60));
-    // Sử dụng price_next_hour nếu có, nếu không thì dùng giá trung bình (fallback)
-    const unitPrice = prices.price_next_hour > 0 ? prices.price_next_hour : (prices.hourly / (prices.base_hourly_limit || 1));
-    return prices.hourly + (units * unitPrice);
+    let nextBlocks = Math.floor(extraAfterFirstBlock / hourlyUnit);
+    const remainderMin = extraAfterFirstBlock % hourlyUnit;
+    
+    if (remainderMin > 0) {
+      if (!isGraceOutEnabled || remainderMin > graceMin) {
+        nextBlocks += 1;
+      }
+    }
+
+    const unitPrice = prices.price_next_hour > 0 ? prices.price_next_hour : (prices.hourly / baseHourlyLimit);
+    return prices.hourly + (nextBlocks * unitPrice);
   } 
   
   if (rentalType === 'daily') {

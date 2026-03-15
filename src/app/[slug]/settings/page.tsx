@@ -51,100 +51,112 @@ export default function SettingsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Main Bento Large */}
-        <Link href={`/${slug}/settings/pricing`} className="md:col-span-2 bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative min-h-[240px] active:scale-[0.98]">
-          <div className="relative z-10">
-            <div className="w-16 h-16 bg-accent/5 rounded-[22px] flex items-center justify-center mb-6 text-accent">
-              <DollarSign size={36} />
+        {can(PERMISSION_KEYS.VIEW_SETTINGS_PRICING) && (
+          <Link href={`/${slug}/settings/pricing`} className="md:col-span-2 bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative min-h-[240px] active:scale-[0.98]">
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-accent/5 rounded-[22px] flex items-center justify-center mb-6 text-accent">
+                <DollarSign size={36} />
+              </div>
+              <h2 className="text-3xl font-black tracking-tight mb-2 text-main">Cấu hình giá</h2>
+              <p className="text-muted font-medium text-base max-w-xs leading-relaxed">Thiết lập bảng giá, phụ thu và các chính sách giảm giá linh hoạt.</p>
             </div>
-            <h2 className="text-3xl font-black tracking-tight mb-2 text-main">Cấu hình giá</h2>
-            <p className="text-muted font-medium text-base max-w-xs leading-relaxed">Thiết lập bảng giá, phụ thu và các chính sách giảm giá linh hoạt.</p>
-          </div>
-          <div className="flex items-center gap-2 font-black text-xs uppercase tracking-[0.2em] relative z-10 text-accent group-hover:gap-4 transition-all">
-            <span>Truy cập</span>
-            <ChevronRight size={18} />
-          </div>
-          <div className="absolute right-[-20px] bottom-[-20px] w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all duration-500" />
-        </Link>
+            <div className="flex items-center gap-2 font-black text-xs uppercase tracking-[0.2em] relative z-10 text-accent group-hover:gap-4 transition-all">
+              <span>Truy cập</span>
+              <ChevronRight size={18} />
+            </div>
+            <div className="absolute right-[-20px] bottom-[-20px] w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all duration-500" />
+          </Link>
+        )}
 
         {/* General Settings - New */}
-        <Link href={`/${slug}/settings/general`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-blue-50 rounded-[18px] flex items-center justify-center mb-4 text-blue-500">
-              <Settings2 size={28} />
+        {can(PERMISSION_KEYS.VIEW_SETTINGS_GENERAL) && (
+          <Link href={`/${slug}/settings/general`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+            <div className="relative z-10">
+              <div className="w-12 h-12 bg-blue-50 rounded-[18px] flex items-center justify-center mb-4 text-blue-500">
+                <Settings2 size={28} />
+              </div>
+              <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Cấu hình chung</h3>
+              <p className="text-muted font-medium text-sm leading-relaxed">Thông tin khách sạn, địa chỉ, liên hệ.</p>
             </div>
-            <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Cấu hình chung</h3>
-            <p className="text-muted font-medium text-sm leading-relaxed">Thông tin khách sạn, địa chỉ, liên hệ.</p>
-          </div>
-          <div className="flex justify-end mt-2">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
-              <ArrowUpRight size={22} />
+            <div className="flex justify-end mt-2">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                <ArrowUpRight size={22} />
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
         {/* Categories Small */}
-        <Link href={`/${slug}/settings/categories`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-orange-50 rounded-[18px] flex items-center justify-center mb-4 text-orange-500">
-              <BedDouble size={28} />
+        {can(PERMISSION_KEYS.VIEW_SETTINGS_CATEGORIES) && (
+          <Link href={`/${slug}/settings/categories`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+            <div className="relative z-10">
+              <div className="w-12 h-12 bg-orange-50 rounded-[18px] flex items-center justify-center mb-4 text-orange-500">
+                <BedDouble size={28} />
+              </div>
+              <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Hạng phòng</h3>
+              <p className="text-muted font-medium text-sm leading-relaxed">Quản lý danh sách phòng và hạng phòng.</p>
             </div>
-            <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Hạng phòng</h3>
-            <p className="text-muted font-medium text-sm leading-relaxed">Quản lý danh sách phòng và hạng phòng.</p>
-          </div>
-          <div className="flex justify-end mt-2">
-            <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 group-hover:scale-110 transition-transform">
-              <ArrowUpRight size={22} />
+            <div className="flex justify-end mt-2">
+              <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 group-hover:scale-110 transition-transform">
+                <ArrowUpRight size={22} />
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
         {/* Services Small */}
-        <Link href={`/${slug}/settings/services`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-purple-50 rounded-[18px] flex items-center justify-center mb-4 text-purple-500">
-              <Users size={28} />
+        {can(PERMISSION_KEYS.VIEW_SETTINGS_SERVICES) && (
+          <Link href={`/${slug}/settings/services`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+            <div className="relative z-10">
+              <div className="w-12 h-12 bg-purple-50 rounded-[18px] flex items-center justify-center mb-4 text-purple-500">
+                <Users size={28} />
+              </div>
+              <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Dịch vụ</h3>
+              <p className="text-muted font-medium text-sm leading-relaxed">Menu đồ ăn, nước uống và kho.</p>
             </div>
-            <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Dịch vụ</h3>
-            <p className="text-muted font-medium text-sm leading-relaxed">Menu đồ ăn, nước uống và kho.</p>
-          </div>
-          <div className="flex justify-end mt-2">
-            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
-              <ArrowUpRight size={22} />
+            <div className="flex justify-end mt-2">
+              <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
+                <ArrowUpRight size={22} />
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
         {/* Cash Flow Categories - New */}
-        <Link href={`/${slug}/settings/cash-flow`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-emerald-50 rounded-[18px] flex items-center justify-center mb-4 text-emerald-500">
-              <DollarSign size={28} />
+        {can(PERMISSION_KEYS.VIEW_SETTINGS_CASH_FLOW) && (
+          <Link href={`/${slug}/settings/cash-flow`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+            <div className="relative z-10">
+              <div className="w-12 h-12 bg-emerald-50 rounded-[18px] flex items-center justify-center mb-4 text-emerald-500">
+                <DollarSign size={28} />
+              </div>
+              <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Danh mục Thu Chi</h3>
+              <p className="text-muted font-medium text-sm leading-relaxed">Quản lý các loại khoản thu chi.</p>
             </div>
-            <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Danh mục Thu Chi</h3>
-            <p className="text-muted font-medium text-sm leading-relaxed">Quản lý các loại khoản thu chi.</p>
-          </div>
-          <div className="flex justify-end mt-2">
-            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
-              <ArrowUpRight size={22} />
+            <div className="flex justify-end mt-2">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+                <ArrowUpRight size={22} />
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
         {/* System Settings - New */}
-        <Link href={`/${slug}/settings/system`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-slate-50 rounded-[18px] flex items-center justify-center mb-4 text-slate-500">
-              <ShieldCheck size={28} />
+        {can(PERMISSION_KEYS.VIEW_SETTINGS_SYSTEM) && (
+          <Link href={`/${slug}/settings/system`} className="bento-card p-6 bg-white border-accent/10 flex flex-col justify-between group overflow-hidden relative active:scale-[0.98]">
+            <div className="relative z-10">
+              <div className="w-12 h-12 bg-slate-50 rounded-[18px] flex items-center justify-center mb-4 text-slate-500">
+                <ShieldCheck size={28} />
+              </div>
+              <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Hệ thống</h3>
+              <p className="text-muted font-medium text-sm leading-relaxed">Cấu hình tham số và hành vi.</p>
             </div>
-            <h3 className="text-2xl font-black tracking-tight mb-1 text-main">Hệ thống</h3>
-            <p className="text-muted font-medium text-sm leading-relaxed">Cấu hình tham số và hành vi.</p>
-          </div>
-          <div className="flex justify-end mt-2">
-            <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 group-hover:scale-110 transition-transform">
-              <ArrowUpRight size={22} />
+            <div className="flex justify-end mt-2">
+              <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 group-hover:scale-110 transition-transform">
+                <ArrowUpRight size={22} />
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
         {/* Staff & Permissions - NEW GỘP */}
         {can(PERMISSION_KEYS.MANAGE_PERMISSIONS) && (
