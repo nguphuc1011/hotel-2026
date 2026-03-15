@@ -212,7 +212,7 @@ export default function AppShell({
   }
 
   interface NavItem {
-    icon: JSX.Element;
+    icon: React.ReactNode;
     label: string;
     href: string;
     permission?: string;
