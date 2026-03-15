@@ -211,7 +211,15 @@ export default function AppShell({
     return <>{children}</>;
   }
 
-  const navItems: { icon: JSX.Element; label: string; href: string; permission?: string; isSpecial?: boolean }[] = [
+  interface NavItem {
+    icon: JSX.Element;
+    label: string;
+    href: string;
+    permission?: string;
+    isSpecial?: boolean;
+  }
+
+  const navItems: NavItem[] = [
     { icon: <LayoutDashboard size={24} />, label: 'Sơ đồ', href: `/${slug}`, permission: PERMISSION_KEYS.VIEW_DASHBOARD },
     { icon: <Banknote size={24} />, label: 'Thu Chi', href: `/${slug}/tien`, permission: PERMISSION_KEYS.VIEW_MONEY },
     { icon: <Users size={24} />, label: 'Khách hàng', href: `/${slug}/customers`, permission: PERMISSION_KEYS.VIEW_CUSTOMERS },
@@ -219,7 +227,7 @@ export default function AppShell({
     { icon: <SettingsIcon size={24} />, label: 'Cài đặt', href: `/${slug}/settings`, permission: PERMISSION_KEYS.VIEW_SETTINGS },
   ];
 
-  const saasAdminItem = can(PERMISSION_KEYS.VIEW_SAAS_ADMIN) ? {
+  const saasAdminItem: NavItem | null = can(PERMISSION_KEYS.VIEW_SAAS_ADMIN) ? {
     icon: <ShieldCheck size={24} />,
     label: 'Quản trị SaaS',
     href: '/saas-admin',
@@ -236,7 +244,7 @@ export default function AppShell({
 
   const visibleNavItems = filteredNavItems.filter(item => !item.permission || can(item.permission));
 
-  const finalSidebarItems = mounted ? (() => {
+  const finalSidebarItems: NavItem[] = mounted ? (() => {
     const items = [...visibleNavItems];
     if (saasAdminItem) items.push(saasAdminItem);
     return items;
@@ -270,7 +278,7 @@ export default function AppShell({
                 "flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 font-bold text-sm",
                 pathname === item.href 
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
-                  : (item as any).isSpecial 
+                  : item.isSpecial 
                     ? "text-emerald-500 hover:bg-emerald-50"
                     : "text-slate-500 hover:bg-slate-50 hover:text-blue-600"
               )}

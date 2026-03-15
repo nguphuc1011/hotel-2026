@@ -56,6 +56,18 @@ export interface BookingBill {
   explanation?: string[];
 }
 
+export interface UpdateBookingDetailsParams {
+  bookingId: string;
+  customerName?: string;
+  checkInAt: string;
+  customPrice?: number;
+  priceApplyMode: 'all' | 'future';
+  reason: string;
+  customerId?: string;
+  notes?: string;
+  verifiedStaff?: { id: string, name: string };
+}
+
 export const bookingService = {
   async calculateBill(bookingId: string, nowOverride?: string): Promise<BookingBill | null> {
     try {
@@ -389,17 +401,7 @@ export const bookingService = {
     }
   },
 
-  async updateBookingDetails(params: {
-    bookingId: string;
-    customerName?: string;
-    checkInAt: string;
-    customPrice?: number;
-    priceApplyMode: 'all' | 'future';
-    reason: string;
-    customerId?: string;
-    notes?: string;
-    verifiedStaff?: { id: string, name: string };
-  }) {
+  async updateBookingDetails(params: UpdateBookingDetailsParams) {
     try {
       const { data, error } = await supabase.rpc('update_booking_details', {
         p_booking_id: params.bookingId,

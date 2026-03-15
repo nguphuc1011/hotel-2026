@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Edit3, Calendar, DollarSign, User, Search, AlertCircle, Loader2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { bookingService } from '@/services/bookingService';
+import { bookingService, UpdateBookingDetailsParams } from '@/services/bookingService';
 import { customerService, Customer } from '@/services/customerService';
 import { Booking, Room } from '@/types/dashboard';
 import { formatMoney } from '@/utils/format';
@@ -178,9 +178,9 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
           }
       }
 
-      const payload = {
+      const payload: UpdateBookingDetailsParams = {
         bookingId: booking.id,
-        customerName: finalCustomerId ? undefined : customerName,
+        customerName: finalCustomerId ? undefined : searchTerm || customerName,
         checkInAt: new Date(checkInAt).toISOString(),
         customPrice,
         priceApplyMode,
