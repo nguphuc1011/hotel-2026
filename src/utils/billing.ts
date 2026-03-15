@@ -14,6 +14,8 @@ export interface LiveCalculationParams {
   settings?: {
     grace_minutes: number;
     grace_out_enabled: boolean;
+    hourly_ceiling_enabled?: boolean;
+    hourly_ceiling_percent?: number;
   };
 }
 
@@ -21,12 +23,12 @@ export interface LiveCalculationParams {
  * FE Approximation of room charge for live dashboard display.
  * NOTE: DB remains the source of truth for final checkout.
  */
-export function calculateLiveRoomCharge(params: LiveCalculationParams): number {
+export function calculateLiveRoomCharge(params: LiveCalculationParams): { amount: number; isCeilingHit: boolean } {
   const { checkInAt, rentalType, prices, settings } = params;
   const checkIn = new Date(checkInAt);
   const now = new Date();
   
-  if (isNaN(checkIn.getTime())) return 0;
+  if (isNaN(checkIn.getTime())) return { amount: 0, isCeilingHit: false };
   
   const elapsedMin = Math.max(0, differenceInMinutes(now, checkIn));
   const graceMin = settings?.grace_out_enabled ? (settings.grace_minutes || 0) : 0;
@@ -37,45 +39,53 @@ export function calculateLiveRoomCharge(params: LiveCalculationParams): number {
     const baseHourlyLimit = prices.base_hourly_limit || 1;
     const firstBlockMin = baseHourlyLimit * hourlyUnit;
     
+    let currentAmount = 0;
+
     // 1. Block đầu
     if (elapsedMin <= firstBlockMin) {
-      return prices.hourly;
-    }
+      currentAmount = prices.hourly;
+    } else {
+      // 2. Kiểm tra ân hạn cho block đầu
+      const extraAfterFirstBlock = elapsedMin - firstBlockMin;
+      if (isGraceOutEnabled && extraAfterFirstBlock <= graceMin) {
+        currentAmount = prices.hourly;
+      } else {
+        // 3. Tính các block tiếp theo
+        let nextBlocks = Math.floor(extraAfterFirstBlock / hourlyUnit);
+        const remainderMin = extraAfterFirstBlock % hourlyUnit;
+        
+        if (remainderMin > 0) {
+          if (!isGraceOutEnabled || remainderMin > graceMin) {
+            nextBlocks += 1;
+          }
+        }
 
-    // 2. Kiểm tra ân hạn cho block đầu
-    const extraAfterFirstBlock = elapsedMin - firstBlockMin;
-    if (isGraceOutEnabled && extraAfterFirstBlock <= graceMin) {
-      return prices.hourly;
-    }
-
-    // 3. Tính các block tiếp theo (Mỗi block đều có ân hạn riêng theo logic DB)
-    // Logic DB: v_next_blocks := FLOOR(v_remaining_min / v_hourly_unit);
-    //           v_remainder_min := MOD(v_remaining_min, v_hourly_unit);
-    //           IF v_remainder_min > grace THEN v_next_blocks += 1;
-    
-    let nextBlocks = Math.floor(extraAfterFirstBlock / hourlyUnit);
-    const remainderMin = extraAfterFirstBlock % hourlyUnit;
-    
-    if (remainderMin > 0) {
-      if (!isGraceOutEnabled || remainderMin > graceMin) {
-        nextBlocks += 1;
+        const unitPrice = prices.price_next_hour > 0 ? prices.price_next_hour : (prices.hourly / baseHourlyLimit);
+        currentAmount = prices.hourly + (nextBlocks * unitPrice);
       }
     }
 
-    const unitPrice = prices.price_next_hour > 0 ? prices.price_next_hour : (prices.hourly / baseHourlyLimit);
-    return prices.hourly + (nextBlocks * unitPrice);
+    // 4. Ceiling logic
+    if (settings?.hourly_ceiling_enabled) {
+      const ceilingPercent = settings.hourly_ceiling_percent || 100;
+      const ceilingAmount = prices.daily * (ceilingPercent / 100);
+      if (currentAmount > ceilingAmount) {
+        return { amount: ceilingAmount, isCeilingHit: true };
+      }
+    }
+
+    return { amount: currentAmount, isCeilingHit: false };
   } 
   
   if (rentalType === 'daily') {
     const elapsedHours = Math.max(0, differenceInHours(now, checkIn));
     const days = Math.max(1, Math.ceil((elapsedHours - (graceMin / 60)) / 24));
-    return days * prices.daily;
+    return { amount: days * prices.daily, isCeilingHit: false };
   }
   
   if (rentalType === 'overnight') {
-    // Overnight is usually a fixed price until checkout or next day
-    return prices.overnight;
+    return { amount: prices.overnight, isCeilingHit: false };
   }
 
-  return 0;
+  return { amount: 0, isCeilingHit: false };
 }

@@ -325,7 +325,7 @@ export default function MoneyPage() {
             </h1>
           </div>
           
-          <div className="flex items-center gap-3 hidden md:flex">
+          <div className="flex items-center gap-3">
             {canViewExtraFunds && (
               <button
                 onClick={() => setShowExtraFunds(!showExtraFunds)}
@@ -333,7 +333,8 @@ export default function MoneyPage() {
                   "px-4 py-3.5 rounded-2xl font-bold flex items-center gap-2 border active:scale-95 transition-all duration-300",
                   showExtraFunds 
                     ? "bg-slate-800 text-white border-slate-800 shadow-md" 
-                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50",
+                  "hidden md:flex"
                 )}
               >
                 {showExtraFunds ? <ToggleRight size={20} className="text-emerald-400" /> : <ToggleLeft size={20} />}
@@ -344,22 +345,22 @@ export default function MoneyPage() {
             {can(PERMISSION_KEYS.FINANCE_ADJUST_WALLET) && (
               <button 
                 onClick={() => setIsAdjustmentModalOpen(true)}
-                className="bg-white hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 border border-slate-200 active:scale-95 transition-all duration-300"
+                className="bg-white hover:bg-slate-50 text-slate-700 px-4 md:px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 border border-slate-200 active:scale-95 transition-all duration-300"
               >
                 <AlertTriangle size={18} className="text-amber-500" />
-                <span>Điều chỉnh</span>
+                <span className="hidden sm:inline">Điều chỉnh</span>
               </button>
             )}
             
             {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
               <button 
                 onClick={() => setIsModalOpen(true)}
-                className="group bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-slate-200 active:scale-95 transition-all duration-300"
+                className="group bg-slate-900 hover:bg-slate-800 text-white px-4 md:px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-slate-200 active:scale-95 transition-all duration-300"
               >
                 <div className="bg-white/20 p-1 rounded-lg group-hover:rotate-90 transition-transform duration-500">
                   <Plus size={18} />
                 </div>
-                <span>Tạo phiếu mới</span>
+                <span className="hidden sm:inline">Tạo phiếu mới</span>
               </button>
             )}
           </div>

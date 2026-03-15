@@ -37,10 +37,12 @@ interface RoomCardProps {
 const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusChange }) => {
   // Live Amount Calculation (FE Approximation)
   const [liveAmount, setLiveAmount] = useState<number | null>(null);
+  const [isLiveCeilingHit, setIsLiveCeilingHit] = useState(false);
 
   useEffect(() => {
     if (room.status !== 'occupied' || !room.current_booking) {
       setLiveAmount(null);
+      setIsLiveCeilingHit(false);
       return;
     }
 
@@ -52,6 +54,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
       const nowTime = now.getTime();
       let totalAmount = 0;
       let usingLadder = false;
+      let ceilingHit = false;
 
       // 1. ƯU TIÊN SỐ 1: Sử dụng Thang giá (Pricing Ladder) từ DB - GIẢM TẢI HỆ THỐNG
       if (booking.pricing_ladder && Array.isArray(booking.pricing_ladder) && booking.pricing_ladder.length > 0) {
@@ -63,13 +66,21 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         if (currentPoint) {
           totalAmount = currentPoint.amount;
           usingLadder = true;
-          // console.log(`[LADDER] Room ${room.name} using point: ${currentPoint.time} -> ${currentPoint.amount}`);
+          
+          // Check if ladder price already reached ceiling
+          if (booking.booking_type === 'hourly') {
+            const ceilingPercent = settings?.hourly_ceiling_percent || 100;
+            const ceilingAmount = (room.price_daily || 0) * (ceilingPercent / 100);
+            if (totalAmount >= ceilingAmount && ceilingAmount > 0) {
+              ceilingHit = true;
+            }
+          }
         }
       } 
 
       // 2. FALLBACK: Nếu thang giá lỗi hoặc không có điểm phù hợp, mới tính toán ở FE
       if (!usingLadder) {
-        totalAmount = calculateLiveRoomCharge({
+        const { amount, isCeilingHit } = calculateLiveRoomCharge({
           checkInAt: booking.check_in_at,
           rentalType: booking.booking_type,
           prices: {
@@ -82,6 +93,9 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
           },
           settings: settings
         });
+        totalAmount = amount;
+        ceilingHit = isCeilingHit;
+
         // Cộng thêm các thành phần động khác
         totalAmount = totalAmount 
           + (booking.service_total || 0) 
@@ -97,6 +111,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         + (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0);
         
       setLiveAmount(finalToPay);
+      setIsLiveCeilingHit(ceilingHit);
     };
 
     updateLiveAmount();
@@ -134,22 +149,31 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
       }
     } else if (room.status === 'occupied' && room.current_booking) {
       const { booking_type, check_in_at, duration_text } = room.current_booking;
-      const isAutoSwitched = booking_type === 'hourly' && duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm'));
+      
+      // Nhận diện nhảy giá trần (Live hoặc từ DB)
+      const isAutoSwitched = (booking_type === 'hourly' && duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm'))) || (booking_type === 'hourly' && isLiveCeilingHit);
       
       subText = room.current_booking.customer_name || 'Khách vãng lai';
       
       const checkIn = check_in_at ? new Date(check_in_at) : null;
       const isValidDate = checkIn && !isNaN(checkIn.getTime());
 
-      // Ưu tiên hiển thị duration_text từ DB nếu có (Dành cho trường hợp nhảy giá trần hoặc phạt muộn)
-      if (duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm'))) {
+      // Ưu tiên hiển thị duration_text từ DB nếu có, hoặc nếu đã nhảy giá trần ở FE
+      if (isLiveCeilingHit || (duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm')))) {
           bgColor = 'bg-[#1e40af]';
           textColor = 'text-white';
-          Icon = duration_text.includes('ngày') ? Sun : Moon;
+          
+          // Xác định text hiển thị thời gian
+          let displayDuration = duration_text;
+          if (isLiveCeilingHit && (!duration_text || (!duration_text.includes('ngày') && !duration_text.includes('đêm')))) {
+             displayDuration = "1 ngày"; // Fallback FE
+          }
+
+          Icon = (displayDuration && displayDuration.includes('đêm')) ? Moon : Sun;
           statusText = (
             <div className="flex items-center gap-1.5">
               <Calendar size={16} />
-              <span>{duration_text}</span>
+              <span>{displayDuration}</span>
             </div>
           );
           
@@ -161,7 +185,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
               </span>
             );
           } else {
-            badgeText = duration_text.includes('ngày') ? 'NGÀY' : 'ĐÊM';
+            badgeText = (displayDuration && displayDuration.includes('đêm')) ? 'ĐÊM' : 'NGÀY';
           }
       } else {
           switch (booking_type) {
@@ -203,10 +227,10 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
       }
     }
 
-    return { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName };
-  }, [room.status, room.current_booking, room.notes, room.last_cleaned_at, room.is_dirty_overdue]);
+    return { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName, badgeText };
+  }, [room.status, room.current_booking, room.notes, room.last_cleaned_at, room.is_dirty_overdue, isLiveCeilingHit]);
 
-  const { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName } = display;
+  const { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName, badgeText } = display;
 
   // Formatting currency
   const formattedAmount = useMemo(() => {
@@ -254,11 +278,25 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
           </span>
 
           {room.status === 'occupied' && room.current_booking && (
-            <div className="px-2 py-1 rounded-lg bg-black/10 backdrop-blur-md ml-auto">
-              <span className="text-[9px] font-black uppercase tracking-wider block">
-                {room.current_booking.booking_type === 'hourly' ? 'GIỜ' : 
-                 room.current_booking.booking_type === 'overnight' ? 'ĐÊM' : 'NGÀY'}
-              </span>
+            <div className="ml-auto">
+              {badgeText ? (
+                typeof badgeText === 'string' ? (
+                  <div className="px-2 py-1 rounded-lg bg-black/10 backdrop-blur-md">
+                    <span className="text-[9px] font-black uppercase tracking-wider block">
+                      {badgeText}
+                    </span>
+                  </div>
+                ) : (
+                  badgeText
+                )
+              ) : (
+                <div className="px-2 py-1 rounded-lg bg-black/10 backdrop-blur-md">
+                  <span className="text-[9px] font-black uppercase tracking-wider block">
+                    {room.current_booking.booking_type === 'hourly' ? 'GIỜ' : 
+                     room.current_booking.booking_type === 'overnight' ? 'ĐÊM' : 'NGÀY'}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>

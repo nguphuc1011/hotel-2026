@@ -24,18 +24,16 @@ export default function WalletAdjustmentModal({ isOpen, onClose, onSuccess, wall
   const [reason, setReason] = useState('');
   const { verify, SecurityModals } = useSecurity();
   const { user } = usePermission();
-
   const currentWallet = wallets.find(w => w.id === selectedWalletId);
-  const currentBalance = currentWallet ? currentWallet.balance : 0;
-  
+  const currentBalance = currentWallet ? Number(currentWallet.balance) : 0;
+  const diff = actualBalance - currentBalance;
+
   // Update actual balance init when wallet changes or opens
   useEffect(() => {
     if (isOpen && currentWallet) {
-        setActualBalance(currentWallet.balance);
+        setActualBalance(Number(currentWallet.balance));
     }
   }, [isOpen, selectedWalletId, currentWallet]);
-
-  const diff = actualBalance - currentBalance;
 
   if (!isOpen) return null;
 
