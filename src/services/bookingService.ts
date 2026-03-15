@@ -391,7 +391,7 @@ export const bookingService = {
 
   async updateBookingDetails(params: {
     bookingId: string;
-    customerName: string;
+    customerName?: string;
     checkInAt: string;
     customPrice?: number;
     priceApplyMode: 'all' | 'future';
@@ -403,7 +403,7 @@ export const bookingService = {
     try {
       const { data, error } = await supabase.rpc('update_booking_details', {
         p_booking_id: params.bookingId,
-        p_customer_name: params.customerName,
+        p_customer_name: params.customerName || null,
         p_check_in_at: params.checkInAt,
         p_custom_price: params.customPrice ?? null,
         p_price_apply_mode: params.priceApplyMode,
