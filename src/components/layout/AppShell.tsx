@@ -262,7 +262,8 @@ export default function AppShell({
       <WalletNotificationModal />
       {/* PC Sidebar - Hidden on mobile, Stacked (Icon top, Text bottom) on Tablet Landscape (lg:flex), Full on Desktop (xl:flex) */}
       <aside className={cn(
-        "hidden lg:flex flex-col h-full bg-white border-r border-slate-100 z-50 transition-all duration-300 ease-in-out",
+        "hidden lg:flex flex-col h-full bg-white z-50 transition-all duration-300 ease-in-out",
+        "border-r border-slate-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)]", // Soft right shadow for separation
         "lg:w-24 xl:w-72" // lg (Landscape Tablet) = 96px (Stacked), xl (Desktop) = 288px (Full)
       )}>
         <div className="p-4 xl:p-8 flex justify-center xl:justify-start">
@@ -373,7 +374,7 @@ export default function AppShell({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-[#F8F9FB] pt-0 pb-[max(6rem,env(safe-area-inset-bottom))] lg:pb-0">
+      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-[#F4F7FA] pt-0 pb-[max(6rem,env(safe-area-inset-bottom))] lg:pb-0">
         <div className="w-full">
           {children}
         </div>
