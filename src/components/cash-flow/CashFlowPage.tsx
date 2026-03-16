@@ -187,9 +187,7 @@ export default function CashFlowPage() {
           }
         }}
         customerDebt={customerDebt}
-        externalDebt={0}
         onViewCustomerDebt={() => setIsCustomerDebtModalOpen(true)}
-        onViewExternalDebt={() => {}}
       />
 
       {/* Transaction List */}
