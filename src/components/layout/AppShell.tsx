@@ -262,105 +262,144 @@ export default function AppShell({
       <WalletNotificationModal />
       {/* PC Sidebar - Hidden on mobile/iPad Pro Portrait, Stacked on iPad Pro Landscape (xl:flex), Full on Desktop (2xl:flex) */}
       <aside className={cn(
-        "hidden xl:flex flex-col h-full bg-white z-50 transition-all duration-300 ease-in-out",
-        "border-r border-slate-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)]",
-        "xl:w-24 2xl:w-72" // iPad Pro Landscape (1366px) uses w-24 (Stacked), only 2xl (1536px+) uses Full
+        "hidden xl:flex flex-col h-full bg-white/80 backdrop-blur-xl z-50 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+        "border-r border-slate-100/60 shadow-[4px_0_40px_rgba(0,0,0,0.02)]",
+        "xl:w-24 2xl:w-80" // Increased 2xl width slightly for better spacing
       )}>
-        <div className="p-4 2xl:p-8 flex justify-center 2xl:justify-start">
+        <div className="p-6 2xl:p-10 flex justify-center 2xl:justify-start">
           <div className="flex flex-col">
-            <h1 className="text-xl 2xl:text-2xl font-black uppercase tracking-tighter flex items-center gap-2 text-blue-600 truncate">
-              <Building2 className="2xl:hidden" size={28} />
-              <span className="hidden 2xl:inline">{hotelName || 'Hệ thống'}</span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-[18px] bg-slate-900 text-white flex items-center justify-center shadow-2xl shadow-slate-200 group transition-transform hover:scale-105 duration-500">
+                <Building2 size={24} className="group-hover:animate-bounce-subtle" />
+              </div>
+              <div className="hidden 2xl:block overflow-hidden">
+                <h1 className="text-xl font-black uppercase tracking-tighter text-slate-900 truncate leading-none">
+                  {hotelName || 'Hệ thống'}
+                </h1>
+                <p className="text-[9px] font-black text-blue-500 uppercase tracking-[0.2em] mt-1.5 opacity-60">Smart Management</p>
+              </div>
+            </div>
           </div>
         </div>
         
-        <nav className="flex-1 px-2 2xl:px-4 space-y-4 2xl:space-y-2">
-          {finalSidebarItems.map((item) => (
-            <Link 
-              key={item.href} 
-              href={item.href}
-              className={cn(
-                "flex transition-all duration-200 font-bold group relative",
-                pathname === item.href 
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
-                  : item.isSpecial 
-                    ? "text-emerald-500 hover:bg-emerald-50"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-blue-600",
-                // xl (iPad Pro Landscape): Stacked layout
-                // 2xl (Large Desktop): Row layout
-                "flex-col 2xl:flex-row items-center justify-center 2xl:justify-start gap-1 2xl:gap-3 py-2 2xl:py-3 rounded-2xl px-1 2xl:px-4"
-              )}
-            >
-              <div className="shrink-0 transition-transform group-hover:scale-110 duration-200">
-                {item.icon}
-              </div>
-              
-              <span className={cn(
-                "truncate text-[10px] 2xl:text-sm text-center 2xl:text-left leading-tight",
-                "xl:block 2xl:inline"
-              )}>
-                {item.label}
-              </span>
-            </Link>
-          ))}
+        <nav className="flex-1 px-3 2xl:px-6 space-y-3 2xl:space-y-1.5">
+          {finalSidebarItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link 
+                key={item.href} 
+                href={item.href}
+                className={cn(
+                  "flex transition-all duration-500 font-black group relative ease-[cubic-bezier(0.16,1,0.3,1)]",
+                  isActive 
+                    ? "text-slate-900" 
+                    : item.isSpecial 
+                      ? "text-emerald-500 hover:bg-emerald-50/50"
+                      : "text-slate-400 hover:bg-slate-50/80 hover:text-slate-900",
+                  // xl (iPad Pro Landscape): Stacked layout
+                  // 2xl (Large Desktop): Row layout
+                  "flex-col 2xl:flex-row items-center justify-center 2xl:justify-start gap-1 2xl:gap-4 py-3 2xl:py-4 rounded-2xl px-1 2xl:px-5",
+                  isActive && "2xl:bg-white 2xl:shadow-[0_10px_30px_rgba(0,0,0,0.04)] 2xl:border 2xl:border-slate-100"
+                )}
+              >
+                {/* Active Indicator Pill */}
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-blue-600 rounded-r-full hidden 2xl:block animate-in fade-in slide-in-from-left-2 duration-500" />
+                )}
+
+                <div className={cn(
+                  "shrink-0 transition-all duration-500 group-hover:scale-110",
+                  isActive ? "text-blue-600 scale-110" : "opacity-70 group-hover:opacity-100"
+                )}>
+                  {React.cloneElement(item.icon as any, { 
+                    size: 24,
+                    strokeWidth: isActive ? 3 : 2.5
+                  })}
+                </div>
+                
+                <span className={cn(
+                  "truncate text-[9px] 2xl:text-[13px] text-center 2xl:text-left leading-tight uppercase tracking-widest 2xl:tracking-normal 2xl:capitalize font-black 2xl:font-bold",
+                  "xl:block 2xl:inline",
+                  isActive ? "opacity-100" : "opacity-60 group-hover:opacity-100"
+                )}>
+                  {item.label}
+                </span>
+
+                {/* Hover Background Dot for xl */}
+                <div className={cn(
+                  "absolute inset-0 bg-slate-100/50 rounded-2xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity 2xl:hidden",
+                  isActive && "opacity-100 bg-blue-50"
+                )} />
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="p-4 2xl:p-6 border-t border-slate-50 relative" ref={userMenuRef}>
+        <div className="p-4 2xl:p-8 relative" ref={userMenuRef}>
           {showInstallBtn && (
             <button 
               onClick={handleInstallApp}
-              className="flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 p-2 2xl:p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group animate-bounce-subtle justify-center 2xl:justify-start"
+              className="flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-4 p-3 2xl:p-4 w-full rounded-[24px] bg-emerald-50/50 text-emerald-600 hover:bg-emerald-100 transition-all mb-6 group animate-bounce-subtle justify-center 2xl:justify-start border border-emerald-100/50"
             >
-              <div className="w-8 h-8 2xl:w-10 2xl:h-10 shrink-0 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
-                <Download size={18} className="2xl:size-20" />
+              <div className="w-10 h-10 2xl:w-12 2xl:h-12 shrink-0 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-xl shadow-emerald-200 group-hover:rotate-12 transition-transform">
+                <Download size={20} strokeWidth={3} />
               </div>
               <div className="2xl:block flex-1 text-center 2xl:text-left">
-                <p className="text-[9px] 2xl:text-sm font-black uppercase tracking-tight">Cài đặt</p>
-                <p className="hidden 2xl:block text-[10px] font-bold opacity-70 uppercase tracking-wider">Trải nghiệm tốt</p>
+                <p className="text-[9px] 2xl:text-xs font-black uppercase tracking-widest leading-none">Cài đặt</p>
+                <p className="hidden 2xl:block text-[10px] font-bold opacity-60 uppercase tracking-widest mt-1">App Tiện Ích</p>
               </div>
             </button>
           )}
 
           {isUserMenuOpen && (
-            <div className="absolute bottom-full left-1 right-1 2xl:left-4 2xl:right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
+            <div className="absolute bottom-full left-3 right-3 2xl:left-6 2xl:right-6 mb-4 bg-white/90 backdrop-blur-2xl rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.1)] border border-white p-3 animate-in slide-in-from-bottom-4 fade-in duration-500 z-50 overflow-hidden">
+              <div className="px-4 py-3 mb-2 border-b border-slate-50 2xl:block hidden">
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Tài khoản</p>
+                <p className="text-sm font-black text-slate-900 truncate mt-1">{user?.full_name}</p>
+              </div>
               <button 
                 onClick={() => {
                   setIsChangePinModalOpen(true);
                   setIsUserMenuOpen(false);
                 }}
-                className="w-full flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 px-2 2xl:px-4 py-2 2xl:py-3 rounded-xl hover:bg-gray-50 text-main font-bold text-[10px] 2xl:text-sm transition-colors text-center 2xl:text-left"
+                className="w-full flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 px-3 2xl:px-4 py-3 2xl:py-3.5 rounded-2xl hover:bg-slate-50 text-slate-600 font-black text-[10px] 2xl:text-xs transition-all text-center 2xl:text-left group"
               >
-                <Key size={14} className="2xl:size-16 text-muted" />
-                <span>Mã PIN</span>
+                <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
+                  <Key size={14} />
+                </div>
+                <span>Đổi mã PIN</span>
               </button>
-              <div className="h-px bg-gray-100 my-1" />
               <button 
                 onClick={logout}
-                className="w-full flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 px-2 2xl:px-4 py-2 2xl:py-3 rounded-xl hover:bg-rose-50 text-rose-500 font-bold text-[10px] 2xl:text-sm transition-colors text-center 2xl:text-left"
+                className="w-full flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 px-3 2xl:px-4 py-3 2xl:py-3.5 rounded-2xl hover:bg-rose-50 text-rose-500 font-black text-[10px] 2xl:text-xs transition-all text-center 2xl:text-left group"
               >
-                <LogOut size={14} className="2xl:size-16" />
-                <span>Thoát</span>
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-400 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                  <LogOut size={14} />
+                </div>
+                <span>Đăng xuất</span>
               </button>
             </div>
           )}
           
           <button 
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 p-2 2xl:p-3 w-full rounded-2xl hover:bg-slate-50 transition-all group justify-center 2xl:justify-start"
+            className={cn(
+              "flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-4 p-3 2xl:p-4 w-full rounded-[28px] transition-all group justify-center 2xl:justify-start relative",
+              isUserMenuOpen ? "bg-slate-100/50" : "hover:bg-slate-50/50"
+            )}
           >
-            <div className="w-8 h-8 2xl:w-10 2xl:h-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-sm 2xl:text-lg shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
+            <div className="w-12 h-12 2xl:w-14 2xl:h-14 shrink-0 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-black text-lg 2xl:text-xl shadow-xl shadow-blue-100 group-hover:scale-105 transition-all duration-500">
               {user?.full_name?.charAt(0) || 'U'}
             </div>
             <div className="2xl:block flex-1 text-left truncate hidden">
-              <p className="text-sm font-black text-slate-700 truncate">{user?.full_name}</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user?.role}</p>
+              <p className="text-sm font-black text-slate-900 truncate leading-none">{user?.full_name}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5">{user?.role}</p>
             </div>
             {/* Show name below avatar on xl if space permits or just avatar */}
-            <span className="xl:block 2xl:hidden text-[10px] font-black text-slate-500 truncate max-w-full">
+            <span className="xl:block 2xl:hidden text-[9px] font-black text-slate-400 truncate max-w-full mt-1 uppercase tracking-tighter">
               {user?.full_name?.split(' ').pop()}
             </span>
-            <ChevronUp size={16} className={cn("hidden 2xl:block text-slate-400 transition-transform duration-300", isUserMenuOpen && "rotate-180")} />
+            <ChevronUp size={16} className={cn("hidden 2xl:block text-slate-300 transition-transform duration-500", isUserMenuOpen && "rotate-180")} />
           </button>
         </div>
       </aside>
@@ -447,87 +486,87 @@ export default function AppShell({
 
       {/* Mobile Bottom Nav - Show on mobile and iPad Pro Portrait (xl:hidden) */}
       {mounted && (
-        <nav className="xl:hidden fixed bottom-0 left-0 right-0 z-50 h-[75px] flex items-end">
-          <div className="relative w-full h-[65px] flex items-center justify-between px-4 bg-white/90 backdrop-blur-xl rounded-t-[24px] shadow-[0_-10px_30px_rgba(0,0,0,0.1)] border-t border-white/40">
+        <nav className="xl:hidden fixed bottom-0 left-0 right-0 z-50 h-[85px] flex items-end px-4 pb-4">
+          <div className="relative w-full h-[68px] flex items-center justify-between px-2 bg-white/80 backdrop-blur-2xl rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-white/40">
             
             <div className="flex-1 flex justify-around items-center h-full">
-              {leftItems.map((item) => (
-                <Link 
-                  key={item.href}
-                  href={item.href}
-                  className="flex flex-col items-center justify-center active:scale-90 transition-all group"
-                >
-                  <div className={cn(
-                    "w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-300",
-                    pathname === item.href ? "text-accent" : "text-slate-400 group-hover:text-slate-600"
-                  )}>
-                    {React.cloneElement(item.icon as any, { 
-                      size: 20,
-                      strokeWidth: 2
-                    })}
-                  </div>
-                  <span className={cn(
-                    "text-[10px] font-bold transition-colors duration-300 tracking-tight",
-                    pathname === item.href ? "text-accent" : "text-slate-400"
-                  )}>
-                    {item.label}
-                  </span>
-                </Link>
-              ))}
+              {leftItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link 
+                    key={item.href}
+                    href={item.href}
+                    className="flex flex-col items-center justify-center active:scale-90 transition-all group relative px-2"
+                  >
+                    <div className={cn(
+                      "w-10 h-10 flex items-center justify-center rounded-2xl transition-all duration-500",
+                      isActive ? "text-blue-600 bg-blue-50/50" : "text-slate-400 group-hover:text-slate-600"
+                    )}>
+                      {React.cloneElement(item.icon as any, { 
+                        size: 22,
+                        strokeWidth: isActive ? 3 : 2.5
+                      })}
+                    </div>
+                    {isActive && (
+                      <div className="absolute -bottom-1 w-1 h-1 bg-blue-600 rounded-full animate-in zoom-in duration-500" />
+                    )}
+                  </Link>
+                );
+              })}
             </div>
 
             {homeItem && (
                <Link 
                  href={homeItem.href}
-                 className="flex flex-col items-center justify-center active:scale-95 transition-all group px-4 relative -top-2"
+                 className="flex flex-col items-center justify-center active:scale-95 transition-all group px-2 relative -top-6"
                >
                  <div className={cn(
-                   "w-[54px] h-[54px] flex items-center justify-center rounded-2xl transition-all duration-300 shadow-xl relative overflow-hidden",
+                   "w-[64px] h-[64px] flex items-center justify-center rounded-[24px] transition-all duration-500 shadow-2xl relative overflow-hidden",
                    pathname === homeItem.href 
-                     ? "bg-accent text-white shadow-accent/30" 
-                     : "bg-white/40 backdrop-blur-md text-slate-500 border border-white/60 shadow-sm"
+                     ? "bg-slate-900 text-white shadow-slate-200" 
+                     : "bg-white text-slate-500 border border-slate-100 shadow-lg shadow-slate-100"
                  )}>
-                   {/* Transparent border effect */}
-                   <div className="absolute inset-0 rounded-2xl border-[1.5px] border-white/30 pointer-events-none" />
+                   {/* Shine effect */}
+                   <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
                    
                    {React.cloneElement(homeItem.icon as any, { 
-                      size: 26,
-                      strokeWidth: 2.5
+                      size: 28,
+                      strokeWidth: 3
                    })}
                  </div>
-                 <span className={cn(
-                   "text-[10px] font-bold transition-colors duration-300 tracking-tight mt-1",
-                   pathname === homeItem.href ? "text-accent" : "text-slate-400"
+                 <div className={cn(
+                    "mt-2 px-3 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-500",
+                    pathname === homeItem.href ? "bg-slate-900 text-white" : "bg-white text-slate-400 border border-slate-100"
                  )}>
-                   {homeItem.label}
-                 </span>
+                    {homeItem.label}
+                 </div>
                </Link>
              )}
 
             <div className="flex-1 flex justify-around items-center h-full">
-              {rightItems.map((item) => (
-                <Link 
-                  key={item.href}
-                  href={item.href}
-                  className="flex flex-col items-center justify-center active:scale-90 transition-all group"
-                >
-                  <div className={cn(
-                    "w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-300",
-                    pathname === item.href ? "text-accent" : "text-slate-400 group-hover:text-slate-600"
-                  )}>
-                    {React.cloneElement(item.icon as any, { 
-                      size: 20,
-                      strokeWidth: 2
-                    })}
-                  </div>
-                  <span className={cn(
-                    "text-[10px] font-bold transition-colors duration-300 tracking-tight",
-                    pathname === item.href ? "text-accent" : "text-slate-400"
-                  )}>
-                    {item.label}
-                  </span>
-                </Link>
-              ))}
+              {rightItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link 
+                    key={item.href}
+                    href={item.href}
+                    className="flex flex-col items-center justify-center active:scale-90 transition-all group relative px-2"
+                  >
+                    <div className={cn(
+                      "w-10 h-10 flex items-center justify-center rounded-2xl transition-all duration-500",
+                      isActive ? "text-blue-600 bg-blue-50/50" : "text-slate-400 group-hover:text-slate-600"
+                    )}>
+                      {React.cloneElement(item.icon as any, { 
+                        size: 22,
+                        strokeWidth: isActive ? 3 : 2.5
+                      })}
+                    </div>
+                    {isActive && (
+                      <div className="absolute -bottom-1 w-1 h-1 bg-blue-600 rounded-full animate-in zoom-in duration-500" />
+                    )}
+                  </Link>
+                );
+              })}
             </div>
 
           </div>
