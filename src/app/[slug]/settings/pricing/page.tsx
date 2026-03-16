@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronLeft, Sun, Moon, Clock, ShieldCheck, Percent, Settings2, Plus } from 'lucide-react';
+import { 
+  ChevronLeft, Sun, Moon, Clock, ShieldCheck, 
+  Settings2, Plus, ArrowLeft, Save, AlertCircle, Info,
+  CheckCircle2, Calculator, Wallet, Trash2
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/controls';
 import { settingsService, Settings, RoomCategory } from '@/services/settingsService';
@@ -26,68 +30,25 @@ export default function PricingPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      console.log('Fetching data...');
       const [sData, cData] = await Promise.all([
         settingsService.getSettings(),
         settingsService.getRoomCategories()
       ]);
       
-      console.log('Settings data:', sData);
-      console.log('Categories data:', cData);
-
-      // Default settings if null
-      let finalSettings = sData;
-      if (!finalSettings) {
-        console.warn('Settings is null, using default fallback');
-        finalSettings = {
-          key: 'config',
-          check_in_time: '14:00',
-          check_out_time: '12:00',
-          overnight_start_time: '22:00',
-          overnight_end_time: '08:00',
-          overnight_checkout_time: '10:00',
-          night_audit_time: '04:00',
-          full_day_early_before: '04:00',
-          full_day_late_after: '18:00',
-          auto_surcharge_enabled: true,
-          auto_overnight_switch: false,
-          auto_full_day_early: true,
-          auto_full_day_late: true,
-          extra_person_enabled: false,
-          extra_person_method: 'fixed',
-          grace_in_enabled: true,
-          grace_out_enabled: true,
-          grace_minutes: 15,
-          vat_enabled: false,
-          service_fee_enabled: false,
-          vat_percent: 10,
-          service_fee_percent: 5,
-          hourly_unit: 60,
-          base_hourly_limit: 1,
-          hourly_ceiling_enabled: true,
-          hourly_ceiling_percent: 100,
-          surcharge_rules: [],
-          auto_deduct_inventory: true,
-          allow_manual_price_override: true,
-          enable_print_bill: true
-        } as Settings;
+      if (sData) {
+        const formatTime = (t: string) => (t && typeof t === 'string') ? t.substring(0, 5) : (t || '00:00');
+        sData.check_in_time = formatTime(sData.check_in_time);
+        sData.check_out_time = formatTime(sData.check_out_time);
+        sData.overnight_start_time = formatTime(sData.overnight_start_time);
+        sData.overnight_end_time = formatTime(sData.overnight_end_time);
+        sData.overnight_checkout_time = formatTime(sData.overnight_checkout_time);
+        
+        setSettings(sData);
       }
-      
-      // Format time strings (HH:mm:ss -> HH:mm)
-      const formatTime = (t: string) => (t && typeof t === 'string') ? t.substring(0, 5) : (t || '');
-      finalSettings.check_in_time = formatTime(finalSettings.check_in_time);
-      finalSettings.check_out_time = formatTime(finalSettings.check_out_time);
-      finalSettings.overnight_start_time = formatTime(finalSettings.overnight_start_time);
-      finalSettings.overnight_end_time = formatTime(finalSettings.overnight_end_time);
-      finalSettings.overnight_checkout_time = formatTime(finalSettings.overnight_checkout_time);
-      finalSettings.night_audit_time = formatTime(finalSettings.night_audit_time);
-      finalSettings.full_day_early_before = formatTime(finalSettings.full_day_early_before);
-      finalSettings.full_day_late_after = formatTime(finalSettings.full_day_late_after);
-      
-      setSettings(finalSettings);
       setCategories(cData || []);
     } catch (error) {
       console.error('Error in fetchData:', error);
+      toast.error('Không thể tải dữ liệu cấu hình');
     } finally {
       setLoading(false);
     }
@@ -97,28 +58,21 @@ export default function PricingPage() {
     if (!settings) return;
     setSaving(true);
     try {
-      // Prepare data for saving
-      const settingsToSave = JSON.parse(JSON.stringify(settings));
-      
-      // Ensure time strings are in HH:mm:ss format for Postgres
+      const settingsToSave = { ...settings };
       const ensureSeconds = (t: string) => (t && t.length === 5) ? `${t}:00` : t;
       settingsToSave.check_in_time = ensureSeconds(settingsToSave.check_in_time);
       settingsToSave.check_out_time = ensureSeconds(settingsToSave.check_out_time);
       settingsToSave.overnight_start_time = ensureSeconds(settingsToSave.overnight_start_time);
       settingsToSave.overnight_end_time = ensureSeconds(settingsToSave.overnight_end_time);
       settingsToSave.overnight_checkout_time = ensureSeconds(settingsToSave.overnight_checkout_time);
-      settingsToSave.night_audit_time = ensureSeconds(settingsToSave.night_audit_time);
-      settingsToSave.full_day_early_before = ensureSeconds(settingsToSave.night_audit_time); // Sync both for compatibility
-      settingsToSave.full_day_late_after = ensureSeconds(settingsToSave.full_day_late_after);
 
       await Promise.all([
         settingsService.updateSettings(settingsToSave),
         ...categories.map(c => settingsService.updateRoomCategory(c.id, c))
       ]);
       
-      // Refresh data to show formatted times
       await fetchData();
-      toast.success('Đã lưu cấu hình thành công!');
+      toast.success('Đã lưu cấu hình giá thành công!');
     } catch (error) {
       console.error('Failed to save settings:', error);
       toast.error('Có lỗi xảy ra khi lưu cấu hình.');
@@ -127,177 +81,176 @@ export default function PricingPage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]"><div className="animate-spin w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full"></div></div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+    </div>
+  );
+
+  if (!settings) return null;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-40 font-sans">
-      <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 md:mb-12">
-          <div className="space-y-2">
+    <div className="min-h-screen bg-[#F5F5F7] text-slate-900 font-sans selection:bg-slate-900 selection:text-white pb-40">
+      
+      {/* 1. TOP NAV */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-10 h-20 md:h-24 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <button 
               onClick={() => router.back()}
-              className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mb-4 font-bold"
+              className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-90"
             >
-              <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-slate-300 group-hover:bg-slate-50 transition-all">
-                <ChevronLeft size={16} />
-              </div>
-              <span className="text-xs font-black uppercase tracking-widest">Quay lại</span>
+              <ArrowLeft size={20} />
             </button>
-            <div className="flex items-center gap-4 mb-2">
-               <div className="w-14 h-14 rounded-2xl bg-slate-200 text-slate-700 flex items-center justify-center shadow-sm">
-                 <Settings2 size={28} />
-               </div>
-               <div>
-                  <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-                    Cấu hình giá
-                  </h1>
-                  <p className="text-slate-500 font-medium text-base md:text-lg mt-1">
-                    Thiết lập bảng giá, giờ giấc và các chính sách phụ thu
-                  </p>
-               </div>
+            <div className="flex flex-col">
+              <h1 className="text-xl md:text-2xl font-black tracking-tight text-slate-900 leading-none">Cấu hình giá</h1>
+              <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Hệ thống & Vận hành</span>
             </div>
           </div>
           
           <button 
             onClick={handleSave}
             disabled={saving}
-            className="hidden md:flex bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-2xl font-bold items-center gap-3 shadow-lg shadow-slate-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 md:h-12 px-5 md:px-8 bg-slate-900 text-white rounded-full text-[13px] font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg shadow-slate-200 disabled:opacity-50"
           >
-            {saving ? <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" /> : <Settings2 size={20} />}
-            <span>Lưu thay đổi</span>
+            {saving ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> : <Save size={18} />}
+            <span>{saving ? 'Đang lưu...' : 'Lưu cấu hình'}</span>
           </button>
         </div>
+      </div>
 
-        {/* Navigation Tabs */}
-        <div className="bg-white p-1.5 rounded-[24px] shadow-sm border border-slate-100 inline-flex gap-1 w-full md:w-auto overflow-x-auto">
-          {[
-            { id: 'times', label: 'Giờ giấc', icon: Clock },
-            { id: 'policies', label: 'Phụ thu', icon: ShieldCheck },
-            { id: 'vat', label: 'Thuế & Phí', icon: Percent },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSubTab(tab.id)}
-              className={cn(
-                "px-6 py-3 rounded-[20px] font-bold text-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap flex-1 md:flex-none",
-                subTab === tab.id 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-              )}
-            >
-              <tab.icon size={18} strokeWidth={2.5} />
-              {tab.label}
-            </button>
-          ))}
+      <main className="max-w-[1400px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-10 md:space-y-16">
+        
+        {/* 2. TAB NAVIGATION */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div className="space-y-1.5 px-2">
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight">Thiết lập chính sách</h2>
+            <p className="text-slate-400 font-bold text-sm md:text-base">Quản lý khung giờ và các quy tắc tự động áp giá</p>
+          </div>
+
+          <div className="flex items-center gap-1.5 p-1.5 bg-white/80 backdrop-blur-md rounded-full border border-slate-200/60 shadow-sm self-start md:self-auto overflow-x-auto no-scrollbar">
+            {[
+              { id: 'times', label: 'Khung giờ', icon: Clock },
+              { id: 'policies', label: 'Ân hạn', icon: ShieldCheck },
+            ].map((tab) => (
+              <button 
+                key={tab.id}
+                onClick={() => setSubTab(tab.id)}
+                className={cn(
+                  "px-6 md:px-10 py-2.5 rounded-full text-[12px] md:text-[13px] font-bold transition-all uppercase tracking-widest flex items-center gap-2 whitespace-nowrap",
+                  subTab === tab.id ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                )}
+              >
+                <tab.icon size={16} /> {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Content Area */}
-        <div className="space-y-6">
+        {/* 3. CONTENT SECTIONS */}
+        <div className="grid grid-cols-1 gap-10 md:gap-16">
           {settings && (
             <>
               {subTab === 'times' && (
-                <div className="grid gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  {/* Giờ giấc tiêu chuẩn */}
-                  <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-[100px] -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  
+                  {/* Standard Times Card */}
+                  <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12">
+                      <Sun size={200} strokeWidth={0.5} />
+                    </div>
                     
-                    <div className="flex items-center gap-4 mb-8 relative">
-                      <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-[20px] flex items-center justify-center shadow-sm">
-                        <Sun size={28} strokeWidth={2} />
+                    <div className="relative z-10 flex items-center gap-5 mb-10 md:mb-12">
+                      <div className="w-16 h-16 rounded-3xl bg-orange-50 text-orange-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
+                        <Sun size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-slate-900">Giờ giấc tiêu chuẩn</h3>
-                        <p className="text-slate-500 font-medium text-sm">Thiết lập khung giờ nhận và trả phòng mặc định</p>
+                        <h3 className="text-2xl font-black tracking-tight">Giờ Nhận & Trả</h3>
+                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Khung giờ tiêu chuẩn cho khách Ngày</p>
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-8">
+                    <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
                       <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Giờ nhận phòng</label>
-                        <div className="relative group/input">
-                          <input 
-                            type="time" 
-                            value={settings.check_in_time} 
-                            onChange={(e) => setSettings({...settings, check_in_time: e.target.value})}
-                            className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-200 font-black text-xl text-slate-900 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer"
-                          />
-                          <Clock className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/input:text-blue-500 transition-colors" size={20} />
-                        </div>
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] ml-2">Giờ nhận phòng</label>
+                        <input 
+                          type="time" 
+                          value={settings.check_in_time} 
+                          onChange={(e) => setSettings({...settings, check_in_time: e.target.value})}
+                          className="w-full h-16 md:h-20 px-2 rounded-[24px] bg-slate-50 border border-transparent font-black text-2xl md:text-3xl text-slate-900 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/5 transition-all cursor-pointer text-center [&::-webkit-calendar-picker-indicator]:hidden"
+                        />
                       </div>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] ml-2">Giờ trả phòng</label>
+                        <input 
+                          type="time" 
+                          value={settings.check_out_time} 
+                          onChange={(e) => setSettings({...settings, check_out_time: e.target.value})}
+                          className="w-full h-16 md:h-20 px-2 rounded-[24px] bg-slate-50 border border-transparent font-black text-2xl md:text-3xl text-slate-900 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/5 transition-all cursor-pointer text-center [&::-webkit-calendar-picker-indicator]:hidden"
+                        />
+                      </div>
+                    </div>
 
-                      <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Giờ trả phòng</label>
-                        <div className="relative group/input">
-                          <input 
-                            type="time" 
-                            value={settings.check_out_time} 
-                            onChange={(e) => setSettings({...settings, check_out_time: e.target.value})}
-                            className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-200 font-black text-xl text-slate-900 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer"
-                          />
-                          <Clock className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/input:text-blue-500 transition-colors" size={20} />
-                        </div>
-                      </div>
+                    <div className="relative z-10 p-8 rounded-[32px] bg-orange-50/50 border border-orange-100/30 flex items-center gap-5">
+                       <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-orange-500 shrink-0">
+                         <Info size={20} />
+                       </div>
+                       <p className="text-xs font-bold text-orange-900 leading-relaxed">
+                         Khung giờ này dùng để tính toán phụ thu nhận sớm/trả trễ cho các booking theo Ngày.
+                       </p>
                     </div>
                   </div>
 
-                  {/* Cấu hình Qua đêm */}
-                  <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-[100px] -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500" />
+                  {/* Overnight Times Card */}
+                  <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12">
+                      <Moon size={200} strokeWidth={0.5} />
+                    </div>
                     
-                    <div className="flex items-center gap-4 mb-8 relative">
-                      <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-[20px] flex items-center justify-center shadow-sm">
-                        <Moon size={28} strokeWidth={2} />
+                    <div className="relative z-10 flex items-center gap-5 mb-10 md:mb-12">
+                      <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
+                        <Moon size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-slate-900">Cấu hình Qua đêm</h3>
-                        <p className="text-slate-500 font-medium text-sm">Khung giờ áp dụng giá qua đêm</p>
+                        <h3 className="text-2xl font-black tracking-tight">Cấu hình Qua đêm</h3>
+                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Khung giờ áp dụng giá Đêm</p>
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8 mb-8">
+                    <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
                       <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Bắt đầu nhận đêm</label>
-                        <div className="relative group/input">
-                          <input 
-                            type="time" 
-                            value={settings.overnight_start_time} 
-                            onChange={(e) => setSettings({...settings, overnight_start_time: e.target.value})}
-                            className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-200 font-black text-xl text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer"
-                          />
-                        </div>
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] ml-2">Bắt đầu nhận đêm</label>
+                        <input 
+                          type="time" 
+                          value={settings.overnight_start_time} 
+                          onChange={(e) => setSettings({...settings, overnight_start_time: e.target.value})}
+                          className="w-full h-16 md:h-20 px-2 rounded-[24px] bg-slate-50 border border-transparent font-black text-2xl md:text-3xl text-slate-900 outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all cursor-pointer text-center [&::-webkit-calendar-picker-indicator]:hidden"
+                        />
                       </div>
-
                       <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Kết thúc nhận đêm</label>
-                        <div className="relative group/input">
-                          <input 
-                            type="time" 
-                            value={settings.overnight_end_time} 
-                            onChange={(e) => setSettings({...settings, overnight_end_time: e.target.value})}
-                            className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-200 font-black text-xl text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer"
-                          />
-                        </div>
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] ml-2">Kết thúc nhận đêm</label>
+                        <input 
+                          type="time" 
+                          value={settings.overnight_end_time} 
+                          onChange={(e) => setSettings({...settings, overnight_end_time: e.target.value})}
+                          className="w-full h-16 md:h-20 px-2 rounded-[24px] bg-slate-50 border border-transparent font-black text-2xl md:text-3xl text-slate-900 outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all cursor-pointer text-center [&::-webkit-calendar-picker-indicator]:hidden"
+                        />
                       </div>
-
                       <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Giờ trả phòng đêm</label>
-                        <div className="relative group/input">
-                          <input 
-                            type="time" 
-                            value={settings.overnight_checkout_time} 
-                            onChange={(e) => setSettings({...settings, overnight_checkout_time: e.target.value})}
-                            className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-200 font-black text-xl text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer"
-                          />
-                        </div>
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] ml-2">Trả phòng đêm</label>
+                        <input 
+                          type="time" 
+                          value={settings.overnight_checkout_time} 
+                          onChange={(e) => setSettings({...settings, overnight_checkout_time: e.target.value})}
+                          className="w-full h-16 md:h-20 px-2 rounded-[24px] bg-slate-50 border border-transparent font-black text-2xl md:text-3xl text-slate-900 outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all cursor-pointer text-center [&::-webkit-calendar-picker-indicator]:hidden"
+                        />
                       </div>
                     </div>
 
-                    <div className="bg-indigo-50/50 rounded-2xl p-6 flex items-center justify-between border border-indigo-100/50">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-base font-bold text-slate-900">Tự động chuyển Qua đêm</span>
-                        <span className="text-sm font-medium text-slate-500">Tự động áp giá Đêm khi khách vào đúng khung giờ</span>
+                    <div className="relative z-10 bg-indigo-50/50 rounded-[32px] p-8 flex items-center justify-between border border-indigo-100/30">
+                      <div className="space-y-1">
+                        <p className="text-base font-black text-indigo-900 tracking-tight">Tự động chuyển giá Đêm</p>
+                        <p className="text-xs font-bold text-indigo-400 leading-relaxed">Hệ thống tự động áp giá Đêm khi khách vào đúng khung giờ</p>
                       </div>
                       <Switch 
                         checked={settings.auto_overnight_switch} 
@@ -308,220 +261,97 @@ export default function PricingPage() {
                 </div>
               )}
 
-
               {subTab === 'policies' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                  {/* Tự động tính thêm ngày */}
-                  <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-50 rounded-bl-[100px] -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 animate-in fade-in slide-in-from-left-4 duration-500">
+                  
+                  {/* Grace Period Card */}
+                  <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12">
+                      <Clock size={200} strokeWidth={0.5} />
+                    </div>
                     
-                    <div className="flex items-center gap-4 mb-8 relative">
-                      <div className="w-14 h-14 bg-red-50 text-red-600 rounded-[20px] flex items-center justify-center shadow-sm">
-                        <Clock size={28} strokeWidth={2} />
+                    <div className="relative z-10 flex items-center gap-5 mb-10">
+                      <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
+                        <Clock size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-slate-900">Tự động tính thêm ngày</h3>
-                        <p className="text-slate-500 font-medium text-sm">Cấu hình thời gian tự động cộng thêm ngày</p>
+                        <h3 className="text-2xl font-black tracking-tight">Ân hạn (Grace Period)</h3>
+                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Linh động thời gian cho khách</p>
                       </div>
                     </div>
 
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <div className="flex flex-col">
-                          <span className="text-base font-bold text-slate-900">Mốc Night Audit (Chốt ngày)</span>
-                          <span className="text-sm font-medium text-slate-500">Mốc giờ hệ thống tự động chốt sổ và tính thêm ngày nếu vào sớm</span>
-                        </div>
-                        <div className="relative group/input">
-                          <input 
-                            type="time" 
-                            value={settings.night_audit_time} 
-                            onChange={(e) => setSettings({...settings, night_audit_time: e.target.value})}
-                            className="w-40 h-12 px-4 rounded-xl bg-white border border-slate-200 font-black text-lg text-slate-900 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all text-center"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <span className="text-base font-bold text-slate-900">Kích hoạt tính sớm (Full day)</span>
-                        <Switch 
-                          checked={settings.auto_full_day_early} 
-                          onChange={(val: boolean) => setSettings({...settings, auto_full_day_early: val})} 
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <div className="flex flex-col">
-                          <span className="text-base font-bold text-slate-900">Trả muộn tính thêm ngày</span>
-                          <span className="text-sm font-medium text-slate-500">Sau mốc này sẽ tự động tính thêm 1 ngày</span>
-                        </div>
-                        <div className="relative group/input">
-                          <input 
-                            type="time" 
-                            value={settings.full_day_late_after} 
-                            onChange={(e) => setSettings({...settings, full_day_late_after: e.target.value})}
-                            className="w-40 h-12 px-4 rounded-xl bg-white border border-slate-200 font-black text-lg text-slate-900 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all text-center"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <span className="text-base font-bold text-slate-900">Kích hoạt tính trễ (Full day)</span>
-                        <Switch 
-                          checked={settings.auto_full_day_late} 
-                          onChange={(val: boolean) => setSettings({...settings, auto_full_day_late: val})} 
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Ân hạn */}
-                  <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-bl-[100px] -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500" />
-                    
-                    <div className="flex items-center gap-4 mb-8 relative">
-                      <div className="w-14 h-14 bg-green-50 text-green-600 rounded-[20px] flex items-center justify-center shadow-sm">
-                        <Clock size={28} strokeWidth={2} />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-black text-slate-900">Ân hạn (Grace Period)</h3>
-                        <p className="text-slate-500 font-medium text-sm">Thời gian linh động cho khách</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <div className="flex flex-col">
-                          <span className="text-base font-bold text-slate-900">Số phút ân hạn</span>
-                          <span className="text-sm font-medium text-slate-500">Thời gian khách được trễ không tính tiền</span>
-                        </div>
-                        <div className="flex items-center gap-3">
+                    <div className="relative z-10 space-y-6">
+                      <div className="p-10 rounded-[40px] bg-emerald-50/30 border border-emerald-100/50 flex flex-col items-center justify-center text-center">
+                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.3em] mb-4">Số phút ân hạn</p>
+                        <div className="flex items-baseline gap-3">
                           <input 
                             type="number" 
                             value={settings.grace_minutes} 
                             onChange={(e) => setSettings({...settings, grace_minutes: parseInt(e.target.value) || 0})}
-                            className="w-24 h-12 px-4 rounded-xl bg-white border border-slate-200 font-black text-lg text-slate-900 focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all text-center"
+                            className="w-32 h-24 bg-transparent text-center font-black text-6xl md:text-7xl text-emerald-600 outline-none placeholder:text-emerald-100"
                           />
-                          <span className="font-bold text-slate-400">phút</span>
+                          <span className="text-2xl font-black text-emerald-300">PHÚT</span>
                         </div>
+                        <p className="text-xs font-bold text-emerald-400 mt-4 max-w-[200px]">Thời gian khách được trễ mà không bị tính thêm phí</p>
                       </div>
 
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <span className="text-base font-bold text-slate-900">Ân hạn nhận phòng</span>
-                        <Switch 
-                          checked={settings.grace_in_enabled} 
-                          onChange={(val: boolean) => setSettings({...settings, grace_in_enabled: val})} 
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <span className="text-base font-bold text-slate-900">Ân hạn trả phòng</span>
-                        <Switch 
-                          checked={settings.grace_out_enabled} 
-                          onChange={(val: boolean) => setSettings({...settings, grace_out_enabled: val})} 
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {subTab === 'vat' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                  {/* Thuế & Phí */}
-                  <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-[100px] -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500" />
-                    
-                    <div className="flex items-center gap-4 mb-8 relative">
-                      <div className="w-14 h-14 bg-orange-50 text-orange-600 rounded-[20px] flex items-center justify-center shadow-sm">
-                        <Percent size={28} strokeWidth={2} />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-black text-slate-900">Thuế & Phí dịch vụ</h3>
-                        <p className="text-slate-500 font-medium text-sm">Cấu hình VAT và phí phục vụ</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <div className="flex flex-col gap-2">
-                          <span className="text-base font-bold text-slate-900">Thuế VAT</span>
-                          {settings.vat_enabled && (
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="number" 
-                                value={settings.vat_percent} 
-                                onChange={(e) => setSettings({...settings, vat_percent: parseFloat(e.target.value) || 0})}
-                                className="w-24 h-10 px-3 rounded-xl bg-white border border-slate-200 font-black text-lg text-slate-900 focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all text-center"
-                              />
-                              <span className="font-bold text-slate-400">%</span>
-                            </div>
-                          )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-6 rounded-[24px] bg-white border border-slate-100 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center"><Sun size={14} /></div>
+                            <span className="text-sm font-black text-slate-700">Ân hạn Nhận</span>
+                          </div>
+                          <Switch checked={settings.grace_in_enabled} onChange={(val: boolean) => setSettings({...settings, grace_in_enabled: val})} />
                         </div>
-                        <Switch 
-                          checked={settings.vat_enabled} 
-                          onChange={(val: boolean) => setSettings({...settings, vat_enabled: val})} 
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <div className="flex flex-col gap-2">
-                          <span className="text-base font-bold text-slate-900">Phí dịch vụ</span>
-                          {settings.service_fee_enabled && (
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="number" 
-                                value={settings.service_fee_percent} 
-                                onChange={(e) => setSettings({...settings, service_fee_percent: parseFloat(e.target.value) || 0})}
-                                className="w-24 h-10 px-3 rounded-xl bg-white border border-slate-200 font-black text-lg text-slate-900 focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all text-center"
-                              />
-                              <span className="font-bold text-slate-400">%</span>
-                            </div>
-                          )}
+                        <div className="p-6 rounded-[24px] bg-white border border-slate-100 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center"><Moon size={14} /></div>
+                            <span className="text-sm font-black text-slate-700">Ân hạn Trả</span>
+                          </div>
+                          <Switch checked={settings.grace_out_enabled} onChange={(val: boolean) => setSettings({...settings, grace_out_enabled: val})} />
                         </div>
-                        <Switch 
-                          checked={settings.service_fee_enabled} 
-                          onChange={(val: boolean) => setSettings({...settings, service_fee_enabled: val})} 
-                        />
                       </div>
                     </div>
                   </div>
 
-                  {/* Tiện ích khác - MOVED HERE */}
-                  <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-bl-[100px] -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500" />
+                  {/* Manual Override Card */}
+                  <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12">
+                      <Wallet size={200} strokeWidth={0.5} />
+                    </div>
                     
-                    <div className="flex items-center gap-4 mb-8 relative">
-                      <div className="w-14 h-14 bg-gray-50 text-gray-600 rounded-[20px] flex items-center justify-center shadow-sm">
-                        <Settings2 size={28} strokeWidth={2} />
+                    <div className="relative z-10 flex items-center gap-5 mb-10">
+                      <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
+                        <Calculator size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-slate-900">Cấu hình vận hành</h3>
-                        <p className="text-slate-500 font-medium text-sm">Các thiết lập hệ thống khác</p>
+                        <h3 className="text-2xl font-black tracking-tight">Ghi đè giá thủ công</h3>
+                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Quyền hạn điều chỉnh giá của nhân viên</p>
                       </div>
                     </div>
 
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <span className="text-base font-bold text-slate-900">Tự động trừ kho dịch vụ</span>
-                        <Switch 
-                          checked={settings.auto_deduct_inventory} 
-                          onChange={(val: boolean) => setSettings({...settings, auto_deduct_inventory: val})} 
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <span className="text-base font-bold text-slate-900">Cho phép sửa giá thủ công</span>
-                        <Switch 
-                          checked={settings.allow_manual_price_override} 
-                          onChange={(val: boolean) => setSettings({...settings, allow_manual_price_override: val})} 
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
-                        <span className="text-base font-bold text-slate-900">Tự động in hóa đơn</span>
-                        <Switch 
-                          checked={settings.enable_print_bill} 
-                          onChange={(val: boolean) => setSettings({...settings, enable_print_bill: val})} 
-                        />
-                      </div>
+                    <div className="relative z-10 space-y-6">
+                       <div className="p-8 rounded-[32px] bg-blue-50/50 border border-blue-100/30 flex items-center justify-between">
+                         <div className="space-y-1">
+                           <p className="text-lg font-black text-blue-900 tracking-tight">Cho phép sửa giá</p>
+                           <p className="text-xs font-bold text-blue-400">Nhân viên có thể chỉnh giá phòng trực tiếp trên hóa đơn</p>
+                         </div>
+                         <Switch 
+                           checked={settings.allow_manual_price_override} 
+                           onChange={(val: boolean) => setSettings({...settings, allow_manual_price_override: val})} 
+                         />
+                       </div>
+
+                       <div className="p-8 rounded-[32px] bg-slate-50 border border-slate-100">
+                          <div className="flex gap-4">
+                            <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
+                              <span className="text-[10px] font-black">!</span>
+                            </div>
+                            <p className="text-xs font-bold text-slate-400 leading-relaxed">
+                              Lưu ý: Mọi hành động ghi đè giá thủ công sẽ được lưu vết trong lịch sử hệ thống để phục vụ đối soát.
+                            </p>
+                          </div>
+                       </div>
                     </div>
                   </div>
                 </div>
@@ -529,17 +359,17 @@ export default function PricingPage() {
             </>
           )}
         </div>
-      </div>
+      </main>
 
-      {/* Mobile Fixed Footer */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-slate-100 md:hidden z-50">
+      {/* 4. MOBILE FLOATING ACTION */}
+      <div className="fixed bottom-10 left-0 right-0 px-6 md:hidden z-50">
         <button 
           onClick={handleSave}
           disabled={saving}
-          className="w-full h-14 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-lg shadow-slate-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-18 bg-slate-900 text-white rounded-3xl font-black uppercase tracking-widest text-[13px] shadow-2xl shadow-slate-900/40 flex items-center justify-center gap-3 active:scale-95 transition-all"
         >
-          {saving ? <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" /> : <Settings2 size={20} />}
-          <span>Lưu thay đổi</span>
+          {saving ? <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" /> : <Save size={20} />}
+          {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
         </button>
       </div>
     </div>

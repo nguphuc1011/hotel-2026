@@ -18,7 +18,10 @@ import {
   Search,
   MapPin,
   Check,
-  X
+  X,
+  ArrowLeft,
+  Fingerprint,
+  UserCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
@@ -28,6 +31,7 @@ import { PERMISSION_METADATA } from '@/constants/permissions';
 import { permissionService, RolePermission, PERMISSION_KEYS } from '@/services/permissionService';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuthStore } from '@/stores/authStore';
+import { cn } from '@/lib/utils';
 
 interface Staff {
   id: string;
@@ -50,13 +54,13 @@ interface SecurityMatrixItem {
 
 const ROLES = ['Staff', 'Manager'];
 const POLICY_OPTIONS = [
-  { id: 'ALLOW', label: 'Tự quyết', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  { id: 'PIN', label: 'Cần PIN', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { id: 'DENY', label: 'Cấm', color: 'bg-rose-100 text-rose-700 border-rose-200' }
+  { id: 'ALLOW', label: 'Tự quyết', color: 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-emerald-50' },
+  { id: 'PIN', label: 'Cần PIN', color: 'bg-amber-50 text-amber-600 border-amber-100 shadow-amber-50' },
+  { id: 'DENY', label: 'Cấm', color: 'bg-rose-50 text-rose-600 border-rose-100 shadow-rose-50' }
 ];
 
 const OVERRIDE_OPTIONS = [
-  { id: null, label: 'Kế thừa', color: 'bg-slate-100 text-slate-500 border-slate-200' },
+  { id: null, label: 'Kế thừa', color: 'bg-slate-50 text-slate-400 border-slate-100' },
   ...POLICY_OPTIONS
 ];
 
@@ -107,17 +111,14 @@ export default function StaffSettingsPage() {
   // Load Data
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch Current User
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUserId(user?.id || null);
 
-      // Fetch Staff
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
         .select('*')
@@ -125,20 +126,16 @@ export default function StaffSettingsPage() {
       if (staffError) throw staffError;
       setStaffList(staffData);
 
-      // Fetch Security Matrix
       const { data: matrixData, error: matrixError } = await supabase.rpc('fn_get_security_matrix');
       if (matrixError) throw matrixError;
       setSecurityMatrix(matrixData || []);
 
-      // Fetch Functional Permissions (Roles)
       const rolesData = await permissionService.getAllRoles();
       setRolePermissions(rolesData);
 
-      // Fetch Floors
       const { data: floorsData } = await supabase.rpc('fn_get_available_floors');
       setAvailableFloors(floorsData?.map((f: any) => f.floor) || []);
 
-      // Fetch User Floors
       const { data: userFloorsData } = await supabase.rpc('fn_get_all_user_floors_map');
       const map: Record<string, number[]> = {};
       userFloorsData?.forEach((item: any) => {
@@ -162,14 +159,13 @@ export default function StaffSettingsPage() {
         
       if (error) throw error;
       
-      // Update local state directly for speed
       setSecurityMatrix(prev => prev.map(item => 
         item.key === key ? { ...item, global_policy: policy } : item
       ));
       toast.success('Đã cập nhật cấu hình mặc định');
     } catch (error: any) {
       toast.error('Lỗi: ' + error.message);
-      fetchData(); // Revert on error
+      fetchData();
     }
   };
 
@@ -183,7 +179,6 @@ export default function StaffSettingsPage() {
       });
       if (error) throw error;
       
-      // Update local state
       setSecurityMatrix(prev => prev.map(item => {
         if (item.key !== key) return item;
         const newRoles = { ...item.role_policies };
@@ -208,7 +203,6 @@ export default function StaffSettingsPage() {
       });
       if (error) throw error;
       
-      // Update local state
       setSecurityMatrix(prev => prev.map(item => {
         if (item.key !== key) return item;
         const newUsers = { ...item.user_policies };
@@ -218,13 +212,12 @@ export default function StaffSettingsPage() {
       }));
       
       toast.success('Đã cập nhật ngoại lệ cho nhân viên');
-      setEditingActionKey(null); // Close modal
+      setEditingActionKey(null);
     } catch (error: any) {
       toast.error('Lỗi: ' + error.message);
     }
   };
 
-  // Staff Management Functions
   const handleOpenStaffModal = (staff?: Staff) => {
     if (staff) {
       setEditingStaff(staff);
@@ -362,7 +355,6 @@ export default function StaffSettingsPage() {
   const groupedMatrix = useMemo(() => {
     const groups: Record<string, SecurityMatrixItem[]> = {};
     securityMatrix.forEach(item => {
-      // Infer category from key prefix if not explicit
       const cat = item.category || item.key.split('_')[0]; 
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(item);
@@ -387,7 +379,11 @@ export default function StaffSettingsPage() {
       <select
         value={value || ''}
         onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
-        className={`h-9 text-[10px] font-black uppercase tracking-wider rounded-2xl border-2 outline-none cursor-pointer transition-all ${selected.color} ${className}`}
+        className={cn(
+          "h-10 text-[10px] font-black uppercase tracking-wider rounded-2xl border border-transparent outline-none cursor-pointer transition-all shadow-sm px-3",
+          selected.color,
+          className
+        )}
       >
         {options.map(opt => (
           <option key={opt.id || 'inherit'} value={opt.id || ''}>
@@ -398,7 +394,6 @@ export default function StaffSettingsPage() {
     );
   };
 
-  // Functional Permissions Handlers
   const handleToggleFunctionalPermission = async (roleCode: string, permissionCode: string) => {
     const role = rolePermissions.find(r => r.role_code === roleCode);
     if (!role) return;
@@ -415,8 +410,6 @@ export default function StaffSettingsPage() {
     try {
       if (!user?.hotel_id) throw new Error('Không tìm thấy thông tin khách sạn');
       await permissionService.updateRolePermissions(roleCode, newPermissions, user.hotel_id);
-      
-      // Update local state
       setRolePermissions(prev => prev.map(r => 
         r.role_code === roleCode ? { ...r, permissions: newPermissions } : r
       ));
@@ -426,251 +419,268 @@ export default function StaffSettingsPage() {
     }
   };
 
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-      </div>
-    );
-  }
+  if (isAuthLoading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+    </div>
+  );
 
-  if (!can(PERMISSION_KEYS.MANAGE_PERMISSIONS)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
-        <div className="text-center">
-          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
-          <h1 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h1>
-          <p className="text-slate-500">Bạn không có quyền quản lý nhân viên & phân quyền.</p>
-          <Link href={`/${slug}/settings`} className="text-blue-500 hover:underline mt-4 block">
-            Quay lại Cài đặt
-          </Link>
-        </div>
+  if (!can(PERMISSION_KEYS.MANAGE_PERMISSIONS)) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7]">
+      <div className="text-center p-10 bg-white rounded-[40px] shadow-sm">
+        <ShieldCheck size={64} className="mx-auto text-slate-200 mb-6" />
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quyền truy cập bị từ chối</h1>
+        <p className="text-slate-400 font-bold mt-2">Bạn không có quyền quản lý nhân sự & phân quyền.</p>
+        <Link href={`/${slug}/settings`} className="inline-block px-8 py-3 bg-slate-900 text-white rounded-full font-bold mt-8 transition-all active:scale-95">
+          Quay lại Cài đặt
+        </Link>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-8 pb-32 font-sans">
-      <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div>
+    <div className="min-h-screen bg-[#F5F5F7] text-slate-900 font-sans selection:bg-slate-900 selection:text-white pb-40">
+      
+      {/* 1. TOP NAV */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-10 h-20 md:h-24 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <button 
-              onClick={() => router.back()} 
-              className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mb-4 font-bold"
+              onClick={() => router.back()}
+              className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-90"
             >
-              <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-slate-300 group-hover:bg-slate-50 transition-all">
-                <ChevronLeft size={16} />
-              </div>
-              <span className="text-xs font-black uppercase tracking-widest">Quay lại</span>
+              <ArrowLeft size={20} />
             </button>
-            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
-                <ShieldCheck size={24} />
-              </div>
-              Nhân viên & Bảo mật
-            </h1>
+            <div className="flex flex-col">
+              <h1 className="text-xl md:text-2xl font-black tracking-tight text-slate-900 leading-none">Nhân viên & Quyền</h1>
+              <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Quản trị nhân sự & Bảo mật</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/50 rounded-full border border-slate-200/60 shadow-inner md:flex hidden">
+            {[
+              { id: 'staff', label: 'Tài khoản', icon: Users },
+              { id: 'security', label: 'Bảo mật', icon: ShieldCheck },
+              { id: 'functional', label: 'Tính năng', icon: Lock },
+            ].map((tab) => (
+              <button 
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={cn(
+                  "px-6 py-2 rounded-full text-[11px] font-black transition-all uppercase tracking-widest flex items-center gap-2",
+                  activeTab === tab.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                <tab.icon size={14} /> {tab.label}
+              </button>
+            ))}
           </div>
 
-          <div className="flex p-1.5 bg-slate-100 rounded-[20px] w-full md:w-auto">
+          <button 
+            onClick={() => handleOpenStaffModal()}
+            className="h-10 md:h-12 px-5 md:px-8 bg-slate-900 text-white rounded-full text-[13px] font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg shadow-slate-200"
+          >
+            <Plus size={18} />
+            <span className="hidden md:inline">Thêm nhân viên</span>
+          </button>
+        </div>
+      </div>
+
+      <main className="max-w-[1200px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-10 md:space-y-16">
+        
+        {/* Mobile Tab Nav */}
+        <div className="flex md:hidden p-1.5 bg-white/80 backdrop-blur-md rounded-full border border-slate-200/60 shadow-sm overflow-x-auto no-scrollbar">
+          {[
+            { id: 'staff', label: 'Tài khoản' },
+            { id: 'security', label: 'Bảo mật' },
+            { id: 'functional', label: 'Quyền' },
+          ].map((tab) => (
             <button 
-              onClick={() => setActiveTab('staff')}
-              className={`flex-1 md:flex-none px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'staff' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={cn(
+                "flex-1 px-6 py-2.5 rounded-full text-[10px] font-black transition-all uppercase tracking-widest whitespace-nowrap",
+                activeTab === tab.id ? "bg-slate-900 text-white shadow-md" : "text-slate-400"
+              )}
             >
-              Tài khoản
+              {tab.label}
             </button>
-            <button 
-              onClick={() => setActiveTab('security')}
-              className={`flex-1 md:flex-none px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'security' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Ma trận Bảo mật
-            </button>
-            <button 
-              onClick={() => setActiveTab('functional')}
-              className={`flex-1 md:flex-none px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'functional' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Phân quyền
-            </button>
-          </div>
+          ))}
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-          </div>
-        ) : (
-          <>
-            {/* TAB 1: STAFF MANAGEMENT */}
-            {activeTab === 'staff' && (
-              <div className="space-y-6">
-                {/* Staff Filter/Toggle */}
-                <div className="flex justify-end">
-                  <button 
-                    onClick={() => setShowInactive(!showInactive)}
-                    className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-2xl border-2 transition-all ${showInactive ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
-                  >
-                    {showInactive ? 'Đang hiện nhân viên đã khóa' : 'Xem nhân viên đã nghỉ việc'}
-                  </button>
-                </div>
+        {/* TAB CONTENT */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          
+          {/* TAB 1: STAFF LIST */}
+          {activeTab === 'staff' && (
+            <div className="space-y-10">
+              <div className="flex items-center justify-between px-2">
+                <h2 className="text-2xl md:text-3xl font-black tracking-tight">Danh sách nhân sự</h2>
+                <button 
+                  onClick={() => setShowInactive(!showInactive)}
+                  className={cn(
+                    "text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border transition-all",
+                    showInactive ? "bg-rose-50 border-rose-100 text-rose-500" : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
+                  )}
+                >
+                  {showInactive ? 'Ẩn nhân viên khóa' : 'Xem nhân viên đã nghỉ'}
+                </button>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Add Staff Card */}
-                  <div 
-                    onClick={() => handleOpenStaffModal()}
-                    className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[32px] p-8 flex flex-col items-center justify-center text-center group cursor-pointer hover:bg-slate-100 transition-all min-h-[200px]"
-                  >
-                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-slate-400 mb-4 shadow-sm group-hover:scale-110 transition-transform">
-                      <Plus size={32} />
-                    </div>
-                    <h3 className="font-black uppercase tracking-tight text-slate-600">Thêm nhân viên</h3>
-                    <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase">Cấp tài khoản mới</p>
-                  </div>
-
-                  {/* Staff List */}
-                  {staffList
-                    .filter(s => showInactive || s.is_active)
-                    .map((staff) => (
-                      <div key={staff.id} className={`bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm relative group transition-all ${staff.is_active ? '' : 'opacity-70 grayscale hover:opacity-100 hover:grayscale-0'}`}>
-                        <div className="flex items-start justify-between mb-6">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-600">
-                              <Users size={20} />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                {staffList
+                  .filter(s => showInactive || s.is_active)
+                  .map((staff) => (
+                    <div 
+                      key={staff.id} 
+                      className={cn(
+                        "bg-white/80 backdrop-blur-xl rounded-[40px] p-8 border border-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.05)] hover:scale-[1.02] transition-all duration-500 group relative overflow-hidden",
+                        !staff.is_active && "opacity-60 grayscale"
+                      )}
+                    >
+                      <div className="relative z-10 flex flex-col h-full">
+                        <div className="flex items-start justify-between mb-8">
+                          <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-[24px] bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-all duration-500">
+                              <Users size={32} />
                             </div>
                             <div>
-                              <h3 className="text-lg font-black tracking-tight text-slate-900">{staff.full_name}</h3>
-                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">@{staff.username}</p>
+                              <h3 className="text-xl font-black tracking-tight text-slate-900">{staff.full_name}</h3>
+                              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">@{staff.username}</p>
                             </div>
                           </div>
-                          <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${staff.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                          <div className={cn(
+                            "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                            staff.is_active ? "bg-emerald-50 text-emerald-500 border-emerald-100" : "bg-rose-50 text-rose-500 border-rose-100"
+                          )}>
                             {staff.is_active ? 'Active' : 'Locked'}
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
-                           <div className="flex-1 px-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold text-slate-600 flex items-center gap-2">
-                             <Shield size={14} className="text-slate-400" />
-                             {ROLE_NAMES[staff.role] || staff.role}
-                           </div>
+                        <div className="space-y-4 flex-1">
+                          <div className="flex items-center gap-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                            <Shield size={16} className="text-slate-300" />
+                            <span className="text-xs font-black uppercase tracking-widest text-slate-600">{ROLE_NAMES[staff.role] || staff.role}</span>
+                          </div>
+                          
+                          {userFloorsMap[staff.id] && userFloorsMap[staff.id].length > 0 && (
+                            <div className="flex items-center gap-3 bg-blue-50/30 p-4 rounded-2xl border border-blue-100/30">
+                              <MapPin size={16} className="text-blue-300" />
+                              <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                                Tầng: {userFloorsMap[staff.id].join(', ')}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 mt-4">
-                          <button 
-                            onClick={() => handleOpenPinModal(staff)}
-                            className="py-3 bg-slate-50 hover:bg-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 text-slate-600"
-                          >
-                            <Key size={14} /> PIN
+                        <div className="grid grid-cols-3 gap-2 mt-10 pt-6 border-t border-slate-50">
+                          <button onClick={() => handleOpenPinModal(staff)} className="h-12 bg-slate-50 hover:bg-slate-900 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 text-slate-400">
+                            <Fingerprint size={16} /> PIN
                           </button>
-                          <button 
-                            onClick={() => handleOpenFloorModal(staff)}
-                            className="py-3 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 rounded-2xl flex items-center justify-center transition-all text-slate-600"
-                            title="Phân tầng"
-                          >
-                            <MapPin size={16} />
+                          <button onClick={() => handleOpenFloorModal(staff)} className="h-12 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 rounded-2xl flex items-center justify-center transition-all text-slate-400">
+                            <MapPin size={18} />
                           </button>
-                          <button 
-                            onClick={() => handleOpenStaffModal(staff)}
-                            className="py-3 bg-slate-50 hover:bg-orange-50 hover:text-orange-600 rounded-2xl flex items-center justify-center transition-all text-slate-600"
-                          >
-                            <Settings2 size={16} />
+                          <button onClick={() => handleOpenStaffModal(staff)} className="h-12 bg-slate-50 hover:bg-orange-50 hover:text-orange-600 rounded-2xl flex items-center justify-center transition-all text-slate-400">
+                            <Settings2 size={18} />
                           </button>
                         </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: SECURITY MATRIX */}
-            {activeTab === 'security' && (
-              <div className="space-y-8">
-                {securityCategories.map((cat) => {
-                  // Find items for this category (handling both 'checkin' and 'checkin_...' keys)
-                  const items = groupedMatrix[cat.id] || [];
-                  if (items.length === 0) return null;
-
-                  return (
-                    <div key={cat.id}>
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${cat.bg} ${cat.color}`}>
-                          <ShieldCheck size={20} />
-                        </div>
-                        <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">{cat.name}</h2>
                       </div>
                       
-                      <div className="bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-sm">
+                      {/* Decoration */}
+                      <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none -rotate-12">
+                        <Users size={150} />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: SECURITY MATRIX */}
+          {activeTab === 'security' && (
+            <div className="space-y-12">
+              <div className="px-2">
+                <h2 className="text-2xl md:text-3xl font-black tracking-tight">Ma trận Bảo mật</h2>
+                <p className="text-slate-400 font-bold text-sm md:text-base mt-1">Cấu hình các hành động yêu cầu xác thực hoặc giới hạn quyền hạn</p>
+              </div>
+
+              {securityCategories.map((cat) => {
+                const items = groupedMatrix[cat.id] || [];
+                if (items.length === 0) return null;
+
+                return (
+                  <div key={cat.id} className="space-y-6">
+                    <div className="flex items-center gap-4 px-2">
+                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", cat.bg, cat.color)}>
+                        <ShieldCheck size={24} />
+                      </div>
+                      <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">{cat.name}</h3>
+                    </div>
+                    
+                    <div className="bg-white/80 backdrop-blur-xl rounded-[40px] border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] overflow-hidden">
+                      <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead>
-                            <tr className="bg-slate-50 border-b border-slate-100">
-                              <th className="text-left py-6 px-8 text-[10px] font-black uppercase tracking-widest text-slate-400 w-1/3">Hành động bảo mật</th>
-                              <th className="text-center py-6 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-32">Mặc định</th>
+                            <tr className="bg-slate-50/50 border-b border-slate-100">
+                              <th className="text-left py-8 px-10 text-[11px] font-black uppercase tracking-widest text-slate-400">Hành động</th>
+                              <th className="text-center py-8 px-4 text-[11px] font-black uppercase tracking-widest text-slate-400 w-40">Mặc định</th>
                               {ROLES.map(role => (
-                                <th key={role} className="text-center py-6 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-32">
+                                <th key={role} className="text-center py-8 px-4 text-[11px] font-black uppercase tracking-widest text-slate-400 w-40">
                                   {ROLE_NAMES[role] || role}
                                 </th>
                               ))}
-                              <th className="text-left py-6 px-8 text-[10px] font-black uppercase tracking-widest text-slate-400">Ngoại lệ (Nhân viên)</th>
+                              <th className="text-left py-8 px-10 text-[11px] font-black uppercase tracking-widest text-slate-400">Ngoại lệ</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
                             {items.map((item) => (
-                              <tr key={item.key} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="py-6 px-8">
-                                  <p className="font-bold text-sm text-slate-700">{item.description}</p>
-                                  <p className="text-[10px] font-bold text-slate-400 font-mono mt-1">{item.key}</p>
+                              <tr key={item.key} className="hover:bg-slate-50/30 transition-colors group">
+                                <td className="py-6 px-10">
+                                  <p className="font-black text-slate-800 tracking-tight leading-none">{item.description}</p>
                                 </td>
                                 
-                                {/* Global Policy */}
                                 <td className="py-4 px-4 text-center">
                                   <PolicySelect 
                                     value={item.global_policy}
                                     onChange={(val) => handleUpdateGlobalPolicy(item.key, val!)}
-                                    options={POLICY_OPTIONS}
                                   />
                                 </td>
 
-                                {/* Role Overrides */}
                                 {ROLES.map(role => (
                                   <td key={role} className="py-4 px-4 text-center">
                                     <PolicySelect 
                                       value={item.role_policies[role] || null}
                                       onChange={(val) => handleUpdateRolePolicy(role, item.key, val)}
                                       options={OVERRIDE_OPTIONS}
-                                      className={!item.role_policies[role] ? 'opacity-50 hover:opacity-100' : ''}
+                                      className={!item.role_policies[role] ? 'opacity-30 hover:opacity-100' : ''}
                                     />
                                   </td>
                                 ))}
 
-                                {/* User Overrides Display */}
-                                <td className="py-4 px-8">
+                                <td className="py-4 px-10">
                                   <div className="flex flex-wrap gap-2">
                                     {Object.entries(item.user_policies).map(([userId, policy]) => {
                                       const staff = staffList.find(s => s.id === userId);
                                       if (!staff) return null;
-                                      
                                       const policyConfig = POLICY_OPTIONS.find(p => p.id === policy);
-                                      
                                       return (
-                                        <div key={userId} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-bold ${policyConfig?.color || 'bg-slate-100 border-slate-200'}`}>
+                                        <div key={userId} className={cn(
+                                          "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest shadow-sm",
+                                          policyConfig?.color || 'bg-slate-50 border-slate-100'
+                                        )}>
                                           <span>{staff.full_name}</span>
-                                          <button 
-                                            onClick={() => handleUpdateUserPolicy(userId, item.key, null)}
-                                            className="hover:text-red-500 transition-colors"
-                                          >
-                                            <XCircle size={12} />
+                                          <button onClick={() => handleUpdateUserPolicy(userId, item.key, null)} className="hover:text-rose-500 transition-colors">
+                                            <X size={12} />
                                           </button>
                                         </div>
                                       );
                                     })}
                                     
                                     <button 
-                                      onClick={() => {
-                                        setEditingActionKey(item.key);
-                                        setOverrideUserId('');
-                                        setOverridePolicy('ALLOW');
-                                      }}
-                                      className="w-8 h-8 rounded-full border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-200 transition-colors bg-white"
+                                      onClick={() => { setEditingActionKey(item.key); setOverrideUserId(''); setOverridePolicy('ALLOW'); }}
+                                      className="w-10 h-10 rounded-full border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 hover:text-blue-500 hover:border-blue-200 transition-all bg-white"
                                     >
-                                      <Plus size={14} />
+                                      <Plus size={16} />
                                     </button>
                                   </div>
                                 </td>
@@ -680,316 +690,327 @@ export default function StaffSettingsPage() {
                         </table>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* TAB 3: FUNCTIONAL PERMISSIONS */}
-            {activeTab === 'functional' && (
-               <div className="space-y-6">
-                  <div className="bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-sm p-8">
-                    <div className="mb-8">
-                      <h2 className="text-xl font-black uppercase tracking-tight text-slate-900 mb-2">Phân quyền Chức năng</h2>
-                      <p className="text-slate-500 text-sm font-medium">Cấp quyền truy cập các trang và tính năng cho từng vai trò.</p>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-100">
-                            <th className="text-left py-6 px-8 text-[10px] font-black uppercase tracking-widest text-slate-400 w-1/3">Chức năng / Trang</th>
-                            {/* Only show non-admin roles */}
-                            {rolePermissions.filter(r => r.role_code !== 'admin').map(role => (
-                              <th key={role.role_code} className="text-center py-6 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-32">
-                                {role.role_name}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                          {PERMISSION_METADATA.map((group) => (
-                            <Fragment key={group.group}>
-                              {/* Group Header */}
-                              <tr className="bg-slate-50/50">
-                                <td colSpan={rolePermissions.length} className="py-4 px-8 font-black text-xs uppercase text-slate-500 tracking-wider">
-                                  {group.group}
-                                </td>
-                              </tr>
-                              
-                              {/* Permission Items */}
-                              {group.items.map(item => (
-                                <tr key={item.code} className="hover:bg-slate-50/50 transition-colors">
-                                  <td className="py-4 px-8">
-                                    <p className="font-bold text-sm text-slate-700">{item.label}</p>
-                                  </td>
-                                  
-                                  {rolePermissions.filter(r => r.role_code !== 'admin').map(role => {
-                                    const isChecked = role.permissions.includes(item.code);
-                                    return (
-                                      <td key={role.role_code} className="py-4 px-4 text-center">
-                                        <button
-                                          onClick={() => handleToggleFunctionalPermission(role.role_code, item.code)}
-                                          className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
-                                            isChecked 
-                                              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' 
-                                              : 'bg-slate-100 text-slate-300 hover:bg-slate-200'
-                                          }`}
-                                        >
-                                          {isChecked ? <Check size={20} strokeWidth={3} /> : <X size={20} />}
-                                        </button>
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              ))}
-                            </Fragment>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
                   </div>
-               </div>
-            )}
-          </>
-        )}
-
-        {/* Modals - Standardized Style */}
-        {isStaffModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 mb-6">
-                {editingStaff ? 'Cập nhật nhân viên' : 'Thêm nhân viên mới'}
-              </h2>
-              <form onSubmit={handleSaveStaff} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Tên đăng nhập</label>
-                  <input 
-                    type="text"
-                    value={staffFormData.username}
-                    onChange={e => setStaffFormData({...staffFormData, username: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none font-bold text-slate-700 transition-all"
-                    placeholder="VD: user1"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Họ và tên</label>
-                  <input 
-                    type="text"
-                    value={staffFormData.full_name}
-                    onChange={e => setStaffFormData({...staffFormData, full_name: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none font-bold text-slate-700 transition-all"
-                    placeholder="VD: Nguyễn Văn A"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Vai trò</label>
-                  <div className="relative">
-                    <select 
-                      value={staffFormData.role}
-                      onChange={e => setStaffFormData({...staffFormData, role: e.target.value})}
-                      className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none font-bold text-slate-700 transition-all cursor-pointer appearance-none"
-                    >
-                      <option value="Staff">Nhân viên</option>
-                      <option value="Manager">Quản lý</option>
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                      <ChevronLeft size={16} className="-rotate-90" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                  <input 
-                    type="checkbox"
-                    checked={staffFormData.is_active}
-                    onChange={e => setStaffFormData({...staffFormData, is_active: e.target.checked})}
-                    className="w-5 h-5 accent-blue-600 rounded-lg cursor-pointer"
-                  />
-                  <span className="font-bold text-sm text-slate-700">Đang hoạt động</span>
-                </div>
-
-                <div className="flex gap-3 mt-8">
-                  <button 
-                    type="button"
-                    onClick={() => setIsStaffModalOpen(false)}
-                    className="flex-1 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Hủy bỏ
-                  </button>
-                  <button 
-                    type="submit"
-                    className="flex-1 py-4 rounded-2xl font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200"
-                  >
-                    Lưu thay đổi
-                  </button>
-                </div>
-              </form>
+                );
+              })}
             </div>
-          </div>
-        )}
+          )}
 
-        {isPinModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <h2 className="text-xl font-black uppercase tracking-tight text-slate-900 mb-6">
-                Đặt mã PIN cho {editingStaff?.full_name}
-              </h2>
-              <form onSubmit={handleSavePin} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Mã PIN mới (4 số)</label>
+          {/* TAB 3: FUNCTIONAL PERMISSIONS */}
+          {activeTab === 'functional' && (
+            <div className="space-y-12">
+              <div className="px-2">
+                <h2 className="text-2xl md:text-3xl font-black tracking-tight">Phân quyền Tính năng</h2>
+                <p className="text-slate-400 font-bold text-sm md:text-base mt-1">Cấp quyền truy cập các module và trang nghiệp vụ cho từng vai trò</p>
+              </div>
+
+              <div className="bg-white/80 backdrop-blur-xl rounded-[40px] border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50/50 border-b border-slate-100">
+                        <th className="text-left py-8 px-10 text-[11px] font-black uppercase tracking-widest text-slate-400">Chức năng / Module</th>
+                        {rolePermissions.filter(r => r.role_code !== 'admin').map(role => (
+                          <th key={role.role_code} className="text-center py-8 px-4 text-[11px] font-black uppercase tracking-widest text-slate-400 w-40">
+                            {role.role_name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {PERMISSION_METADATA.map((group) => (
+                        <Fragment key={group.group}>
+                          <tr className="bg-slate-50/30">
+                            <td colSpan={rolePermissions.length} className="py-5 px-10 font-black text-[10px] uppercase text-slate-400 tracking-[0.2em]">
+                              {group.group}
+                            </td>
+                          </tr>
+                          
+                          {group.items.map(item => (
+                            <tr key={item.code} className="hover:bg-slate-50/30 transition-colors">
+                              <td className="py-5 px-10">
+                                <p className="font-black text-slate-700 text-sm tracking-tight">{item.label}</p>
+                              </td>
+                              
+                              {rolePermissions.filter(r => r.role_code !== 'admin').map(role => {
+                                const isChecked = role.permissions.includes(item.code);
+                                return (
+                                  <td key={role.role_code} className="py-4 px-4 text-center">
+                                    <button
+                                      onClick={() => handleToggleFunctionalPermission(role.role_code, item.code)}
+                                      className={cn(
+                                        "w-12 h-12 rounded-[18px] flex items-center justify-center transition-all duration-500",
+                                        isChecked 
+                                          ? "bg-emerald-500 text-white shadow-lg shadow-emerald-100" 
+                                          : "bg-slate-50 text-slate-200 hover:bg-slate-100 hover:text-slate-400"
+                                      )}
+                                    >
+                                      {isChecked ? <UserCheck size={20} /> : <Lock size={18} strokeWidth={3} />}
+                                    </button>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* 5. MODALS (STAFF, PIN, FLOOR, OVERRIDE) */}
+      
+      {/* Staff Modal */}
+      {isStaffModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-t-[40px] md:rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden border border-white animate-in slide-in-from-bottom duration-500">
+            <div className="p-8 md:p-10 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
+              <div className="space-y-1">
+                <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+                  {editingStaff ? 'Hồ sơ nhân viên' : 'Nhân viên mới'}
+                </h3>
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Thiết lập tài khoản & vai trò</p>
+              </div>
+              <button onClick={() => setIsStaffModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full text-slate-400 border border-slate-100 shadow-sm transition-all">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveStaff} className="p-8 md:p-10 space-y-8">
+              <div className="space-y-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Tên đăng nhập *</label>
+                <input 
+                  type="text"
+                  value={staffFormData.username}
+                  onChange={e => setStaffFormData({...staffFormData, username: e.target.value})}
+                  className="w-full h-16 px-8 rounded-[24px] bg-slate-50 border border-transparent font-black text-xl text-slate-900 outline-none focus:bg-white focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all"
+                  placeholder="VD: nv_linh"
+                />
+              </div>
+              
+              <div className="space-y-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Họ và tên *</label>
+                <input 
+                  type="text"
+                  value={staffFormData.full_name}
+                  onChange={e => setStaffFormData({...staffFormData, full_name: e.target.value})}
+                  className="w-full h-16 px-8 rounded-[24px] bg-slate-50 border border-transparent font-black text-xl text-slate-900 outline-none focus:bg-white focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all"
+                  placeholder="VD: Nguyễn Văn A"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Vai trò hệ thống</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {['Staff', 'Manager'].map(role => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setStaffFormData({...staffFormData, role})}
+                      className={cn(
+                        "h-16 rounded-[24px] font-black uppercase tracking-widest text-[11px] transition-all border-2",
+                        staffFormData.role === role 
+                          ? "bg-slate-900 text-white border-slate-900 shadow-lg" 
+                          : "bg-white text-slate-400 border-slate-100 hover:border-slate-200"
+                      )}
+                    >
+                      {ROLE_NAMES[role]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="p-6 rounded-[32px] bg-slate-50/50 border border-slate-100 flex items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <p className="text-base font-black text-slate-900 tracking-tight">Trạng thái hoạt động</p>
+                  <p className="text-[11px] font-bold text-slate-400 leading-relaxed">Nhân viên có thể đăng nhập vào hệ thống</p>
+                </div>
+                <div 
+                  onClick={() => setStaffFormData({...staffFormData, is_active: !staffFormData.is_active})}
+                  className={cn(
+                    "w-14 h-8 rounded-full relative transition-all cursor-pointer",
+                    staffFormData.is_active ? "bg-emerald-500" : "bg-slate-200"
+                  )}
+                >
+                  <div className={cn(
+                    "w-6 h-6 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                    staffFormData.is_active ? "left-7" : "left-1"
+                  )} />
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button 
+                  type="submit"
+                  className="w-full py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-[13px] shadow-xl shadow-slate-200 hover:bg-slate-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  {editingStaff ? 'Cập nhật hồ sơ' : 'Tạo tài khoản ngay'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Pin Modal */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-t-[40px] md:rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden border border-white animate-in slide-in-from-bottom duration-500">
+            <div className="p-8 md:p-10 text-center space-y-2 bg-slate-50/50 border-b border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-[24px] shadow-sm flex items-center justify-center mx-auto mb-4 text-slate-900">
+                <Key size={32} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Thiết lập mã PIN</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{editingStaff?.full_name}</p>
+            </div>
+            
+            <form onSubmit={handleSavePin} className="p-8 md:p-10 space-y-8">
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center block">Mã PIN mới (4 số)</label>
                   <input 
                     type="password"
                     maxLength={4}
+                    autoFocus
                     value={pinFormData.pin}
                     onChange={e => setPinFormData({...pinFormData, pin: e.target.value.replace(/\D/g, '')})}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none font-black text-center text-3xl tracking-[0.5em] text-slate-900"
+                    className="w-full h-20 bg-slate-50 rounded-[32px] font-black text-center text-4xl tracking-[0.8em] text-slate-900 outline-none focus:bg-white focus:ring-4 focus:ring-slate-900/5 border-none transition-all"
                     placeholder="••••"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Xác nhận mã PIN</label>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center block">Xác nhận lại</label>
                   <input 
                     type="password"
                     maxLength={4}
                     value={pinFormData.confirmPin}
                     onChange={e => setPinFormData({...pinFormData, confirmPin: e.target.value.replace(/\D/g, '')})}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none font-black text-center text-3xl tracking-[0.5em] text-slate-900"
+                    className="w-full h-20 bg-slate-50 rounded-[32px] font-black text-center text-4xl tracking-[0.8em] text-slate-900 outline-none focus:bg-white focus:ring-4 focus:ring-slate-900/5 border-none transition-all"
                     placeholder="••••"
                   />
                 </div>
+              </div>
 
-                <div className="flex gap-3 mt-8">
-                  <button 
-                    type="button"
-                    onClick={() => setIsPinModalOpen(false)}
-                    className="flex-1 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Hủy
-                  </button>
-                  <button 
-                    type="submit"
-                    className="flex-1 py-4 rounded-2xl font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200"
-                  >
-                    Lưu PIN
-                  </button>
-                </div>
-              </form>
-            </div>
+              <button 
+                type="submit"
+                className="w-full py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-[13px] shadow-xl shadow-slate-200 hover:bg-slate-800 active:scale-[0.98] transition-all"
+              >
+                Lưu mã PIN
+              </button>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-        {isFloorModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <h2 className="text-xl font-black uppercase tracking-tight text-slate-900 mb-2">
-                Phân tầng hoạt động
-              </h2>
-              <p className="text-slate-500 text-sm mb-6 font-medium">Chọn các tầng mà {editingStaff?.full_name} được phép quản lý</p>
-              
-              <form onSubmit={handleSaveFloors} className="space-y-6">
-                <div className="grid grid-cols-3 gap-3">
-                  {availableFloors.map(floor => (
+      {/* Floor Modal */}
+      {isFloorModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-t-[40px] md:rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden border border-white animate-in slide-in-from-bottom duration-500">
+            <div className="p-8 md:p-10 text-center space-y-2 bg-slate-50/50 border-b border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-[24px] shadow-sm flex items-center justify-center mx-auto mb-4 text-blue-500">
+                <MapPin size={32} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Phân tầng quản lý</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{editingStaff?.full_name}</p>
+            </div>
+            
+            <form onSubmit={handleSaveFloors} className="p-8 md:p-10 space-y-8">
+              <div className="grid grid-cols-3 gap-3">
+                {availableFloors.map(floor => (
+                  <button
+                    key={floor}
+                    type="button"
+                    onClick={() => toggleFloor(floor)}
+                    className={cn(
+                      "h-16 rounded-[24px] font-black text-xl flex items-center justify-center transition-all border-2",
+                      floorFormData.floors.includes(floor)
+                        ? "bg-slate-900 text-white border-slate-900 shadow-lg"
+                        : "bg-slate-50 text-slate-300 border-transparent hover:border-slate-200"
+                    )}
+                  >
+                    {floor}
+                  </button>
+                ))}
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-[13px] shadow-xl shadow-slate-200 hover:bg-slate-800 active:scale-[0.98] transition-all"
+              >
+                Lưu phân tầng
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Override Modal */}
+      {editingActionKey && (
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-t-[40px] md:rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden border border-white animate-in slide-in-from-bottom duration-500">
+            <div className="p-8 md:p-10 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
+              <div className="space-y-1">
+                <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Ngoại lệ nhân sự</h3>
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Thiết lập quyền riêng biệt</p>
+              </div>
+              <button onClick={() => setEditingActionKey(null)} className="w-12 h-12 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full text-slate-400 border border-slate-100 shadow-sm transition-all">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8 md:p-10 space-y-8">
+              <div className="space-y-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Chọn nhân viên</label>
+                <select 
+                  value={overrideUserId}
+                  onChange={(e) => setOverrideUserId(e.target.value)}
+                  className="w-full h-16 px-8 rounded-[24px] bg-slate-50 border-none font-black text-lg text-slate-900 outline-none focus:ring-4 focus:ring-slate-900/5 transition-all cursor-pointer appearance-none"
+                >
+                  <option value="">-- Chọn nhân viên --</option>
+                  {staffList.map(staff => (
+                    <option key={staff.id} value={staff.id}>{staff.full_name} (@{staff.username})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Quyền hạn áp dụng</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {POLICY_OPTIONS.map(opt => (
                     <button
-                      key={floor}
-                      type="button"
-                      onClick={() => toggleFloor(floor)}
-                      className={`h-14 rounded-2xl font-black text-xl flex items-center justify-center transition-all border-2 ${
-                        floorFormData.floors.includes(floor)
-                          ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200'
-                          : 'bg-slate-50 text-slate-400 border-transparent hover:border-slate-200'
-                      }`}
+                      key={opt.id}
+                      onClick={() => setOverridePolicy(opt.id)}
+                      className={cn(
+                        "h-16 rounded-[24px] text-[10px] font-black uppercase tracking-widest border-2 transition-all",
+                        overridePolicy === opt.id
+                          ? opt.color + " border-transparent shadow-lg"
+                          : "bg-white border-slate-100 text-slate-300 hover:border-slate-200"
+                      )}
                     >
-                      {floor}
+                      {opt.label}
                     </button>
                   ))}
                 </div>
+              </div>
 
-                <div className="flex gap-3 mt-8">
-                  <button 
-                    type="button"
-                    onClick={() => setIsFloorModalOpen(false)}
-                    className="flex-1 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Hủy
-                  </button>
-                  <button 
-                    type="submit"
-                    className="flex-1 py-4 rounded-2xl font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200"
-                  >
-                    Lưu
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* User Override Modal */}
-        {editingActionKey && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <h2 className="text-xl font-black uppercase tracking-tight text-slate-900 mb-2">
-                Thêm ngoại lệ
-              </h2>
-              <p className="text-slate-500 text-sm mb-6 font-medium">Cấp quyền riêng cho nhân viên cụ thể</p>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Nhân viên</label>
-                  <select 
-                    value={overrideUserId}
-                    onChange={(e) => setOverrideUserId(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none font-bold text-slate-700 transition-all cursor-pointer"
-                  >
-                    <option value="">-- Chọn nhân viên --</option>
-                    {staffList.map(staff => (
-                      <option key={staff.id} value={staff.id}>
-                        {staff.full_name} (@{staff.username})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Quyền hạn</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {POLICY_OPTIONS.map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setOverridePolicy(opt.id)}
-                        className={`py-3 rounded-2xl text-xs font-black uppercase tracking-wider border-2 transition-all ${
-                          overridePolicy === opt.id
-                            ? `${opt.color} shadow-sm scale-105`
-                            : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-3 mt-8">
-                  <button 
-                    onClick={() => setEditingActionKey(null)}
-                    className="flex-1 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Hủy
-                  </button>
-                  <button 
-                    disabled={!overrideUserId}
-                    onClick={() => handleUpdateUserPolicy(overrideUserId, editingActionKey!, overridePolicy)}
-                    className="flex-1 py-4 rounded-2xl font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Lưu
-                  </button>
-                </div>
+              <div className="pt-4">
+                <button 
+                  disabled={!overrideUserId}
+                  onClick={() => handleUpdateUserPolicy(overrideUserId, editingActionKey!, overridePolicy)}
+                  className="w-full py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-[13px] shadow-xl shadow-slate-200 hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-30"
+                >
+                  Xác nhận ngoại lệ
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
