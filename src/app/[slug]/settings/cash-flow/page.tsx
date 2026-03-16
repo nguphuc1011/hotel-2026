@@ -13,6 +13,7 @@ import PinValidationModal from '@/components/shared/PinValidationModal';
 import { toast } from 'sonner';
 import { useGlobalDialog } from '@/providers/GlobalDialogProvider';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/controls';
 
 export default function CashFlowSettingsPage() {
   const router = useRouter();

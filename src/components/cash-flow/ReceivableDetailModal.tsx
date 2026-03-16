@@ -22,12 +22,15 @@ import { formatMoney } from '@/lib/utils';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
+import { useAuth } from '@/providers/AuthProvider';
+
 interface ReceivableDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
 export default function ReceivableDetailModal({ isOpen, onClose }: ReceivableDetailModalProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,7 +38,7 @@ export default function ReceivableDetailModal({ isOpen, onClose }: ReceivableDet
   const fetchDetails = async () => {
     setLoading(true);
     try {
-      const data = await cashFlowService.getExpectedRevenueDetails();
+      const data = await cashFlowService.getExpectedRevenueDetails(user?.hotel_id);
       setEntries(data);
     } catch (error) {
       console.error('Error fetching expected revenue details:', error);

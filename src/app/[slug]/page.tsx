@@ -105,9 +105,9 @@ export default function DashboardPage() {
       
       // 1. Fetch Dashboard Data & Settings in parallel
       const [unifiedResult, settingsResult, expectedRevenueResult] = await Promise.all([
-        supabase.rpc('fn_get_dashboard_data'),
-        supabase.rpc('get_system_settings'),
-        supabase.rpc('fn_get_daily_expected_revenue')
+        supabase.rpc('fn_get_dashboard_data', { p_hotel_id: user?.hotel_id }),
+        supabase.rpc('get_system_settings', { p_hotel_id: user?.hotel_id }),
+        supabase.rpc('fn_get_daily_expected_revenue', { p_hotel_id: user?.hotel_id })
       ]);
 
       if (unifiedResult.error) throw unifiedResult.error;

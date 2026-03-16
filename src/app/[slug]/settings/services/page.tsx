@@ -163,62 +163,44 @@ export default function ServicesPage() {
   const executeImport = async (data: { quantity: number; cost: number; notes: string; mode: 'buy_unit' | 'sell_unit' }) => {
     if (!selectedService || data.quantity <= 0) return;
 
-    const qtyBuy = data.quantity;
-    const totalAmount = Math.round(data.cost);
+    const qtyBuy = Number(data.quantity);
+    const totalAmount = Math.round(Number(data.cost));
     let note = data.notes;
     const currentMode = data.mode;
 
-    let finalQtyBuy = qtyBuy;
-    if (currentMode === 'buy_unit') {
-        finalQtyBuy = qtyBuy * (selectedService.conversion_factor || 1);
-        note = `${data.notes} (Nhập theo ${selectedService.unit_buy})`;
-    } else {
-        note = `${data.notes} (Nhập theo ${selectedService.unit_sell})`;
-    }
-
-    if (totalAmount > 0) {
-        const newUnitCost = Math.round(totalAmount / finalQtyBuy);
-        const currentCost = Number(selectedService.cost_price) || 0;
-        
-        const isZeroCost = currentCost === 0;
-        const isDeviation = currentCost > 0 && Math.abs(newUnitCost - currentCost) / currentCost > 0.3;
-
-        if (isZeroCost || isDeviation) {
-            const message = isZeroCost 
-                ? `Cảnh báo: Giá vốn hiện tại đang là 0đ (không hợp lệ). Giá nhập mới là ${formatMoney(newUnitCost)}.\nBạn có muốn CẬP NHẬT lại giá vốn gốc theo giá mới này không?`
-                : `Cảnh báo lệch giá: Giá nhập mới (${formatMoney(newUnitCost)}) lệch nhiều so với giá vốn hiện tại (${formatMoney(currentCost)}).\nBạn có muốn CẬP NHẬT lại giá vốn gốc theo giá mới này không?`;
-
-            const shouldUpdateCost = await confirmDialog({
-                title: 'Phát hiện lệch giá vốn',
-                message: message,
-                confirmLabel: 'Cập nhật giá vốn',
-                cancelLabel: 'Giữ nguyên',
-                destructive: false
-            });
-
-            if (shouldUpdateCost) {
-                await serviceService.updateService(selectedService.id, { 
-                    cost_price: newUnitCost 
-                });
-                toast.success('Đã cập nhật giá vốn gốc!');
-                setSelectedService((prev) => (prev ? { ...prev, cost_price: newUnitCost } : prev));
-            }
-        }
-    }
-    
-    let quantityToPassToRPC = qtyBuy;
+    let finalQtyToImport = qtyBuy;
+    // Nếu nhập theo đơn vị bán (Lon), ta cần quy đổi ngược lại về đơn vị mua (Thùng) để truyền vào RPC
+    // Vì RPC p_qty_buy sẽ nhân với conversion_factor
     if (currentMode === 'sell_unit') {
-        quantityToPassToRPC = qtyBuy / (selectedService.conversion_factor || 1);
+        finalQtyToImport = qtyBuy / (selectedService.conversion_factor || 1);
     }
 
     try {
-      await serviceService.importInventory(selectedService.id, quantityToPassToRPC, totalAmount, note, user?.id);
-      setIsImportModalOpen(false);
-      fetchServices();
-      toast.success('Đã nhập kho thành công');
+      console.log('Executing Import:', { 
+        service_id: selectedService.id, 
+        qty_buy: finalQtyToImport, 
+        total_amount: totalAmount,
+        conversion_factor: selectedService.conversion_factor 
+      });
+      
+      const result = await serviceService.importInventory(
+        selectedService.id, 
+        finalQtyToImport, 
+        totalAmount, 
+        note, 
+        user?.id
+      );
+
+      if (result) {
+        setIsImportModalOpen(false);
+        fetchServices();
+        toast.success('Đã nhập kho thành công');
+      } else {
+        throw new Error('RPC returned null');
+      }
     } catch (error) {
       console.error('Error importing inventory:', error);
-      toast.error('Lỗi khi nhập kho');
+      toast.error('Lỗi khi nhập kho. Vui lòng kiểm tra lại số lượng hoặc quyền hạn.');
     }
   };
 
@@ -255,12 +237,12 @@ export default function ServicesPage() {
         const service = services.find(s => s.id === item.id);
         if (!service) return;
 
-        let finalQtyBuy = item.qty;
+        let finalQtyToImport = Number(item.qty);
         if (item.mode === 'sell_unit') {
-            finalQtyBuy = item.qty / (service.conversion_factor || 1);
+            finalQtyToImport = Number(item.qty) / (service.conversion_factor || 1);
         }
 
-        await serviceService.importInventory(service.id, finalQtyBuy, 0, note, user?.id);
+        return serviceService.importInventory(service.id, finalQtyToImport, 0, note, user?.id);
     });
 
     try {
@@ -271,7 +253,7 @@ export default function ServicesPage() {
       toast.success('Đã nhập kho thành công!');
     } catch (error) {
       console.error('Error bulk importing:', error);
-      toast.error('Lỗi khi nhập kho hàng loạt');
+      toast.error('Lỗi khi nhập kho hàng loạt. Vui lòng kiểm tra lại quyền hạn.');
     }
   };
 
@@ -815,7 +797,191 @@ export default function ServicesPage() {
         actionName={pinActionName}
       />
 
-      {/* Adjust Modal & Bulk Import & History ... already complex, will skip extreme UI change for these deep sub-modals to avoid breaking logic */}
+      {/* 1. Inventory Import Modal */}
+      <InventoryImportModal 
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        service={selectedService}
+        onConfirm={handleImport}
+      />
+
+      {/* 2. Adjust Inventory Modal */}
+      {isAdjustModalOpen && selectedService && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center shadow-sm">
+                  <RefreshCw className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-amber-950">Kiểm kho</h3>
+                  <p className="text-sm font-bold text-amber-600/80 uppercase tracking-wider">{selectedService.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsAdjustModalOpen(false)} className="w-12 h-12 flex items-center justify-center hover:bg-slate-200 rounded-full transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-wider ml-1">Số lượng thực tế ({selectedService.unit_sell})</label>
+                <input 
+                  type="number" 
+                  value={inventoryForm.quantity}
+                  onChange={(e) => setInventoryForm({...inventoryForm, quantity: Number(e.target.value)})}
+                  className="w-full px-6 py-5 rounded-[24px] bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100 outline-none font-black text-3xl text-amber-600 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-wider ml-1">Lý do điều chỉnh</label>
+                <input 
+                  type="text" 
+                  value={inventoryForm.notes}
+                  onChange={(e) => setInventoryForm({...inventoryForm, notes: e.target.value})}
+                  className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100 outline-none font-bold text-slate-600"
+                  placeholder="VD: Hao hụt, Kiểm kê định kỳ..."
+                />
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex gap-4">
+              <button onClick={() => setIsAdjustModalOpen(false)} className="flex-1 py-4 rounded-2xl font-black text-slate-400 hover:bg-slate-200">HỦY</button>
+              <button onClick={handleAdjust} className="flex-[2] py-4 rounded-2xl font-black text-white bg-amber-500 hover:bg-amber-600 shadow-xl shadow-amber-200 transition-all">XÁC NHẬN</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Inventory History Modal */}
+      {isHistoryModalOpen && selectedService && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[40px] w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center shadow-sm">
+                  <History className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-blue-950">Lịch sử kho</h3>
+                  <p className="text-sm font-bold text-blue-600/80 uppercase tracking-wider">{selectedService.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsHistoryModalOpen(false)} className="w-12 h-12 flex items-center justify-center hover:bg-slate-200 rounded-full transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4">
+              {logs.length === 0 ? (
+                <div className="py-20 text-center text-slate-300 font-black uppercase tracking-widest">Chưa có lịch sử biến động</div>
+              ) : (
+                logs.map((log) => (
+                  <div key={log.id} className="bg-slate-50 rounded-3xl p-6 flex items-center justify-between border border-slate-100">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs",
+                        log.type === 'IMPORT' ? "bg-emerald-100 text-emerald-600" : 
+                        log.type === 'ADJUST' ? "bg-amber-100 text-amber-600" : "bg-rose-100 text-rose-600"
+                      )}>
+                        {log.type === 'IMPORT' ? 'NHẬP' : log.type === 'ADJUST' ? 'KIỂM' : 'XUẤT'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-900">{log.notes || 'Biến động kho'}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{format(new Date(log.created_at), 'HH:mm - dd/MM/yyyy')}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={cn("text-lg font-black", log.quantity > 0 ? "text-emerald-600" : "text-rose-600")}>
+                        {log.quantity > 0 ? '+' : ''}{log.quantity} {selectedService.unit_sell}
+                      </p>
+                      <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Tồn: {log.balance_after}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Bulk Import Modal */}
+      {isBulkImportOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[40px] w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-slate-200">
+                  <Truck className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900">Nhập kho nhanh</h3>
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">Cập nhật tồn kho hàng loạt cho Menu</p>
+                </div>
+              </div>
+              <button onClick={() => setIsBulkImportOpen(false)} className="w-12 h-12 flex items-center justify-center hover:bg-slate-200 rounded-full transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50/30">
+              {bulkItems.map((item, idx) => {
+                const service = services.find(s => s.id === item.id);
+                if (!service) return null;
+                return (
+                  <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center justify-between gap-6 shadow-sm">
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center shadow-sm">
+                        <Coffee size={24} />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900">{service.name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tồn: {service.stock_quantity} {service.unit_sell}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex bg-slate-100 p-1 rounded-xl">
+                        <button 
+                          onClick={() => {
+                            const newItems = [...bulkItems];
+                            newItems[idx].mode = 'buy_unit';
+                            setBulkItems(newItems);
+                          }}
+                          className={cn("px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all", item.mode === 'buy_unit' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-400")}
+                        >
+                          {service.unit_buy}
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const newItems = [...bulkItems];
+                            newItems[idx].mode = 'sell_unit';
+                            setBulkItems(newItems);
+                          }}
+                          className={cn("px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all", item.mode === 'sell_unit' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-400")}
+                        >
+                          {service.unit_sell}
+                        </button>
+                      </div>
+                      <input 
+                        type="number"
+                        value={item.qty || ''}
+                        onChange={(e) => {
+                          const newItems = [...bulkItems];
+                          newItems[idx].qty = Number(e.target.value);
+                          setBulkItems(newItems);
+                        }}
+                        placeholder="0"
+                        className="w-24 h-12 bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 rounded-xl font-black text-center text-lg outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="p-8 bg-white border-t border-slate-100 flex gap-4">
+              <button onClick={() => setIsBulkImportOpen(false)} className="flex-1 py-4 rounded-2xl font-black text-slate-400 hover:bg-slate-50 transition-all">HỦY BỎ</button>
+              <button onClick={handleBulkImport} className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95">XÁC NHẬN NHẬP KHO</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 5. MOBILE FLOATING ACTION */}
       <div className="fixed bottom-10 left-0 right-0 px-6 md:hidden z-50">

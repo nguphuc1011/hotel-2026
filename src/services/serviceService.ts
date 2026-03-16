@@ -123,8 +123,8 @@ export const serviceService = {
             // Construct payload dynamically to rely on DB defaults for optional fields
             const payload: any = {
                 p_service_id: serviceId,
-                p_qty_buy: quantity,
-                p_total_amount: totalAmount,
+                p_qty_buy: Number(quantity),
+                p_total_amount: Number(totalAmount),
                 p_payment_method_code: 'cash'
             };
             if (notes) payload.p_notes = notes;
@@ -133,17 +133,20 @@ export const serviceService = {
             // Explicitly logging payload for debugging
             console.log('Import Inventory Payload:', payload);
 
-        // Debug Auth before call
-        const { data: debugAuth } = await supabase.rpc('debug_auth');
-        console.log('Debug Auth Check:', debugAuth);
-
         const { data, error } = await supabase.rpc('import_inventory', payload);
 
-        if (error) throw error;
+        if (error) {
+            console.error('RPC Error importing inventory:', error);
+            // If it's the hotel_id error, we inform the user to contact admin for DB update
+            if (error.message?.includes('hotel_id')) {
+                throw new Error('Lỗi cấu trúc Database: Vui lòng cập nhật hàm import_inventory (bỏ cột hotel_id trong bảng transactions)');
+            }
+            throw error;
+        }
         return data;
     } catch (err: any) {
-        console.error('Error importing inventory:', formatError(err));
-        return null;
+        console.error('Error importing inventory service:', formatError(err));
+        throw err;
     }
   },
 

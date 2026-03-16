@@ -449,10 +449,12 @@ export const cashFlowService = {
     return data;
   },
 
-  async getExpectedRevenueDetails(): Promise<any[]> {
+  async getExpectedRevenueDetails(hotelId?: string): Promise<any[]> {
     try {
       // Gọi RPC mới để lấy dữ liệu đã được filter theo mốc Night Audit từ DB
-      const { data, error } = await supabase.rpc('fn_get_daily_expected_ledger');
+      const { data, error } = await supabase.rpc('fn_get_daily_expected_ledger', {
+        p_hotel_id: hotelId
+      });
 
       if (error) {
         console.error('Error fetching expected revenue ledger:', error);
