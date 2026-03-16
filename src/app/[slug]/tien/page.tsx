@@ -287,34 +287,34 @@ export default function MoneyPage() {
                   Tiền mặt thực tế
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-5xl md:text-[80px] font-black tracking-tighter text-slate-900 leading-none">
+                  <span className="text-4xl md:text-[80px] font-black tracking-tighter text-slate-900 leading-none">
                     {displayRawBalance(balanceStats.cash.closing)}
                   </span>
                   <span className="text-xl md:text-4xl font-black text-slate-200 tracking-tighter uppercase">₫</span>
                 </div>
-                <p className="text-slate-400 font-bold text-sm md:text-lg">Số dư hiện tại trong két an toàn</p>
+                <p className="text-sm md:text-lg font-bold text-slate-400">{walletConfigs.CASH.subLabel}</p>
               </div>
             </div>
 
-            <div className="relative z-10 w-full md:w-auto grid grid-cols-3 md:flex md:flex-col gap-4 md:gap-8 min-w-[300px]">
+            <div className="relative z-10 w-full md:w-auto grid grid-cols-3 md:flex md:flex-col gap-4 md:gap-10 min-w-[300px]">
               <div className="space-y-1 text-center md:text-right">
-                <p className="text-[10px] md:text-[12px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
-                <p className="text-sm md:text-2xl font-black text-slate-800 tracking-tight">{formatMoney(balanceStats.cash.opening)}</p>
+                <p className="text-[10px] md:text-[13px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
+                <p className="text-sm md:text-3xl font-black text-slate-800 tracking-tight">{formatMoney(balanceStats.cash.opening)}</p>
               </div>
-              <div className="space-y-1 text-center md:text-right border-x md:border-x-0 md:border-y border-slate-100 py-0 md:py-6 px-2 md:px-0">
-                <p className="text-[10px] md:text-[12px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
-                <p className="text-sm md:text-2xl font-black text-emerald-600 tracking-tight">+{formatMoney(balanceStats.cash.in)}</p>
+              <div className="space-y-1 text-center md:text-right border-x md:border-x-0 md:border-y border-slate-100 py-0 md:py-8 px-2 md:px-0">
+                <p className="text-[10px] md:text-[13px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
+                <p className="text-sm md:text-3xl font-black text-emerald-600 tracking-tight">+{formatMoney(balanceStats.cash.in)}</p>
               </div>
               <div className="space-y-1 text-center md:text-right">
-                <p className="text-[10px] md:text-[12px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
-                <p className="text-sm md:text-2xl font-black text-rose-600 tracking-tight">-{formatMoney(balanceStats.cash.out)}</p>
+                <p className="text-[10px] md:text-[13px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
+                <p className="text-sm md:text-3xl font-black text-rose-600 tracking-tight">-{formatMoney(balanceStats.cash.out)}</p>
               </div>
             </div>
           </div>
         </section>
 
         {/* 3. SECONDARY WALLETS ROW */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
           {['BANK', 'DEBT', 'RECEIVABLE', 'REVENUE'].map((id) => {
             const config = walletConfigs[id];
             const stats = id === 'BANK' ? balanceStats.bank : id === 'DEBT' ? balanceStats.debt : id === 'RECEIVABLE' ? balanceStats.receivable : balanceStats.revenue;
@@ -328,37 +328,37 @@ export default function MoneyPage() {
                   if (id === 'RECEIVABLE') setIsReceivableModalOpen(true);
                 }}
                 className={cn(
-                  "bg-white rounded-[32px] p-6 md:p-8 border border-slate-200/60 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-500 group relative overflow-hidden",
+                  "bg-white rounded-[24px] md:rounded-[32px] p-5 md:p-8 border border-slate-200/60 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-500 group relative overflow-hidden",
                   isClickable && "cursor-pointer"
                 )}
               >
-                <div className="flex items-center justify-between mb-8">
-                  <div className={cn("p-3 rounded-2xl text-white shadow-lg", `bg-gradient-to-br ${config.gradient}`)}>
+                <div className="flex items-center justify-between mb-6 md:mb-8">
+                  <div className={cn("p-2.5 md:p-3 rounded-xl md:rounded-2xl text-white shadow-lg", `bg-gradient-to-br ${config.gradient}`)}>
                     {config.icon}
                   </div>
-                  {isClickable && <div className="text-slate-300 group-hover:text-slate-900 transition-colors"><ChevronRight size={20} /></div>}
+                  {isClickable && <div className="text-slate-300 group-hover:text-slate-900 transition-colors"><ChevronRight size={18} /></div>}
                 </div>
                 
                 <div className="space-y-1">
-                  <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{config.label}</h3>
+                  <h3 className="text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest">{config.label}</h3>
                   <div className="flex items-baseline gap-1">
-                    <span className={cn("text-2xl md:text-3xl font-black tracking-tight", stats.closing < 0 ? "text-rose-600" : "text-slate-900")}>
+                    <span className={cn("text-xl md:text-3xl font-black tracking-tight", stats.closing < 0 ? "text-rose-600" : "text-slate-900")}>
                       {displayRawBalance(stats.closing)}
                     </span>
-                    <span className="text-xs font-black text-slate-300 uppercase">₫</span>
+                    <span className="text-[10px] md:text-xs font-black text-slate-300 uppercase">₫</span>
                   </div>
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-slate-50 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-slate-50 flex items-center justify-between">
+                  <div className="flex items-center gap-3 md:gap-4">
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Thu</span>
-                      <span className="text-xs font-black text-emerald-600">+{formatMoney(stats.in)}</span>
+                      <span className="text-[8px] md:text-[11px] font-black text-slate-300 uppercase leading-none mb-1 md:mb-1.5 tracking-wider">Thu</span>
+                      <span className="text-xs md:text-base font-black text-emerald-600">+{formatMoney(stats.in)}</span>
                     </div>
-                    <div className="w-px h-6 bg-slate-100 mx-1" />
+                    <div className="w-px h-6 md:h-8 bg-slate-100 mx-1" />
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Chi</span>
-                      <span className="text-xs font-black text-rose-600">-{formatMoney(stats.out)}</span>
+                      <span className="text-[8px] md:text-[11px] font-black text-slate-300 uppercase leading-none mb-1 md:mb-1.5 tracking-wider">Chi</span>
+                      <span className="text-xs md:text-base font-black text-rose-600">-{formatMoney(stats.out)}</span>
                     </div>
                   </div>
                 </div>
@@ -419,66 +419,92 @@ export default function MoneyPage() {
                           onClick={() => tx.ref_id ? setHistoryModal({ open: true, bookingId: tx.ref_id }) : null}
                           className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer flex items-center p-6 md:p-8 gap-6 md:gap-10"
                         >
-                          {/* Time Column */}
-                          <div className="flex flex-col items-center min-w-[60px] md:min-w-[80px]">
-                            <span className="text-base md:text-lg font-black text-slate-900 leading-none mb-1">{timeStr}</span>
-                            <span className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-tighter">{dateStr}</span>
-                          </div>
+                          {/* Mobile Layout (Stacked) / Desktop Layout (Row) */}
+                          <div className="flex flex-col md:flex-row flex-1 p-5 md:p-8 gap-4 md:gap-10">
+                            {/* Time & Icon Group */}
+                            <div className="flex items-center justify-between md:justify-start md:min-w-[180px] gap-4">
+                              <div className="flex flex-col items-center min-w-[60px]">
+                                <span className="text-base md:text-lg font-black text-slate-900 leading-none mb-1">{timeStr}</span>
+                                <span className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-tighter">{dateStr}</span>
+                              </div>
+                              
+                              <div className={cn(
+                                "w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
+                                tx.flow_type === 'IN' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                              )}>
+                                {tx.flow_type === 'IN' ? <ArrowDownRight size={24} strokeWidth={2.5} /> : <ArrowUpRight size={24} strokeWidth={2.5} />}
+                              </div>
 
-                          {/* Category Icon */}
-                          <div className={cn(
-                            "w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
-                            tx.flow_type === 'IN' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                          )}>
-                            {tx.flow_type === 'IN' ? <ArrowDownRight size={24} strokeWidth={2.5} /> : <ArrowUpRight size={24} strokeWidth={2.5} />}
-                          </div>
-
-                          {/* Content Column */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3 mb-1">
-                              <span className="text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-400">{tx.category}</span>
-                              {tx.is_auto && <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-[8px] font-black rounded uppercase">Auto</span>}
+                              {/* Amount on Mobile (Show on right side of icon/time row) */}
+                              <div className="md:hidden text-right flex-1">
+                                <div className={cn(
+                                  "text-xl font-black tracking-tighter",
+                                  tx.flow_type === 'IN' ? "text-emerald-600" : "text-rose-600"
+                                )}>
+                                  {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
+                                </div>
+                              </div>
                             </div>
-                            <h4 className="text-sm md:text-lg font-black text-slate-900 tracking-tight truncate group-hover:text-slate-600 transition-colors">
-                              {(() => {
-                                const parts = [];
-                                if (tx.customer_name) parts.push(tx.customer_name);
-                                if (tx.room_name) parts.push(`P.${tx.room_name}`);
-                                let action = tx.description || '';
-                                if (tx.category === 'Tiền phòng' || tx.category === 'Tiền cọc') {
-                                   if (action.toLowerCase().includes('checkout') || action.toLowerCase().includes('thanh toán phòng')) action = 'Trả phòng';
-                                   else if (action.toLowerCase().includes('cọc')) action = 'Cọc phòng';
-                                   else if (action.toLowerCase().includes('nhận phòng')) action = 'Nhận phòng';
-                                }
-                                if (tx.room_name) {
-                                   const roomRegex = new RegExp(`Phòng ${tx.room_name}|${tx.room_name}`, 'gi');
-                                   action = action.replace(roomRegex, '').replace(/\s+/g, ' ').trim();
-                                   if (action.startsWith('-')) action = action.substring(1).trim();
-                                }
-                                if (action && action !== tx.category) parts.push(action);
-                                return parts.join(' • ');
-                              })()}
-                            </h4>
-                          </div>
 
-                          {/* Amount Column */}
-                          <div className="text-right shrink-0">
-                            <div className={cn(
-                              "text-lg md:text-2xl font-black tracking-tighter mb-1",
-                              tx.flow_type === 'IN' ? "text-emerald-600" : "text-rose-600"
-                            )}>
-                              {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
-                            </div>
-                            <div className="flex items-center justify-end gap-3">
-                              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                            {/* Content Column */}
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                              <div className="flex items-center gap-3 mb-1.5">
+                                <span className="text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-400">{tx.category}</span>
+                                {tx.is_auto && <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-[8px] font-black rounded uppercase">Auto</span>}
+                              </div>
+                              <h4 className="text-sm md:text-lg font-black text-slate-900 tracking-tight leading-snug group-hover:text-slate-600 transition-colors">
                                 {(() => {
-                                  const code = (tx.payment_method_code || 'cash').toLowerCase();
-                                  if (code === 'cash') return 'Tiền mặt';
-                                  if (code === 'pos') return 'POS';
-                                  if (code === 'credit') return 'Công nợ';
-                                  return 'Chuyển khoản';
+                                  const parts = [];
+                                  if (tx.customer_name) parts.push(tx.customer_name);
+                                  if (tx.room_name) parts.push(`P.${tx.room_name}`);
+                                  let action = tx.description || '';
+                                  if (tx.category === 'Tiền phòng' || tx.category === 'Tiền cọc') {
+                                     if (action.toLowerCase().includes('checkout') || action.toLowerCase().includes('thanh toán phòng')) action = 'Trả phòng';
+                                     else if (action.toLowerCase().includes('cọc')) action = 'Cọc phòng';
+                                     else if (action.toLowerCase().includes('nhận phòng')) action = 'Nhận phòng';
+                                  }
+                                  if (tx.room_name) {
+                                     const roomRegex = new RegExp(`Phòng ${tx.room_name}|${tx.room_name}`, 'gi');
+                                     action = action.replace(roomRegex, '').replace(/\s+/g, ' ').trim();
+                                     if (action.startsWith('-')) action = action.substring(1).trim();
+                                  }
+                                  if (action && action !== tx.category) parts.push(action);
+                                  return parts.join(' • ');
                                 })()}
-                              </span>
+                              </h4>
+                              {/* Staff & Payment Method on Mobile */}
+                              <div className="md:hidden mt-2 flex items-center gap-3">
+                                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                                  {(() => {
+                                    const code = (tx.payment_method_code || 'cash').toLowerCase();
+                                    if (code === 'cash') return 'Tiền mặt';
+                                    if (code === 'pos') return 'POS';
+                                    if (code === 'credit') return 'Công nợ';
+                                    return 'Chuyển khoản';
+                                  })()}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Amount Column (Desktop only) */}
+                            <div className="hidden md:flex flex-col justify-center text-right shrink-0 min-w-[180px]">
+                              <div className={cn(
+                                "text-2xl font-black tracking-tighter mb-1",
+                                tx.flow_type === 'IN' ? "text-emerald-600" : "text-rose-600"
+                              )}>
+                                {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
+                              </div>
+                              <div className="flex items-center justify-end gap-3">
+                                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                                  {(() => {
+                                    const code = (tx.payment_method_code || 'cash').toLowerCase();
+                                    if (code === 'cash') return 'Tiền mặt';
+                                    if (code === 'pos') return 'POS';
+                                    if (code === 'credit') return 'Công nợ';
+                                    return 'Chuyển khoản';
+                                  })()}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
