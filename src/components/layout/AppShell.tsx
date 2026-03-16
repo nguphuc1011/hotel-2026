@@ -259,66 +259,67 @@ export default function AppShell({
   return (
     <div className="flex w-full h-screen overflow-hidden bg-white">
       <WalletNotificationModal />
-      {/* PC Sidebar */}
-      <aside className="hidden md:flex flex-col w-72 h-full bg-white border-r border-slate-100 z-50">
-        <div className="p-8">
+      {/* PC Sidebar - Hidden on mobile, Mini on Tablet Landscape (lg:flex), Full on Desktop (xl:flex) */}
+      <aside className={cn(
+        "hidden lg:flex flex-col h-full bg-white border-r border-slate-100 z-50 transition-all duration-300 ease-in-out",
+        "lg:w-20 xl:w-72" // lg (Landscape Tablet) = Mini, xl (Desktop) = Full
+      )}>
+        <div className="p-4 xl:p-8 flex justify-center xl:justify-start">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2 text-blue-600">
-              {hotelName || 'Hệ thống'}
+            <h1 className="text-xl xl:text-2xl font-black uppercase tracking-tighter flex items-center gap-2 text-blue-600 truncate">
+              <Building2 className="xl:hidden" size={28} />
+              <span className="hidden xl:inline">{hotelName || 'Hệ thống'}</span>
             </h1>
           </div>
         </div>
         
-        <nav className="flex-1 px-4 space-y-1">
+        <nav className="flex-1 px-2 xl:px-4 space-y-2">
           {finalSidebarItems.map((item) => (
             <Link 
               key={item.href} 
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 font-bold text-sm",
+                "flex items-center gap-3 py-3 rounded-2xl transition-all duration-200 font-bold text-sm group relative",
                 pathname === item.href 
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
                   : item.isSpecial 
                     ? "text-emerald-500 hover:bg-emerald-50"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-blue-600"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-blue-600",
+                "justify-center xl:justify-start px-0 xl:px-4" // Mini mode = centered icons
               )}
             >
-              {item.icon}
-              {item.label}
+              <div className="shrink-0 transition-transform group-hover:scale-110 duration-200">
+                {item.icon}
+              </div>
+              <span className="hidden xl:inline truncate">{item.label}</span>
+              
+              {/* Tooltip for Mini Sidebar */}
+              <div className="lg:xl:hidden absolute left-full ml-4 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] whitespace-nowrap shadow-xl">
+                {item.label}
+                <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45" />
+              </div>
             </Link>
           ))}
         </nav>
 
-        <div className="p-6 border-t border-white/20 relative" ref={userMenuRef}>
+        <div className="p-4 xl:p-6 border-t border-slate-50 relative" ref={userMenuRef}>
           {showInstallBtn && (
             <button 
               onClick={handleInstallApp}
-              className="flex items-center gap-3 p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group animate-bounce-subtle"
+              className="flex items-center gap-3 p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group animate-bounce-subtle justify-center xl:justify-start"
             >
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 shrink-0 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
                 <Download size={20} />
               </div>
-              <div className="flex-1 text-left">
+              <div className="hidden xl:block flex-1 text-left">
                 <p className="text-sm font-black uppercase tracking-tight">Cài đặt App</p>
                 <p className="text-[10px] font-bold opacity-70 uppercase tracking-wider">Trải nghiệm tốt hơn</p>
               </div>
             </button>
           )}
 
-          {isIOS && (
-            <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 mb-4 animate-in fade-in slide-in-from-bottom-2">
-              <div className="flex items-center gap-2 mb-2">
-                <Smartphone size={16} className="text-blue-500" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Cài đặt trên iPhone</p>
-              </div>
-              <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
-                Nhấn nút <span className="text-blue-600 font-black">Chia sẻ</span> bên dưới trình duyệt và chọn <span className="text-blue-600 font-black">Thêm vào MH chính</span>.
-              </p>
-            </div>
-          )}
-
           {isUserMenuOpen && (
-            <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
+            <div className="absolute bottom-full left-2 right-2 xl:left-4 xl:right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
               <button 
                 onClick={() => {
                   setIsChangePinModalOpen(true);
@@ -327,7 +328,7 @@ export default function AppShell({
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-main font-bold text-sm transition-colors text-left"
               >
                 <Key size={16} className="text-muted" />
-                Đổi mã PIN
+                <span className="hidden xl:inline">Đổi mã PIN</span>
               </button>
               <div className="h-px bg-gray-100 my-1" />
               <button 
@@ -335,29 +336,29 @@ export default function AppShell({
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 text-rose-500 font-bold text-sm transition-colors text-left"
               >
                 <LogOut size={16} />
-                Đăng xuất
+                <span className="hidden xl:inline">Đăng xuất</span>
               </button>
             </div>
           )}
           
           <button 
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center gap-3 p-3 w-full rounded-2xl hover:bg-white/40 transition-all group"
+            className="flex items-center gap-3 p-2 xl:p-3 w-full rounded-2xl hover:bg-slate-50 transition-all group justify-center xl:justify-start"
           >
-            <div className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center font-black text-lg shadow-lg shadow-accent/20 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
               {user?.full_name?.charAt(0) || 'U'}
             </div>
-            <div className="flex-1 text-left">
-              <p className="text-sm font-black text-main truncate">{user?.full_name}</p>
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">{user?.role}</p>
+            <div className="hidden xl:block flex-1 text-left truncate">
+              <p className="text-sm font-black text-slate-700 truncate">{user?.full_name}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user?.role}</p>
             </div>
-            <ChevronUp size={16} className={`text-muted transition-transform duration-300 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+            <ChevronUp size={16} className={cn("hidden xl:block text-slate-400 transition-transform duration-300", isUserMenuOpen && "rotate-180")} />
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-[#F8F9FB] pt-0 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-0">
+      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-[#F8F9FB] pt-0 pb-[max(6rem,env(safe-area-inset-bottom))] lg:pb-0">
         <div className="w-full">
           {children}
         </div>
@@ -436,9 +437,9 @@ export default function AppShell({
       )}
 
 
-      {/* Mobile Bottom Nav */}
+      {/* Mobile Bottom Nav - Show on mobile and iPad Portrait (lg:hidden) */}
       {mounted && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-[75px] flex items-end">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 h-[75px] flex items-end">
           <div className="relative w-full h-[65px] flex items-center justify-between px-4 bg-white/90 backdrop-blur-xl rounded-t-[24px] shadow-[0_-10px_30px_rgba(0,0,0,0.1)] border-t border-white/40">
             
             <div className="flex-1 flex justify-around items-center h-full">

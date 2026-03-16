@@ -32,6 +32,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
   const [formData, setFormData] = useState({
     flow_type: 'OUT' as 'IN' | 'OUT',
     category: '',
+    category_id: '', // New
     amount: 0,
     description: '',
     payment_method_code: 'cash',
@@ -59,6 +60,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
         setFormData({
           flow_type: transaction.flow_type,
           category: transaction.category,
+          category_id: transaction.category_id || '', // New
           amount: transaction.amount,
           description: transaction.description || '',
           payment_method_code: transaction.payment_method_code || 'cash',
@@ -86,10 +88,11 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
       } else if (initialCustomer) {
         setSelectedCustomer(initialCustomer);
         setCustomerSearchTerm(initialCustomer.full_name);
+        // We'll find the category ID in the useEffect for categories
         setFormData(prev => ({
            ...prev,
            flow_type: 'IN', // Default to receiving money (Repayment)
-           category: 'Thu nợ', // Auto-select category if possible
+           category: 'Thu nợ', 
            amount: Math.abs(initialCustomer.balance) > 0 ? Math.abs(initialCustomer.balance) : 0
         }));
       } else {
@@ -97,6 +100,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
         setFormData({
           flow_type: 'OUT',
           category: '',
+          category_id: '', // New
           amount: 0,
           description: '',
           payment_method_code: 'cash',
@@ -144,6 +148,14 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
     try {
       const data = await cashFlowService.getCategories();
       setCategories(data);
+      
+      // Auto-select ID if we have a category name but no ID (e.g. from initialData)
+      if (formData.category && !formData.category_id) {
+        const cat = data.find(c => c.name === formData.category && c.type === formData.flow_type);
+        if (cat) {
+          setFormData(prev => ({ ...prev, category_id: cat.id }));
+        }
+      }
     } catch (error) {
       console.error(error);
       toast.error('Không thể tải danh mục');
@@ -170,6 +182,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
             description: formData.description,
             occurred_at: submitDate.toISOString(),
             category: formData.category,
+            // category_id: formData.category_id, // If updateTransaction supports it
             payment_method_code: formData.payment_method_code,
             verifiedStaff: verifiedStaff
          });
@@ -189,6 +202,8 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
           } else {
              await cashFlowService.createTransaction({
                 ...formData,
+                category: formData.category,
+                category_id: formData.category_id,
                 occurred_at: submitDate,
                 verifiedStaff: verifiedStaff
              });
@@ -204,6 +219,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
           setFormData({
             flow_type: 'OUT',
             category: '',
+            category_id: '', // New
             amount: 0,
             description: '',
             payment_method_code: 'cash',
@@ -222,8 +238,8 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!formData.category || formData.amount <= 0) {
-      toast.error('Vui lòng nhập đầy đủ thông tin');
+    if (!formData.category_id || formData.amount <= 0) {
+      toast.error('Vui lòng chọn danh mục và nhập số tiền');
       return;
     }
 
@@ -231,7 +247,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
         ? 'finance_delete_transaction' 
         : (formData.flow_type === 'IN' ? 'finance_create_income' : 'finance_manual_cash_out');
 
-    verify(permissionKey, (staffId, staffName) => {
+    verify(permissionKey as any, (staffId, staffName) => {
         if (staffId) {
             handleProcessTransaction({ id: staffId, name: staffName || '' });
         } else if (user) {
@@ -243,7 +259,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
   };
 
   const filteredCategories = categories.filter(c => 
-    c.type === formData.flow_type && (!c.is_system || c.name === formData.category)
+    c.type === formData.flow_type && (!c.is_system || c.id === formData.category_id)
   );
 
   return (
@@ -351,9 +367,15 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
                                  setSelectedCustomer(c);
                                  setCustomerSearchTerm(c.full_name);
                                  setCustomersList([]);
-                                 // Auto-fill amount if repayment
+                                 // Auto-fill amount and category if repayment
                                  if (formData.flow_type === 'IN' && c.balance < 0) {
-                                    setFormData(prev => ({ ...prev, amount: Math.abs(c.balance), category: 'Thu nợ' }));
+                                    const repaymentCat = categories.find(cat => cat.name === 'Thu nợ' && cat.type === 'IN');
+                                    setFormData(prev => ({ 
+                                      ...prev, 
+                                      amount: Math.abs(c.balance), 
+                                      category: 'Thu nợ',
+                                      category_id: repaymentCat?.id || ''
+                                    }));
                                  }
                               }}
                               className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center justify-between group transition-colors"
@@ -394,12 +416,12 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => setFormData({ ...formData, category: cat.name })}
+                  onClick={() => setFormData({ ...formData, category: cat.name, category_id: cat.id })}
                   className={cn(
                     "px-3 py-3 rounded-xl text-sm font-bold border-2 transition-all text-left truncate",
-                    formData.category === cat.name
-                      ? "border-[#007AFF] bg-blue-50 text-[#007AFF]"
-                      : "border-slate-100 bg-white text-slate-600 hover:border-slate-200"
+                    formData.category_id === cat.id
+                      ? "bg-slate-900 border-slate-900 text-white shadow-md shadow-slate-200"
+                      : "bg-white border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
                   )}
                 >
                   {cat.name}

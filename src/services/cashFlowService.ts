@@ -5,6 +5,7 @@ export interface CashFlowTransaction {
   id: string;
   flow_type: 'IN' | 'OUT';
   category: string;
+  category_id?: string; // New: Reference to category ID
   amount: number;
   description: string | null;
   occurred_at: string;
@@ -288,7 +289,8 @@ export const cashFlowService = {
   // Gọi RPC tạo phiếu (Transaction safe)
   async createTransaction(payload: {
     flow_type: 'IN' | 'OUT';
-    category: string;
+    category?: string; // Optional if category_id provided
+    category_id?: string; // New: Recommended
     amount: number;
     description: string;
     occurred_at: Date;
@@ -299,7 +301,8 @@ export const cashFlowService = {
   }) {
     const { data, error } = await supabase.rpc('fn_create_cash_flow', {
       p_flow_type: payload.flow_type,
-      p_category: payload.category,
+      p_category: payload.category || null,
+      p_category_id: payload.category_id || null, // Pass to RPC
       p_amount: payload.amount,
       p_description: payload.description,
       p_occurred_at: payload.occurred_at.toISOString(),
