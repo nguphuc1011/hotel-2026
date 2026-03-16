@@ -376,55 +376,57 @@ export default function MoneyPage() {
     if (type === 'large') {
       return (
         <div className={cn(
-          "bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-10 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 group relative overflow-hidden h-full flex flex-col justify-between",
-          "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-50 before:transition-opacity",
+          "bg-white/80 backdrop-blur-xl rounded-[32px] md:rounded-[48px] p-8 md:p-14 border border-white shadow-[0_12px_40px_rgb(0,0,0,0.03)] hover:shadow-[0_25px_60px_rgba(0,0,0,0.08)] transition-all duration-700 group relative overflow-hidden h-full flex flex-col justify-between",
+          "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-30 before:transition-opacity",
           config.gradient
         )}>
           {/* Decorative elements */}
-          <div className="absolute top-0 right-0 p-6 md:p-12 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity duration-700 pointer-events-none rotate-12 group-hover:rotate-0">
-            <Banknote className="w-40 h-40 md:w-60 md:h-60" strokeWidth={1} />
+          <div className="absolute top-0 right-0 p-8 md:p-16 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-1000 pointer-events-none rotate-12 group-hover:rotate-0">
+            <Banknote className="w-48 h-48 md:w-80 md:h-80" strokeWidth={1} />
           </div>
 
           <div className="relative z-10">
-            <div className="flex items-center justify-between mb-8 md:mb-12">
-              <div className="flex items-center gap-4 md:gap-6">
-                {config.icon}
+            <div className="flex items-center justify-between mb-10 md:mb-16">
+              <div className="flex items-center gap-5 md:gap-8">
+                <div className="scale-110 md:scale-125">
+                  {config.icon}
+                </div>
                 <div>
-                  <h3 className="text-[17px] md:text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{config.label}</h3>
-                  <p className="text-[17px] md:text-lg font-black text-slate-900 tracking-tight opacity-40">{config.subLabel}</p>
+                  <h3 className="text-[17px] md:text-[14px] font-black text-slate-400 uppercase tracking-[0.25em] mb-1.5">{config.label}</h3>
+                  <p className="text-[17px] md:text-2xl font-black text-slate-900 tracking-tight opacity-40">{config.subLabel}</p>
                 </div>
               </div>
               <div className="flex flex-col items-end">
-                <span className="px-3 py-1 md:px-4 md:py-1.5 bg-white/80 backdrop-blur-sm text-slate-900 text-[13px] md:text-[11px] font-black rounded-xl md:rounded-2xl shadow-sm border border-slate-100 uppercase tracking-widest">VNĐ</span>
+                <span className="px-4 py-1.5 md:px-6 md:py-2 bg-white/90 backdrop-blur-md text-slate-900 text-[13px] md:text-[12px] font-black rounded-full shadow-sm border border-slate-100 uppercase tracking-widest">VNĐ</span>
               </div>
             </div>
 
-            <div className="mb-6 md:mb-10">
-              <div className="flex items-baseline gap-2 md:gap-4 overflow-hidden">
-                <span className="text-7xl md:text-[80px] font-black text-slate-900 tracking-[-0.05em] leading-none truncate">
+            <div className="mb-10 md:mb-16">
+              <div className="flex items-baseline gap-3 md:gap-6 overflow-hidden">
+                <span className="text-5xl md:text-[80px] font-black text-slate-900 tracking-[-0.06em] leading-none truncate">
                   {displayRawBalance(stats.closing)}
                 </span>
-                <span className="text-3xl md:text-4xl font-black text-slate-200 tracking-tighter uppercase mb-1 md:mb-2">₫</span>
+                <span className="text-2xl md:text-4xl font-black text-slate-200 tracking-tighter uppercase mb-1 md:mb-2">₫</span>
               </div>
-              <p className="text-base md:text-base font-bold text-slate-400 mt-4 md:mt-6 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <p className="text-sm md:text-lg font-bold text-slate-400 mt-6 md:mt-10 flex items-center gap-3">
+                <span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
                 Số dư thực tế trong két
               </p>
             </div>
           </div>
 
-          <div className="relative z-10 grid grid-cols-3 gap-3 md:gap-8 pt-6 md:pt-10 border-t border-slate-100/50">
-            <div className="space-y-1 md:space-y-1">
-              <p className="text-[13px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
-              <p className="text-base md:text-xl font-black text-slate-800 tracking-tight truncate">{formatMoney(stats.opening)}</p>
+          <div className="relative z-10 grid grid-cols-3 gap-6 md:gap-12 pt-8 md:pt-14 border-t border-slate-100/50">
+            <div className="space-y-2">
+              <p className="text-[13px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
+              <p className="text-lg md:text-3xl font-black text-slate-800 tracking-tight truncate">{formatMoney(stats.opening)}</p>
             </div>
-            <div className="space-y-1 md:space-y-1">
-              <p className="text-[13px] md:text-[10px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
-              <p className="text-base md:text-xl font-black text-emerald-600 tracking-tight truncate">+{formatMoney(stats.in)}</p>
+            <div className="space-y-2">
+              <p className="text-[13px] md:text-[11px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
+              <p className="text-lg md:text-3xl font-black text-emerald-600 tracking-tight truncate">+{formatMoney(stats.in)}</p>
             </div>
-            <div className="space-y-1 md:space-y-1">
-              <p className="text-[13px] md:text-[10px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
-              <p className="text-base md:text-xl font-black text-rose-600 tracking-tight truncate">-{formatMoney(stats.out)}</p>
+            <div className="space-y-2">
+              <p className="text-[13px] md:text-[11px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
+              <p className="text-lg md:text-3xl font-black text-rose-600 tracking-tight truncate">-{formatMoney(stats.out)}</p>
             </div>
           </div>
         </div>
@@ -434,7 +436,7 @@ export default function MoneyPage() {
     return (
       <div 
         className={cn(
-          "bg-white rounded-[28px] md:rounded-[36px] p-5 md:p-8 border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_15px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group relative overflow-hidden h-full flex flex-col justify-between cursor-pointer",
+          "bg-white/80 backdrop-blur-md rounded-[32px] md:rounded-[40px] p-6 md:p-10 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)] hover:scale-[1.01] transition-all duration-500 group relative overflow-hidden h-full flex flex-col justify-between cursor-pointer",
           config.gradient
         )}
         onClick={() => {
@@ -443,15 +445,15 @@ export default function MoneyPage() {
         }}
       >
         <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12 group-hover:rotate-0">
-          {isBank && <CreditCard className="w-32 h-32 md:w-44 md:h-44" strokeWidth={1} />}
-          {isDebt && <Users className="w-32 h-32 md:w-44 md:h-44" strokeWidth={1} />}
-          {isReceivable && <Lock className="w-32 h-32 md:w-44 md:h-44" strokeWidth={1} />}
-          {isRevenue && <TrendingUp className="w-32 h-32 md:w-44 md:h-44" strokeWidth={1} />}
+          {isBank && <CreditCard className="w-36 h-32 md:w-48 md:h-44" strokeWidth={1} />}
+          {isDebt && <Users className="w-36 h-32 md:w-48 md:h-44" strokeWidth={1} />}
+          {isReceivable && <Lock className="w-36 h-32 md:w-48 md:h-44" strokeWidth={1} />}
+          {isRevenue && <TrendingUp className="w-36 h-32 md:w-48 md:h-44" strokeWidth={1} />}
         </div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 md:gap-5 mb-6 md:mb-8">
-            <div className="scale-75 md:scale-100 origin-left">
+          <div className="flex items-center gap-4 md:gap-6 mb-8 md:mb-10">
+            <div className="scale-90 md:scale-100 origin-left">
               {config.icon}
             </div>
             <div>
@@ -460,7 +462,7 @@ export default function MoneyPage() {
             </div>
           </div>
 
-          <div className="mb-4 md:mb-8">
+          <div className="mb-6 md:mb-10">
             <div className="flex items-baseline gap-1 md:gap-2">
               <span className={cn(
                 "text-5xl md:text-[42px] font-black tracking-tighter leading-none",
@@ -473,7 +475,7 @@ export default function MoneyPage() {
           </div>
         </div>
 
-          <div className="relative z-10 pt-4 md:pt-6 border-t border-slate-100/50">
+          <div className="relative z-10 pt-6 md:pt-8 border-t border-slate-100/50">
             {isDebt || isReceivable ? (
               <div className={cn(
                 "w-full flex items-center justify-between group/btn",
@@ -481,20 +483,20 @@ export default function MoneyPage() {
               )}>
                 <span className="text-[17px] md:text-[11px] font-black uppercase tracking-widest">Chi tiết</span>
                 <div className={cn(
-                  "w-12 h-12 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover/btn:translate-x-1 shadow-sm",
+                  "w-12 h-12 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-300 group-hover/btn:translate-x-1 shadow-sm",
                   isDebt ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
                 )}>
-                  <ArrowUpRight className="w-6 h-6 md:w-5 md:h-5" strokeWidth={3} />
+                  <ArrowUpRight className="w-6 h-6 md:w-6 md:h-6" strokeWidth={3} />
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-2 md:gap-3">
+                  <div className="flex items-center gap-3 md:gap-4">
                     <span className="text-[13px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu</span>
                     <span className="text-xl md:text-base font-black text-emerald-600">+{formatMoney(stats.in)}</span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 md:gap-4">
                     <span className="text-[13px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Chi</span>
                     <span className="text-xl md:text-base font-black text-rose-600">-{formatMoney(stats.out)}</span>
                   </div>
@@ -507,72 +509,70 @@ export default function MoneyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/30 p-4 md:p-10 pb-32 space-y-6 md:space-y-12">
+    <div className="min-h-screen bg-[#F5F5F7] p-4 md:p-10 pb-32 space-y-8 md:space-y-14">
       {SecurityModals}
       {/* Header */}
-      <div className="flex flex-col gap-6 md:gap-8">
-        <div className="flex items-center justify-between">
-          <div className="relative">
-            <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-[-0.04em]">Quỹ tiền</h1>
-            <div className="absolute -top-1 -right-3 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] animate-pulse" />
-          </div>
-          
-          <div className="hidden md:flex items-center gap-3 md:gap-4">
-            {can(PERMISSION_KEYS.FINANCE_ADJUST_WALLET) && (
-              <button 
-                onClick={() => setIsAdjustmentModalOpen(true)}
-                className="h-12 md:h-14 px-4 md:px-6 bg-white text-amber-600 rounded-xl md:rounded-[20px] text-[11px] md:text-sm font-black uppercase tracking-widest shadow-sm border border-slate-100 hover:bg-amber-50 transition-all flex items-center justify-center gap-2 md:gap-3"
-              >
-                <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
-                Điều chỉnh
-              </button>
-            )}
-            {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="h-12 md:h-14 px-4 md:px-8 bg-slate-900 text-white rounded-xl md:rounded-[20px] text-[11px] md:text-sm font-black uppercase tracking-widest shadow-[0_10px_30px_rgba(15,23,42,0.2)] hover:bg-slate-800 transition-all flex items-center justify-center gap-2 md:gap-3"
-              >
-                <Plus className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
-                Lập phiếu
-              </button>
-            )}
-          </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="relative">
+          <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight">Quỹ tiền</h1>
+          <div className="absolute -top-1 -right-3 w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse" />
         </div>
-
-        {/* Action Buttons for Mobile */}
-        <div className="grid grid-cols-2 md:hidden items-center gap-3">
+        
+        <div className="flex items-center gap-3 md:gap-4">
           {can(PERMISSION_KEYS.FINANCE_ADJUST_WALLET) && (
             <button 
               onClick={() => setIsAdjustmentModalOpen(true)}
-              className="h-12 px-4 bg-white text-amber-600 rounded-xl text-[11px] font-black uppercase tracking-widest shadow-sm border border-slate-100 active:bg-amber-50 transition-all flex items-center justify-center gap-2"
+              className="h-12 md:h-14 px-6 md:px-8 bg-white text-slate-900 rounded-full text-sm font-bold uppercase tracking-wider shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-slate-100"
             >
-              <AlertTriangle className="w-4 h-4" />
+              <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
               Điều chỉnh
             </button>
           )}
           {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="h-12 px-4 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-[0_10px_30px_rgba(15,23,42,0.2)] active:bg-slate-800 transition-all flex items-center justify-center gap-2"
+              className="h-12 md:h-14 px-6 md:px-10 bg-slate-900 text-white rounded-full text-sm font-bold uppercase tracking-wider shadow-[0_10px_25px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
-              <Plus className="w-5 h-5" strokeWidth={3} />
+              <Plus className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
               Lập phiếu
             </button>
           )}
         </div>
-        
-        {/* Time Filter - Slidable on Mobile */}
-        <div className="flex items-center gap-1 p-1 bg-slate-200/50 rounded-xl md:rounded-2xl backdrop-blur-sm overflow-x-auto no-scrollbar scroll-smooth">
+      </div>
+
+      {/* Bento Grid */}
+      <div className="flex flex-col lg:grid lg:grid-cols-4 gap-6 md:gap-10">
+        <div className="lg:col-span-2 lg:row-span-2 min-h-[380px] md:min-h-[550px]">
+          {renderWalletCard('CASH', 'large')}
+        </div>
+        <div className="min-h-[180px] md:h-[300px]">
+          {renderWalletCard('BANK')}
+        </div>
+        <div className="min-h-[180px] md:h-[300px]">
+          {renderWalletCard('DEBT')}
+        </div>
+        <div className="min-h-[180px] md:h-[300px]">
+          {renderWalletCard('REVENUE')}
+        </div>
+        <div className="min-h-[180px] md:h-[300px]">
+          {renderWalletCard('RECEIVABLE')}
+        </div>
+      </div>
+
+      {/* Transaction List Section */}
+      <div className="space-y-6 md:space-y-8">
+        {/* Time Filter - Moved here and Apple Styled */}
+        <div className="flex items-center gap-2 p-1.5 bg-white/50 backdrop-blur-md rounded-2xl md:rounded-[24px] border border-white/50 shadow-sm overflow-x-auto no-scrollbar scroll-smooth w-fit max-w-full mx-auto md:mx-0">
           <div className="flex items-center gap-1 min-w-max px-1">
             {QUICK_RANGES.map((r) => (
               <button
                 key={r.id}
                 onClick={() => handleRangeChange(r.id)}
                 className={cn(
-                  "px-4 py-2 md:px-6 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-[12px] font-black transition-all uppercase tracking-widest whitespace-nowrap",
+                  "px-5 py-2.5 md:px-8 md:py-3 rounded-xl md:rounded-[18px] text-[11px] md:text-[13px] font-bold transition-all uppercase tracking-wider whitespace-nowrap",
                   rangeType === r.id 
-                    ? "bg-white text-slate-900 shadow-sm" 
-                    : "text-slate-400 hover:text-slate-600"
+                    ? "bg-slate-900 text-white shadow-md scale-[1.02]" 
+                    : "text-slate-500 hover:text-slate-900 hover:bg-white/80"
                 )}
               >
                 {r.label}
@@ -580,41 +580,20 @@ export default function MoneyPage() {
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Bento Grid */}
-      <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 md:gap-8">
-        <div className="lg:col-span-2 lg:row-span-2 min-h-[360px] md:min-h-[500px]">
-          {renderWalletCard('CASH', 'large')}
-        </div>
-        <div className="min-h-[160px] md:h-[280px]">
-          {renderWalletCard('BANK')}
-        </div>
-        <div className="min-h-[160px] md:h-[280px]">
-          {renderWalletCard('DEBT')}
-        </div>
-        <div className="min-h-[160px] md:h-[280px]">
-          {renderWalletCard('REVENUE')}
-        </div>
-        <div className="min-h-[160px] md:h-[280px]">
-          {renderWalletCard('RECEIVABLE')}
-        </div>
-      </div>
-
-      {/* Transaction List */}
-      {can(PERMISSION_KEYS.VIEW_MONEY_TRANSACTION_HISTORY) && (
-        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
-          <div className="p-8 md:p-10 border-b border-slate-50 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-slate-50 text-slate-600 rounded-2xl"><Clock size={24} /></div>
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Chi tiết dòng tiền</h2>
+        {can(PERMISSION_KEYS.VIEW_MONEY_TRANSACTION_HISTORY) && (
+          <div className="bg-white/80 backdrop-blur-xl rounded-[32px] md:rounded-[48px] border border-white shadow-[0_10px_40px_rgba(0,0,0,0.03)] overflow-hidden">
+            <div className="p-8 md:p-12 border-b border-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-5">
+                <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-lg shadow-slate-200"><Clock size={28} /></div>
+                <div>
+                  <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight">Dòng tiền</h2>
+                </div>
               </div>
+              <span className="px-5 py-2 bg-slate-100 text-slate-600 text-[11px] font-black rounded-full uppercase tracking-widest shadow-sm">
+                {transactions.length} GD
+              </span>
             </div>
-            <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[9px] font-black rounded-full uppercase tracking-widest">
-              {transactions.length} GD
-            </span>
-          </div>
 
           <div className="overflow-x-auto">
             <div className="min-w-full">
