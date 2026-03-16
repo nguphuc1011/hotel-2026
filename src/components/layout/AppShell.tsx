@@ -260,11 +260,11 @@ export default function AppShell({
   return (
     <div className="flex w-full h-screen overflow-hidden bg-white">
       <WalletNotificationModal />
-      {/* PC Sidebar - Hidden on mobile, Stacked on Tablet/iPad Pro Landscape (lg:flex), Full on Desktop (2xl:flex) */}
+      {/* PC Sidebar - Hidden on mobile/iPad Pro Portrait, Stacked on iPad Pro Landscape (xl:flex), Full on Desktop (2xl:flex) */}
       <aside className={cn(
-        "hidden lg:flex flex-col h-full bg-white z-50 transition-all duration-300 ease-in-out",
+        "hidden xl:flex flex-col h-full bg-white z-50 transition-all duration-300 ease-in-out",
         "border-r border-slate-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)]",
-        "lg:w-24 2xl:w-72" // iPad Pro Landscape (1366px) will now use w-24 (Stacked), only 2xl (1536px+) uses Full
+        "xl:w-24 2xl:w-72" // iPad Pro Landscape (1366px) uses w-24 (Stacked), only 2xl (1536px+) uses Full
       )}>
         <div className="p-4 2xl:p-8 flex justify-center 2xl:justify-start">
           <div className="flex flex-col">
@@ -287,7 +287,7 @@ export default function AppShell({
                   : item.isSpecial 
                     ? "text-emerald-500 hover:bg-emerald-50"
                     : "text-slate-500 hover:bg-slate-50 hover:text-blue-600",
-                // lg (iPad Pro Landscape): Stacked layout
+                // xl (iPad Pro Landscape): Stacked layout
                 // 2xl (Large Desktop): Row layout
                 "flex-col 2xl:flex-row items-center justify-center 2xl:justify-start gap-1 2xl:gap-3 py-2 2xl:py-3 rounded-2xl px-1 2xl:px-4"
               )}
@@ -298,7 +298,7 @@ export default function AppShell({
               
               <span className={cn(
                 "truncate text-[10px] 2xl:text-sm text-center 2xl:text-left leading-tight",
-                "lg:block 2xl:inline"
+                "xl:block 2xl:inline"
               )}>
                 {item.label}
               </span>
@@ -356,8 +356,8 @@ export default function AppShell({
               <p className="text-sm font-black text-slate-700 truncate">{user?.full_name}</p>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user?.role}</p>
             </div>
-            {/* Show name below avatar on lg if space permits or just avatar */}
-            <span className="lg:block 2xl:hidden text-[10px] font-black text-slate-500 truncate max-w-full">
+            {/* Show name below avatar on xl if space permits or just avatar */}
+            <span className="xl:block 2xl:hidden text-[10px] font-black text-slate-500 truncate max-w-full">
               {user?.full_name?.split(' ').pop()}
             </span>
             <ChevronUp size={16} className={cn("hidden 2xl:block text-slate-400 transition-transform duration-300", isUserMenuOpen && "rotate-180")} />
@@ -366,7 +366,7 @@ export default function AppShell({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-[#F4F7FA] pt-0 pb-[max(6rem,env(safe-area-inset-bottom))] lg:pb-0">
+      <main className="flex-1 h-full overflow-auto relative no-scrollbar bg-[#F4F7FA] pt-0 pb-[max(6rem,env(safe-area-inset-bottom))] xl:pb-0">
         <div className="w-full">
           {children}
         </div>
@@ -445,9 +445,9 @@ export default function AppShell({
       )}
 
 
-      {/* Mobile Bottom Nav - Show on mobile and iPad Portrait (lg:hidden) */}
+      {/* Mobile Bottom Nav - Show on mobile and iPad Pro Portrait (xl:hidden) */}
       {mounted && (
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 h-[75px] flex items-end">
+        <nav className="xl:hidden fixed bottom-0 left-0 right-0 z-50 h-[75px] flex items-end">
           <div className="relative w-full h-[65px] flex items-center justify-between px-4 bg-white/90 backdrop-blur-xl rounded-t-[24px] shadow-[0_-10px_30px_rgba(0,0,0,0.1)] border-t border-white/40">
             
             <div className="flex-1 flex justify-around items-center h-full">
