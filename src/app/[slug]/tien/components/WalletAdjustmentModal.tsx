@@ -102,31 +102,28 @@ export default function WalletAdjustmentModal({ isOpen, onClose, onSuccess, wall
           {/* Wallet Selection */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-slate-700">Chọn ví cần điều chỉnh</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setSelectedWalletId('CASH')}
-                className={cn(
-                  "px-4 py-3 rounded-xl border font-bold transition-all",
-                  selectedWalletId === 'CASH' 
-                    ? "bg-emerald-50 border-emerald-500 text-emerald-700" 
-                    : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-                )}
-              >
-                Tiền mặt (Két)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedWalletId('BANK')}
-                className={cn(
-                  "px-4 py-3 rounded-xl border font-bold transition-all",
-                  selectedWalletId === 'BANK' 
-                    ? "bg-blue-50 border-blue-500 text-blue-700" 
-                    : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-                )}
-              >
-                Ngân hàng
-              </button>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'CASH', label: 'Tiền mặt', activeClass: 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' },
+                { id: 'BANK', label: 'Ngân hàng', activeClass: 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' },
+                { id: 'RECEIVABLE', label: 'Công nợ tạm', activeClass: 'bg-orange-50 border-orange-500 text-orange-700 shadow-sm' },
+                { id: 'DEBT', label: 'Công nợ khách', activeClass: 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm' },
+                { id: 'REVENUE', label: 'Sổ doanh thu', activeClass: 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm' },
+              ].map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setSelectedWalletId(w.id)}
+                  className={cn(
+                    "px-3 py-2.5 rounded-xl border text-xs font-black uppercase tracking-tighter transition-all flex items-center justify-center text-center",
+                    selectedWalletId === w.id 
+                      ? w.activeClass 
+                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                  )}
+                >
+                  {w.label}
+                </button>
+              ))}
             </div>
           </div>
 

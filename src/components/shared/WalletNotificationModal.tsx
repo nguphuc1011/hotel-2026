@@ -30,9 +30,8 @@ export default function WalletNotificationModal() {
     const mapping: Record<string, string> = {
       'CASH': 'Tiền mặt',
       'BANK': 'Ngân hàng',
-      'ESCROW': 'Tiền cọc',
-      'REVENUE': 'Doanh thu',
-      'RECEIVABLE': 'Công nợ khách'
+      'RECEIVABLE': 'Công nợ tạm',
+      'REVENUE': 'Doanh thu'
     };
     return mapping[name.toUpperCase()] || name;
   };

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { cashFlowService, CashFlowTransaction, CashFlowStats, Wallet } from '@/services/cashFlowService';
 import TransactionModal from '@/components/cash-flow/TransactionModal';
-import WalletCards from './components/WalletCards';
+import WalletCards from '@/components/cash-flow/WalletCards';
 import BookingHistoryModal from './components/BookingHistoryModal';
 import CustomerDebtModal from './components/CustomerDebtModal';
 import { customerService } from '@/services/customerService';
@@ -207,9 +207,7 @@ export default function CashFlowPage() {
           }
         }}
         customerDebt={customerDebt}
-        externalDebt={0}
         onViewCustomerDebt={() => setIsCustomerDebtModalOpen(true)}
-        onViewExternalDebt={() => {}}
       />
 
       {/* Transaction List */}

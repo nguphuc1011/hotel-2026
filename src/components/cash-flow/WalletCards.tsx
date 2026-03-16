@@ -23,9 +23,7 @@ interface WalletCardsProps {
   onSelectWallet: (id: string | null) => void;
   onRefresh?: () => void;
   customerDebt: number;
-  externalDebt: number;
   onViewCustomerDebt: () => void;
-  onViewExternalDebt: () => void;
 }
 
 export default function WalletCards({ 
@@ -35,9 +33,7 @@ export default function WalletCards({
   onSelectWallet, 
   onRefresh,
   customerDebt,
-  externalDebt,
-  onViewCustomerDebt,
-  onViewExternalDebt
+  onViewCustomerDebt
 }: WalletCardsProps) {
   const [changes, setChanges] = useState<Record<string, { diff: number }>>({});
   const prevBalancesRef = useRef<Record<string, number>>({});
@@ -115,8 +111,8 @@ export default function WalletCards({
     switch (id) {
       case 'CASH': return <Banknote size={24} />;
       case 'BANK': return <Building2 size={24} />;
-      case 'ESCROW': return <Lock size={24} />;
-      case 'RECEIVABLE': return <UserMinus size={24} />;
+      case 'RECEIVABLE': return <Lock size={24} />;
+      case 'DEBT': return <UserMinus size={24} />;
       case 'REVENUE': return <TrendingUp size={24} />;
       default: return <Wallet size={24} />;
     }
@@ -124,151 +120,92 @@ export default function WalletCards({
 
   const getWalletColor = (id: string) => {
     switch (id) {
-      case 'CASH': return 'bg-green-50 text-green-600 border-green-200';
+      case 'CASH': return 'bg-emerald-50 text-emerald-600 border-emerald-200';
       case 'BANK': return 'bg-blue-50 text-blue-600 border-blue-200';
-      case 'ESCROW': return 'bg-orange-50 text-orange-600 border-orange-200';
-      case 'RECEIVABLE': return 'bg-purple-50 text-purple-600 border-purple-200';
+      case 'RECEIVABLE': return 'bg-orange-50 text-orange-600 border-orange-200';
+      case 'DEBT': return 'bg-rose-50 text-rose-600 border-rose-200';
       case 'REVENUE': return 'bg-indigo-50 text-indigo-600 border-indigo-200';
-      default: return 'bg-gray-50 text-gray-600 border-gray-200';
+      default: return 'bg-slate-50 text-slate-600 border-slate-200';
     }
   };
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-32 bg-slate-100 rounded-xl animate-pulse" />
         ))}
       </div>
     );
   }
 
+  // Chuẩn hóa danh sách 5 ví để hiển thị
+  const displayWallets = [
+    wallets.find(w => w.id === 'CASH') || { id: 'CASH', name: 'Tiền mặt', balance: 0 },
+    wallets.find(w => w.id === 'BANK') || { id: 'BANK', name: 'Ngân hàng', balance: 0 },
+    wallets.find(w => w.id === 'RECEIVABLE') || { id: 'RECEIVABLE', name: 'Công nợ tạm', balance: 0 },
+    { id: 'DEBT', name: 'Công nợ khách', balance: Math.abs(customerDebt) },
+    wallets.find(w => w.id === 'REVENUE') || { id: 'REVENUE', name: 'Doanh thu', balance: 0 },
+  ];
+
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-        {wallets.map((wallet) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {displayWallets.map((wallet) => {
           const isSelected = selectedWalletId === wallet.id;
           const colorClass = getWalletColor(wallet.id);
+          const icon = getWalletIcon(wallet.id);
           
           return (
             <div 
               key={wallet.id}
-              onClick={() => onSelectWallet(isSelected ? null : wallet.id)}
+              onClick={() => {
+                if (wallet.id === 'DEBT') {
+                  onViewCustomerDebt();
+                } else {
+                  onSelectWallet(isSelected ? null : wallet.id);
+                }
+              }}
               className={cn(
-                "cursor-pointer relative overflow-hidden transition-all duration-200 group",
-                "p-4 rounded-xl border-2 hover:shadow-md",
-                isSelected 
-                  ? `ring-2 ring-offset-2 ring-blue-500 ${colorClass}` 
-                  : "bg-white border-gray-100 hover:border-gray-200"
+                "cursor-pointer relative overflow-hidden transition-all duration-300 group",
+                "p-5 rounded-2xl border border-slate-100 bg-white hover:border-slate-200 hover:shadow-xl hover:shadow-slate-200/50",
+                isSelected && "ring-2 ring-slate-900 ring-offset-2 border-transparent shadow-lg"
               )}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className={cn(
-                  "p-2 rounded-lg",
-                  isSelected ? "bg-white/50" : "bg-gray-50 text-gray-500"
-                )}>
-                  {getWalletIcon(wallet.id)}
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={cn(
+                    "p-2.5 rounded-xl transition-colors duration-300",
+                    colorClass
+                  )}>
+                    {icon}
+                  </div>
+                  {isSelected && (
+                    <div className="px-2 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-wider">
+                      Đang chọn
+                    </div>
+                  )}
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  {isSelected && (
-                    <div className="px-2 py-1 bg-white/50 rounded text-[10px] font-bold uppercase tracking-wider">
-                      Đang xem
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <p className={cn(
-                  "text-sm font-medium mb-1",
-                  isSelected ? "opacity-80" : "text-gray-500"
-                )}>
-                  {wallet.name}
-                </p>
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <h3 className={cn(
-                    "text-xl font-bold truncate",
-                    isSelected ? "" : "text-gray-900"
-                  )}>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                    {wallet.id === 'RECEIVABLE' ? 'Khách đang ở' : 
+                     wallet.id === 'DEBT' ? 'Khách đã đi' :
+                     wallet.name}
+                  </p>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">
                     {formatMoney(wallet.balance)}
                   </h3>
-                  
-                  {/* Diff Indicator - Side by Side */}
-                  {changes[wallet.id] && (
-                    <div className={cn(
-                        "text-xs font-bold flex items-center px-1.5 py-0.5 rounded-md animate-in fade-in slide-in-from-left-1 duration-300",
-                        changes[wallet.id].diff > 0 
-                          ? "text-emerald-700 bg-emerald-100/80" 
-                          : "text-rose-700 bg-rose-100/80"
-                    )}>
-                        {changes[wallet.id].diff > 0 ? '+' : ''}{formatMoney(changes[wallet.id].diff)}
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Background decoration */}
-              <div className="absolute -bottom-4 -right-4 opacity-5 pointer-events-none transform rotate-12 scale-150">
-                 {getWalletIcon(wallet.id)}
+              {/* Decorative Background Icon */}
+              <div className="absolute -bottom-6 -right-6 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity duration-500 pointer-events-none transform rotate-12 scale-[2.5]">
+                 {icon}
               </div>
             </div>
           );
         })}
-
-        {/* Khách nợ Card */}
-        <div 
-          onClick={onViewCustomerDebt}
-          className="cursor-pointer relative overflow-hidden transition-all duration-200 group p-4 rounded-xl border-2 bg-rose-50 border-rose-100 hover:border-rose-200 hover:shadow-md"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="p-2 rounded-lg bg-rose-100 text-rose-600">
-              <Users size={24} />
-            </div>
-          </div>
-          
-          <div>
-            <p className="text-sm font-medium mb-1 text-rose-600/80">
-              Khách nợ
-            </p>
-            <div className="flex flex-wrap items-baseline gap-2">
-              <h3 className="text-xl font-bold truncate text-rose-700">
-                {formatMoney(Math.abs(customerDebt))}
-              </h3>
-            </div>
-          </div>
-
-          <div className="absolute -bottom-4 -right-4 opacity-10 pointer-events-none transform rotate-12 scale-150 text-rose-500">
-             <Users size={40} />
-          </div>
-        </div>
-
-        {/* Nợ ngoài Card */}
-        <div 
-          onClick={onViewExternalDebt}
-          className="cursor-pointer relative overflow-hidden transition-all duration-200 group p-4 rounded-xl border-2 bg-amber-50 border-amber-100 hover:border-amber-200 hover:shadow-md"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="p-2 rounded-lg bg-amber-100 text-amber-600">
-              <FileWarning size={24} />
-            </div>
-          </div>
-          
-          <div>
-            <p className="text-sm font-medium mb-1 text-amber-600/80">
-              Nợ ngoài
-            </p>
-            <div className="flex flex-wrap items-baseline gap-2">
-              <h3 className="text-xl font-bold truncate text-amber-700">
-                {formatMoney(externalDebt)}
-              </h3>
-            </div>
-          </div>
-
-          <div className="absolute -bottom-4 -right-4 opacity-10 pointer-events-none transform rotate-12 scale-150 text-amber-500">
-             <FileWarning size={40} />
-          </div>
-        </div>
       </div>
     </>
   );

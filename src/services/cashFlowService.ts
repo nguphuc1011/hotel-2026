@@ -447,5 +447,29 @@ export const cashFlowService = {
     }
     
     return data;
+  },
+
+  async getExpectedRevenueDetails(): Promise<any[]> {
+    try {
+      // Gọi RPC mới để lấy dữ liệu đã được filter theo mốc Night Audit từ DB
+      const { data, error } = await supabase.rpc('fn_get_daily_expected_ledger');
+
+      if (error) {
+        console.error('Error fetching expected revenue ledger:', error);
+        throw error;
+      }
+      
+      // Map lại cấu trúc dữ liệu để tương thích với Frontend hiện tại
+      return (data || []).map((item: any) => ({
+        ...item,
+        bookings: {
+          rooms: { room_number: item.room_number },
+          customers: { full_name: item.customer_name }
+        }
+      }));
+    } catch (err) {
+      console.error('Fatal error in getExpectedRevenueDetails:', err);
+      throw err;
+    }
   }
 };

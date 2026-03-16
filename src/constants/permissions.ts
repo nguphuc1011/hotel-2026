@@ -8,7 +8,6 @@ export const PERMISSION_METADATA = [
       { code: PERMISSION_KEYS.VIEW_MONEY_BALANCE_CASH, label: 'Xem số dư Tiền mặt (Két)' },
       { code: PERMISSION_KEYS.VIEW_MONEY_BALANCE_BANK, label: 'Xem số dư Ngân hàng' },
       { code: PERMISSION_KEYS.VIEW_MONEY_REVENUE, label: 'Xem Sổ Doanh thu (Quỹ tổng hợp)' },
-      { code: PERMISSION_KEYS.VIEW_MONEY_EXTRA_FUNDS, label: 'Xem Quỹ mở rộng (Cọc, Công nợ...)' },
       { code: PERMISSION_KEYS.VIEW_MONEY_DEBT_LIST, label: 'Xem Danh sách Khách nợ' },
       { code: PERMISSION_KEYS.VIEW_MONEY_TRANSACTION_HISTORY, label: 'Xem Lịch sử Giao dịch' },
       { code: PERMISSION_KEYS.FINANCE_ADJUST_WALLET, label: 'Điều chỉnh số dư quỹ' },

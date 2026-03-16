@@ -12,7 +12,6 @@ export const PERMISSION_KEYS = {
   VIEW_MONEY_BALANCE_CASH: 'view_money_balance_cash',
   VIEW_MONEY_BALANCE_BANK: 'view_money_balance_bank',
   VIEW_MONEY_REVENUE: 'view_money_revenue',
-  VIEW_MONEY_EXTRA_FUNDS: 'view_money_extra_funds', // Shows Escrow/Receivable/Revenue blocks
   CREATE_TRANSACTION: 'create_transaction',
 
   // Dashboard

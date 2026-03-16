@@ -27,6 +27,7 @@ import TransactionModal from '@/components/cash-flow/TransactionModal';
 import { useParams, useRouter } from 'next/navigation';
 import { formatMoney } from '@/utils/format';
 import { TrendingUp } from 'lucide-react';
+import ReceivableDetailModal from '@/components/cash-flow/ReceivableDetailModal';
 
 export interface FilterState {
   available: boolean;
@@ -70,6 +71,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isReceivableModalOpen, setIsReceivableModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -193,62 +195,70 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             onClick={handleRefresh}
             disabled={loading || isRefreshing}
             className={cn(
-              "flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-blue-600 md:bg-white text-white md:text-blue-600 rounded-2xl shadow-lg md:shadow-sm border border-transparent md:border-slate-100",
-              "hover:bg-blue-700 md:hover:bg-slate-50 active:scale-95 transition-all duration-200",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
+              "flex items-center justify-center transition-all duration-300 active:scale-95 disabled:opacity-50",
+              "w-10 h-10 md:w-auto md:h-11 md:px-5 rounded-2xl",
+              "bg-slate-100 md:bg-white text-slate-600 border border-slate-200/60 md:shadow-sm md:hover:bg-slate-50 md:hover:border-slate-300"
             )}
           >
-            <ArrowRightLeft className={cn((isRefreshing || loading) && "animate-spin")} size={18} />
-            <span className="text-[9px] md:text-sm font-bold uppercase tracking-tight md:text-slate-700">Cập nhật</span>
+            <ArrowRightLeft className={cn((isRefreshing || loading) && "animate-spin")} size={18} strokeWidth={2.5} />
+            <span className="hidden md:block ml-2 text-sm font-bold tracking-tight">Cập nhật</span>
           </button>
 
           {/* Dự thu thực tế trong ngày (Tham khảo) */}
-          <div className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2 bg-emerald-50 border border-emerald-100 rounded-2xl">
-            <div className="p-1 md:p-1.5 bg-emerald-500 rounded-lg text-white">
-              <TrendingUp size={14} className="md:w-4 md:h-4" />
+          <div 
+            onClick={() => setIsReceivableModalOpen(true)}
+            className={cn(
+              "flex flex-col md:flex-row items-center justify-center cursor-pointer transition-all duration-500 group",
+              "px-3 md:px-6 py-1 md:py-2.5 rounded-2xl md:rounded-3xl",
+              "bg-white md:bg-white/80 border border-emerald-100 md:border-slate-200/60 md:backdrop-blur-xl",
+              "md:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)] md:hover:shadow-[0_8px_20px_-2px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5"
+            )}
+          >
+            <div className="hidden md:flex p-2 bg-emerald-50 text-emerald-600 rounded-2xl mr-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-300">
+              <TrendingUp size={18} strokeWidth={2.5} />
             </div>
-            <div>
-              <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-emerald-600 leading-none mb-0.5 md:mb-1 whitespace-nowrap">Dự thu</p>
-              <p className="text-xs md:text-sm font-black text-slate-900 leading-none">{formatMoney(expectedRevenue)}</p>
+            <div className="flex flex-col md:block items-center">
+              <p className="text-[8px] md:text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 md:text-slate-500 leading-none mb-0.5 md:mb-1 whitespace-nowrap">Dự thu</p>
+              <p className="text-sm md:text-lg font-black text-slate-900 leading-none tracking-tight">{formatMoney(expectedRevenue)}</p>
             </div>
           </div>
         </div>
 
         {/* Right Actions: Mobile Filter + Sell Service + User */}
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-3">
           
           {/* Mobile Filter Toggle */}
           <button 
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={cn(
-              "w-12 h-12 md:w-10 md:h-10 rounded-2xl flex flex-col items-center justify-center border shadow-sm transition-all gap-1",
+              "w-10 h-10 md:w-11 md:h-11 rounded-2xl flex items-center justify-center transition-all duration-300 border",
               showMobileFilters 
-                ? "bg-slate-900 text-white border-slate-900" 
-                : "bg-white text-slate-600 border-slate-200"
+                ? "bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-900/20" 
+                : "bg-slate-100 md:bg-white text-slate-600 border-slate-200/60 md:shadow-sm md:hover:bg-slate-50"
             )}
           >
-            <Filter size={18} />
-            <span className="md:hidden text-[9px] font-bold uppercase tracking-tight">Lọc</span>
+            <Filter size={18} strokeWidth={2.5} />
+            <span className="hidden md:block ml-2 text-sm font-bold tracking-tight">Lọc</span>
           </button>
 
           {/* Transaction Button */}
           {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
             <button 
               onClick={() => setIsTransactionModalOpen(true)}
-              className="h-12 md:h-10 px-2 md:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+              className="h-10 md:h-11 px-3 md:px-5 bg-blue-600 text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 md:shadow-blue-600/10 hover:bg-blue-700 transition-all active:scale-95"
             >
-              <Banknote size={18} />
-              <span className="text-[9px] md:text-sm font-bold uppercase tracking-tight">Thu Chi</span>
+              <Banknote className="hidden md:block" size={18} strokeWidth={2.5} />
+              <span className="text-[10px] md:text-sm font-bold tracking-tight">Thu Chi</span>
             </button>
           )}
 
           {/* Sell Service Button */}
           <button 
             onClick={() => toast.info('Tính năng đang phát triển')}
-            className="h-12 md:h-10 px-2 md:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+            className="h-10 md:h-11 px-3 md:px-5 bg-slate-900 text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10 hover:bg-slate-800 transition-all active:scale-95"
           >
-            <Store size={18} />
-            <span className="text-[9px] md:text-sm font-bold uppercase tracking-tight">Bán DV</span>
+            <Store className="hidden md:block" size={18} strokeWidth={2.5} />
+            <span className="text-[10px] md:text-sm font-bold tracking-tight">Bán DV</span>
           </button>
 
           {/* User Profile */}
@@ -359,75 +369,72 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
       {/* Change PIN Modal */}
       {isChangePinModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">
-                Đổi mã PIN
-              </h2>
-              <button 
-                onClick={() => setIsChangePinModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleChangePin} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Mã PIN cũ</label>
-                <input 
-                  type="password"
-                  maxLength={4}
-                  value={changePinData.oldPin}
-                  onChange={e => setChangePinData({...changePinData, oldPin: e.target.value.replace(/\D/g, '')})}
-                  className="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-emerald-500 outline-none font-black text-center text-2xl tracking-[1em]"
-                  placeholder="••••"
-                  autoFocus
-                />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsChangePinModalOpen(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 md:p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-black text-slate-900">ĐỔI MÃ PIN</h2>
+                <button onClick={() => setIsChangePinModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">PIN Mới</label>
-                  <input 
+              <form onSubmit={handleChangePin} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Mã PIN cũ</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={changePinData.oldPin}
+                    onChange={(e) => setChangePinData({ ...changePinData, oldPin: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    placeholder="****"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Mã PIN mới</label>
+                  <input
                     type="password"
                     maxLength={4}
                     value={changePinData.newPin}
-                    onChange={e => setChangePinData({...changePinData, newPin: e.target.value.replace(/\D/g, '')})}
-                    className="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-emerald-500 outline-none font-black text-center text-2xl tracking-[0.5em]"
+                    onChange={(e) => setChangePinData({ ...changePinData, newPin: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    placeholder="****"
+                    required
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Xác nhận</label>
-                  <input 
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Xác nhận PIN mới</label>
+                  <input
                     type="password"
                     maxLength={4}
                     value={changePinData.confirmPin}
-                    onChange={e => setChangePinData({...changePinData, confirmPin: e.target.value.replace(/\D/g, '')})}
-                    className="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-emerald-500 outline-none font-black text-center text-2xl tracking-[0.5em]"
+                    onChange={(e) => setChangePinData({ ...changePinData, confirmPin: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    placeholder="****"
+                    required
                   />
                 </div>
-              </div>
-
-              <div className="flex gap-3 mt-8">
-                <button 
-                  type="button"
-                  onClick={() => setIsChangePinModalOpen(false)}
-                  className="flex-1 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors"
-                >
-                  Hủy
-                </button>
-                <button 
+                
+                <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200 mt-4"
                 >
-                  Đổi PIN
+                  XÁC NHẬN ĐỔI PIN
                 </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
+      )}
+
+      {isReceivableModalOpen && (
+        <ReceivableDetailModal
+          isOpen={isReceivableModalOpen}
+          onClose={() => setIsReceivableModalOpen(false)}
+        />
       )}
     </div>
   );

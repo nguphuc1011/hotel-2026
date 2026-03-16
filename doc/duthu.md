@@ -16,19 +16,19 @@
 Hệ thống ghi nhận biến động vào một sổ cái riêng (`daily_expected_ledger`) dựa trên các sự kiện sau:
 
 ### A. Các sự kiện làm TĂNG con số (+)
-1. **Check-in (Phòng Ngày/Đêm):** Cộng ngay `[Tiền phòng 1 ngày]` + `[Phụ thu sớm]` + `[Tiền dịch vụ ban đầu]`.
-2. **Check-out (Phòng Giờ):** Cộng `[Tiền phòng thực tế]` + `[Phụ thu muộn]`.
-3. **Phát sinh Dịch vụ/Phụ thu:** Cộng ngay giá trị dịch vụ/phụ thu mới vào thời điểm nhân viên nhập máy (áp dụng cho cả phòng Giờ và Ngày).
+1. **Check-in (Mọi loại phòng):** Cộng ngay `[Tiền phòng ban đầu]` + `[Phụ thu sớm]`. (Tiền phòng ban đầu là 1 ngày/đêm hoặc giờ đầu tiên).
+2. **Check-out (Phòng Giờ):** Cộng thêm phần chênh lệch giữa `[Tiền phòng thực tế]` và số tiền đã ghi nhận lúc Check-in.
+3. **Phát sinh Dịch vụ/Phụ thu:** Cộng ngay giá trị dịch vụ/phụ thu mới vào thời điểm nhân viên nhập máy.
 4. **Mốc tính thêm ngày (Stay-over):** Khi hệ thống tự động nhảy tiền phòng cho khách ở nhiều ngày, cộng thêm `[Tiền phòng 1 ngày]`.
 
 ### B. Các sự kiện làm GIẢM con số (-)
 1. **Hủy phòng:** Trừ lại toàn bộ số tiền đã từng được cộng vào dự thu của booking đó.
-2. **Sửa giá/Giảm giá:** Trừ đi phần giá trị chênh lệch bị giảm xuống.
+2. **Sửa giá:** Trừ đi/Cộng thêm phần chênh lệch khi nhân viên thay đổi giá phòng thủ công.
 3. **Xóa dịch vụ:** Trừ đi giá trị của dịch vụ vừa xóa khỏi hóa đơn.
 
 ### C. Các trường hợp GIỮ NGUYÊN (0)
-1. **Check-out (Phòng Ngày/Đêm):** Không tác động, vì tiền này đã được ghi nhận lúc khách vào hoặc lúc nhảy mốc tính thêm ngày.
-2. **Tiền dịch vụ lúc Check-out phòng Giờ:** Không cộng thêm (vì đã cộng lúc nhập máy ở bước A.3), tránh lỗi cộng trùng 2 lần.
+1. **Phụ thu quá giờ (Ngày/Đêm):** Không tự động cộng vào dự thu (theo yêu cầu đơn giản hóa, đây chỉ là số tham khảo).
+2. **Check-out (Phòng Ngày/Đêm):** Không tác động.
 
 ---
 
