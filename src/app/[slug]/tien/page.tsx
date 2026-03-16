@@ -719,6 +719,7 @@ export default function MoneyPage() {
           </div>
         </div>
       )}
+    </div>
 
       <TransactionModal 
         isOpen={isModalOpen} 
