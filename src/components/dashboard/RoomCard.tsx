@@ -74,9 +74,9 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
             .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
 
           if (currentPoint) {
-            totalAmount = currentPoint.amount;
-            durationText = currentPoint.reason || booking.duration_text;
-            usingLadder = true;
+          totalAmount = currentPoint.amount;
+          durationText = currentPoint.reason || booking.duration_text || null;
+          usingLadder = true;
             
             // Check if ladder price already reached ceiling
             if (booking.booking_type === 'hourly') {
