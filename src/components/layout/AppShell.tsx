@@ -260,10 +260,10 @@ export default function AppShell({
   return (
     <div className="flex w-full h-screen overflow-hidden bg-white">
       <WalletNotificationModal />
-      {/* PC Sidebar - Hidden on mobile, Mini on Tablet Landscape (lg:flex), Full on Desktop (xl:flex) */}
+      {/* PC Sidebar - Hidden on mobile, Stacked (Icon top, Text bottom) on Tablet Landscape (lg:flex), Full on Desktop (xl:flex) */}
       <aside className={cn(
         "hidden lg:flex flex-col h-full bg-white border-r border-slate-100 z-50 transition-all duration-300 ease-in-out",
-        "lg:w-20 xl:w-72" // lg (Landscape Tablet) = Mini, xl (Desktop) = Full
+        "lg:w-24 xl:w-72" // lg (Landscape Tablet) = 96px (Stacked), xl (Desktop) = 288px (Full)
       )}>
         <div className="p-4 xl:p-8 flex justify-center xl:justify-start">
           <div className="flex flex-col">
@@ -274,27 +274,37 @@ export default function AppShell({
           </div>
         </div>
         
-        <nav className="flex-1 px-2 xl:px-4 space-y-2">
+        <nav className="flex-1 px-2 xl:px-4 space-y-4 xl:space-y-2">
           {finalSidebarItems.map((item) => (
             <Link 
               key={item.href} 
               href={item.href}
               className={cn(
-                "flex items-center gap-3 py-3 rounded-2xl transition-all duration-200 font-bold text-sm group relative",
+                "flex transition-all duration-200 font-bold group relative",
                 pathname === item.href 
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
                   : item.isSpecial 
                     ? "text-emerald-500 hover:bg-emerald-50"
                     : "text-slate-500 hover:bg-slate-50 hover:text-blue-600",
-                "justify-center xl:justify-start px-0 xl:px-4" // Mini mode = centered icons
+                // lg (iPad Landscape): Stacked layout (column), 
+                // xl (PC): Row layout
+                "flex-col xl:flex-row items-center justify-center xl:justify-start gap-1 xl:gap-3 py-2 xl:py-3 rounded-2xl px-1 xl:px-4"
               )}
             >
               <div className="shrink-0 transition-transform group-hover:scale-110 duration-200">
                 {item.icon}
               </div>
-              <span className="hidden xl:inline truncate">{item.label}</span>
               
-              {/* Tooltip for Mini Sidebar */}
+              {/* Text: Below icon on lg, Beside icon on xl */}
+              <span className={cn(
+                "truncate text-[10px] xl:text-sm text-center xl:text-left leading-tight",
+                "lg:block xl:inline" // Always show text on lg and xl
+              )}>
+                {item.label}
+              </span>
+              
+              {/* Tooltip only for Mini Sidebar if text was hidden (but here we show text) */}
+              {/* Keeping it for extra UX if needed, but it won't show due to hidden class logic */}
               <div className="lg:xl:hidden absolute left-full ml-4 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] whitespace-nowrap shadow-xl">
                 {item.label}
                 <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45" />
@@ -307,52 +317,56 @@ export default function AppShell({
           {showInstallBtn && (
             <button 
               onClick={handleInstallApp}
-              className="flex items-center gap-3 p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group animate-bounce-subtle justify-center xl:justify-start"
+              className="flex flex-col xl:flex-row items-center gap-1 xl:gap-3 p-2 xl:p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group animate-bounce-subtle justify-center xl:justify-start"
             >
-              <div className="w-10 h-10 shrink-0 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
-                <Download size={20} />
+              <div className="w-8 h-8 xl:w-10 xl:h-10 shrink-0 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
+                <Download size={18} className="xl:size-20" />
               </div>
-              <div className="hidden xl:block flex-1 text-left">
-                <p className="text-sm font-black uppercase tracking-tight">Cài đặt App</p>
-                <p className="text-[10px] font-bold opacity-70 uppercase tracking-wider">Trải nghiệm tốt hơn</p>
+              <div className="xl:block flex-1 text-center xl:text-left">
+                <p className="text-[9px] xl:text-sm font-black uppercase tracking-tight">Cài đặt</p>
+                <p className="hidden xl:block text-[10px] font-bold opacity-70 uppercase tracking-wider">Trải nghiệm tốt</p>
               </div>
             </button>
           )}
 
           {isUserMenuOpen && (
-            <div className="absolute bottom-full left-2 right-2 xl:left-4 xl:right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
+            <div className="absolute bottom-full left-1 right-1 xl:left-4 xl:right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
               <button 
                 onClick={() => {
                   setIsChangePinModalOpen(true);
                   setIsUserMenuOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-main font-bold text-sm transition-colors text-left"
+                className="w-full flex flex-col xl:flex-row items-center gap-1 xl:gap-3 px-2 xl:px-4 py-2 xl:py-3 rounded-xl hover:bg-gray-50 text-main font-bold text-[10px] xl:text-sm transition-colors text-center xl:text-left"
               >
-                <Key size={16} className="text-muted" />
-                <span className="hidden xl:inline">Đổi mã PIN</span>
+                <Key size={14} className="xl:size-16 text-muted" />
+                <span>Mã PIN</span>
               </button>
               <div className="h-px bg-gray-100 my-1" />
               <button 
                 onClick={logout}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 text-rose-500 font-bold text-sm transition-colors text-left"
+                className="w-full flex flex-col xl:flex-row items-center gap-1 xl:gap-3 px-2 xl:px-4 py-2 xl:py-3 rounded-xl hover:bg-rose-50 text-rose-500 font-bold text-[10px] xl:text-sm transition-colors text-center xl:text-left"
               >
-                <LogOut size={16} />
-                <span className="hidden xl:inline">Đăng xuất</span>
+                <LogOut size={14} className="xl:size-16" />
+                <span>Thoát</span>
               </button>
             </div>
           )}
           
           <button 
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center gap-3 p-2 xl:p-3 w-full rounded-2xl hover:bg-slate-50 transition-all group justify-center xl:justify-start"
+            className="flex flex-col xl:flex-row items-center gap-1 xl:gap-3 p-2 xl:p-3 w-full rounded-2xl hover:bg-slate-50 transition-all group justify-center xl:justify-start"
           >
-            <div className="w-10 h-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 xl:w-10 xl:h-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-sm xl:text-lg shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
               {user?.full_name?.charAt(0) || 'U'}
             </div>
-            <div className="hidden xl:block flex-1 text-left truncate">
+            <div className="xl:block flex-1 text-left truncate hidden">
               <p className="text-sm font-black text-slate-700 truncate">{user?.full_name}</p>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user?.role}</p>
             </div>
+            {/* Show name below avatar on lg if space permits or just avatar */}
+            <span className="lg:block xl:hidden text-[10px] font-black text-slate-500 truncate max-w-full">
+              {user?.full_name?.split(' ').pop()}
+            </span>
             <ChevronUp size={16} className={cn("hidden xl:block text-slate-400 transition-transform duration-300", isUserMenuOpen && "rotate-180")} />
           </button>
         </div>
