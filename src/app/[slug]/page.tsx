@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [rooms, setRooms] = useState<DashboardRoom[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [expectedRevenue, setExpectedRevenue] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   
   // New Filter State
@@ -104,9 +105,10 @@ export default function DashboardPage() {
       console.log(`[Dashboard] Fetching data (isSilent: ${isSilent}) at ${new Date().toLocaleTimeString()}`);
       
       // 1. Fetch Dashboard Data & Settings in parallel
-      const [unifiedResult, settingsResult] = await Promise.all([
+      const [unifiedResult, settingsResult, expectedRevenueResult] = await Promise.all([
         supabase.rpc('fn_get_dashboard_data'),
-        supabase.rpc('get_system_settings')
+        supabase.rpc('get_system_settings'),
+        supabase.rpc('fn_get_daily_expected_revenue')
       ]);
 
       if (unifiedResult.error) throw unifiedResult.error;
@@ -114,6 +116,9 @@ export default function DashboardPage() {
       if (unifiedResult.data) {
         const { rooms: roomsData, bookings: bookingsData, rates: ratesData, wallets: walletsData } = unifiedResult.data;
         
+        // Update Expected Revenue
+        setExpectedRevenue(expectedRevenueResult.data || 0);
+
         // 2. Update Settings only if changed
         const newSettings = settingsResult.data || null;
         setSettings((prev: any) => {
@@ -628,13 +633,14 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#F8F9FB] pb-32">
       <div className="w-full px-0 md:px-8 py-0 md:py-6">
         <DashboardHeader 
-          hotelName={settings?.hotel_name}
-          counts={counts}
-          filters={filters}
-          onToggle={handleToggleFilter}
-          onRefresh={fetchData}
-          loading={loading}
-        />
+         hotelName={settings?.hotel_name}
+         counts={counts}
+         filters={filters}
+         onToggle={handleToggleFilter}
+         onRefresh={fetchData}
+         loading={loading}
+         expectedRevenue={expectedRevenue}
+       />
 
         {/* Room Grid */}
         <div className="w-full px-4 md:px-0 mt-4 md:mt-6">

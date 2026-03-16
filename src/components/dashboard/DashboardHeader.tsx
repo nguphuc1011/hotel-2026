@@ -25,6 +25,8 @@ import { usePermission } from '@/hooks/usePermission';
 import { PERMISSION_KEYS } from '@/services/permissionService';
 import TransactionModal from '@/components/cash-flow/TransactionModal';
 import { useParams, useRouter } from 'next/navigation';
+import { formatMoney } from '@/utils/format';
+import { TrendingUp } from 'lucide-react';
 
 export interface FilterState {
   available: boolean;
@@ -48,6 +50,7 @@ interface DashboardHeaderProps {
   onToggle: (key: keyof FilterState) => void;
   onRefresh?: () => Promise<void>;
   loading?: boolean;
+  expectedRevenue?: number;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
@@ -56,7 +59,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   filters, 
   onToggle,
   onRefresh,
-  loading
+  loading,
+  expectedRevenue = 0
 }) => {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -197,6 +201,17 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             <ArrowRightLeft className={cn((isRefreshing || loading) && "animate-spin")} size={18} />
             <span className="text-[9px] md:text-sm font-bold uppercase tracking-tight md:text-slate-700">Cập nhật</span>
           </button>
+
+          {/* Dự thu thực tế trong ngày (Tham khảo) */}
+          <div className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2 bg-emerald-50 border border-emerald-100 rounded-2xl">
+            <div className="p-1 md:p-1.5 bg-emerald-500 rounded-lg text-white">
+              <TrendingUp size={14} className="md:w-4 md:h-4" />
+            </div>
+            <div>
+              <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-emerald-600 leading-none mb-0.5 md:mb-1 whitespace-nowrap">Dự thu</p>
+              <p className="text-xs md:text-sm font-black text-slate-900 leading-none">{formatMoney(expectedRevenue)}</p>
+            </div>
+          </div>
         </div>
 
         {/* Right Actions: Mobile Filter + Sell Service + User */}
