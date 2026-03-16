@@ -55,90 +55,78 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
 
       const now = new Date();
       const nowTime = now.getTime();
-      let totalAmount = 0;
+      
+      // MẶC ĐỊNH: Lấy số tiền cuối cùng từ Backend (Khớp 100% Folio)
+      let totalAmount = booking.total_amount || 0;
+      let durationText = booking.duration_text || null;
       let usingLadder = false;
       let ceilingHit = false;
-      let durationText = booking.duration_text || null;
 
-      // 1. ƯU TIÊN SỐ 1: Sử dụng Thang giá (Pricing Ladder) từ DB - CHÍNH XÁC 100% THEO BACKEND
+      // 1. CẬP NHẬT THEO THANG GIÁ (Nếu có mốc mới trong tương lai/quá khứ gần)
       if (booking.pricing_ladder && Array.isArray(booking.pricing_ladder) && booking.pricing_ladder.length > 0) {
         const ladder = booking.pricing_ladder;
         const lastPointTime = new Date(ladder[ladder.length - 1].time).getTime();
 
-        // Chỉ dùng ladder nếu thời điểm hiện tại nằm trong phạm vi của ladder
-        // Nếu đã vượt quá mốc cuối cùng của ladder -> Dữ liệu đã cũ, cần tính toán lại
         if (nowTime <= lastPointTime) {
-          // Tìm mốc giá mới nhất trong QUÁ KHỨ (hoặc hiện tại)
           const currentPoint = ladder
             .filter(p => new Date(p.time).getTime() <= nowTime)
             .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
 
           if (currentPoint) {
-          totalAmount = currentPoint.amount;
-          durationText = currentPoint.reason || booking.duration_text || null;
-          usingLadder = true;
-            
-            // Check if ladder price already reached ceiling
-            if (booking.booking_type === 'hourly') {
-              const ceilingPercent = settings?.hourly_ceiling_percent || 100;
-              const ceilingAmount = (room.price_daily || 0) * (ceilingPercent / 100);
-              if (totalAmount >= ceilingAmount && ceilingAmount > 0) {
-                ceilingHit = true;
-              }
-            }
+            totalAmount = currentPoint.amount;
+            durationText = currentPoint.reason || booking.duration_text || null;
+            usingLadder = true;
           }
         }
       } 
 
-      // 2. FALLBACK: Nếu thang giá lỗi, hết hạn hoặc không có điểm phù hợp, mới tính toán ở FE
+      // 2. FALLBACK: Nếu thang giá hết hạn (như phòng 204 ở lâu ngày), dùng logic tính toán dự phòng
       if (!usingLadder) {
-        const { amount, isCeilingHit } = calculateLiveRoomCharge({
-          checkInAt: booking.check_in_at,
-          rentalType: booking.booking_type,
-          prices: {
-            hourly: room.price_hourly || 0,
-            price_next_hour: room.price_next_hour || 0,
-            daily: room.price_daily || 0,
-            overnight: room.price_overnight || 0,
-            base_hourly_limit: room.base_hourly_limit || 1,
-            hourly_unit: room.hourly_unit || 60,
-          },
-          settings: settings
-        });
-        totalAmount = amount;
-        ceilingHit = isCeilingHit;
-
-        // Cập nhật text hiển thị thời gian khi dùng fallback FE
-        if (ceilingHit) {
-           const hours = Math.max(1, differenceInHours(now, new Date(booking.check_in_at)));
-           const days = Math.max(1, Math.ceil(hours / 24));
-           durationText = `${days} ngày`;
-        } else if (booking.booking_type === 'hourly') {
-           const diffMin = differenceInMinutes(now, new Date(booking.check_in_at));
-           const h = Math.floor(diffMin / 60);
-           const m = diffMin % 60;
-           durationText = h > 0 ? `${h} giờ ${m} phút` : `${m} phút`;
+        // Nếu Backend đã tính sẵn total_amount (Snapshot/Live), dùng luôn con số đó
+        // Chỉ khi không có mới dùng calculateLiveRoomCharge
+        if (booking.total_amount && booking.total_amount > 0) {
+           totalAmount = booking.total_amount;
         } else {
-           const hours = Math.max(1, differenceInHours(now, new Date(booking.check_in_at)));
-           const units = Math.max(1, Math.ceil(hours / 24));
-           durationText = `${units} ${booking.booking_type === 'overnight' ? 'đêm' : 'ngày'}`;
+          const { amount, isCeilingHit } = calculateLiveRoomCharge({
+            checkInAt: booking.check_in_at,
+            rentalType: booking.booking_type,
+            prices: {
+              hourly: room.price_hourly || 0,
+              price_next_hour: room.price_next_hour || 0,
+              daily: room.price_daily || 0,
+              overnight: room.price_overnight || 0,
+              base_hourly_limit: room.base_hourly_limit || 1,
+              hourly_unit: room.hourly_unit || 60,
+            },
+            settings: settings
+          });
+          totalAmount = amount;
+          ceilingHit = isCeilingHit;
         }
 
-        // Cộng thêm các thành phần động khác
-        totalAmount = totalAmount 
-          + (booking.service_total || 0) 
-          + (booking.surcharge_amount || 0) 
-          + (booking.extra_person_charge || 0)
-          + (booking.custom_surcharge || 0)
-          - (booking.discount_amount || 0);
+        // Cập nhật text hiển thị thời gian khi dùng fallback
+        if (!durationText) {
+           const hours = Math.max(1, differenceInHours(now, new Date(booking.check_in_at)));
+           if (hours >= 24) {
+              const days = Math.floor(hours / 24);
+              const rem = hours % 24;
+              durationText = `${days} ngày${rem > 0 ? ` ${rem} giờ` : ''}`;
+           } else {
+              const diffMin = differenceInMinutes(now, new Date(booking.check_in_at));
+              const h = Math.floor(diffMin / 60);
+              const m = diffMin % 60;
+              durationText = h > 0 ? `${h} giờ ${m} phút` : `${m} phút`;
+           }
+        }
       }
 
       // 3. Kết hợp với Thu trước và Nợ cũ (Static)
+      // Chú ý: totalAmount ở đây là tiền phòng + dịch vụ từ BE trả về
       const finalToPay = totalAmount 
         - (booking.deposit_amount || 0) 
         + (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0);
         
-      // 3. ĐỊNH DẠNG LẠI HIỂN THỊ (Fix lỗi BE trả về "giờ" khi đã nhảy giá "ngày")
+      // 4. ĐỊNH DẠNG LẠI HIỂN THỊ THỜI GIAN
       if (durationText && durationText.includes('giờ')) {
         const hoursMatch = durationText.match(/\d+/);
         if (hoursMatch) {
