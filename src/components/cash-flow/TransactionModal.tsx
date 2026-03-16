@@ -74,6 +74,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
         setFormData({
           flow_type: initialData.flow_type || 'OUT',
           category: initialData.category || '',
+          category_id: initialData.category_id || '', // Fixed: Added missing category_id
           amount: initialData.amount || 0,
           description: initialData.description || '',
           payment_method_code: initialData.payment_method_code || 'cash',
@@ -93,6 +94,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
            ...prev,
            flow_type: 'IN', // Default to receiving money (Repayment)
            category: 'Thu nợ', 
+           category_id: '', // Will be filled by fetchCategories
            amount: Math.abs(initialCustomer.balance) > 0 ? Math.abs(initialCustomer.balance) : 0
         }));
       } else {
@@ -284,7 +286,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
             <button
               type="button"
-              onClick={() => setFormData({ ...formData, flow_type: 'IN', category: '' })}
+              onClick={() => setFormData({ ...formData, flow_type: 'IN', category: '', category_id: '' })}
               className={cn(
                 "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all",
                 formData.flow_type === 'IN'
@@ -297,7 +299,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, initialCu
             </button>
             <button
               type="button"
-              onClick={() => setFormData({ ...formData, flow_type: 'OUT', category: '' })}
+              onClick={() => setFormData({ ...formData, flow_type: 'OUT', category: '', category_id: '' })}
               className={cn(
                 "flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all",
                 formData.flow_type === 'OUT'
