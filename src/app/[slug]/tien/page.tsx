@@ -455,15 +455,15 @@ export default function MoneyPage() {
               {config.icon}
             </div>
             <div>
-              <h3 className="text-[9px] md:text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-0.5 leading-none">{config.label}</h3>
-              <p className="text-[10px] md:text-sm font-black text-slate-900 tracking-tight opacity-30 leading-none">{config.subLabel}</p>
+              <h3 className="text-[11px] md:text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-0.5 leading-none">{config.label}</h3>
+              <p className="text-[12px] md:text-sm font-black text-slate-900 tracking-tight opacity-30 leading-none">{config.subLabel}</p>
             </div>
           </div>
 
           <div className="mb-4 md:mb-8">
             <div className="flex items-baseline gap-1 md:gap-2">
               <span className={cn(
-                "text-2xl md:text-[42px] font-black tracking-tighter leading-none",
+                "text-3xl md:text-[42px] font-black tracking-tighter leading-none",
                 stats.closing < 0 ? "text-rose-600" : "text-slate-900"
               )}>
                 {displayRawBalance(stats.closing)}
@@ -479,7 +479,7 @@ export default function MoneyPage() {
                 "w-full flex items-center justify-between group/btn",
                 isDebt ? "text-rose-600" : "text-amber-600"
               )}>
-                <span className="text-[9px] md:text-[11px] font-black uppercase tracking-widest">Chi tiết</span>
+                <span className="text-[11px] md:text-[11px] font-black uppercase tracking-widest">Chi tiết</span>
                 <div className={cn(
                   "w-10 h-10 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover/btn:translate-x-1 shadow-sm",
                   isDebt ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
@@ -491,12 +491,12 @@ export default function MoneyPage() {
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu</span>
-                    <span className="text-sm md:text-base font-black text-blue-600">+{formatMoney(stats.in)}</span>
+                    <span className="text-[10px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu</span>
+                    <span className="text-base md:text-base font-black text-blue-600">+{formatMoney(stats.in)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Chi</span>
-                    <span className="text-sm md:text-base font-black text-rose-600">-{formatMoney(stats.out)}</span>
+                    <span className="text-[10px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Chi</span>
+                    <span className="text-base md:text-base font-black text-rose-600">-{formatMoney(stats.out)}</span>
                   </div>
                 </div>
               </div>
@@ -609,11 +609,10 @@ export default function MoneyPage() {
               <div className="p-3 bg-slate-50 text-slate-600 rounded-2xl"><Clock size={24} /></div>
               <div>
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">Chi tiết dòng tiền</h2>
-                <p className="text-sm font-bold text-slate-400">Danh sách giao dịch thu chi trong kỳ</p>
               </div>
             </div>
-            <span className="px-4 py-1.5 bg-slate-100 text-slate-500 text-[10px] font-black rounded-full uppercase tracking-widest">
-              {transactions.length} giao dịch
+            <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[9px] font-black rounded-full uppercase tracking-widest">
+              {transactions.length} GD
             </span>
           </div>
 
