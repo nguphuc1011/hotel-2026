@@ -138,6 +138,19 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         - (booking.deposit_amount || 0) 
         + (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0);
         
+      // 3. ĐỊNH DẠNG LẠI HIỂN THỊ (Fix lỗi BE trả về "giờ" khi đã nhảy giá "ngày")
+      if (durationText && durationText.includes('giờ')) {
+        const hoursMatch = durationText.match(/\d+/);
+        if (hoursMatch) {
+          const hours = parseInt(hoursMatch[0]);
+          if (hours >= 24) {
+            const days = Math.floor(hours / 24);
+            const remainingHours = hours % 24;
+            durationText = `${days} ngày${remainingHours > 0 ? ` ${remainingHours} giờ` : ''}`;
+          }
+        }
+      }
+
       setLiveAmount(finalToPay);
       setLiveDuration(durationText);
       setIsLiveCeilingHit(ceilingHit);
