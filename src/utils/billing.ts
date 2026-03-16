@@ -65,26 +65,28 @@ export function calculateLiveRoomCharge(params: LiveCalculationParams): { amount
       }
     }
 
-    // 4. Ceiling logic
+    // 4. Ceiling logic (Giá trần)
     if (settings?.hourly_ceiling_enabled) {
       const ceilingPercent = settings.hourly_ceiling_percent || 100;
-      const ceilingAmount = prices.daily * (ceilingPercent / 100);
-      if (currentAmount > ceilingAmount) {
-        return { amount: ceilingAmount, isCeilingHit: true };
+      const ceilingAmountPerDay = prices.daily * (ceilingPercent / 100);
+      
+      // Nếu tiền giờ vượt quá giá trần của 1 ngày
+      if (currentAmount > ceilingAmountPerDay) {
+        // Tính số ngày lưu trú
+        const elapsedDays = Math.max(1, Math.ceil(differenceInHours(now, checkIn) / 24));
+        return { amount: elapsedDays * prices.daily, isCeilingHit: true };
       }
     }
 
     return { amount: currentAmount, isCeilingHit: false };
   } 
   
-  if (rentalType === 'daily') {
-    const elapsedHours = Math.max(0, differenceInHours(now, checkIn));
-    const days = Math.max(1, Math.ceil((elapsedHours - (graceMin / 60)) / 24));
-    return { amount: days * prices.daily, isCeilingHit: false };
-  }
-  
-  if (rentalType === 'overnight') {
-    return { amount: prices.overnight, isCeilingHit: false };
+  if (rentalType === 'daily' || rentalType === 'overnight') {
+    const elapsedHours = differenceInHours(now, checkIn);
+    // Tính số ngày/đêm bằng cách làm tròn lên mỗi 24 giờ, tối thiểu 1
+    const units = Math.max(1, Math.ceil(elapsedHours / 24));
+    const unitPrice = rentalType === 'daily' ? prices.daily : prices.overnight;
+    return { amount: units * unitPrice, isCeilingHit: false };
   }
 
   return { amount: 0, isCeilingHit: false };

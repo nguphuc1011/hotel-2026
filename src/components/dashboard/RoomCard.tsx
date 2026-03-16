@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardRoom } from '@/types/dashboard';
-import { format } from 'date-fns';
+import { format, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 import LiveTimer from './LiveTimer';
 
 import { formatMoney, getContrastTextColor } from '@/utils/format';
@@ -39,9 +39,12 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
   const [liveAmount, setLiveAmount] = useState<number | null>(null);
   const [isLiveCeilingHit, setIsLiveCeilingHit] = useState(false);
 
+  const [liveDuration, setLiveDuration] = useState<string | null>(null);
+
   useEffect(() => {
     if (room.status !== 'occupied' || !room.current_booking) {
       setLiveAmount(null);
+      setLiveDuration(null);
       setIsLiveCeilingHit(false);
       return;
     }
@@ -55,30 +58,39 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
       let totalAmount = 0;
       let usingLadder = false;
       let ceilingHit = false;
+      let durationText = booking.duration_text || null;
 
-      // 1. ƯU TIÊN SỐ 1: Sử dụng Thang giá (Pricing Ladder) từ DB - GIẢM TẢI HỆ THỐNG
+      // 1. ƯU TIÊN SỐ 1: Sử dụng Thang giá (Pricing Ladder) từ DB - CHÍNH XÁC 100% THEO BACKEND
       if (booking.pricing_ladder && Array.isArray(booking.pricing_ladder) && booking.pricing_ladder.length > 0) {
-        // Tìm mốc giá mới nhất trong QUÁ KHỨ (hoặc hiện tại)
-        const currentPoint = booking.pricing_ladder
-          .filter(p => new Date(p.time).getTime() <= nowTime)
-          .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
+        const ladder = booking.pricing_ladder;
+        const lastPointTime = new Date(ladder[ladder.length - 1].time).getTime();
 
-        if (currentPoint) {
-          totalAmount = currentPoint.amount;
-          usingLadder = true;
-          
-          // Check if ladder price already reached ceiling
-          if (booking.booking_type === 'hourly') {
-            const ceilingPercent = settings?.hourly_ceiling_percent || 100;
-            const ceilingAmount = (room.price_daily || 0) * (ceilingPercent / 100);
-            if (totalAmount >= ceilingAmount && ceilingAmount > 0) {
-              ceilingHit = true;
+        // Chỉ dùng ladder nếu thời điểm hiện tại nằm trong phạm vi của ladder
+        // Nếu đã vượt quá mốc cuối cùng của ladder -> Dữ liệu đã cũ, cần tính toán lại
+        if (nowTime <= lastPointTime) {
+          // Tìm mốc giá mới nhất trong QUÁ KHỨ (hoặc hiện tại)
+          const currentPoint = ladder
+            .filter(p => new Date(p.time).getTime() <= nowTime)
+            .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
+
+          if (currentPoint) {
+            totalAmount = currentPoint.amount;
+            durationText = currentPoint.reason || booking.duration_text;
+            usingLadder = true;
+            
+            // Check if ladder price already reached ceiling
+            if (booking.booking_type === 'hourly') {
+              const ceilingPercent = settings?.hourly_ceiling_percent || 100;
+              const ceilingAmount = (room.price_daily || 0) * (ceilingPercent / 100);
+              if (totalAmount >= ceilingAmount && ceilingAmount > 0) {
+                ceilingHit = true;
+              }
             }
           }
         }
       } 
 
-      // 2. FALLBACK: Nếu thang giá lỗi hoặc không có điểm phù hợp, mới tính toán ở FE
+      // 2. FALLBACK: Nếu thang giá lỗi, hết hạn hoặc không có điểm phù hợp, mới tính toán ở FE
       if (!usingLadder) {
         const { amount, isCeilingHit } = calculateLiveRoomCharge({
           checkInAt: booking.check_in_at,
@@ -96,6 +108,22 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         totalAmount = amount;
         ceilingHit = isCeilingHit;
 
+        // Cập nhật text hiển thị thời gian khi dùng fallback FE
+        if (ceilingHit) {
+           const hours = Math.max(1, differenceInHours(now, new Date(booking.check_in_at)));
+           const days = Math.max(1, Math.ceil(hours / 24));
+           durationText = `${days} ngày`;
+        } else if (booking.booking_type === 'hourly') {
+           const diffMin = differenceInMinutes(now, new Date(booking.check_in_at));
+           const h = Math.floor(diffMin / 60);
+           const m = diffMin % 60;
+           durationText = h > 0 ? `${h} giờ ${m} phút` : `${m} phút`;
+        } else {
+           const hours = Math.max(1, differenceInHours(now, new Date(booking.check_in_at)));
+           const units = Math.max(1, Math.ceil(hours / 24));
+           durationText = `${units} ${booking.booking_type === 'overnight' ? 'đêm' : 'ngày'}`;
+        }
+
         // Cộng thêm các thành phần động khác
         totalAmount = totalAmount 
           + (booking.service_total || 0) 
@@ -111,37 +139,49 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         + (booking.customer_balance && booking.customer_balance < 0 ? Math.abs(booking.customer_balance) : 0);
         
       setLiveAmount(finalToPay);
+      setLiveDuration(durationText);
       setIsLiveCeilingHit(ceilingHit);
     };
 
     updateLiveAmount();
     
     // TỐI ƯU HÓA: Thay vì setInterval 10s, ta tìm mốc thời gian nhảy tiền tiếp theo trong ladder
-    // và đặt một cái setTimeout duy nhất đến đúng thời điểm đó.
+    // Nếu thang giá hết hạn hoặc không có, ta dùng Interval chậm hơn để bù đắp.
     let timeoutId: NodeJS.Timeout;
+    let fallbackInterval: NodeJS.Timeout;
 
     const scheduleNextUpdate = () => {
       const ladder = room.current_booking?.pricing_ladder;
-      if (!ladder || !Array.isArray(ladder)) return;
-
-      const nowTime = new Date().getTime();
-      const nextPoint = ladder
-        .filter(p => new Date(p.time).getTime() > nowTime)
-        .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())[0];
-
-      if (nextPoint) {
-        const delay = new Date(nextPoint.time).getTime() - nowTime + 2000; // Thêm 2s trừ hao độ trễ mạng
-        timeoutId = setTimeout(() => {
-          updateLiveAmount();
-          scheduleNextUpdate(); // Đặt lịch cho mốc tiếp theo
-        }, delay);
+      const nowMs = new Date().getTime();
+      
+      if (ladder && Array.isArray(ladder) && ladder.length > 0) {
+        const lastPointTime = new Date(ladder[ladder.length - 1].time).getTime();
+        
+        // Nếu ladder vẫn còn hiệu lực trong tương lai
+        if (nowMs < lastPointTime) {
+          const nextPoint = ladder.find(p => new Date(p.time).getTime() > nowMs);
+          if (nextPoint) {
+            const delay = new Date(nextPoint.time).getTime() - nowMs + 1000;
+            timeoutId = setTimeout(() => {
+              updateLiveAmount();
+              scheduleNextUpdate();
+            }, delay);
+            return;
+          }
+        }
       }
+
+      // FALLBACK: Nếu không có ladder hoặc ladder hết hạn, cập nhật mỗi 30s để giữ tính "Live"
+      fallbackInterval = setInterval(() => {
+        updateLiveAmount();
+      }, 30000);
     };
 
     scheduleNextUpdate();
-    
+
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (fallbackInterval) clearInterval(fallbackInterval);
     };
   }, [room.status, room.current_booking, room.price_hourly, room.price_daily, room.price_overnight, room.base_hourly_limit, room.hourly_unit, settings]);
 
@@ -172,7 +212,8 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         isFlashing = true;
       }
     } else if (room.status === 'occupied' && room.current_booking) {
-      const { booking_type, check_in_at, duration_text } = room.current_booking;
+      const { booking_type, check_in_at } = room.current_booking;
+      const duration_text = liveDuration || room.current_booking.duration_text;
       
       // Nhận diện nhảy giá trần (Live hoặc từ DB)
       const isAutoSwitched = (booking_type === 'hourly' && duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm'))) || (booking_type === 'hourly' && isLiveCeilingHit);
@@ -182,14 +223,14 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
       const checkIn = check_in_at ? new Date(check_in_at) : null;
       const isValidDate = checkIn && !isNaN(checkIn.getTime());
 
-      // Ưu tiên hiển thị duration_text từ DB nếu có, hoặc nếu đã nhảy giá trần ở FE
+      // Ưu tiên hiển thị duration_text từ DB (liveDuration) nếu có, hoặc nếu đã nhảy giá trần ở FE
       if (isLiveCeilingHit || (duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm')))) {
           bgColor = 'bg-[#1e40af]';
           textColor = 'text-white';
           
           // Xác định text hiển thị thời gian
           let displayDuration = duration_text;
-          if (isLiveCeilingHit && (!duration_text || (!duration_text.includes('ngày') && !duration_text.includes('đêm')))) {
+          if (isLiveCeilingHit && (!displayDuration || (!displayDuration.includes('ngày') && !displayDuration.includes('đêm')))) {
              displayDuration = "1 ngày"; // Fallback FE
           }
 
@@ -223,7 +264,11 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
                  statusText = (
                     <div className="flex items-center gap-1.5">
                       <Clock size={16} className="animate-pulse" />
-                      <LiveTimer checkInAt={check_in_at} mode="hourly" />
+                      {duration_text ? (
+                        <span>{duration_text}</span>
+                      ) : (
+                        <LiveTimer checkInAt={check_in_at} mode="hourly" />
+                      )}
                     </div>
                   );
               } else {
@@ -240,7 +285,11 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
                 statusText = (
                   <div className="flex items-center gap-1.5">
                     <Calendar size={16} />
-                    <LiveTimer checkInAt={check_in_at} mode={booking_type} />
+                    {duration_text ? (
+                      <span>{duration_text}</span>
+                    ) : (
+                      <LiveTimer checkInAt={check_in_at} mode={booking_type} />
+                    )}
                   </div>
                 );
               } else {
@@ -252,7 +301,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
     }
 
     return { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName, badgeText };
-  }, [room.status, room.current_booking, room.notes, room.last_cleaned_at, room.is_dirty_overdue, isLiveCeilingHit]);
+  }, [room.status, room.current_booking, room.notes, room.last_cleaned_at, room.is_dirty_overdue, isLiveCeilingHit, liveDuration]);
 
   const { bgColor, textColor, Icon, statusText, subText, isFlashing, iconClassName, badgeText } = display;
 

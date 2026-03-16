@@ -696,31 +696,32 @@ export default function MoneyPage() {
                               {(() => {
                                 const parts = [];
                                 if (tx.customer_name) parts.push(tx.customer_name);
-                                if (tx.room_name) parts.push(`P.${tx.room_name}`);
+                                if (tx.room_name) parts.push(`Phòng ${tx.room_name}`);
                                 
                                 let action = tx.description || '';
-                                // Simplify Booking actions
+                                // Rút gọn các hành động Booking để dễ đọc
                                 if (tx.category === 'Tiền phòng' || tx.category === 'Tiền cọc') {
                                    if (action.toLowerCase().includes('checkout') || action.toLowerCase().includes('thanh toán phòng')) action = 'Trả phòng';
                                    else if (action.toLowerCase().includes('cọc')) action = 'Cọc phòng';
                                    else if (action.toLowerCase().includes('nhận phòng')) action = 'Nhận phòng';
                                 }
                                 
-                                // Remove redundant room info from description if we already have room_name
+                                // Loại bỏ lặp lại tên phòng trong mô tả nếu đã có room_name
                                 if (tx.room_name) {
-                                   action = action.replace(new RegExp(`Phòng ${tx.room_name}`, 'gi'), '')
-                                                  .replace(new RegExp(`${tx.room_name}`, 'gi'), '')
-                                                  .replace(/\(\)/g, '')
-                                                  .trim();
+                                   const roomRegex = new RegExp(`Phòng ${tx.room_name}|${tx.room_name}`, 'gi');
+                                   action = action.replace(roomRegex, '').replace(/\s+/g, ' ').trim();
+                                   if (action.startsWith('-')) action = action.substring(1).trim();
+                                   if (action.startsWith('()')) action = action.substring(2).trim();
                                 }
                                 
-                                // Append action
+                                // Thêm hành động vào mảng
                                 if (action && action !== tx.category) {
                                   parts.push(action);
                                 } else if (parts.length === 0) {
                                   parts.push(tx.description || tx.category);
-                                } else {
-                                  parts.push(tx.category); // Fallback if action is empty but we have room/customer
+                                } else if (parts.length === 1 && parts[0] === tx.customer_name) {
+                                   // Nếu chỉ có tên khách, thêm category để biết làm gì
+                                   parts.push(tx.category);
                                 }
                                 
                                 return parts.join(' - ');
