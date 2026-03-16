@@ -48,7 +48,23 @@ export default function SettingsPage() {
   }
 
   // Define groups for better organization
-  const SETTINGS_GROUPS = [
+  interface SettingItem {
+    id: string;
+    label: string;
+    desc: string;
+    icon: React.ReactNode;
+    href: string;
+    permission: string;
+    color: string;
+    featured?: boolean;
+  }
+
+  interface SettingGroup {
+    title: string;
+    items: SettingItem[];
+  }
+
+  const SETTINGS_GROUPS: SettingGroup[] = [
     {
       title: "Cơ bản & Hệ thống",
       items: [
