@@ -277,7 +277,11 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
                  statusText = (
                     <div className="flex items-center gap-1.5">
                       <Clock size={16} className="animate-pulse" />
-                      <span>{duration_text || room.current_booking.duration_text || '--:--'}</span>
+                      {duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm')) ? (
+                        <span>{duration_text}</span>
+                      ) : (
+                        <LiveTimer checkInAt={check_in_at} mode="hourly" />
+                      )}
                     </div>
                   );
               } else {
