@@ -260,8 +260,6 @@ export default function BillBreakdown({
             )}
             {bill.explanation.map((line, idx) => {
               // 1. Format Full DateTime: YYYY-MM-DD HH:MM:SS... -> HH:MM DD/MM
-              // Note: The SQL already returns formatted strings like "HH:MM DD/MM" for key events.
-              // We just need to clean up any raw timestamps if they slip through.
               let formattedLine = line.replace(/(\d{4}-\d{2}-\d{2})[\sT](\d{2}:\d{2}):\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g, (match, date, time) => {
                  const [y, m, d] = date.split('-');
                  return `${time} ${d}/${m}`;
@@ -270,8 +268,18 @@ export default function BillBreakdown({
               // 2. Format Time Only: HH:MM:SS.xxxx -> HH:MM
               formattedLine = formattedLine.replace(/(\d{2}:\d{2}):\d{2}(?:\.\d+)?/g, '$1');
 
+              // 3. Highlight important info (Money, Units, Type switches)
+              const isHighlight = formattedLine.includes('vượt trần') || 
+                                 formattedLine.includes('Tính thêm') || 
+                                 formattedLine.includes('Chuyển sang') ||
+                                 formattedLine.includes('ngày') ||
+                                 formattedLine.includes('đêm');
+
               return (
-                <div key={idx} className={cn("flex gap-2 text-xs leading-relaxed italic font-medium", auditTextColor)}>
+                <div key={idx} className={cn(
+                    "flex gap-2 text-xs leading-relaxed italic font-medium", 
+                    isHighlight ? "text-rose-500 font-bold" : auditTextColor
+                )}>
                   <span className="opacity-30 shrink-0">•</span>
                   <span>{formattedLine}</span>
                 </div>

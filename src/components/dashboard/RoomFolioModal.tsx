@@ -691,7 +691,7 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                   const actualType = bill.rental_type_actual || bill.rental_type;
                                   
                                   // Nếu là phòng ngày/đêm HOẶC phòng giờ đã nhảy giá trần sang ngày
-                                  if (bill.duration_text && (actualType === 'daily' || actualType === 'overnight')) {
+                                  if (bill.duration_text && (actualType === 'daily' || actualType === 'overnight' || bill.duration_text.includes('ngày') || bill.duration_text.includes('đêm'))) {
                                       return (
                                           <div className="flex items-center justify-center gap-2">
                                               <Calendar className="w-5 h-5 text-white/60" />
