@@ -390,41 +390,41 @@ export default function MoneyPage() {
               <div className="flex items-center gap-4 md:gap-6">
                 {config.icon}
                 <div>
-                  <h3 className="text-[10px] md:text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{config.label}</h3>
-                  <p className="text-sm md:text-lg font-black text-slate-900 tracking-tight opacity-40">{config.subLabel}</p>
+                  <h3 className="text-[17px] md:text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{config.label}</h3>
+                  <p className="text-[17px] md:text-lg font-black text-slate-900 tracking-tight opacity-40">{config.subLabel}</p>
                 </div>
               </div>
               <div className="flex flex-col items-end">
-                <span className="px-3 py-1 md:px-4 md:py-1.5 bg-white/80 backdrop-blur-sm text-slate-900 text-[10px] md:text-[11px] font-black rounded-xl md:rounded-2xl shadow-sm border border-slate-100 uppercase tracking-widest">VNĐ</span>
+                <span className="px-3 py-1 md:px-4 md:py-1.5 bg-white/80 backdrop-blur-sm text-slate-900 text-[13px] md:text-[11px] font-black rounded-xl md:rounded-2xl shadow-sm border border-slate-100 uppercase tracking-widest">VNĐ</span>
               </div>
             </div>
 
             <div className="mb-6 md:mb-10">
               <div className="flex items-baseline gap-2 md:gap-4 overflow-hidden">
-                <span className="text-6xl md:text-[80px] font-black text-slate-900 tracking-[-0.05em] leading-none truncate">
+                <span className="text-7xl md:text-[80px] font-black text-slate-900 tracking-[-0.05em] leading-none truncate">
                   {displayRawBalance(stats.closing)}
                 </span>
-                <span className="text-2xl md:text-4xl font-black text-slate-200 tracking-tighter uppercase mb-1 md:mb-2">₫</span>
+                <span className="text-3xl md:text-4xl font-black text-slate-200 tracking-tighter uppercase mb-1 md:mb-2">₫</span>
               </div>
-              <p className="text-sm md:text-base font-bold text-slate-400 mt-4 md:mt-6 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <p className="text-base md:text-base font-bold text-slate-400 mt-4 md:mt-6 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
                 Số dư thực tế trong két
               </p>
             </div>
           </div>
 
           <div className="relative z-10 grid grid-cols-3 gap-3 md:gap-8 pt-6 md:pt-10 border-t border-slate-100/50">
-            <div className="space-y-0.5 md:space-y-1">
-              <p className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
-              <p className="text-sm md:text-xl font-black text-slate-800 tracking-tight truncate">{formatMoney(stats.opening)}</p>
+            <div className="space-y-1 md:space-y-1">
+              <p className="text-[12px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
+              <p className="text-base md:text-xl font-black text-slate-800 tracking-tight truncate">{formatMoney(stats.opening)}</p>
             </div>
-            <div className="space-y-0.5 md:space-y-1">
-              <p className="text-[8px] md:text-[10px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
-              <p className="text-sm md:text-xl font-black text-emerald-600 tracking-tight truncate">+{formatMoney(stats.in)}</p>
+            <div className="space-y-1 md:space-y-1">
+              <p className="text-[12px] md:text-[10px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
+              <p className="text-base md:text-xl font-black text-emerald-600 tracking-tight truncate">+{formatMoney(stats.in)}</p>
             </div>
-            <div className="space-y-0.5 md:space-y-1">
-              <p className="text-[8px] md:text-[10px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
-              <p className="text-sm md:text-xl font-black text-rose-600 tracking-tight truncate">-{formatMoney(stats.out)}</p>
+            <div className="space-y-1 md:space-y-1">
+              <p className="text-[12px] md:text-[10px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
+              <p className="text-base md:text-xl font-black text-rose-600 tracking-tight truncate">-{formatMoney(stats.out)}</p>
             </div>
           </div>
         </div>
@@ -455,20 +455,20 @@ export default function MoneyPage() {
               {config.icon}
             </div>
             <div>
-              <h3 className="text-[11px] md:text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-0.5 leading-none">{config.label}</h3>
-              <p className="text-[12px] md:text-sm font-black text-slate-900 tracking-tight opacity-30 leading-none">{config.subLabel}</p>
+              <h3 className="text-[17px] md:text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1 leading-none">{config.label}</h3>
+              <p className="text-[17px] md:text-sm font-black text-slate-900 tracking-tight opacity-30 leading-none">{config.subLabel}</p>
             </div>
           </div>
 
           <div className="mb-4 md:mb-8">
             <div className="flex items-baseline gap-1 md:gap-2">
               <span className={cn(
-                "text-3xl md:text-[42px] font-black tracking-tighter leading-none",
+                "text-5xl md:text-[42px] font-black tracking-tighter leading-none",
                 stats.closing < 0 ? "text-rose-600" : "text-slate-900"
               )}>
                 {displayRawBalance(stats.closing)}
               </span>
-              <span className="text-sm md:text-xl font-black text-slate-200 tracking-tighter uppercase">₫</span>
+              <span className="text-xl md:text-xl font-black text-slate-200 tracking-tighter uppercase">₫</span>
             </div>
           </div>
         </div>
@@ -479,24 +479,24 @@ export default function MoneyPage() {
                 "w-full flex items-center justify-between group/btn",
                 isDebt ? "text-rose-600" : "text-amber-600"
               )}>
-                <span className="text-[11px] md:text-[11px] font-black uppercase tracking-widest">Chi tiết</span>
+                <span className="text-[17px] md:text-[11px] font-black uppercase tracking-widest">Chi tiết</span>
                 <div className={cn(
-                  "w-10 h-10 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover/btn:translate-x-1 shadow-sm",
+                  "w-12 h-12 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover/btn:translate-x-1 shadow-sm",
                   isDebt ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
                 )}>
-                  <ArrowUpRight className="w-5 h-5" strokeWidth={3} />
+                  <ArrowUpRight className="w-6 h-6 md:w-5 md:h-5" strokeWidth={3} />
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu</span>
-                    <span className="text-base md:text-base font-black text-blue-600">+{formatMoney(stats.in)}</span>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[13px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu</span>
+                    <span className="text-xl md:text-base font-black text-blue-600">+{formatMoney(stats.in)}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Chi</span>
-                    <span className="text-base md:text-base font-black text-rose-600">-{formatMoney(stats.out)}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[13px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Chi</span>
+                    <span className="text-xl md:text-base font-black text-rose-600">-{formatMoney(stats.out)}</span>
                   </div>
                 </div>
               </div>
