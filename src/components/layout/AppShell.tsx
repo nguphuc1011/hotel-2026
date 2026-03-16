@@ -236,6 +236,7 @@ export default function AppShell({
   } : null;
 
   const filteredNavItems = navItems.filter(item => {
+    // Chỉ ẩn nếu explicitly set là false, mặc định (undefined/null) thì vẫn hiện
     if (item.href.endsWith('/reports') && user?.hotels?.features?.advanced_reports === false) {
       return false;
     }
