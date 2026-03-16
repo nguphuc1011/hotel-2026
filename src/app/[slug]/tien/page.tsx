@@ -415,15 +415,15 @@ export default function MoneyPage() {
 
           <div className="relative z-10 grid grid-cols-3 gap-3 md:gap-8 pt-6 md:pt-10 border-t border-slate-100/50">
             <div className="space-y-1 md:space-y-1">
-              <p className="text-[12px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
+              <p className="text-[13px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
               <p className="text-base md:text-xl font-black text-slate-800 tracking-tight truncate">{formatMoney(stats.opening)}</p>
             </div>
             <div className="space-y-1 md:space-y-1">
-              <p className="text-[12px] md:text-[10px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
+              <p className="text-[13px] md:text-[10px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
               <p className="text-base md:text-xl font-black text-emerald-600 tracking-tight truncate">+{formatMoney(stats.in)}</p>
             </div>
             <div className="space-y-1 md:space-y-1">
-              <p className="text-[12px] md:text-[10px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
+              <p className="text-[13px] md:text-[10px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
               <p className="text-base md:text-xl font-black text-rose-600 tracking-tight truncate">-{formatMoney(stats.out)}</p>
             </div>
           </div>
@@ -492,7 +492,7 @@ export default function MoneyPage() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-3">
                     <span className="text-[13px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu</span>
-                    <span className="text-xl md:text-base font-black text-blue-600">+{formatMoney(stats.in)}</span>
+                    <span className="text-xl md:text-base font-black text-emerald-600">+{formatMoney(stats.in)}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-[13px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Chi</span>
