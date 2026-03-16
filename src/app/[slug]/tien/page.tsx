@@ -44,7 +44,7 @@ import { useSecurity } from '@/hooks/useSecurity';
 const QUICK_RANGES = [
   { id: 'TODAY', label: 'Hôm nay' },
   { id: 'YESTERDAY', label: 'Hôm qua' },
-  { id: 'WEEK', label: '7 ngày qua' },
+  { id: 'WEEK', label: '7 ngày' },
   { id: 'MONTH', label: 'Tháng này' },
   { id: 'LAST_MONTH', label: 'Tháng trước' },
   { id: 'YEAR', label: 'Năm nay' },
@@ -265,57 +265,6 @@ export default function MoneyPage() {
      );
   }
 
-  const handleCompensate = (tx: CashFlowTransaction) => {
-    const isIncome = tx.flow_type === 'IN';
-    const newData: Partial<CashFlowTransaction> = {
-        flow_type: isIncome ? 'OUT' : 'IN',
-        category: 'Điều chỉnh',
-        amount: tx.amount,
-        description: `Điều chỉnh cho giao dịch: ${tx.description}`,
-        payment_method_code: tx.payment_method_code,
-    };
-    setInitialTransactionData(newData);
-    setInitialSearchTerm(tx.customer_name);
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (tx: CashFlowTransaction) => {
-    if (tx.is_auto) {
-      toast.error('Không thể sửa giao dịch tự động từ hệ thống');
-      return;
-    }
-    setSelectedTransaction(tx);
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (tx: CashFlowTransaction, verifiedStaff?: { id: string, name: string }) => {
-    if (tx.is_auto) {
-        toast.error('Không thể xóa giao dịch tự động từ hệ thống');
-        return;
-    }
-
-    if (!verifiedStaff) {
-      await verify('finance_delete_transaction', (staffId, staffName) => 
-        handleDelete(tx, staffId ? { id: staffId, name: staffName || '' } : undefined)
-      );
-      return;
-    }
-
-    if (!confirm(`Bạn có chắc chắn muốn xóa giao dịch này?`)) return;
-
-    try {
-      setLoading(true);
-      await cashFlowService.deleteTransaction(tx.id, 'Xóa thủ công', verifiedStaff);
-      toast.success('Đã xóa giao dịch');
-      await fetchData();
-    } catch (error) {
-      console.error(error);
-      toast.error('Có lỗi xảy ra khi xóa giao dịch');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Render helper for the Bento grid
   const renderWalletCard = (walletId: string, type: 'large' | 'medium' = 'medium') => {
     const wallet = wallets.find(w => w.id === walletId);
@@ -336,35 +285,35 @@ export default function MoneyPage() {
     const walletConfigs: Record<string, { icon: React.ReactNode; label: string; subLabel: string; color: string; gradient: string }> = {
       CASH: {
         icon: <div className="p-4 bg-emerald-500/10 text-emerald-600 rounded-[24px] backdrop-blur-md border border-emerald-500/20"><Banknote size={32} strokeWidth={2.5} /></div>,
-        label: 'TIỀN MẶT',
+        label: 'Tiền mặt',
         subLabel: 'Két an toàn',
         color: 'emerald',
         gradient: 'from-emerald-50 to-white'
       },
       BANK: {
         icon: <div className="p-3 bg-blue-500/10 text-blue-600 rounded-[20px] backdrop-blur-md border border-blue-500/20"><CreditCard size={24} strokeWidth={2.5} /></div>,
-        label: 'NGÂN HÀNG',
+        label: 'Ngân hàng',
         subLabel: 'Tài khoản',
         color: 'blue',
         gradient: 'from-blue-50 to-white'
       },
       DEBT: {
         icon: <div className="p-3 bg-rose-500/10 text-rose-600 rounded-[20px] backdrop-blur-md border border-rose-500/20"><Users size={24} strokeWidth={2.5} /></div>,
-        label: 'CÔNG NỢ KHÁCH',
+        label: 'Công nợ khách',
         subLabel: 'Khách đã trả phòng',
         color: 'rose',
         gradient: 'from-rose-50 to-white'
       },
       RECEIVABLE: {
         icon: <div className="p-3 bg-amber-500/10 text-amber-600 rounded-[20px] backdrop-blur-md border border-amber-500/20"><Lock size={24} strokeWidth={2.5} /></div>,
-        label: 'CÔNG NỢ TẠM',
+        label: 'Công nợ tạm',
         subLabel: 'Khách đang ở',
         color: 'amber',
         gradient: 'from-amber-50 to-white'
       },
       REVENUE: {
         icon: <div className="p-3 bg-indigo-500/10 text-indigo-600 rounded-[20px] backdrop-blur-md border border-indigo-500/20"><TrendingUp size={24} strokeWidth={2.5} /></div>,
-        label: 'DOANH THU',
+        label: 'Doanh thu',
         subLabel: 'Doanh thu thuần',
         color: 'indigo',
         gradient: 'from-indigo-50 to-white'
@@ -376,7 +325,7 @@ export default function MoneyPage() {
     if (type === 'large') {
       return (
         <div className={cn(
-          "bg-white/80 backdrop-blur-xl rounded-[32px] md:rounded-[48px] p-8 md:p-14 border border-white shadow-[0_12px_40px_rgb(0,0,0,0.03)] hover:shadow-[0_25px_60px_rgba(0,0,0,0.08)] transition-all duration-700 group relative overflow-hidden h-full flex flex-col justify-between",
+          "bg-white rounded-[40px] p-8 md:p-14 border border-slate-100 shadow-[0_12px_40px_rgba(0,0,0,0.03)] hover:shadow-[0_25px_60px_rgba(0,0,0,0.08)] transition-all duration-700 group relative overflow-hidden h-full flex flex-col justify-between",
           "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-30 before:transition-opacity",
           config.gradient
         )}>
@@ -436,7 +385,7 @@ export default function MoneyPage() {
     return (
       <div 
         className={cn(
-          "bg-white/80 backdrop-blur-md rounded-[32px] md:rounded-[40px] p-6 md:p-10 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)] hover:scale-[1.01] transition-all duration-500 group relative overflow-hidden h-full flex flex-col justify-between cursor-pointer",
+          "bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-10 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)] hover:scale-[1.01] transition-all duration-500 group relative overflow-hidden h-full flex flex-col justify-between cursor-pointer",
           config.gradient
         )}
         onClick={() => {
@@ -509,217 +458,216 @@ export default function MoneyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] p-4 md:p-10 pb-32 space-y-8 md:space-y-14">
+    <div className="min-h-screen bg-[#F5F5F7] p-4 md:p-10 pb-32 space-y-8 md:space-y-16">
       {SecurityModals}
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="relative">
-          <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight">Quỹ tiền</h1>
-          <div className="absolute -top-1 -right-3 w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse" />
+      
+      {/* Apple Style Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 md:gap-12">
+        <div className="space-y-2 md:space-y-4">
+          <div className="inline-flex items-center px-4 py-1.5 bg-slate-900/5 rounded-full text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+            Quản lý tài chính
+          </div>
+          <h1 className="text-5xl md:text-8xl font-black text-slate-900 tracking-tight leading-[0.9]">
+            Quỹ tiền
+          </h1>
         </div>
         
         <div className="flex items-center gap-3 md:gap-4">
           {can(PERMISSION_KEYS.FINANCE_ADJUST_WALLET) && (
             <button 
               onClick={() => setIsAdjustmentModalOpen(true)}
-              className="h-12 md:h-14 px-6 md:px-8 bg-white text-slate-900 rounded-full text-sm font-bold uppercase tracking-wider shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-slate-100"
+              className="h-14 md:h-16 px-6 md:px-10 bg-white text-slate-900 rounded-full text-sm font-bold uppercase tracking-widest shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.1)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-slate-100"
             >
-              <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
+              <AlertTriangle className="w-5 h-5" />
               Điều chỉnh
             </button>
           )}
           {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="h-12 md:h-14 px-6 md:px-10 bg-slate-900 text-white rounded-full text-sm font-bold uppercase tracking-wider shadow-[0_10px_25px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="h-14 md:h-16 px-8 md:px-12 bg-slate-900 text-white rounded-full text-sm font-bold uppercase tracking-widest shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_45px_rgba(0,0,0,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
             >
-              <Plus className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
+              <Plus className="w-6 h-6" strokeWidth={3} />
               Lập phiếu
             </button>
           )}
         </div>
       </div>
 
-      {/* Bento Grid */}
-      <div className="flex flex-col lg:grid lg:grid-cols-4 gap-6 md:gap-10">
-        <div className="lg:col-span-2 lg:row-span-2 min-h-[380px] md:min-h-[550px]">
+      {/* Bento Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-12">
+        <div className="lg:col-span-2 lg:row-span-2 min-h-[400px] md:min-h-[600px]">
           {renderWalletCard('CASH', 'large')}
         </div>
-        <div className="min-h-[180px] md:h-[300px]">
+        <div className="min-h-[200px] md:h-[320px]">
           {renderWalletCard('BANK')}
         </div>
-        <div className="min-h-[180px] md:h-[300px]">
+        <div className="min-h-[200px] md:h-[320px]">
           {renderWalletCard('DEBT')}
         </div>
-        <div className="min-h-[180px] md:h-[300px]">
+        <div className="min-h-[200px] md:h-[320px]">
           {renderWalletCard('REVENUE')}
         </div>
-        <div className="min-h-[180px] md:h-[300px]">
+        <div className="min-h-[200px] md:h-[320px]">
           {renderWalletCard('RECEIVABLE')}
         </div>
       </div>
 
-      {/* Transaction List Section */}
-      <div className="space-y-6 md:space-y-8">
-        {/* Time Filter - Moved here and Apple Styled */}
-        <div className="flex items-center gap-2 p-1.5 bg-white/50 backdrop-blur-md rounded-2xl md:rounded-[24px] border border-white/50 shadow-sm overflow-x-auto no-scrollbar scroll-smooth w-fit max-w-full mx-auto md:mx-0">
-          <div className="flex items-center gap-1 min-w-max px-1">
-            {QUICK_RANGES.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => handleRangeChange(r.id)}
-                className={cn(
-                  "px-5 py-2.5 md:px-8 md:py-3 rounded-xl md:rounded-[18px] text-[11px] md:text-[13px] font-bold transition-all uppercase tracking-wider whitespace-nowrap",
-                  rangeType === r.id 
-                    ? "bg-slate-900 text-white shadow-md scale-[1.02]" 
-                    : "text-slate-500 hover:text-slate-900 hover:bg-white/80"
-                )}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
+      {/* Transaction Section */}
+      <div className="space-y-8 md:space-y-12">
         {can(PERMISSION_KEYS.VIEW_MONEY_TRANSACTION_HISTORY) && (
-          <div className="bg-white/80 backdrop-blur-xl rounded-[32px] md:rounded-[48px] border border-white shadow-[0_10px_40px_rgba(0,0,0,0.03)] overflow-hidden">
-            <div className="p-8 md:p-12 border-b border-slate-50 flex items-center justify-between">
-              <div className="flex items-center gap-5">
-                <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-lg shadow-slate-200"><Clock size={28} /></div>
+          <div className="space-y-8 md:space-y-12">
+            {/* Transaction Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
+              <div className="flex items-center gap-6">
+                <div className="p-5 bg-slate-900 text-white rounded-[24px] shadow-xl shadow-slate-200"><Clock size={32} /></div>
                 <div>
-                  <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight">Dòng tiền</h2>
+                  <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight">Dòng tiền</h2>
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-black rounded-full uppercase tracking-widest">
+                      {transactions.length} Giao dịch
+                    </span>
+                  </div>
                 </div>
               </div>
-              <span className="px-5 py-2 bg-slate-100 text-slate-600 text-[11px] font-black rounded-full uppercase tracking-widest shadow-sm">
-                {transactions.length} GD
-              </span>
-            </div>
 
-          <div className="overflow-x-auto">
-            <div className="min-w-full">
-              {loading ? (
-                <div className="py-20 text-center">
-                  <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
-                </div>
-              ) : transactions.length === 0 ? (
-                <div className="py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Không có dữ liệu</div>
-              ) : (
-                <div className="divide-y divide-slate-50">
-                  {transactions.map((tx) => {
-                    const dateObj = new Date(tx.occurred_at);
-                    const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
-                    const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }); // Short date for list
-
-                    return (
-                    <div
-                      key={tx.id}
-                      onClick={() => tx.ref_id ? setHistoryModal({ open: true, bookingId: tx.ref_id }) : null}
+              {/* Time Filter - Moved here, Apple Styled */}
+              <div className="flex items-center gap-2 p-2 bg-white/60 backdrop-blur-md rounded-[24px] border border-white shadow-sm overflow-x-auto no-scrollbar scroll-smooth">
+                <div className="flex items-center gap-1 min-w-max">
+                  {QUICK_RANGES.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => handleRangeChange(r.id)}
                       className={cn(
-                        "group bg-white rounded-2xl border border-slate-100 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-50/50 transition-all duration-300 cursor-pointer overflow-hidden flex items-stretch min-h-[72px] border-l-4",
-                        tx.flow_type === 'IN' ? "border-l-emerald-500" : "border-l-rose-500"
+                        "px-6 py-3 md:px-8 md:py-3.5 rounded-[18px] text-[11px] md:text-[13px] font-bold transition-all uppercase tracking-widest whitespace-nowrap",
+                        rangeType === r.id 
+                          ? "bg-slate-900 text-white shadow-lg scale-[1.02]" 
+                          : "text-slate-500 hover:text-slate-900 hover:bg-white/80"
                       )}
                     >
-                      
-                      {/* Left: Time & Flow Indicator */}
-                      <div className="flex items-stretch">
-                         <div className="px-4 flex flex-col justify-center items-center bg-slate-50/50 border-r border-slate-100 min-w-[80px]">
-                            <span className="text-sm font-black text-slate-700 leading-none mb-1">{timeStr}</span>
-                            <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">{dateStr}</span>
-                         </div>
-                      </div>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-                      {/* Middle: Content */}
-                      <div className="flex-1 px-5 py-3 flex flex-col justify-center min-w-0">
-                        <div className="mb-0.5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            {tx.category}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center">
-                          <span className="font-bold text-slate-800 text-[14px] leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
-                              {(() => {
-                                const parts = [];
-                                if (tx.customer_name) parts.push(tx.customer_name);
-                                if (tx.room_name) parts.push(`Phòng ${tx.room_name}`);
-                                
-                                let action = tx.description || '';
-                                // Rút gọn các hành động Booking để dễ đọc
-                                if (tx.category === 'Tiền phòng' || tx.category === 'Tiền cọc') {
-                                   if (action.toLowerCase().includes('checkout') || action.toLowerCase().includes('thanh toán phòng')) action = 'Trả phòng';
-                                   else if (action.toLowerCase().includes('cọc')) action = 'Cọc phòng';
-                                   else if (action.toLowerCase().includes('nhận phòng')) action = 'Nhận phòng';
-                                }
-                                
-                                // Loại bỏ lặp lại tên phòng trong mô tả nếu đã có room_name
-                                if (tx.room_name) {
-                                   const roomRegex = new RegExp(`Phòng ${tx.room_name}|${tx.room_name}`, 'gi');
-                                   action = action.replace(roomRegex, '').replace(/\s+/g, ' ').trim();
-                                   if (action.startsWith('-')) action = action.substring(1).trim();
-                                   if (action.startsWith('()')) action = action.substring(2).trim();
-                                }
-                                
-                                // Thêm hành động vào mảng
-                                if (action && action !== tx.category) {
-                                  parts.push(action);
-                                } else if (parts.length === 0) {
-                                  parts.push(tx.description || tx.category);
-                                } else if (parts.length === 1 && parts[0] === tx.customer_name) {
-                                   // Nếu chỉ có tên khách, thêm category để biết làm gì
-                                   parts.push(tx.category);
-                                }
-                                
-                                return parts.join(' - ');
-                              })()}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Right: Amount & Payment Method */}
-                      <div className="px-5 py-3 flex flex-col justify-center items-end border-l border-slate-50 min-w-[140px] bg-slate-50/30">
-                         <div className="flex items-center gap-2">
-                           <span className={cn(
-                             "font-black tracking-tighter text-lg",
-                             tx.flow_type === 'IN' ? "text-emerald-600" : "text-rose-600"
-                           )}>
-                             {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
-                           </span>
-                         </div>
-                         
-                         <div className="mt-1 flex items-center gap-2 justify-end w-full">
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 truncate max-w-[80px]">
-                              <User size={10} />
-                              <span className="truncate">{tx.staff_name || tx.verified_by_staff_name || 'Hệ thống'}</span>
+            {/* List Container */}
+            <div className="bg-white/80 backdrop-blur-2xl rounded-[40px] md:rounded-[60px] border border-white shadow-[0_20px_80px_rgba(0,0,0,0.04)] overflow-hidden">
+              <div className="overflow-x-auto">
+                <div className="min-w-full">
+                  {loading ? (
+                    <div className="py-32 text-center">
+                      <div className="inline-block w-10 h-10 border-4 border-slate-100 border-t-slate-900 rounded-full animate-spin" />
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <div className="py-32 text-center text-slate-300 font-black uppercase tracking-[0.2em] text-lg">Không có dữ liệu</div>
+                  ) : (
+                    <div className="divide-y divide-slate-50 p-4 md:p-8 space-y-4">
+                      {transactions.map((tx) => {
+                        const dateObj = new Date(tx.occurred_at);
+                        const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+
+                        return (
+                        <div
+                          key={tx.id}
+                          onClick={() => tx.ref_id ? setHistoryModal({ open: true, bookingId: tx.ref_id }) : null}
+                          className={cn(
+                            "group bg-white rounded-[28px] border border-slate-100 hover:border-slate-900/10 hover:shadow-[0_15px_40px_rgba(0,0,0,0.05)] transition-all duration-500 cursor-pointer overflow-hidden flex items-stretch min-h-[90px] md:min-h-[110px]",
+                            tx.flow_type === 'IN' ? "border-l-[10px] border-l-emerald-500" : "border-l-[10px] border-l-rose-500"
+                          )}
+                        >
+                          <div className="flex items-stretch">
+                             <div className="px-6 md:px-10 flex flex-col justify-center items-center bg-slate-50/30 border-r border-slate-50 min-w-[100px] md:min-w-[140px]">
+                                <span className="text-lg md:text-xl font-black text-slate-800 leading-none mb-1.5">{timeStr}</span>
+                                <span className="text-[11px] md:text-[13px] font-bold text-slate-400 leading-none uppercase tracking-widest">{dateStr}</span>
+                             </div>
+                          </div>
+
+                          <div className="flex-1 px-8 md:px-12 py-4 flex flex-col justify-center min-w-0">
+                            <div className="mb-1.5 flex items-center gap-3">
+                              <span className="text-[11px] md:text-[12px] font-black uppercase tracking-[0.15em] text-slate-400">
+                                {tx.category}
+                              </span>
+                              {tx.is_auto && (
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-[9px] font-black rounded uppercase">Tự động</span>
+                              )}
                             </div>
                             
-                            <span className={cn(
-                               "text-[10px] uppercase font-bold px-2 py-0.5 rounded text-center border inline-block min-w-[36px]",
-                               (!tx.payment_method_code || tx.payment_method_code?.toLowerCase() === 'cash') 
-                                 ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
-                                 : "bg-blue-50 text-blue-700 border-blue-100"
+                            <div className="flex items-center">
+                              <span className="font-black text-slate-900 text-lg md:text-2xl tracking-tight leading-tight line-clamp-1">
+                                  {(() => {
+                                    const parts = [];
+                                    if (tx.customer_name) parts.push(tx.customer_name);
+                                    if (tx.room_name) parts.push(`Phòng ${tx.room_name}`);
+                                    
+                                    let action = tx.description || '';
+                                    if (tx.category === 'Tiền phòng' || tx.category === 'Tiền cọc') {
+                                       if (action.toLowerCase().includes('checkout') || action.toLowerCase().includes('thanh toán phòng')) action = 'Trả phòng';
+                                       else if (action.toLowerCase().includes('cọc')) action = 'Cọc phòng';
+                                       else if (action.toLowerCase().includes('nhận phòng')) action = 'Nhận phòng';
+                                    }
+                                    
+                                    if (tx.room_name) {
+                                       const roomRegex = new RegExp(`Phòng ${tx.room_name}|${tx.room_name}`, 'gi');
+                                       action = action.replace(roomRegex, '').replace(/\s+/g, ' ').trim();
+                                       if (action.startsWith('-')) action = action.substring(1).trim();
+                                    }
+                                    
+                                    if (action && action !== tx.category) {
+                                      parts.push(action);
+                                    } else if (parts.length === 0) {
+                                      parts.push(tx.description || tx.category);
+                                    }
+                                    
+                                    return parts.join(' • ');
+                                  })()}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="px-8 md:px-14 py-4 flex flex-col justify-center items-end border-l border-slate-50 min-w-[180px] md:min-w-[240px] bg-slate-50/20">
+                             <span className={cn(
+                               "font-black tracking-tighter text-2xl md:text-4xl",
+                               tx.flow_type === 'IN' ? "text-emerald-600" : "text-rose-600"
                              )}>
-                               {(() => {
-                                 const code = (tx.payment_method_code || 'cash').toLowerCase();
-                                 if (code === 'cash') return 'TM';
-                                 if (code === 'pos') return 'POS';
-                                 if (code === 'credit') return 'CN';
-                                 return 'CK';
-                               })()}
+                               {tx.flow_type === 'IN' ? '+' : '-'}{formatMoney(tx.amount)}
                              </span>
-                         </div>
-
-                         {/* Actions disabled: Audit Only Policy */}
-                      </div>
+                             
+                             <div className="mt-2 flex items-center gap-3">
+                                <div className="flex items-center gap-1.5 text-[11px] md:text-[12px] font-bold text-slate-400">
+                                  <User size={12} />
+                                  <span>{tx.staff_name || tx.verified_by_staff_name || 'Hệ thống'}</span>
+                                </div>
+                                
+                                <span className={cn(
+                                   "text-[10px] md:text-[11px] uppercase font-black px-3 py-1 rounded-full border shadow-sm",
+                                   (!tx.payment_method_code || tx.payment_method_code?.toLowerCase() === 'cash') 
+                                     ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                                     : "bg-blue-50 text-blue-700 border-blue-100"
+                                 )}>
+                                   {(() => {
+                                     const code = (tx.payment_method_code || 'cash').toLowerCase();
+                                     if (code === 'cash') return 'Tiền mặt';
+                                     if (code === 'pos') return 'Thẻ POS';
+                                     if (code === 'credit') return 'Công nợ';
+                                     return 'Chuyển khoản';
+                                   })()}
+                                 </span>
+                             </div>
+                          </div>
+                        </div>
+                        );
+                      })}
                     </div>
-                    );
-                  })}
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
 
       <TransactionModal 
         isOpen={isModalOpen} 
@@ -751,9 +699,9 @@ export default function MoneyPage() {
       {can(PERMISSION_KEYS.CREATE_TRANSACTION) && (
         <button
           onClick={() => setIsModalOpen(true)}
-          className="md:hidden fixed bottom-24 right-4 z-50 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl shadow-slate-900/30 flex items-center justify-center active:scale-90 transition-all duration-300 hover:bg-slate-800"
+          className="md:hidden fixed bottom-10 right-6 z-50 w-16 h-16 bg-slate-900 text-white rounded-full shadow-2xl shadow-slate-900/40 flex items-center justify-center active:scale-90 transition-all duration-300"
         >
-          <Plus size={24} strokeWidth={2.5} />
+          <Plus size={32} strokeWidth={3} />
         </button>
       )}
 
