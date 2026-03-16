@@ -343,130 +343,61 @@ export default function DashboardPage() {
     }
   }, [can]); // Only re-run when permission changes, NOT when fetchData changes
 
-  // Smart Update Logic based on User Requirements
+  // TỐI ƯU HÓA DASHBOARD: Sử dụng Smart Update tập trung
   useEffect(() => {
     if (isAuthLoading || !can(PERMISSION_KEYS.VIEW_DASHBOARD) || !settings) return;
 
-    // 1. Function to calculate next update times for all active rooms
+    // 1. Hàm tính toán tất cả các mốc thời gian cần cập nhật dữ liệu từ Server
     const getNextUpdateTimes = () => {
       const times: number[] = [];
-      const now = new Date();
-      const nowMs = now.getTime();
-      const config = settings; 
-
+      const nowMs = new Date().getTime();
+      
       rooms.forEach(room => {
         if (room.status !== 'occupied' || !room.current_booking) return;
         
-        const checkIn = new Date(room.current_booking.check_in_at);
-        const bookingType = room.current_booking.booking_type;
-        
-        // SaaS Logic: Prefer category-specific settings (from room object), fallback to global config
-        const graceMinutes = config.grace_minutes || 0;
-        const graceOutEnabled = config.grace_out_enabled;
-
-        if (bookingType === 'hourly') {
-          // Use values from the room (which came from its category)
-          const baseHours = room.base_hourly_limit || config.base_hourly_limit || 1;
-          const hourlyUnit = room.hourly_unit || config.hourly_unit || 60;
-          
-          // Mốc 1: Hết block đầu + ân hạn
-          const firstMarkMs = checkIn.getTime() + (baseHours * 60 + (graceOutEnabled ? graceMinutes : 0)) * 60000;
-          if (firstMarkMs > nowMs) times.push(firstMarkMs);
-
-          // Mốc tiếp theo: Mỗi block tiếp theo + ân hạn (tối đa 12 block tiếp theo để bao phủ 1 ngày)
-          for (let i = 1; i <= 12; i++) {
-            const nextMarkMs = checkIn.getTime() + (baseHours * 60 + i * hourlyUnit + (graceOutEnabled ? graceMinutes : 0)) * 60000;
-            if (nextMarkMs > nowMs) {
-              times.push(nextMarkMs);
-              break; 
-            }
-          }
-
-          // Mốc chuyển Qua đêm (nếu có auto-switch)
-          if (config.auto_overnight_switch && config.overnight_start_time) {
-            const [h, m] = config.overnight_start_time.split(':').map(Number);
-            const overnightStart = new Date();
-            overnightStart.setHours(h, m, 0, 0);
-            if (overnightStart.getTime() > nowMs) times.push(overnightStart.getTime());
-          }
-        } else {
-          // Daily / Overnight Logic
-          const isOvernight = bookingType === 'overnight';
-          // Dùng mốc trả phòng từ cài đặt (SaaS dynamic)
-          const targetTimeStr = isOvernight ? (config.overnight_checkout_time || config.check_out_time) : config.check_out_time;
-          const lateCutoffStr = config.full_day_late_after; 
-          
-          if (targetTimeStr) {
-            const [h, m] = targetTimeStr.split(':').map(Number);
-            const checkOutMark = new Date();
-            checkOutMark.setHours(h, m, 0, 0);
-            
-            // Mốc 1: Giờ trả phòng + ân hạn (Bắt đầu tính phụ thu muộn)
-            const lateStartMs = checkOutMark.getTime() + (graceOutEnabled ? graceMinutes : 0) * 60000;
-            if (lateStartMs > nowMs) times.push(lateStartMs);
-          }
-
-          if (lateCutoffStr) {
-            const [h, m] = lateCutoffStr.split(':').map(Number);
-            const lateCutoffMark = new Date();
-            lateCutoffMark.setHours(h, m, 0, 0);
-            
-            // Mốc 2: Mốc nhảy thêm 1 ngày tiền phòng (Full Day Late)
-            if (lateCutoffMark.getTime() > nowMs) times.push(lateCutoffMark.getTime());
-          }
-
-          // Mốc 3: Night Audit (Mốc reset ngày mới/tính thêm ngày nếu ở tiếp)
-          if (config.night_audit_time) {
-            const [h, m] = config.night_audit_time.split(':').map(Number);
-            const auditMark = new Date();
-            auditMark.setHours(h, m, 0, 0);
-            if (auditMark.getTime() <= nowMs) auditMark.setDate(auditMark.getDate() + 1);
-            times.push(auditMark.getTime());
+        // Mốc 1: Từ Pricing Ladder (Độ chính xác cao nhất)
+        if (room.current_booking.pricing_ladder && Array.isArray(room.current_booking.pricing_ladder)) {
+          const nextPoint = room.current_booking.pricing_ladder
+            .find((p: any) => new Date(p.time).getTime() > nowMs);
+          if (nextPoint) {
+            times.push(new Date(nextPoint.time).getTime());
           }
         }
+
+        // Mốc 2: Các mốc mặc định (Phòng hờ ladder thiếu hoặc chưa cập nhật)
+        // Ví dụ: Night Audit, Grace Out, v.v. (Có thể mở rộng thêm ở đây)
       });
 
-      // Remove duplicates and sort
-      return Array.from(new Set(times)).sort((a, b) => a - b);
+      // Lọc bỏ các mốc trong quá khứ và sắp xếp
+      return Array.from(new Set(times))
+        .filter(t => t > nowMs)
+        .sort((a, b) => a - b);
     };
 
-    const scheduleNextUpdates = () => {
-      const nextTimes = getNextUpdateTimes();
-      if (nextTimes.length === 0) return;
+    const nextTimes = getNextUpdateTimes();
+    let timeoutId: NodeJS.Timeout;
 
-      const nextTargetMs = nextTimes[0];
-      const delayMs = nextTargetMs - new Date().getTime();
+    if (nextTimes.length > 0) {
+      const nextTick = nextTimes[0];
+      const delay = nextTick - new Date().getTime() + 5000; // Thêm 5s trừ hao độ trễ
 
-      // User's "Safety Surround" logic: Update 2 minutes before, at the mark, and 2 minutes after
-      const surroundDelays = [
-        delayMs - 120000, // 2 mins before
-        delayMs,          // exactly at the mark
-        delayMs + 120000  // 2 mins after
-      ].filter(d => d > 0);
+      timeoutId = setTimeout(() => {
+        console.log("[Dashboard] Smart Auto-Refresh triggered by milestone");
+        fetchData(true);
+      }, delay);
+    }
 
-      const timers = surroundDelays.map(d => {
-        return setTimeout(() => {
-          console.log(`Smart Update triggered (surround logic) at ${new Date().toLocaleTimeString()}`);
-          fetchData(true); // Silent update
-        }, d);
-      });
-
-      return timers;
-    };
-
-    const timers = scheduleNextUpdates();
-    
-    // Fallback: Still keep a slow polling (e.g. 30 mins) just in case of edge cases
+    // 2. Fallback: Cập nhật mỗi 10 phút để đảm bảo dữ liệu luôn mới (tránh treo tab)
     const fallbackInterval = setInterval(() => {
-      console.log("Smart Update: Fallback slow refresh...");
-      fetchData();
-    }, 30 * 60 * 1000);
+      console.log("[Dashboard] Fallback refresh...");
+      fetchData(true);
+    }, 600000); // 10 minutes
 
     return () => {
-      timers?.forEach(clearTimeout);
+      if (timeoutId) clearTimeout(timeoutId);
       clearInterval(fallbackInterval);
     };
-  }, [isAuthLoading, can, rooms, settings, fetchData]);
+  }, [rooms, settings, can, isAuthLoading, fetchData]);
 
   // Real-time Subscription with Debounced Refresh
   useEffect(() => {

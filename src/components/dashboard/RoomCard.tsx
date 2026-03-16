@@ -116,9 +116,33 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
 
     updateLiveAmount();
     
-    // Update every 10 seconds for a more "live" feel
-    const interval = setInterval(updateLiveAmount, 10000);
-    return () => clearInterval(interval);
+    // TỐI ƯU HÓA: Thay vì setInterval 10s, ta tìm mốc thời gian nhảy tiền tiếp theo trong ladder
+    // và đặt một cái setTimeout duy nhất đến đúng thời điểm đó.
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleNextUpdate = () => {
+      const ladder = room.current_booking?.pricing_ladder;
+      if (!ladder || !Array.isArray(ladder)) return;
+
+      const nowTime = new Date().getTime();
+      const nextPoint = ladder
+        .filter(p => new Date(p.time).getTime() > nowTime)
+        .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())[0];
+
+      if (nextPoint) {
+        const delay = new Date(nextPoint.time).getTime() - nowTime + 2000; // Thêm 2s trừ hao độ trễ mạng
+        timeoutId = setTimeout(() => {
+          updateLiveAmount();
+          scheduleNextUpdate(); // Đặt lịch cho mốc tiếp theo
+        }, delay);
+      }
+    };
+
+    scheduleNextUpdate();
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [room.status, room.current_booking, room.price_hourly, room.price_daily, room.price_overnight, room.base_hourly_limit, room.hourly_unit, settings]);
 
   // Determine display properties based on status and booking
@@ -407,6 +431,7 @@ export default memo(RoomCard, (prevProps, nextProps) => {
     prevProps.room.updated_at === nextProps.room.updated_at &&
     JSON.stringify(prevProps.room.current_booking) === JSON.stringify(nextProps.room.current_booking) &&
     prevProps.room.group_color === nextProps.room.group_color &&
-    prevProps.room.is_dirty_overdue === nextProps.room.is_dirty_overdue
+    prevProps.room.is_dirty_overdue === nextProps.room.is_dirty_overdue &&
+    JSON.stringify(prevProps.settings) === JSON.stringify(nextProps.settings)
   );
 });

@@ -19,11 +19,10 @@ const LiveTimer: React.FC<LiveTimerProps> = ({ checkInAt, mode }) => {
       const now = new Date();
       
       if (mode === 'hourly') {
-        const diffSec = Math.max(0, differenceInSeconds(now, checkIn));
-        const h = Math.floor(diffSec / 3600);
-        const m = Math.floor((diffSec % 3600) / 60);
-        const s = diffSec % 60;
-        setDisplay(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        const diffMin = Math.max(0, Math.floor(differenceInSeconds(now, checkIn) / 60));
+        const h = Math.floor(diffMin / 60);
+        const m = diffMin % 60;
+        setDisplay(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
       } else if (mode === 'daily') {
         const diffHours = Math.max(0, differenceInHours(now, checkIn));
         const diffDays = Math.ceil(diffHours / 24);
@@ -40,7 +39,8 @@ const LiveTimer: React.FC<LiveTimerProps> = ({ checkInAt, mode }) => {
     // Only run interval for hourly rooms
     if (mode !== 'hourly') return;
 
-    const intervalMs = 1000; 
+    // Tối ưu: Cập nhật mỗi 60 giây (đủ để không lệch phút mà nhẹ hơn 1s)
+    const intervalMs = 60000; 
     const timer = setInterval(updateTime, intervalMs);
 
     return () => clearInterval(timer);
