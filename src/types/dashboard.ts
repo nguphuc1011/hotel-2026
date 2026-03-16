@@ -22,6 +22,7 @@ export interface Room {
 export interface PricingLadderPoint {
   time: string;
   amount: number;
+  reason?: string;
 }
 
 export interface Booking {
