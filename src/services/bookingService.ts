@@ -18,6 +18,7 @@ export interface BookingBill {
   room_number: string;
   customer_name: string;
   rental_type: 'hourly' | 'daily' | 'overnight';
+  rental_type_actual?: 'hourly' | 'daily' | 'overnight';
   
   // Time
   check_in_at: string;

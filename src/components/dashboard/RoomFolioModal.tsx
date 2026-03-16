@@ -675,17 +675,23 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                           <div className="flex items-center justify-center gap-2 mb-2">
                               <div className="text-[10px] font-black uppercase tracking-[0.15em] text-blue-200/80">Thời gian ở</div>
                               <div className="px-2 py-0.5 rounded-lg text-[10px] font-black text-white border border-white/20 bg-white/10 uppercase tracking-widest whitespace-nowrap">
-                                  {bill?.rental_type === 'hourly' ? 'Giờ' : 
-                                   bill?.rental_type === 'overnight' ? 'Đêm' : 
-                                   bill?.rental_type === 'daily' ? 'Ngày' : 
-                                   (activeBooking ? (activeBooking.booking_type === 'hourly' ? 'Giờ' : activeBooking.booking_type === 'overnight' ? 'Đêm' : 'Ngày') : '---')}
+                                  {(() => {
+                                      const type = bill?.rental_type_actual || bill?.rental_type || (activeBooking ? activeBooking.booking_type : null);
+                                      if (type === 'hourly') return 'Giờ';
+                                      if (type === 'overnight') return 'Đêm';
+                                      if (type === 'daily') return 'Ngày';
+                                      return '---';
+                                  })()}
                               </div>
                           </div>
                           <div className="font-black text-2xl leading-tight tabular-nums text-yellow-300">
                               {(() => {
                                   if (!bill?.check_in_at) return '--';
                                   
-                                  if (bill.duration_text && (bill.rental_type === 'daily' || bill.rental_type === 'overnight')) {
+                                  const actualType = bill.rental_type_actual || bill.rental_type;
+                                  
+                                  // Nếu là phòng ngày/đêm HOẶC phòng giờ đã nhảy giá trần sang ngày
+                                  if (bill.duration_text && (actualType === 'daily' || actualType === 'overnight')) {
                                       return (
                                           <div className="flex items-center justify-center gap-2">
                                               <Calendar className="w-5 h-5 text-white/60" />
@@ -694,8 +700,8 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
                                       );
                                   }
 
-                                  const mode = bill.rental_type === 'hourly' ? 'hourly' : 
-                                               bill.rental_type === 'overnight' ? 'overnight' : 'daily';
+                                  const mode = actualType === 'hourly' ? 'hourly' : 
+                                               actualType === 'overnight' ? 'overnight' : 'daily';
                                   
                                   return (
                                       <div className="flex items-center justify-center gap-2">

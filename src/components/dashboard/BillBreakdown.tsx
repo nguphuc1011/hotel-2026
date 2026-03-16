@@ -42,6 +42,7 @@ export default function BillBreakdown({
   // Calculate explanation text for Room Charge
   const getRoomChargeExplanation = () => {
     const details = [];
+    const actualType = bill.rental_type_actual || bill.rental_type;
     
     // 1. Check for explicit "x" formula (Daily/Overnight usually)
     const mainExp = bill.explanation?.find(e => e.includes('Tiền phòng') && e.includes('x'));
@@ -49,7 +50,7 @@ export default function BillBreakdown({
         const match = mainExp.match(/\((.*?)\)/);
         if (match) details.push(match[1]);
     } 
-    else if (bill.rental_type === 'hourly') {
+    else if (actualType === 'hourly') {
         // 2. Hourly details
         const firstHour = bill.explanation?.find(e => e.includes('Giờ đầu tiên'));
         if (firstHour) {
@@ -64,8 +65,8 @@ export default function BillBreakdown({
     }
     
     // 3. Fallback for auto-switch or missing formula
-    if (details.length === 0 && (bill.rental_type === 'daily' || bill.rental_type === 'overnight')) {
-         const unit = bill.rental_type === 'overnight' ? 'đêm' : 'ngày';
+    if (details.length === 0 && (actualType === 'daily' || actualType === 'overnight')) {
+         const unit = actualType === 'overnight' ? 'đêm' : 'ngày';
          details.push(`1 ${unit} x ${formatMoney(bill.room_charge)}`);
     }
 
