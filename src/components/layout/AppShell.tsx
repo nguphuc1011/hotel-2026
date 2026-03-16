@@ -260,22 +260,22 @@ export default function AppShell({
   return (
     <div className="flex w-full h-screen overflow-hidden bg-white">
       <WalletNotificationModal />
-      {/* PC Sidebar - Hidden on mobile, Stacked (Icon top, Text bottom) on Tablet Landscape (lg:flex), Full on Desktop (xl:flex) */}
+      {/* PC Sidebar - Hidden on mobile, Stacked on Tablet/iPad Pro Landscape (lg:flex), Full on Desktop (2xl:flex) */}
       <aside className={cn(
         "hidden lg:flex flex-col h-full bg-white z-50 transition-all duration-300 ease-in-out",
-        "border-r border-slate-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)]", // Soft right shadow for separation
-        "lg:w-24 xl:w-72" // lg (Landscape Tablet) = 96px (Stacked), xl (Desktop) = 288px (Full)
+        "border-r border-slate-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)]",
+        "lg:w-24 2xl:w-72" // iPad Pro Landscape (1366px) will now use w-24 (Stacked), only 2xl (1536px+) uses Full
       )}>
-        <div className="p-4 xl:p-8 flex justify-center xl:justify-start">
+        <div className="p-4 2xl:p-8 flex justify-center 2xl:justify-start">
           <div className="flex flex-col">
-            <h1 className="text-xl xl:text-2xl font-black uppercase tracking-tighter flex items-center gap-2 text-blue-600 truncate">
-              <Building2 className="xl:hidden" size={28} />
-              <span className="hidden xl:inline">{hotelName || 'Hệ thống'}</span>
+            <h1 className="text-xl 2xl:text-2xl font-black uppercase tracking-tighter flex items-center gap-2 text-blue-600 truncate">
+              <Building2 className="2xl:hidden" size={28} />
+              <span className="hidden 2xl:inline">{hotelName || 'Hệ thống'}</span>
             </h1>
           </div>
         </div>
         
-        <nav className="flex-1 px-2 xl:px-4 space-y-4 xl:space-y-2">
+        <nav className="flex-1 px-2 2xl:px-4 space-y-4 2xl:space-y-2">
           {finalSidebarItems.map((item) => (
             <Link 
               key={item.href} 
@@ -287,67 +287,59 @@ export default function AppShell({
                   : item.isSpecial 
                     ? "text-emerald-500 hover:bg-emerald-50"
                     : "text-slate-500 hover:bg-slate-50 hover:text-blue-600",
-                // lg (iPad Landscape): Stacked layout (column), 
-                // xl (PC): Row layout
-                "flex-col xl:flex-row items-center justify-center xl:justify-start gap-1 xl:gap-3 py-2 xl:py-3 rounded-2xl px-1 xl:px-4"
+                // lg (iPad Pro Landscape): Stacked layout
+                // 2xl (Large Desktop): Row layout
+                "flex-col 2xl:flex-row items-center justify-center 2xl:justify-start gap-1 2xl:gap-3 py-2 2xl:py-3 rounded-2xl px-1 2xl:px-4"
               )}
             >
               <div className="shrink-0 transition-transform group-hover:scale-110 duration-200">
                 {item.icon}
               </div>
               
-              {/* Text: Below icon on lg, Beside icon on xl */}
               <span className={cn(
-                "truncate text-[10px] xl:text-sm text-center xl:text-left leading-tight",
-                "lg:block xl:inline" // Always show text on lg and xl
+                "truncate text-[10px] 2xl:text-sm text-center 2xl:text-left leading-tight",
+                "lg:block 2xl:inline"
               )}>
                 {item.label}
               </span>
-              
-              {/* Tooltip only for Mini Sidebar if text was hidden (but here we show text) */}
-              {/* Keeping it for extra UX if needed, but it won't show due to hidden class logic */}
-              <div className="lg:xl:hidden absolute left-full ml-4 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] whitespace-nowrap shadow-xl">
-                {item.label}
-                <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45" />
-              </div>
             </Link>
           ))}
         </nav>
 
-        <div className="p-4 xl:p-6 border-t border-slate-50 relative" ref={userMenuRef}>
+        <div className="p-4 2xl:p-6 border-t border-slate-50 relative" ref={userMenuRef}>
           {showInstallBtn && (
             <button 
               onClick={handleInstallApp}
-              className="flex flex-col xl:flex-row items-center gap-1 xl:gap-3 p-2 xl:p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group animate-bounce-subtle justify-center xl:justify-start"
+              className="flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 p-2 2xl:p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group animate-bounce-subtle justify-center 2xl:justify-start"
             >
-              <div className="w-8 h-8 xl:w-10 xl:h-10 shrink-0 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
-                <Download size={18} className="xl:size-20" />
+              <div className="w-8 h-8 2xl:w-10 2xl:h-10 shrink-0 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
+                <Download size={18} className="2xl:size-20" />
               </div>
-              <div className="xl:block flex-1 text-center xl:text-left">
-                <p className="text-[9px] xl:text-sm font-black uppercase tracking-tight">Cài đặt</p>
-                <p className="hidden xl:block text-[10px] font-bold opacity-70 uppercase tracking-wider">Trải nghiệm tốt</p>
+              <div className="2xl:block flex-1 text-center 2xl:text-left">
+                <p className="text-[9px] 2xl:text-sm font-black uppercase tracking-tight">Cài đặt</p>
+                <p className="hidden 2xl:block text-[10px] font-bold opacity-70 uppercase tracking-wider">Trải nghiệm tốt</p>
               </div>
             </button>
           )}
 
           {isUserMenuOpen && (
-            <div className="absolute bottom-full left-1 right-1 xl:left-4 xl:right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
+            <div className="absolute bottom-full left-1 right-1 2xl:left-4 2xl:right-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
               <button 
                 onClick={() => {
                   setIsChangePinModalOpen(true);
                   setIsUserMenuOpen(false);
                 }}
-                className="w-full flex flex-col xl:flex-row items-center gap-1 xl:gap-3 px-2 xl:px-4 py-2 xl:py-3 rounded-xl hover:bg-gray-50 text-main font-bold text-[10px] xl:text-sm transition-colors text-center xl:text-left"
+                className="w-full flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 px-2 2xl:px-4 py-2 2xl:py-3 rounded-xl hover:bg-gray-50 text-main font-bold text-[10px] 2xl:text-sm transition-colors text-center 2xl:text-left"
               >
-                <Key size={14} className="xl:size-16 text-muted" />
+                <Key size={14} className="2xl:size-16 text-muted" />
                 <span>Mã PIN</span>
               </button>
               <div className="h-px bg-gray-100 my-1" />
               <button 
                 onClick={logout}
-                className="w-full flex flex-col xl:flex-row items-center gap-1 xl:gap-3 px-2 xl:px-4 py-2 xl:py-3 rounded-xl hover:bg-rose-50 text-rose-500 font-bold text-[10px] xl:text-sm transition-colors text-center xl:text-left"
+                className="w-full flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 px-2 2xl:px-4 py-2 2xl:py-3 rounded-xl hover:bg-rose-50 text-rose-500 font-bold text-[10px] 2xl:text-sm transition-colors text-center 2xl:text-left"
               >
-                <LogOut size={14} className="xl:size-16" />
+                <LogOut size={14} className="2xl:size-16" />
                 <span>Thoát</span>
               </button>
             </div>
@@ -355,20 +347,20 @@ export default function AppShell({
           
           <button 
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex flex-col xl:flex-row items-center gap-1 xl:gap-3 p-2 xl:p-3 w-full rounded-2xl hover:bg-slate-50 transition-all group justify-center xl:justify-start"
+            className="flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 p-2 2xl:p-3 w-full rounded-2xl hover:bg-slate-50 transition-all group justify-center 2xl:justify-start"
           >
-            <div className="w-8 h-8 xl:w-10 xl:h-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-sm xl:text-lg shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 2xl:w-10 2xl:h-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-sm 2xl:text-lg shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
               {user?.full_name?.charAt(0) || 'U'}
             </div>
-            <div className="xl:block flex-1 text-left truncate hidden">
+            <div className="2xl:block flex-1 text-left truncate hidden">
               <p className="text-sm font-black text-slate-700 truncate">{user?.full_name}</p>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user?.role}</p>
             </div>
             {/* Show name below avatar on lg if space permits or just avatar */}
-            <span className="lg:block xl:hidden text-[10px] font-black text-slate-500 truncate max-w-full">
+            <span className="lg:block 2xl:hidden text-[10px] font-black text-slate-500 truncate max-w-full">
               {user?.full_name?.split(' ').pop()}
             </span>
-            <ChevronUp size={16} className={cn("hidden xl:block text-slate-400 transition-transform duration-300", isUserMenuOpen && "rotate-180")} />
+            <ChevronUp size={16} className={cn("hidden 2xl:block text-slate-400 transition-transform duration-300", isUserMenuOpen && "rotate-180")} />
           </button>
         </div>
       </aside>
