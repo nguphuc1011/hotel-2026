@@ -333,7 +333,7 @@ export default function MoneyPage() {
     const isRevenue = walletId === 'REVENUE';
 
     // UI config based on wallet type
-    const config = {
+    const walletConfigs: Record<string, { icon: React.ReactNode; label: string; subLabel: string; color: string; gradient: string }> = {
       CASH: {
         icon: <div className="p-4 bg-emerald-500/10 text-emerald-600 rounded-[24px] backdrop-blur-md border border-emerald-500/20"><Banknote size={32} strokeWidth={2.5} /></div>,
         label: 'TIỀN MẶT',
@@ -369,7 +369,9 @@ export default function MoneyPage() {
         color: 'indigo',
         gradient: 'from-indigo-50 to-white'
       }
-    }[walletId as keyof typeof balanceStats] || { icon: null, label: walletId, subLabel: '', color: 'slate', gradient: 'from-slate-50 to-white' };
+    };
+
+    const config = walletConfigs[walletId] || { icon: null, label: walletId, subLabel: '', color: 'slate', gradient: 'from-slate-50 to-white' };
 
     if (type === 'large') {
       return (
