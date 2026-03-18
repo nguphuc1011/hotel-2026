@@ -411,10 +411,12 @@ export default function DashboardPage() {
 
     const debouncedFetch = () => {
       clearTimeout(refreshTimeout);
+      // Increase debounce time on Mobile to reduce performance impact
+      const debounceMs = window.innerWidth < 768 ? 3000 : 1000;
       refreshTimeout = setTimeout(() => {
         console.log('Real-time Update triggered at', new Date().toLocaleTimeString());
         fetchData(true); // Silent update
-      }, 1000);
+      }, debounceMs);
     };
 
     const channel = supabase

@@ -46,13 +46,15 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
   
   const searchRef = useRef<HTMLDivElement>(null);
   const ignoreSearchRef = useRef(false);
+  const lastInitializedIdRef = useRef<string | null>(null);
 
   // Close search results when clicking outside
   useOnClickOutside(searchRef as any, () => setShowSearchResults(false));
 
   // Initialize data when modal opens
   useEffect(() => {
-    if (isOpen && booking) {
+    // Only re-initialize if the modal is open AND (we haven't initialized yet OR the booking ID has changed)
+    if (isOpen && booking && lastInitializedIdRef.current !== booking.id) {
       // Customer
       setCustomerName(booking.customer_name || '');
       // Don't trigger search immediately on open
@@ -91,6 +93,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, room, onSuc
       setReason('');
       setPriceApplyMode('all');
       setNotes(booking.notes || '');
+
+      // Mark as initialized for this ID
+      lastInitializedIdRef.current = booking.id;
+    } else if (!isOpen) {
+      // Reset initialization marker when modal is closed
+      lastInitializedIdRef.current = null;
     }
   }, [isOpen, booking, room]);
 

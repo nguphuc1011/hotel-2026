@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, LogOut, Edit3, DollarSign, Printer, Search, Coffee, Trash2, ChevronDown, ChevronUp, ChevronRight, Clock, Calendar, Plus, Minus, AlertCircle, MessageSquare, User, Users, ShieldCheck, KeyRound, Link, Unlink, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -111,7 +111,15 @@ function useLongPress(
     };
 }
 
-export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdate, onGroupRoom, pendingApproval }: RoomFolioModalProps) {
+const RoomFolioModal = memo(({ 
+  isOpen, 
+  onClose, 
+  room, 
+  booking, 
+  onUpdate, 
+  onGroupRoom, 
+  pendingApproval 
+}: RoomFolioModalProps) => {
   const { confirm: confirmDialog, alert: alertDialog } = useGlobalDialog();
   const [isTransferGroupMasterModalOpen, setIsTransferGroupMasterModalOpen] = useState(false);
 
@@ -992,16 +1000,18 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
       </div>
 
       <AuditTrailModal />
-      <CancellationPenaltyModal 
-        isOpen={showPenaltyModal}
-        onClose={() => setShowPenaltyModal(false)}
-        roomName={activeRoom?.name || 'N/A'}
-        customerName={bill?.customer_name || 'Khách lẻ'}
-        bill={bill}
-        onConfirm={handleConfirmCancelWithPenalty}
-        isLoading={isLoading}
-      />
-      {bill && (
+      {showPenaltyModal && (
+        <CancellationPenaltyModal 
+          isOpen={showPenaltyModal}
+          onClose={() => setShowPenaltyModal(false)}
+          roomName={activeRoom?.name || 'N/A'}
+          customerName={bill?.customer_name || 'Khách lẻ'}
+          bill={bill}
+          onConfirm={handleConfirmCancelWithPenalty}
+          isLoading={isLoading}
+        />
+      )}
+      {showPaymentModal && bill && (
           <PaymentModal 
               isOpen={showPaymentModal}
               onClose={() => setShowPaymentModal(false)}
@@ -1013,38 +1023,42 @@ export default function RoomFolioModal({ isOpen, onClose, room, booking, onUpdat
           />
       )}
 
-      <EditBookingModal 
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setEditStaff(undefined);
-        }}
-        booking={activeBooking!}
-        room={activeRoom!}
-        verifiedStaff={editStaff}
-        onSuccess={() => {
-          setShowEditModal(false); // Close sub-modal first
-          loadBill();
-          onUpdate();
-          onClose(); // Then close Folio
-        }}
-      />
+      {showEditModal && activeBooking && (
+        <EditBookingModal 
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditStaff(undefined);
+          }}
+          booking={activeBooking!}
+          room={activeRoom!}
+          verifiedStaff={editStaff}
+          onSuccess={() => {
+            setShowEditModal(false); // Close sub-modal first
+            loadBill();
+            onUpdate();
+            onClose(); // Then close Folio
+          }}
+        />
+      )}
 
-      <ChangeRoomModal 
-        isOpen={showChangeRoomModal}
-        onClose={() => {
-          setShowChangeRoomModal(false);
-          setEditStaff(undefined);
-        }}
-        bookingId={activeBooking?.id!} 
-        currentRoomName={activeRoom?.name || 'N/A'} 
-        verifiedStaff={editStaff} 
-        onSuccess={() => { 
-          setShowChangeRoomModal(false); // Close sub-modal first
-          onUpdate();
-          onClose(); // Then close Folio
-        }}
-      />
+      {showChangeRoomModal && activeBooking && (
+        <ChangeRoomModal 
+          isOpen={showChangeRoomModal}
+          onClose={() => {
+            setShowChangeRoomModal(false);
+            setEditStaff(undefined);
+          }}
+          bookingId={activeBooking?.id!} 
+          currentRoomName={activeRoom?.name || 'N/A'} 
+          verifiedStaff={editStaff} 
+          onSuccess={() => { 
+            setShowChangeRoomModal(false); // Close sub-modal first
+            onUpdate();
+            onClose(); // Then close Folio
+          }}
+        />
+      )}
 
       {showDepositModal && activeBooking && activeRoom && (
         <DepositModal 
@@ -1289,3 +1303,5 @@ function QuickActionButton({
         </div>
     )
 }
+
+export default RoomFolioModal;
