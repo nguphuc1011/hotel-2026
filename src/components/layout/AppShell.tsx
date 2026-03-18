@@ -266,18 +266,32 @@ export default function AppShell({
         "border-r border-slate-200/60 shadow-[8px_0_40px_rgba(0,0,0,0.01)]",
         "xl:w-24 2xl:w-72" 
       )}>
-        <div className="p-6 2xl:p-10 flex justify-center 2xl:justify-start">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-[16px] bg-slate-900 text-white flex items-center justify-center shadow-xl shadow-slate-200 group transition-transform hover:scale-105 duration-500">
-                <Building2 size={24} strokeWidth={2.5} />
-              </div>
-              <div className="hidden 2xl:block overflow-hidden">
-                <h1 className="text-xl font-black uppercase tracking-tighter text-slate-900 truncate leading-none">
-                  {hotelName || 'Hệ thống'}
-                </h1>
-                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.1em] mt-1.5 opacity-80">Smart Management</p>
-              </div>
+        {/* Branding Area: HERA Logo at Top, Hotel Name Below (Centered) */}
+        <div className="p-4 2xl:p-10 flex flex-col items-center border-b border-slate-50/50 mb-4 bg-slate-50/30 gap-6">
+          {/* Logo Container - Rectangular Logo from File (Top) */}
+          <div className="relative shrink-0 w-full flex justify-center">
+            <div className="w-16 h-8 2xl:w-52 2xl:h-20 rounded-xl 2xl:rounded-2xl overflow-hidden shadow-xl shadow-slate-100 transition-all duration-500 hover:scale-[1.02] border border-slate-100 bg-white flex items-center justify-center p-1.5 2xl:p-2.5">
+              <img 
+                src="/logo-hera.png" 
+                alt="HERA Logo" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=HERA&background=0f172a&color=fff&bold=true&length=4';
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Hotel Name Area (Below) - Centered */}
+          <div className="hidden 2xl:flex flex-col items-center w-full text-center">
+            <h1 className="text-xl font-black tracking-tight text-slate-900 leading-tight">
+              {hotelName || 'Hệ thống'}
+            </h1>
+            <div className="flex items-center justify-center gap-2 mt-2.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)] animate-pulse"></div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] truncate">
+                Smart Management
+              </p>
             </div>
           </div>
         </div>
@@ -330,14 +344,14 @@ export default function AppShell({
           {showInstallBtn && (
             <button 
               onClick={handleInstallApp}
-              className="flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 p-2.5 2xl:p-3 w-full rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all mb-4 group justify-center 2xl:justify-start border border-emerald-100/50"
+              className="flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 p-2.5 2xl:p-3 w-full rounded-2xl bg-slate-900 text-white hover:bg-slate-800 transition-all mb-4 group justify-center 2xl:justify-start border border-slate-800/50 shadow-lg shadow-slate-200"
             >
-              <div className="w-8 h-8 2xl:w-9 2xl:h-9 shrink-0 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
+              <div className="w-8 h-8 2xl:w-9 2xl:h-9 shrink-0 rounded-xl bg-white/10 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Download size={16} strokeWidth={3} />
               </div>
               <div className="2xl:block flex-1 text-center 2xl:text-left">
-                <p className="text-[9px] 2xl:text-[11px] font-black uppercase tracking-tight leading-none">Cài đặt</p>
-                <p className="hidden 2xl:block text-[9px] font-bold opacity-60 uppercase tracking-widest mt-1">Ứng dụng</p>
+                <p className="text-[9px] 2xl:text-[11px] font-black uppercase tracking-widest leading-none">HERA APP</p>
+                <p className="hidden 2xl:block text-[9px] font-bold opacity-60 uppercase tracking-widest mt-1">Hệ thống quản lý</p>
               </div>
             </button>
           )}

@@ -177,19 +177,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     )}>
       {/* Mobile/Desktop Header with User Account */}
       <div className="flex justify-between items-center px-2 md:px-0 py-2 md:py-0">
-        {/* Logo & Refresh Section */}
+        {/* Refresh & Revenue Section */}
         <div className="flex items-center gap-2 md:gap-4">
-          <div className="hidden md:flex items-center gap-2 md:gap-3">
-            <div className="p-1.5 md:p-2 bg-blue-600 rounded-xl md:rounded-2xl shadow-lg shadow-blue-200">
-              <Store className="text-white w-5 h-5 md:w-6 md:h-6" />
-            </div>
-            <div>
-              <h1 className="text-lg md:text-xl font-black tracking-tighter text-slate-900 uppercase">
-                {hotelName || ''}
-              </h1>
-            </div>
-          </div>
-
           {/* Nút Cập Nhật (Refresh) */}
           <button 
             onClick={handleRefresh}

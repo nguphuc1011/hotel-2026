@@ -241,7 +241,7 @@ export default function SettingsPage() {
               <Info size={28} />
             </div>
             <div>
-              <p className="text-base font-black text-slate-900 tracking-tight">MANA PMS</p>
+              <p className="text-base font-black text-slate-900 tracking-tight">HERA PMS</p>
               <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Version 2.5.0 • Apple Aesthetic Edition</p>
             </div>
           </div>
