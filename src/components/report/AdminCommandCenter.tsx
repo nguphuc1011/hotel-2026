@@ -278,15 +278,31 @@ export default function AdminCommandCenter({ hotelId, initialTab = 'stats' }: Ad
         filter: `hotel_id=eq.${hotelId}`
       }, (payload) => {
         const newTx = payload.new;
-        setActivities(prev => [{
+        const amount = Number(newTx.amount);
+        const isCredit = newTx.payment_method_code === 'credit';
+        const isLargeOpEx = newTx.flow_type === 'OUT' && amount > 1000000;
+        const isAdjustment = newTx.category === 'Điều chỉnh';
+        const isSensitive = isCredit || isLargeOpEx || isAdjustment;
+
+        let description = newTx.description;
+        if (isCredit) description = `[CHO NỢ] ${description}`;
+        if (isLargeOpEx) description = `[CHI LỚN] ${description}`;
+
+        const newItem: ActivityItem = {
           id: newTx.id,
           type: 'cash_flow',
           category: newTx.category,
-          amount: Number(newTx.amount),
-          description: newTx.description,
+          amount: amount,
+          description: description,
           occurred_at: newTx.occurred_at,
-          is_sensitive: newTx.category === 'Điều chỉnh' || newTx.amount > 5000000
-        }, ...prev].slice(0, 20));
+          created_by_name: 'Nhân viên mới', // Realtime payload doesn't have names
+          is_sensitive: isSensitive,
+          metadata: { 
+            staff_id: newTx.created_by,
+            is_credit: isCredit
+          }
+        };
+        setActivities(prev => [newItem, ...prev].slice(0, 100));
       })
       .on('postgres_changes', { 
         event: 'INSERT', 
@@ -295,13 +311,32 @@ export default function AdminCommandCenter({ hotelId, initialTab = 'stats' }: Ad
         filter: `hotel_id=eq.${hotelId}`
       }, (payload) => {
         const newLog = payload.new;
-        setActivities(prev => [{
+        const explanation = newLog.explanation || {};
+        let cleanDesc = '';
+        let isSensitive = false;
+
+        if (explanation.action === 'update_booking_details') {
+          cleanDesc = 'Sửa thông tin Booking';
+          isSensitive = true;
+        } else if (explanation.action === 'cancel_booking') {
+          cleanDesc = `[HỦY PHÒNG] P.${explanation.room_name || '?'}`;
+          isSensitive = true;
+        } else {
+          cleanDesc = 'Hoạt động hệ thống mới';
+          isSensitive = true;
+        }
+
+        const newItem: ActivityItem = {
           id: newLog.id,
           type: 'audit_log',
-          description: Array.isArray(newLog.explanation) ? newLog.explanation.join(', ') : String(newLog.explanation),
+          description: cleanDesc,
           occurred_at: newLog.created_at,
-          is_sensitive: true
-        }, ...prev].slice(0, 20));
+          created_by_name: 'Nhân viên mới',
+          is_sensitive: isSensitive,
+          metadata: { staff_id: newLog.staff_id },
+          amount: Number(newLog.total_amount) || 0
+        };
+        setActivities(prev => [newItem, ...prev].slice(0, 100));
       })
       .subscribe();
 
