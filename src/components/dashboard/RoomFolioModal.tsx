@@ -1126,7 +1126,17 @@ const RoomFolioModal = memo(({
     </div>,
     document.body
   );
-}
+}, (prevProps, nextProps) => {
+  // Optimization: Only re-render if the modal open state changes OR if the relevant room/booking data changes
+  return (
+    prevProps.isOpen === nextProps.isOpen &&
+    prevProps.room?.id === nextProps.room?.id &&
+    prevProps.room?.status === nextProps.room?.status &&
+    prevProps.booking?.id === nextProps.booking?.id &&
+    prevProps.booking?.total_amount === nextProps.booking?.total_amount &&
+    prevProps.booking?.duration_text === nextProps.booking?.duration_text
+  );
+});
 
 // --- Helper Components ---
 
