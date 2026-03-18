@@ -107,7 +107,9 @@ export default function DashboardPage() {
       const [unifiedResult, settingsResult, expectedRevenueResult] = await Promise.all([
         supabase.rpc('fn_get_dashboard_data', { p_hotel_id: user?.hotel_id }),
         supabase.rpc('get_system_settings', { p_hotel_id: user?.hotel_id }),
-        supabase.rpc('fn_get_daily_expected_revenue', { p_hotel_id: user?.hotel_id })
+        supabase.rpc('fn_get_daily_expected_revenue', { p_hotel_id: user?.hotel_id }),
+        // Tự động chốt sổ đêm (Night Audit) nếu cần thiết khi mở Dashboard
+        supabase.rpc('fn_perform_night_audit', { p_hotel_id: user?.hotel_id })
       ]);
 
       if (unifiedResult.error) throw unifiedResult.error;
