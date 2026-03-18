@@ -89,13 +89,31 @@ export default function DashboardPage() {
 
   const [settings, setSettings] = useState<any>(null);
 
+  // Fetch System Settings (Optimized: Fetch only once or when needed)
+  const fetchSettings = useCallback(async () => {
+    try {
+      const { data } = await supabase.rpc('get_system_settings', { p_hotel_id: user?.hotel_id });
+      if (data) setSettings(data);
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  }, [user?.hotel_id]);
+
+  // Perform Night Audit (Optimized: Triggered on mount or manually)
+  const performNightAudit = useCallback(async () => {
+    try {
+      console.log("[Dashboard] Checking for Night Audit...");
+      await supabase.rpc('fn_perform_night_audit', { p_hotel_id: user?.hotel_id });
+    } catch (error) {
+      console.error('Error performing night audit:', error);
+    }
+  }, [user?.hotel_id]);
+
   // Fetch Dashboard Data
   const fetchData = useCallback(async (isSilent = false) => {
     if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) return;
 
     try {
-      // Only show full-screen loader if we have no rooms yet (initial load)
-      // Use functional state check to avoid rooms dependency
       setLoading(prevLoading => {
         if (!isSilent && rooms.length === 0) return true;
         return prevLoading;
@@ -103,13 +121,10 @@ export default function DashboardPage() {
       
       console.log(`[Dashboard] Fetching data (isSilent: ${isSilent}) at ${new Date().toLocaleTimeString()}`);
       
-      // 1. Fetch Dashboard Data & Settings in parallel
-      const [unifiedResult, settingsResult, expectedRevenueResult] = await Promise.all([
+      // 1. Fetch Essential Dashboard Data in parallel
+      const [unifiedResult, expectedRevenueResult] = await Promise.all([
         supabase.rpc('fn_get_dashboard_data', { p_hotel_id: user?.hotel_id }),
-        supabase.rpc('get_system_settings', { p_hotel_id: user?.hotel_id }),
-        supabase.rpc('fn_get_daily_expected_revenue', { p_hotel_id: user?.hotel_id }),
-        // Tự động chốt sổ đêm (Night Audit) nếu cần thiết khi mở Dashboard
-        supabase.rpc('fn_perform_night_audit', { p_hotel_id: user?.hotel_id })
+        supabase.rpc('fn_get_daily_expected_revenue', { p_hotel_id: user?.hotel_id })
       ]);
 
       if (unifiedResult.error) throw unifiedResult.error;
@@ -119,13 +134,6 @@ export default function DashboardPage() {
         
         // Update Expected Revenue
         setExpectedRevenue(expectedRevenueResult.data || 0);
-
-        // 2. Update Settings only if changed
-        const newSettings = settingsResult.data || null;
-        setSettings((prev: any) => {
-          if (JSON.stringify(prev) === JSON.stringify(newSettings)) return prev;
-          return newSettings;
-        });
 
         // Reset color maps
         masterBookingIdToColorMapRef.current.clear();
@@ -279,7 +287,19 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [can, getRandomColor]); // Remove rooms.length dependency
+  }, [can, getRandomColor, user?.hotel_id]); // Added user?.hotel_id to dependencies
+
+  // Combined initialization logic for Dashboard
+  const initDashboard = useCallback(async () => {
+    if (!can(PERMISSION_KEYS.VIEW_DASHBOARD)) return;
+    
+    // Initial fetch of data, settings and trigger night audit
+    await Promise.allSettled([
+        fetchData(),
+        fetchSettings(),
+        performNightAudit()
+    ]);
+  }, [can, fetchData, fetchSettings, performNightAudit]);
 
   // --- Central Execution Handler (The Executioner) ---
   const handleAutoExecution = async (request: any) => {
@@ -342,12 +362,10 @@ export default function DashboardPage() {
     }
   };
 
-  // Initial Load
+  // Initial Load (One dependency, stable for HMR)
   useEffect(() => {
-    if (can(PERMISSION_KEYS.VIEW_DASHBOARD)) {
-      fetchData();
-    }
-  }, [can]); // Only re-run when permission changes, NOT when fetchData changes
+    initDashboard();
+  }, [initDashboard]);
 
   // TỐI ƯU HÓA DASHBOARD: Sử dụng Smart Update tập trung
   useEffect(() => {
