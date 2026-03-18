@@ -48,7 +48,8 @@ export default function SaaSAdminPage() {
     shift_management: 'Quản lý ca làm việc',
     employee_debt: 'Quản lý nợ nhân viên',
     advanced_reports: 'Báo cáo nâng cao (P&L)',
-    saas_admin_access: 'Quyền truy cập SaaS Admin'
+    saas_admin_access: 'Quyền truy cập SaaS Admin',
+    admin_command_center: 'Trung tâm Chỉ huy (Admin)'
   };
 
   // Form state

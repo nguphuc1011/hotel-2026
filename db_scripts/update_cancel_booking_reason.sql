@@ -89,7 +89,21 @@ BEGIN
         WHERE id = v_room_id;
     END IF;
 
-    -- 6. TRÌNH TẤU BÁO CÁO
+    -- 6. [NEW] Log Audit
+    INSERT INTO public.audit_logs (booking_id, room_id, staff_id, explanation)
+    VALUES (
+        p_booking_id, 
+        v_room_id, 
+        COALESCE(p_verified_by_staff_id, auth.uid()), 
+        jsonb_build_object(
+            'action', 'cancel_booking',
+            'room_name', v_room_name,
+            'penalty_amount', p_penalty_amount,
+            'reason', p_reason
+        )
+    );
+
+    -- 7. TRÌNH TẤU BÁO CÁO
     RETURN jsonb_build_object(
         'success', true,
         'message', 'Hủy phòng thành công' || CASE WHEN p_penalty_amount > 0 THEN ' (Đã thu phạt ' || p_penalty_amount || ')' ELSE '' END,

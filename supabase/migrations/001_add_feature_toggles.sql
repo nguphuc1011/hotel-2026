@@ -7,7 +7,8 @@ ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '{
     "shift_management": false,
     "employee_debt": false,
     "advanced_reports": false,
-    "saas_admin_access": false
+    "saas_admin_access": false,
+    "admin_command_center": false
 }'::jsonb;
 
 -- 2. Cập nhật dữ liệu cho khách sạn 'default' (Bật full tính năng để Bệ Hạ dùng thử)
@@ -16,7 +17,8 @@ SET features = '{
     "shift_management": true,
     "employee_debt": true,
     "advanced_reports": true,
-    "saas_admin_access": true
+    "saas_admin_access": true,
+    "admin_command_center": true
 }'::jsonb
 WHERE slug = 'default';
 

@@ -8,11 +8,13 @@ import ProfitCharts from '@/components/report/ProfitCharts';
 import TopItemsTable from '@/components/report/TopItemsTable';
 import SmartAlerts from '@/components/report/SmartAlerts';
 import DrillDownModal from '@/components/report/DrillDownModal';
+import AdminCommandCenter from '@/components/report/AdminCommandCenter';
 import { toast } from 'sonner';
-import { getEndOfDay } from '@/lib/dateUtils'; // Assuming this exists, or I'll define local helpers
+import { getEndOfDay } from '@/lib/dateUtils'; 
 import { usePermission } from '@/hooks/usePermission';
 import { PERMISSION_KEYS } from '@/services/permissionService';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, LayoutDashboard, BarChart3, Activity } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // Helper for date formatting
 const formatDate = (date: Date) => {
@@ -20,7 +22,12 @@ const formatDate = (date: Date) => {
 };
 
 export default function ReportsPage() {
-  const { can, isLoading: isAuthLoading } = usePermission();
+  const { can, user, isLoading: isAuthLoading } = usePermission();
+  const [activeTab, setActiveTab] = useState<'financial' | 'admin_stats' | 'admin_stream'>('financial');
+  
+  // Check feature toggle from user's hotel features
+  const hasAdminCommand = user?.hotels?.features?.admin_command_center === true;
+
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date();
     return {
@@ -229,57 +236,110 @@ export default function ReportsPage() {
     <div className="min-h-screen p-4 md:p-8 space-y-6 pb-32">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-        <div>
+        <div className="space-y-4">
           <h1 className="text-4xl font-black tracking-tighter text-slate-900 flex items-center gap-3">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700">Báo cáo</span>
             <span className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full font-bold tracking-wide border border-emerald-100 shadow-sm flex items-center gap-1">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-              TÀI CHÍNH
+              {activeTab === 'financial' ? 'TÀI CHÍNH' : activeTab === 'admin_stats' ? 'THỐNG KÊ ADMIN' : 'LUỒNG HĐ'}
             </span>
           </h1>
+
+          {/* Tab Selector */}
+          {hasAdminCommand && (
+            <div className="flex items-center p-1.5 bg-slate-100/50 rounded-2xl w-fit border border-slate-200/50">
+              <button
+                onClick={() => setActiveTab('financial')}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black transition-all",
+                  activeTab === 'financial' 
+                    ? "bg-white text-slate-900 shadow-sm" 
+                    : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                <BarChart3 size={16} />
+                Tài chính
+              </button>
+              <button
+                onClick={() => setActiveTab('admin_stats')}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black transition-all",
+                  activeTab === 'admin_stats' 
+                    ? "bg-slate-900 text-white shadow-lg" 
+                    : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                <LayoutDashboard size={16} />
+                Thống kê Admin
+              </button>
+              <button
+                onClick={() => setActiveTab('admin_stream')}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black transition-all",
+                  activeTab === 'admin_stream' 
+                    ? "bg-rose-600 text-white shadow-lg shadow-rose-200" 
+                    : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                <Activity size={16} />
+                Luồng hđ
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Date Filter */}
-        <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-            <button 
-                onClick={() => handleMonthChange(-1)}
-                className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-            >
-                <ChevronLeft size={20} />
-            </button>
-            <div className="flex items-center gap-2 px-2 min-w-[140px] justify-center">
-                <Calendar size={16} className="text-blue-600" />
-                <span className="font-bold text-slate-700 uppercase tracking-wide text-sm">
-                    {formatDate(dateRange.start)}
-                </span>
-            </div>
-            <button 
-                onClick={() => handleMonthChange(1)}
-                className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-            >
-                <ChevronRight size={20} />
-            </button>
-        </div>
+        {/* Date Filter - Only show for financial tab */}
+        {activeTab === 'financial' && (
+          <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+              <button 
+                  onClick={() => handleMonthChange(-1)}
+                  className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                  <ChevronLeft size={20} />
+              </button>
+              <div className="flex items-center gap-2 px-2 min-w-[140px] justify-center">
+                  <Calendar size={16} className="text-blue-600" />
+                  <span className="font-bold text-slate-700 uppercase tracking-wide text-sm">
+                      {formatDate(dateRange.start)}
+                  </span>
+              </div>
+              <button 
+                  onClick={() => handleMonthChange(1)}
+                  className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                  <ChevronRight size={20} />
+              </button>
+          </div>
+        )}
       </div>
 
-      {loading || !data ? (
-          <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-          </div>
+      {activeTab !== 'financial' && user?.hotel_id ? (
+        <AdminCommandCenter 
+          hotelId={user.hotel_id} 
+          initialTab={activeTab === 'admin_stats' ? 'stats' : 'stream'} 
+        />
       ) : (
-          <div className="space-y-8">
-              {/* 1. KPIs */}
-              <ReportKPIs data={data.kpis} onDrillDown={handleDrillDown} />
-
-              {/* 2. Charts */}
-              <ProfitCharts kpis={data.kpis} onDrillDown={handleDrillDown} />
-
-              {/* 3. Bottom Grid: Top Items & Alerts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <TopItemsTable items={data.topItems} />
-                  <SmartAlerts kpis={data.kpis} topItem={data.topItems[0]} />
+        <>
+          {loading || !data ? (
+              <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
               </div>
-          </div>
+          ) : (
+              <div className="space-y-8">
+                  {/* 1. KPIs */}
+                  <ReportKPIs data={data.kpis} onDrillDown={handleDrillDown} />
+
+                  {/* 2. Charts */}
+                  <ProfitCharts kpis={data.kpis} onDrillDown={handleDrillDown} />
+
+                  {/* 3. Bottom Grid: Top Items & Alerts */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <TopItemsTable items={data.topItems} />
+                      <SmartAlerts kpis={data.kpis} topItem={data.topItems[0]} />
+                  </div>
+              </div>
+          )}
+        </>
       )}
 
       {/* Drill Down Modal */}
