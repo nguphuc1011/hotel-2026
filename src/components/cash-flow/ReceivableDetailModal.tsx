@@ -54,19 +54,23 @@ export default function ReceivableDetailModal({ isOpen, onClose }: ReceivableDet
   }, [isOpen]);
 
   const filteredEntries = entries.filter(item => 
-    item.bookings?.rooms?.room_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.bookings?.customers?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.room_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalExpected = entries.reduce((sum, item) => sum + Number(item.amount), 0);
 
   const getEventIcon = (eventType: string, amount: number) => {
-    if (amount > 0) {
-      if (eventType.includes('checkin')) return <LogIn size={16} className="text-emerald-500" />;
-      return <PlusCircle size={16} className="text-emerald-500" />;
-    }
-    if (eventType.includes('checkout')) return <LogOut size={16} className="text-rose-500" />;
+    const type = eventType.toUpperCase();
+    if (type === 'CHECK_IN' || type === 'CHECKIN') return <LogIn size={16} className="text-emerald-500" />;
+    if (type === 'CHECK_OUT' || type === 'CHECKOUT') return <LogOut size={16} className="text-rose-500" />;
+    if (type === 'CANCEL') return <X size={16} className="text-rose-500" />;
+    if (type === 'SERVICE') return <PlusCircle size={16} className="text-blue-500" />;
+    if (type === 'ADJUST') return <RefreshCw size={16} className="text-amber-500" />;
+    if (type === 'MILESTONE') return <TrendingUp size={16} className="text-emerald-500" />;
+    
+    if (amount > 0) return <PlusCircle size={16} className="text-emerald-500" />;
     return <MinusCircle size={16} className="text-rose-500" />;
   };
 
@@ -144,22 +148,23 @@ export default function ReceivableDetailModal({ isOpen, onClose }: ReceivableDet
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
                       <div className="flex items-center">
-                        {/* Hiển thị Badge: Nền tối, ưu tiên dữ liệu JOIN, Fallback bằng cách tách từ description */}
-                        {item.bookings?.rooms?.room_number ? (
+                        {item.room_number ? (
                           <span className="px-2.5 py-1 bg-slate-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm ring-1 ring-white/10">
-                            P.{item.bookings.rooms.room_number}
-                          </span>
-                        ) : item.description?.match(/P\.\w+/i) ? (
-                          <span className="px-2.5 py-1 bg-slate-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm ring-1 ring-white/10">
-                            {item.description.match(/P\.\w+/i)[0].toUpperCase()}
+                            P.{item.room_number}
                           </span>
                         ) : null}
                       </div>
                       
-                      <span className="text-sm font-black text-slate-800">
-                        {/* Clean up description to avoid double room numbers */}
-                        {item.description?.replace(/^P\.\w+\s+/, '')}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-slate-800">
+                          {item.description}
+                        </span>
+                        {item.customer_name && (
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                            {item.customer_name}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
