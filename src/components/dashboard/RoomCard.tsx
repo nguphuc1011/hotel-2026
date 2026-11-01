@@ -238,7 +238,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
           Icon = (displayDuration && displayDuration.includes('đêm')) ? Moon : Sun;
           statusText = (
             <div className="flex items-center gap-1.5">
-              <Calendar size={16} />
+              <Calendar size={13} className="shrink-0 md:w-4 md:h-4" />
               <span>{displayDuration}</span>
             </div>
           );
@@ -264,7 +264,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
               if (isValidDate && check_in_at) {
                  statusText = (
                     <div className="flex items-center gap-1.5">
-                      <Clock size={16} className="animate-pulse" />
+                      <Clock size={13} className="shrink-0 md:w-4 md:h-4 animate-pulse" />
                       {duration_text && (duration_text.includes('ngày') || duration_text.includes('đêm')) ? (
                         <span>{duration_text}</span>
                       ) : (
@@ -285,7 +285,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
               if (isValidDate && check_in_at) {
                 statusText = (
                   <div className="flex items-center gap-1.5">
-                    <Calendar size={16} />
+                    <Calendar size={13} className="shrink-0 md:w-4 md:h-4" />
                     {duration_text ? (
                       <span>{duration_text}</span>
                     ) : (
@@ -332,7 +332,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
       onClick={() => onClick(room)}
       className={cn(
         "relative overflow-hidden group cursor-pointer transition-all duration-300",
-        "h-[230px] md:h-[256px] rounded-[2rem] shadow-lg hover:shadow-2xl",
+        "h-[152px] sm:h-[180px] md:h-[256px] rounded-2xl md:rounded-[2rem] shadow-sm md:shadow-lg hover:shadow-md md:hover:shadow-2xl",
         "hover:scale-[1.02]", // Prompt requirement
         bgColor,
         textColor,
@@ -340,7 +340,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
       )}
     >
       {/* Content Container */}
-      <div className="relative z-10 p-6 flex flex-col h-full justify-between">
+      <div className="relative z-10 p-3 sm:p-4 md:p-6 flex flex-col h-full justify-between">
         
         {/* Top Row: Room Number & Rental Type */}
         <div className="flex justify-between items-end">
@@ -353,7 +353,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
               />
             )}
             <span className={cn(
-              "text-4xl font-black tracking-tighter block",
+              "text-2xl sm:text-3xl md:text-4xl font-black tracking-tight md:tracking-tighter block leading-none",
               "transition-colors duration-300 group-hover:brightness-110"
             )}>
               {room.name}
@@ -364,7 +364,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
             <div className="ml-auto">
               {badgeText ? (
                 typeof badgeText === 'string' ? (
-                  <div className="px-2 py-1 rounded-lg bg-black/10 backdrop-blur-md">
+                  <div className="px-1.5 py-0.5 md:px-2 md:py-1 rounded-md md:rounded-lg bg-black/10 backdrop-blur-md">
                     <span className="text-[9px] font-black uppercase tracking-wider block">
                       {badgeText}
                     </span>
@@ -385,7 +385,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         </div>
 
         {/* Category Badge & Group Indicator */}
-        <div className="mt-2 flex flex-col items-start gap-1">
+        <div className="mt-0.5 md:mt-2 flex flex-col items-start gap-0.5 md:gap-1">
               
               {/* Group Indicator - Neutral pill + color dot */}
               {room.group_color && (room.is_group_master || room.current_booking?.is_group_member) && (
@@ -422,7 +422,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
             </div>
 
         {/* Middle: Customer Name & Booking Details (if occupied) */}
-        <div className="mt-auto mb-2 pt-3">
+        <div className="my-auto py-0.5 md:py-1">
           {room.status === 'occupied' && room.current_booking && (
             <div className="animate-fade-in flex flex-col gap-1">
               <div className="flex items-center gap-1.5 opacity-90">
@@ -448,7 +448,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         <div className="flex items-end justify-between">
           <div className="flex flex-col">
             {/* Duration / Status Text */}
-            <span className="text-[14px] md:text-[13px] font-bold opacity-80 mb-0.5">
+            <span className="text-[11px] md:text-[13px] font-bold opacity-85 mb-0.5 truncate">
               {statusText}
             </span>
             
@@ -456,7 +456,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
             {room.status === 'occupied' || room.status === 'available' ? (
                <span className={cn(
                  "font-bold tracking-normal leading-none",
-                 "text-[24px] md:text-[22px]"
+                 "text-[17px] sm:text-[19px] md:text-[22px]"
                )}>
                  {formattedAmount !== null ? formattedAmount : '0 ₫'}
                </span>
