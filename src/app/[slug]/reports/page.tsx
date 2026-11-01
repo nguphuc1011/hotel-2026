@@ -233,85 +233,89 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8 space-y-6 pb-32">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-        <div className="space-y-4">
-          <h1 className="text-4xl font-black tracking-tighter text-slate-900 flex items-center gap-3">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700">Báo cáo</span>
-            <span className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full font-bold tracking-wide border border-emerald-100 shadow-sm flex items-center gap-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-              {activeTab === 'financial' ? 'TÀI CHÍNH' : activeTab === 'admin_stats' ? 'THỐNG KÊ ADMIN' : 'LUỒNG HĐ'}
+    <div className="min-h-screen bg-[#F5F5F7] text-slate-900 font-sans selection:bg-slate-900 selection:text-white pb-32">
+      {/* 1. APPLE STYLE STICKY HEADER */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-20 flex flex-wrap md:flex-nowrap items-center justify-between gap-3">
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">Báo cáo</h1>
+            <span className="hidden sm:inline-flex text-[11px] bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full font-black tracking-wide border border-emerald-100 shadow-sm items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {activeTab === 'financial' ? 'Tài chính' : activeTab === 'admin_stats' ? 'Admin' : 'Luồng HĐ'}
             </span>
-          </h1>
-
-          {/* Tab Selector */}
-          {hasAdminCommand && (
-            <div className="flex items-center p-1.5 bg-slate-100/50 rounded-2xl w-fit border border-slate-200/50">
-              <button
-                onClick={() => setActiveTab('financial')}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black transition-all",
-                  activeTab === 'financial' 
-                    ? "bg-white text-slate-900 shadow-sm" 
-                    : "text-slate-400 hover:text-slate-600"
-                )}
-              >
-                <BarChart3 size={16} />
-                Tài chính
-              </button>
-              <button
-                onClick={() => setActiveTab('admin_stats')}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black transition-all",
-                  activeTab === 'admin_stats' 
-                    ? "bg-slate-900 text-white shadow-lg" 
-                    : "text-slate-400 hover:text-slate-600"
-                )}
-              >
-                <LayoutDashboard size={16} />
-                Thống kê Admin
-              </button>
-              <button
-                onClick={() => setActiveTab('admin_stream')}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black transition-all",
-                  activeTab === 'admin_stream' 
-                    ? "bg-rose-600 text-white shadow-lg shadow-rose-200" 
-                    : "text-slate-400 hover:text-slate-600"
-                )}
-              >
-                <Activity size={16} />
-                Luồng hđ
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Date Filter - Only show for financial tab */}
-        {activeTab === 'financial' && (
-          <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-              <button 
-                  onClick={() => handleMonthChange(-1)}
-                  className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                  <ChevronLeft size={20} />
-              </button>
-              <div className="flex items-center gap-2 px-2 min-w-[140px] justify-center">
-                  <Calendar size={16} className="text-blue-600" />
-                  <span className="font-bold text-slate-700 uppercase tracking-wide text-sm">
-                      {formatDate(dateRange.start)}
-                  </span>
-              </div>
-              <button 
-                  onClick={() => handleMonthChange(1)}
-                  className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                  <ChevronRight size={20} />
-              </button>
           </div>
-        )}
+
+          <div className="flex items-center gap-2 md:gap-3 flex-wrap sm:flex-nowrap">
+            {/* Tab Selector */}
+            {hasAdminCommand && (
+              <div className="flex items-center p-1 bg-slate-100/80 rounded-full border border-slate-200/60 shadow-inner">
+                <button
+                  onClick={() => setActiveTab('financial')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 md:px-4 py-1.5 rounded-full text-xs font-black transition-all",
+                    activeTab === 'financial' 
+                      ? "bg-white text-slate-900 shadow-sm" 
+                      : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  <BarChart3 size={14} />
+                  <span>Tài chính</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('admin_stats')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 md:px-4 py-1.5 rounded-full text-xs font-black transition-all",
+                    activeTab === 'admin_stats' 
+                      ? "bg-slate-900 text-white shadow-sm" 
+                      : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  <LayoutDashboard size={14} />
+                  <span>Admin</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('admin_stream')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 md:px-4 py-1.5 rounded-full text-xs font-black transition-all",
+                    activeTab === 'admin_stream' 
+                      ? "bg-rose-600 text-white shadow-sm" 
+                      : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  <Activity size={14} />
+                  <span>Luồng HĐ</span>
+                </button>
+              </div>
+            )}
+
+            {/* Date Filter - Only show for financial tab */}
+            {activeTab === 'financial' && (
+              <div className="flex items-center bg-white p-1 rounded-full border border-slate-200/80 shadow-sm">
+                <button 
+                  onClick={() => handleMonthChange(-1)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div className="flex items-center gap-1.5 px-2 min-w-[110px] md:min-w-[130px] justify-center">
+                  <Calendar size={14} className="text-blue-600" />
+                  <span className="font-bold text-slate-800 text-xs tracking-tight">
+                    {formatDate(dateRange.start)}
+                  </span>
+                </div>
+                <button 
+                  onClick={() => handleMonthChange(1)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
 
       {activeTab !== 'financial' && user?.hotel_id ? (
         <AdminCommandCenter 
@@ -341,6 +345,8 @@ export default function ReportsPage() {
           )}
         </>
       )}
+
+      </main>
 
       {/* Drill Down Modal */}
       <DrillDownModal 

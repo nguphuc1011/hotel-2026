@@ -1,0 +1,1322 @@
+{
+  "totalFunctions": 98,
+  "overloads": [],
+  "triggers": [
+    {
+      "tgname": "trg_protect_audit_logs",
+      "table_name": "audit_logs",
+      "function_name": "fn_prevent_modification",
+      "trigger_def": "CREATE TRIGGER trg_protect_audit_logs BEFORE DELETE OR UPDATE ON public.audit_logs FOR EACH ROW EXECUTE FUNCTION fn_prevent_modification()"
+    },
+    {
+      "tgname": "tr_booking_services_snapshot",
+      "table_name": "booking_services",
+      "function_name": "tr_fn_sync_booking_snapshot",
+      "trigger_def": "CREATE TRIGGER tr_booking_services_snapshot AFTER INSERT OR DELETE OR UPDATE ON public.booking_services FOR EACH ROW EXECUTE FUNCTION tr_fn_sync_booking_snapshot()"
+    },
+    {
+      "tgname": "tr_handle_service_inventory",
+      "table_name": "booking_services",
+      "function_name": "handle_service_inventory",
+      "trigger_def": "CREATE TRIGGER tr_handle_service_inventory BEFORE INSERT OR UPDATE ON public.booking_services FOR EACH ROW EXECUTE FUNCTION handle_service_inventory()"
+    },
+    {
+      "tgname": "tr_handle_service_inventory_delete",
+      "table_name": "booking_services",
+      "function_name": "handle_service_inventory",
+      "trigger_def": "CREATE TRIGGER tr_handle_service_inventory_delete AFTER DELETE ON public.booking_services FOR EACH ROW EXECUTE FUNCTION handle_service_inventory()"
+    },
+    {
+      "tgname": "tr_sync_service_to_cash_flow",
+      "table_name": "booking_services",
+      "function_name": "trg_sync_service_to_cash_flow",
+      "trigger_def": "CREATE TRIGGER tr_sync_service_to_cash_flow AFTER INSERT OR DELETE OR UPDATE ON public.booking_services FOR EACH ROW EXECUTE FUNCTION trg_sync_service_to_cash_flow()"
+    },
+    {
+      "tgname": "trg_expected_revenue_services",
+      "table_name": "booking_services",
+      "function_name": "trg_expected_revenue_services_engine",
+      "trigger_def": "CREATE TRIGGER trg_expected_revenue_services AFTER INSERT OR DELETE ON public.booking_services FOR EACH ROW EXECUTE FUNCTION trg_expected_revenue_services_engine()"
+    },
+    {
+      "tgname": "trg_notify_booking_services_realtime",
+      "table_name": "booking_services",
+      "function_name": "fn_realtime_dashboard_notify",
+      "trigger_def": "CREATE TRIGGER trg_notify_booking_services_realtime AFTER INSERT OR DELETE OR UPDATE ON public.booking_services FOR EACH ROW EXECUTE FUNCTION fn_realtime_dashboard_notify()"
+    },
+    {
+      "tgname": "tr_bookings_snapshot",
+      "table_name": "bookings",
+      "function_name": "tr_fn_sync_booking_snapshot",
+      "trigger_def": "CREATE TRIGGER tr_bookings_snapshot AFTER INSERT OR UPDATE ON public.bookings FOR EACH ROW EXECUTE FUNCTION tr_fn_sync_booking_snapshot()"
+    },
+    {
+      "tgname": "trg_expected_revenue_bookings",
+      "table_name": "bookings",
+      "function_name": "trg_expected_revenue_bookings_engine",
+      "trigger_def": "CREATE TRIGGER trg_expected_revenue_bookings AFTER INSERT OR UPDATE ON public.bookings FOR EACH ROW EXECUTE FUNCTION trg_expected_revenue_bookings_engine()"
+    },
+    {
+      "tgname": "trg_notify_bookings_realtime",
+      "table_name": "bookings",
+      "function_name": "fn_realtime_dashboard_notify",
+      "trigger_def": "CREATE TRIGGER trg_notify_bookings_realtime AFTER INSERT OR DELETE OR UPDATE ON public.bookings FOR EACH ROW EXECUTE FUNCTION fn_realtime_dashboard_notify()"
+    },
+    {
+      "tgname": "trg_sync_booking_to_cash_flow_master",
+      "table_name": "bookings",
+      "function_name": "trg_sync_booking_to_cash_flow",
+      "trigger_def": "CREATE TRIGGER trg_sync_booking_to_cash_flow_master AFTER INSERT OR UPDATE ON public.bookings FOR EACH ROW EXECUTE FUNCTION trg_sync_booking_to_cash_flow()"
+    },
+    {
+      "tgname": "tr_cash_flow_updated_at",
+      "table_name": "cash_flow",
+      "function_name": "fn_set_updated_at",
+      "trigger_def": "CREATE TRIGGER tr_cash_flow_updated_at BEFORE UPDATE ON public.cash_flow FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at()"
+    },
+    {
+      "tgname": "trg_notify_cash_flow_realtime",
+      "table_name": "cash_flow",
+      "function_name": "fn_realtime_dashboard_notify",
+      "trigger_def": "CREATE TRIGGER trg_notify_cash_flow_realtime AFTER INSERT OR DELETE OR UPDATE ON public.cash_flow FOR EACH ROW EXECUTE FUNCTION fn_realtime_dashboard_notify()"
+    },
+    {
+      "tgname": "trg_protect_cash_flow",
+      "table_name": "cash_flow",
+      "function_name": "fn_prevent_modification",
+      "trigger_def": "CREATE TRIGGER trg_protect_cash_flow BEFORE DELETE OR UPDATE ON public.cash_flow FOR EACH ROW EXECUTE FUNCTION fn_prevent_modification()"
+    },
+    {
+      "tgname": "trg_sync_wallets_master",
+      "table_name": "cash_flow",
+      "function_name": "fn_sync_wallets",
+      "trigger_def": "CREATE TRIGGER trg_sync_wallets_master AFTER INSERT OR DELETE OR UPDATE ON public.cash_flow FOR EACH ROW EXECUTE FUNCTION fn_sync_wallets()"
+    },
+    {
+      "tgname": "trg_notify_rooms_realtime",
+      "table_name": "rooms",
+      "function_name": "fn_realtime_dashboard_notify",
+      "trigger_def": "CREATE TRIGGER trg_notify_rooms_realtime AFTER INSERT OR DELETE OR UPDATE ON public.rooms FOR EACH ROW EXECUTE FUNCTION fn_realtime_dashboard_notify()"
+    },
+    {
+      "tgname": "shifts_updated_at_trigger",
+      "table_name": "shifts",
+      "function_name": "update_updated_at_column",
+      "trigger_def": "CREATE TRIGGER shifts_updated_at_trigger BEFORE UPDATE ON public.shifts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    },
+    {
+      "tgname": "staff_debts_updated_at_trigger",
+      "table_name": "staff_debts",
+      "function_name": "update_updated_at_column",
+      "trigger_def": "CREATE TRIGGER staff_debts_updated_at_trigger BEFORE UPDATE ON public.staff_debts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    }
+  ],
+  "fnUsage": {
+    "adjust_customer_balance": {
+      "name": "adjust_customer_balance",
+      "signature": "p_customer_id uuid, p_amount numeric, p_type text, p_description text, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_booking_id uuid, p_payment_method text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 2,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts",
+        "src\\services\\customerService.ts"
+      ]
+    },
+    "adjust_inventory": {
+      "name": "adjust_inventory",
+      "signature": "p_service_id uuid, p_new_quantity integer, p_notes text, p_staff_id uuid",
+      "return_type": "json",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\serviceService.ts"
+      ]
+    },
+    "calculate_booking_bill": {
+      "name": "calculate_booking_bill",
+      "signature": "p_booking_id uuid, p_now_override timestamp with time zone",
+      "return_type": "jsonb",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 2,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts",
+        "src\\services\\groupBookingService.ts"
+      ]
+    },
+    "cancel_booking": {
+      "name": "cancel_booking",
+      "signature": "p_booking_id uuid, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_penalty_amount numeric, p_penalty_payment_method text, p_reason text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts"
+      ]
+    },
+    "change_room": {
+      "name": "change_room",
+      "signature": "p_booking_id uuid, p_new_room_id uuid, p_reason text, p_staff_id uuid, p_price_mode text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts"
+      ]
+    },
+    "check_in_customer": {
+      "name": "check_in_customer",
+      "signature": "p_room_id uuid, p_rental_type text, p_customer_id uuid, p_deposit numeric, p_payment_method text, p_services jsonb, p_customer_name text, p_extra_adults integer, p_extra_children integer, p_notes text, p_custom_price numeric, p_custom_price_reason text, p_source text, p_verified_by_staff_id uuid, p_verified_by_staff_name text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts"
+      ]
+    },
+    "close_shift": {
+      "name": "close_shift",
+      "signature": "p_shift_id uuid, p_actual_cash numeric, p_notes text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "debug_auth": {
+      "name": "debug_auth",
+      "signature": "",
+      "return_type": "json",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_adjust_wallet_balance": {
+      "name": "fn_adjust_wallet_balance",
+      "signature": "p_wallet_id text, p_actual_balance numeric, p_reason text, p_verified_by_staff_id uuid, p_verified_by_staff_name text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_approve_request": {
+      "name": "fn_approve_request",
+      "signature": "p_manager_id uuid, p_manager_pin text, p_method text, p_request_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_approve_request_override": {
+      "name": "fn_approve_request_override",
+      "signature": "p_request_id uuid, p_manager_pin text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_auto_assign_shift_id": {
+      "name": "fn_auto_assign_shift_id",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_calculate_bill_adjustments": {
+      "name": "fn_calculate_bill_adjustments",
+      "signature": "p_sub_total numeric, p_discount_amount numeric, p_custom_surcharge numeric",
+      "return_type": "jsonb",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_calculate_extra_person_charge": {
+      "name": "fn_calculate_extra_person_charge",
+      "signature": "p_booking_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_calculate_room_charge": {
+      "name": "fn_calculate_room_charge",
+      "signature": "p_booking_id uuid, p_check_in timestamp with time zone, p_check_out timestamp with time zone, p_rental_type text, p_room_cat_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_calculate_surcharge": {
+      "name": "fn_calculate_surcharge",
+      "signature": "p_check_in timestamp with time zone, p_check_out timestamp with time zone, p_room_cat_id uuid, p_rental_type text",
+      "return_type": "jsonb",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_can_access_tenant": {
+      "name": "fn_can_access_tenant",
+      "signature": "p_hotel_id uuid",
+      "return_type": "boolean",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_change_own_pin": {
+      "name": "fn_change_own_pin",
+      "signature": "p_staff_id uuid, p_old_pin text, p_new_pin text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_check_approval_status": {
+      "name": "fn_check_approval_status",
+      "signature": "p_request_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_check_financial_health": {
+      "name": "fn_check_financial_health",
+      "signature": "",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_create_approval_request": {
+      "name": "fn_create_approval_request",
+      "signature": "p_action_key text, p_request_data jsonb, p_staff_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_create_cash_flow": {
+      "name": "fn_create_cash_flow",
+      "signature": "p_flow_type text, p_category text, p_amount numeric, p_description text, p_occurred_at timestamp with time zone, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_payment_method_code text, p_ref_id uuid, p_is_auto boolean, p_category_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_delete_cash_flow": {
+      "name": "fn_delete_cash_flow",
+      "signature": "p_id uuid, p_reason text, p_verified_by_staff_id uuid, p_verified_by_staff_name text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_delete_hotel": {
+      "name": "fn_delete_hotel",
+      "signature": "p_hotel_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\saas-admin\\page.tsx"
+      ]
+    },
+    "fn_format_money_vi": {
+      "name": "fn_format_money_vi",
+      "signature": "p_amount numeric",
+      "return_type": "text",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_generate_pricing_ladder": {
+      "name": "fn_generate_pricing_ladder",
+      "signature": "p_booking_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_get_all_user_floors_map": {
+      "name": "fn_get_all_user_floors_map",
+      "signature": "p_hotel_id uuid",
+      "return_type": "TABLE(user_id uuid, floors integer[])",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\settings\\staff\\page.tsx"
+      ]
+    },
+    "fn_get_available_floors": {
+      "name": "fn_get_available_floors",
+      "signature": "p_hotel_id uuid",
+      "return_type": "TABLE(floor integer)",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\settings\\staff\\page.tsx"
+      ]
+    },
+    "fn_get_cash_flow_categories": {
+      "name": "fn_get_cash_flow_categories",
+      "signature": "p_type text",
+      "return_type": "TABLE(id uuid, name text, type text, description text, is_system boolean, is_active boolean, is_revenue boolean)",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_get_cash_flow_stats": {
+      "name": "fn_get_cash_flow_stats",
+      "signature": "p_from_date timestamp with time zone, p_to_date timestamp with time zone",
+      "return_type": "jsonb",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_get_current_night_audit_threshold": {
+      "name": "fn_get_current_night_audit_threshold",
+      "signature": "p_hotel_id uuid",
+      "return_type": "timestamp with time zone",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_get_daily_expected_ledger": {
+      "name": "fn_get_daily_expected_ledger",
+      "signature": "p_hotel_id uuid",
+      "return_type": "TABLE(id uuid, booking_id uuid, amount numeric, description text, event_type text, created_at timestamp with time zone, room_number text, customer_name text)",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_get_daily_expected_revenue": {
+      "name": "fn_get_daily_expected_revenue",
+      "signature": "p_hotel_id uuid",
+      "return_type": "numeric",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\page.tsx"
+      ]
+    },
+    "fn_get_dashboard_data": {
+      "name": "fn_get_dashboard_data",
+      "signature": "p_hotel_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\page.tsx"
+      ]
+    },
+    "fn_get_money_page_stats": {
+      "name": "fn_get_money_page_stats",
+      "signature": "p_hotel_id uuid, p_start_date timestamp with time zone, p_end_date timestamp with time zone",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_get_my_hotel_id": {
+      "name": "fn_get_my_hotel_id",
+      "signature": "",
+      "return_type": "uuid",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_get_pnl_report": {
+      "name": "fn_get_pnl_report",
+      "signature": "p_hotel_id uuid, p_start_date timestamp with time zone, p_end_date timestamp with time zone",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\reportService.ts"
+      ]
+    },
+    "fn_get_recorded_expected_revenue": {
+      "name": "fn_get_recorded_expected_revenue",
+      "signature": "p_booking_id uuid, p_since_threshold timestamp with time zone",
+      "return_type": "numeric",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_get_security_context": {
+      "name": "fn_get_security_context",
+      "signature": "p_role text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_get_security_context_v2": {
+      "name": "fn_get_security_context_v2",
+      "signature": "p_staff_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_get_security_matrix": {
+      "name": "fn_get_security_matrix",
+      "signature": "",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 2,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\settings\\staff\\page.tsx",
+        "src\\services\\securityService.ts"
+      ]
+    },
+    "fn_get_security_settings": {
+      "name": "fn_get_security_settings",
+      "signature": "",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\settings\\services\\page.tsx"
+      ]
+    },
+    "fn_get_system_setting": {
+      "name": "fn_get_system_setting",
+      "signature": "p_key text",
+      "return_type": "text",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_get_tenant_id": {
+      "name": "fn_get_tenant_id",
+      "signature": "",
+      "return_type": "uuid",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_get_user_floors": {
+      "name": "fn_get_user_floors",
+      "signature": "p_user_id uuid",
+      "return_type": "TABLE(floor integer)",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_guard_cash_flow": {
+      "name": "fn_guard_cash_flow",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_has_permission": {
+      "name": "fn_has_permission",
+      "signature": "p_staff_id uuid, p_permission_key text",
+      "return_type": "boolean",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_manage_cash_flow_category": {
+      "name": "fn_manage_cash_flow_category",
+      "signature": "p_action text, p_id uuid, p_name text, p_type text, p_description text, p_is_revenue boolean",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_manage_staff": {
+      "name": "fn_manage_staff",
+      "signature": "p_action text, p_id uuid, p_username text, p_full_name text, p_role text, p_pin_hash text, p_is_active boolean, p_hotel_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 4,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\settings\\staff\\page.tsx",
+        "src\\components\\dashboard\\DashboardHeader.tsx",
+        "src\\components\\layout\\AppShell.tsx",
+        "src\\providers\\AuthProvider.tsx"
+      ]
+    },
+    "fn_onboard_new_hotel": {
+      "name": "fn_onboard_new_hotel",
+      "signature": "p_hotel_name text, p_admin_name text, p_admin_phone text, p_admin_pin text, p_hotel_slug text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\saas-admin\\page.tsx"
+      ]
+    },
+    "fn_perform_night_audit": {
+      "name": "fn_perform_night_audit",
+      "signature": "p_hotel_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\page.tsx"
+      ]
+    },
+    "fn_prevent_modification": {
+      "name": "fn_prevent_modification",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 2,
+      "triggers": [
+        "audit_logs:trg_protect_audit_logs",
+        "cash_flow:trg_protect_cash_flow"
+      ],
+      "matchingFiles": []
+    },
+    "fn_realtime_dashboard_notify": {
+      "name": "fn_realtime_dashboard_notify",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 4,
+      "triggers": [
+        "booking_services:trg_notify_booking_services_realtime",
+        "bookings:trg_notify_bookings_realtime",
+        "cash_flow:trg_notify_cash_flow_realtime",
+        "rooms:trg_notify_rooms_realtime"
+      ],
+      "matchingFiles": []
+    },
+    "fn_refresh_expected_revenue": {
+      "name": "fn_refresh_expected_revenue",
+      "signature": "p_hotel_id uuid",
+      "return_type": "numeric",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_resolve_policy": {
+      "name": "fn_resolve_policy",
+      "signature": "p_staff_id uuid, p_action_key text",
+      "return_type": "text",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\securityService.ts"
+      ]
+    },
+    "fn_reverse_cash_flow_on_cancel": {
+      "name": "fn_reverse_cash_flow_on_cancel",
+      "signature": "p_booking_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_set_policy_override": {
+      "name": "fn_set_policy_override",
+      "signature": "p_scope text, p_target_id text, p_action_key text, p_policy_type text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\settings\\staff\\page.tsx"
+      ]
+    },
+    "fn_set_updated_at": {
+      "name": "fn_set_updated_at",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 1,
+      "triggers": [
+        "cash_flow:tr_cash_flow_updated_at"
+      ],
+      "matchingFiles": []
+    },
+    "fn_set_user_floors": {
+      "name": "fn_set_user_floors",
+      "signature": "p_user_id uuid, p_floors integer[]",
+      "return_type": "void",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\settings\\staff\\page.tsx"
+      ]
+    },
+    "fn_staff_login": {
+      "name": "fn_staff_login",
+      "signature": "p_username text, p_pin text, p_hotel_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\providers\\AuthProvider.tsx"
+      ]
+    },
+    "fn_staff_override_login": {
+      "name": "fn_staff_override_login",
+      "signature": "p_username text, p_pin text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_sync_booking_to_ledger": {
+      "name": "fn_sync_booking_to_ledger",
+      "signature": "p_booking_id uuid",
+      "return_type": "void",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_sync_stayover_milestones": {
+      "name": "fn_sync_stayover_milestones",
+      "signature": "p_hotel_id uuid",
+      "return_type": "void",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_sync_wallets": {
+      "name": "fn_sync_wallets",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 1,
+      "triggers": [
+        "cash_flow:trg_sync_wallets_master"
+      ],
+      "matchingFiles": []
+    },
+    "fn_update_booking_snapshot": {
+      "name": "fn_update_booking_snapshot",
+      "signature": "p_booking_id uuid",
+      "return_type": "void",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts"
+      ]
+    },
+    "fn_update_cash_flow": {
+      "name": "fn_update_cash_flow",
+      "signature": "p_id uuid, p_amount numeric, p_description text, p_occurred_at timestamp with time zone, p_category text, p_payment_method_code text, p_verified_by_staff_id uuid, p_verified_by_staff_name text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "fn_update_hotel": {
+      "name": "fn_update_hotel",
+      "signature": "p_hotel_id uuid, p_name text, p_phone text, p_slug text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\saas-admin\\page.tsx"
+      ]
+    },
+    "fn_update_security_setting": {
+      "name": "fn_update_security_setting",
+      "signature": "p_key text, p_policy_type text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "fn_verify_staff_pin": {
+      "name": "fn_verify_staff_pin",
+      "signature": "p_staff_id uuid, p_pin_hash text",
+      "return_type": "boolean",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 5,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\components\\dashboard\\DashboardHeader.tsx",
+        "src\\components\\layout\\AppShell.tsx",
+        "src\\components\\shared\\PinValidationModal.tsx",
+        "src\\providers\\AuthProvider.tsx",
+        "src\\services\\securityService.ts"
+      ]
+    },
+    "force_staff_logout": {
+      "name": "force_staff_logout",
+      "signature": "p_staff_id uuid",
+      "return_type": "void",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "get_financial_health_check": {
+      "name": "get_financial_health_check",
+      "signature": "",
+      "return_type": "json",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "get_group_details": {
+      "name": "get_group_details",
+      "signature": "p_booking_id uuid, p_selected_child_ids uuid[]",
+      "return_type": "jsonb",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 2,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts",
+        "src\\services\\groupBookingService.ts"
+      ]
+    },
+    "get_last_shift_balance": {
+      "name": "get_last_shift_balance",
+      "signature": "p_hotel_id uuid",
+      "return_type": "numeric",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "get_my_shift": {
+      "name": "get_my_shift",
+      "signature": "staff_uuid uuid",
+      "return_type": "TABLE(shift_id uuid, start_cash numeric, status text, started_at timestamp with time zone, expected_cash numeric, cash_variance numeric)",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "get_room_categories": {
+      "name": "get_room_categories",
+      "signature": "",
+      "return_type": "SETOF room_categories",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "get_system_settings": {
+      "name": "get_system_settings",
+      "signature": "p_hotel_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\app\\[slug]\\page.tsx"
+      ]
+    },
+    "group_rooms": {
+      "name": "group_rooms",
+      "signature": "p_master_id uuid, p_child_ids uuid[]",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\groupBookingService.ts"
+      ]
+    },
+    "handle_service_inventory": {
+      "name": "handle_service_inventory",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 2,
+      "triggers": [
+        "booking_services:tr_handle_service_inventory",
+        "booking_services:tr_handle_service_inventory_delete"
+      ],
+      "matchingFiles": []
+    },
+    "import_inventory": {
+      "name": "import_inventory",
+      "signature": "p_service_id uuid, p_qty_buy numeric, p_total_amount numeric, p_payment_method_code text, p_shift_id uuid, p_notes text, p_verified_by_staff_id uuid",
+      "return_type": "json",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 1,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\serviceService.ts"
+      ]
+    },
+    "open_shift": {
+      "name": "open_shift",
+      "signature": "staff_uuid uuid, initial_cash numeric, p_hotel_id uuid",
+      "return_type": "uuid",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "process_checkout": {
+      "name": "process_checkout",
+      "signature": "p_booking_id uuid, p_payment_method text, p_amount_paid numeric, p_discount numeric, p_surcharge numeric, p_notes text, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_selected_child_ids uuid[]",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts"
+      ]
+    },
+    "record_owner_expense": {
+      "name": "record_owner_expense",
+      "signature": "p_amount numeric, p_description text, p_creditor_name text, p_evidence_url text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "refresh_active_ledgers": {
+      "name": "refresh_active_ledgers",
+      "signature": "",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "register_service_usage": {
+      "name": "register_service_usage",
+      "signature": "p_booking_id uuid, p_service_id uuid, p_quantity integer, p_notes text",
+      "return_type": "json",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\serviceService.ts"
+      ]
+    },
+    "repay_owner_debt": {
+      "name": "repay_owner_debt",
+      "signature": "p_payable_id uuid, p_payment_method text, p_pin text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\cashFlowService.ts"
+      ]
+    },
+    "resolve_shift_variance": {
+      "name": "resolve_shift_variance",
+      "signature": "p_shift_id uuid, p_resolution_type text, p_notes text, p_admin_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "settle_debt": {
+      "name": "settle_debt",
+      "signature": "debt_uuid uuid, payment_amount numeric",
+      "return_type": "json",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "tr_fn_sync_booking_snapshot": {
+      "name": "tr_fn_sync_booking_snapshot",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 2,
+      "triggers": [
+        "booking_services:tr_booking_services_snapshot",
+        "bookings:tr_bookings_snapshot"
+      ],
+      "matchingFiles": []
+    },
+    "transfer_group_master": {
+      "name": "transfer_group_master",
+      "signature": "p_old_master_booking_id uuid, p_new_master_booking_id uuid, p_action_for_old_master text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts"
+      ]
+    },
+    "trg_expected_revenue_bookings_engine": {
+      "name": "trg_expected_revenue_bookings_engine",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 1,
+      "triggers": [
+        "bookings:trg_expected_revenue_bookings"
+      ],
+      "matchingFiles": []
+    },
+    "trg_expected_revenue_services_engine": {
+      "name": "trg_expected_revenue_services_engine",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 1,
+      "triggers": [
+        "booking_services:trg_expected_revenue_services"
+      ],
+      "matchingFiles": []
+    },
+    "trg_sync_booking_to_cash_flow": {
+      "name": "trg_sync_booking_to_cash_flow",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 1,
+      "triggers": [
+        "bookings:trg_sync_booking_to_cash_flow_master"
+      ],
+      "matchingFiles": []
+    },
+    "trg_sync_service_to_cash_flow": {
+      "name": "trg_sync_service_to_cash_flow",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 1,
+      "triggers": [
+        "booking_services:tr_sync_service_to_cash_flow"
+      ],
+      "matchingFiles": []
+    },
+    "ungroup_room": {
+      "name": "ungroup_room",
+      "signature": "p_booking_id uuid",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\groupBookingService.ts"
+      ]
+    },
+    "update_booking_details": {
+      "name": "update_booking_details",
+      "signature": "p_booking_id uuid, p_customer_name text, p_check_in_at timestamp with time zone, p_custom_price numeric, p_price_apply_mode text, p_reason text, p_staff_id uuid, p_customer_id uuid, p_notes text",
+      "return_type": "jsonb",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 1,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": [
+        "src\\services\\bookingService.ts"
+      ]
+    },
+    "update_room_category": {
+      "name": "update_room_category",
+      "signature": "p_id uuid, p_category jsonb",
+      "return_type": "room_categories",
+      "is_security_definer": true,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "update_settings": {
+      "name": "update_settings",
+      "signature": "p_check_in_time time without time zone, p_check_out_time time without time zone, p_overnight_start time without time zone, p_overnight_end time without time zone, p_overnight_checkout_enabled boolean, p_overnight_checkout_time time without time zone, p_night_audit_hour time without time zone, p_late_checkout_limit time without time zone, p_early_checkin_limit time without time zone, p_auto_surcharge_enabled boolean, p_surcharge_rules jsonb, p_grace_in_enabled boolean, p_grace_out_enabled boolean, p_grace_minutes integer, p_vat_enabled boolean, p_vat_percent numeric, p_service_fee_enabled boolean, p_service_fee_percent numeric, p_auto_deduct_inventory boolean, p_enable_print_bill boolean, p_allow_manual_price_override boolean",
+      "return_type": "SETOF settings",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 0,
+      "triggers": [],
+      "matchingFiles": []
+    },
+    "update_updated_at_column": {
+      "name": "update_updated_at_column",
+      "signature": "",
+      "return_type": "trigger",
+      "is_security_definer": false,
+      "rpcCallsInSrc": 0,
+      "sqlCallsInSrc": 0,
+      "triggerCount": 2,
+      "triggers": [
+        "shifts:shifts_updated_at_trigger",
+        "staff_debts:staff_debts_updated_at_trigger"
+      ],
+      "matchingFiles": []
+    }
+  }
+}

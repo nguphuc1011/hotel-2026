@@ -200,11 +200,11 @@ export default function CategoriesPage() {
       
       {/* 1. TOP NAV */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-10 h-20 md:h-24 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => router.back()}
-              className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-90"
+              className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-white rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-90"
             >
               <ArrowLeft size={20} />
             </button>
@@ -240,7 +240,7 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      <main className="max-w-[1400px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-10 md:space-y-16">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         
         {/* 2. TAB NAVIGATION */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -751,7 +751,7 @@ export default function CategoriesPage() {
                   type="text"
                   value={editingRoom?.name || ''}
                   onChange={(e) => setEditingRoom(prev => ({ ...prev, name: e.target.value, room_number: e.target.value }))}
-                  className="w-full h-20 md:h-24 px-8 rounded-[32px] bg-slate-50 border border-transparent font-black text-4xl text-slate-900 outline-none focus:bg-white focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all text-center"
+                  className="w-full h-16 md:h-20 px-8 rounded-[32px] bg-slate-50 border border-transparent font-black text-4xl text-slate-900 outline-none focus:bg-white focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all text-center"
                   placeholder="VD: 101"
                 />
               </div>
@@ -800,7 +800,7 @@ export default function CategoriesPage() {
 
       {/* 5. MOBILE FLOATING ACTION */}
       {activeTab === 'categories' && (
-        <div className="fixed bottom-10 left-0 right-0 px-6 md:hidden z-50">
+        <div className="fixed bottom-16 left-0 right-0 px-4 md:hidden z-40">
           <button 
             onClick={handleSaveCategories}
             disabled={saving}

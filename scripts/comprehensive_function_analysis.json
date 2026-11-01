@@ -1,0 +1,1791 @@
+[
+  {
+    "oid": 87555,
+    "proname": "adjust_customer_balance",
+    "signature": "p_customer_id uuid, p_amount numeric, p_type text, p_description text, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_booking_id uuid, p_payment_method text",
+    "args": "p_customer_id uuid, p_amount numeric, p_type text, p_description text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_booking_id uuid DEFAULT NULL::uuid, p_payment_method text DEFAULT 'cash'::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 2,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts",
+      "src\\services\\customerService.ts"
+    ]
+  },
+  {
+    "oid": 71499,
+    "proname": "adjust_inventory",
+    "signature": "p_service_id uuid, p_new_quantity integer, p_notes text, p_staff_id uuid",
+    "args": "p_service_id uuid, p_new_quantity integer, p_notes text DEFAULT NULL::text, p_staff_id uuid DEFAULT NULL::uuid",
+    "return_type": "json",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\serviceService.ts"
+    ]
+  },
+  {
+    "oid": 71500,
+    "proname": "calculate_booking_bill",
+    "signature": "p_booking_id uuid, p_now_override timestamp with time zone",
+    "args": "p_booking_id uuid, p_now_override timestamp with time zone DEFAULT NULL::timestamp with time zone",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 2,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "fn_generate_pricing_ladder",
+      "fn_get_dashboard_data",
+      "fn_get_money_page_stats",
+      "fn_perform_night_audit",
+      "fn_sync_booking_to_ledger",
+      "fn_sync_stayover_milestones",
+      "fn_update_booking_snapshot",
+      "get_group_details",
+      "process_checkout",
+      "trg_expected_revenue_bookings_engine"
+    ],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts",
+      "src\\services\\groupBookingService.ts"
+    ]
+  },
+  {
+    "oid": 71503,
+    "proname": "cancel_booking",
+    "signature": "p_booking_id uuid, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_penalty_amount numeric, p_penalty_payment_method text, p_reason text",
+    "args": "p_booking_id uuid, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_penalty_amount numeric DEFAULT 0, p_penalty_payment_method text DEFAULT 'cash'::text, p_reason text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "transfer_group_master"
+    ],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts"
+    ]
+  },
+  {
+    "oid": 71504,
+    "proname": "change_room",
+    "signature": "p_booking_id uuid, p_new_room_id uuid, p_reason text, p_staff_id uuid",
+    "args": "p_booking_id uuid, p_new_room_id uuid, p_reason text DEFAULT NULL::text, p_staff_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts"
+    ]
+  },
+  {
+    "oid": 77104,
+    "proname": "change_room",
+    "signature": "p_booking_id uuid, p_new_room_id uuid, p_reason text, p_staff_id uuid, p_price_mode text",
+    "args": "p_booking_id uuid, p_new_room_id uuid, p_reason text DEFAULT NULL::text, p_staff_id uuid DEFAULT NULL::uuid, p_price_mode text DEFAULT 'USE_NEW'::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts"
+    ]
+  },
+  {
+    "oid": 87548,
+    "proname": "check_in_customer",
+    "signature": "p_room_id uuid, p_rental_type text, p_customer_id uuid, p_deposit numeric, p_payment_method text, p_services jsonb, p_customer_name text, p_extra_adults integer, p_extra_children integer, p_notes text, p_custom_price numeric, p_custom_price_reason text, p_source text, p_verified_by_staff_id uuid, p_verified_by_staff_name text",
+    "args": "p_room_id uuid, p_rental_type text, p_customer_id uuid DEFAULT NULL::uuid, p_deposit numeric DEFAULT 0, p_payment_method text DEFAULT 'cash'::text, p_services jsonb DEFAULT '[]'::jsonb, p_customer_name text DEFAULT NULL::text, p_extra_adults integer DEFAULT 0, p_extra_children integer DEFAULT 0, p_notes text DEFAULT NULL::text, p_custom_price numeric DEFAULT NULL::numeric, p_custom_price_reason text DEFAULT NULL::text, p_source text DEFAULT 'direct'::text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts"
+    ]
+  },
+  {
+    "oid": 111249,
+    "proname": "close_shift",
+    "signature": "p_shift_id uuid, p_actual_cash numeric, p_notes text",
+    "args": "p_shift_id uuid, p_actual_cash numeric, p_notes text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": true,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71508,
+    "proname": "close_shift",
+    "signature": "p_shift_id uuid, p_denominations jsonb, p_notes text, p_declared_cash_manual numeric",
+    "args": "p_shift_id uuid, p_denominations jsonb DEFAULT NULL::jsonb, p_notes text DEFAULT NULL::text, p_declared_cash_manual numeric DEFAULT NULL::numeric",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": true,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71509,
+    "proname": "debug_auth",
+    "signature": "",
+    "args": "",
+    "return_type": "json",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 78270,
+    "proname": "fn_adjust_wallet_balance",
+    "signature": "p_wallet_id text, p_actual_balance numeric, p_reason text, p_verified_by_staff_id uuid, p_verified_by_staff_name text",
+    "args": "p_wallet_id text, p_actual_balance numeric, p_reason text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 71510,
+    "proname": "fn_apply_wallet_logic",
+    "signature": "p_rec record, p_sign_multiplier integer",
+    "args": "p_rec record, p_sign_multiplier integer",
+    "return_type": "void",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71511,
+    "proname": "fn_approve_request",
+    "signature": "p_manager_id uuid, p_manager_pin text, p_method text, p_request_id uuid",
+    "args": "p_manager_id uuid DEFAULT NULL::uuid, p_manager_pin text DEFAULT NULL::text, p_method text DEFAULT 'PIN_OVERRIDE'::text, p_request_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71512,
+    "proname": "fn_approve_request_override",
+    "signature": "p_request_id uuid, p_manager_pin text",
+    "args": "p_request_id uuid, p_manager_pin text",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 70425,
+    "proname": "fn_auto_assign_shift_id",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71513,
+    "proname": "fn_calculate_bill_adjustments",
+    "signature": "p_sub_total numeric, p_discount_amount numeric, p_custom_surcharge numeric",
+    "args": "p_sub_total numeric, p_discount_amount numeric, p_custom_surcharge numeric",
+    "return_type": "jsonb",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "calculate_booking_bill"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71514,
+    "proname": "fn_calculate_extra_person_charge",
+    "signature": "p_booking_id uuid",
+    "args": "p_booking_id uuid",
+    "return_type": "jsonb",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "calculate_booking_bill"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71516,
+    "proname": "fn_calculate_room_charge",
+    "signature": "p_booking_id uuid, p_check_in timestamp with time zone, p_check_out timestamp with time zone, p_rental_type text, p_room_cat_id uuid",
+    "args": "p_booking_id uuid, p_check_in timestamp with time zone, p_check_out timestamp with time zone, p_rental_type text, p_room_cat_id uuid",
+    "return_type": "jsonb",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "calculate_booking_bill"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71518,
+    "proname": "fn_calculate_surcharge",
+    "signature": "p_check_in timestamp with time zone, p_check_out timestamp with time zone, p_room_cat_id uuid, p_rental_type text",
+    "args": "p_check_in timestamp with time zone, p_check_out timestamp with time zone, p_room_cat_id uuid, p_rental_type text",
+    "return_type": "jsonb",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "calculate_booking_bill"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 111252,
+    "proname": "fn_can_access_tenant",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid",
+    "return_type": "boolean",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71520,
+    "proname": "fn_change_own_pin",
+    "signature": "p_staff_id uuid, p_old_pin text, p_new_pin text",
+    "args": "p_staff_id uuid, p_old_pin text, p_new_pin text",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71521,
+    "proname": "fn_check_approval_status",
+    "signature": "p_request_id uuid",
+    "args": "p_request_id uuid",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71522,
+    "proname": "fn_check_financial_health",
+    "signature": "",
+    "args": "",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71523,
+    "proname": "fn_create_approval_request",
+    "signature": "p_action_key text, p_request_data jsonb, p_staff_id uuid",
+    "args": "p_action_key text, p_request_data jsonb DEFAULT '{}'::jsonb, p_staff_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71526,
+    "proname": "fn_create_cash_flow",
+    "signature": "p_flow_type text, p_category text, p_amount numeric, p_description text, p_occurred_at timestamp with time zone, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_payment_method_code text, p_ref_id uuid, p_is_auto boolean",
+    "args": "p_flow_type text, p_category text, p_amount numeric, p_description text, p_occurred_at timestamp with time zone DEFAULT now(), p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_payment_method_code text DEFAULT 'cash'::text, p_ref_id uuid DEFAULT NULL::uuid, p_is_auto boolean DEFAULT false",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 78362,
+    "proname": "fn_create_cash_flow",
+    "signature": "p_flow_type text, p_category text, p_amount numeric, p_description text, p_occurred_at timestamp with time zone, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_payment_method_code text, p_ref_id uuid, p_is_auto boolean, p_category_id uuid",
+    "args": "p_flow_type text, p_category text DEFAULT NULL::text, p_amount numeric DEFAULT 0, p_description text DEFAULT NULL::text, p_occurred_at timestamp with time zone DEFAULT now(), p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_payment_method_code text DEFAULT 'cash'::text, p_ref_id uuid DEFAULT NULL::uuid, p_is_auto boolean DEFAULT false, p_category_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 71528,
+    "proname": "fn_delete_cash_flow",
+    "signature": "p_id uuid, p_reason text, p_verified_by_staff_id uuid, p_verified_by_staff_name text",
+    "args": "p_id uuid, p_reason text DEFAULT NULL::text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 72506,
+    "proname": "fn_delete_hotel",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\saas-admin\\page.tsx"
+    ]
+  },
+  {
+    "oid": 71530,
+    "proname": "fn_format_money_vi",
+    "signature": "p_amount numeric",
+    "args": "p_amount numeric",
+    "return_type": "text",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "calculate_booking_bill",
+      "fn_calculate_room_charge",
+      "fn_calculate_surcharge",
+      "process_checkout"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 77103,
+    "proname": "fn_generate_pricing_ladder",
+    "signature": "p_booking_id uuid",
+    "args": "p_booking_id uuid",
+    "return_type": "jsonb",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "fn_get_dashboard_data",
+      "fn_update_booking_snapshot"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71531,
+    "proname": "fn_get_all_user_floors_map",
+    "signature": "",
+    "args": "",
+    "return_type": "TABLE(user_id uuid, floors integer[])",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\staff\\page.tsx"
+    ]
+  },
+  {
+    "oid": 111245,
+    "proname": "fn_get_all_user_floors_map",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "TABLE(user_id uuid, floors integer[])",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\staff\\page.tsx"
+    ]
+  },
+  {
+    "oid": 71532,
+    "proname": "fn_get_available_floors",
+    "signature": "",
+    "args": "",
+    "return_type": "TABLE(floor integer)",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\staff\\page.tsx"
+    ]
+  },
+  {
+    "oid": 111244,
+    "proname": "fn_get_available_floors",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "TABLE(floor integer)",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\staff\\page.tsx"
+    ]
+  },
+  {
+    "oid": 71533,
+    "proname": "fn_get_cash_flow_categories",
+    "signature": "p_type text",
+    "args": "p_type text DEFAULT NULL::text",
+    "return_type": "TABLE(id uuid, name text, type text, description text, is_system boolean, is_active boolean, is_revenue boolean)",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 71534,
+    "proname": "fn_get_cash_flow_stats",
+    "signature": "p_from_date timestamp with time zone, p_to_date timestamp with time zone",
+    "args": "p_from_date timestamp with time zone, p_to_date timestamp with time zone",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 81810,
+    "proname": "fn_get_current_night_audit_threshold",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "timestamp with time zone",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "fn_get_daily_expected_ledger",
+      "fn_get_daily_expected_revenue",
+      "trg_expected_revenue_bookings_engine",
+      "trg_expected_revenue_services_engine"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 81857,
+    "proname": "fn_get_daily_expected_ledger",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid",
+    "return_type": "TABLE(id uuid, booking_id uuid, amount numeric, description text, event_type text, created_at timestamp with time zone, room_number text, customer_name text)",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 81856,
+    "proname": "fn_get_daily_expected_revenue",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "numeric",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "fn_refresh_expected_revenue"
+    ],
+    "matchingFiles": [
+      "src\\app\\[slug]\\page.tsx"
+    ]
+  },
+  {
+    "oid": 74803,
+    "proname": "fn_get_dashboard_data",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\page.tsx"
+    ]
+  },
+  {
+    "oid": 111242,
+    "proname": "fn_get_money_page_stats",
+    "signature": "p_hotel_id uuid, p_start_date timestamp with time zone, p_end_date timestamp with time zone",
+    "args": "p_hotel_id uuid, p_start_date timestamp with time zone, p_end_date timestamp with time zone",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 80677,
+    "proname": "fn_get_my_hotel_id",
+    "signature": "",
+    "args": "",
+    "return_type": "uuid",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 111220,
+    "proname": "fn_get_pnl_report",
+    "signature": "p_hotel_id uuid, p_start_date timestamp with time zone, p_end_date timestamp with time zone",
+    "args": "p_hotel_id uuid, p_start_date timestamp with time zone, p_end_date timestamp with time zone",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\reportService.ts"
+    ]
+  },
+  {
+    "oid": 81858,
+    "proname": "fn_get_recorded_expected_revenue",
+    "signature": "p_booking_id uuid",
+    "args": "p_booking_id uuid",
+    "return_type": "numeric",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": true,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "trg_expected_revenue_bookings_engine"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 87523,
+    "proname": "fn_get_recorded_expected_revenue",
+    "signature": "p_booking_id uuid, p_since_threshold timestamp with time zone",
+    "args": "p_booking_id uuid, p_since_threshold timestamp with time zone DEFAULT '-infinity'::timestamp with time zone",
+    "return_type": "numeric",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": true,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "trg_expected_revenue_bookings_engine"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71535,
+    "proname": "fn_get_security_context",
+    "signature": "p_role text",
+    "args": "p_role text",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71536,
+    "proname": "fn_get_security_context_v2",
+    "signature": "p_staff_id uuid",
+    "args": "p_staff_id uuid",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71537,
+    "proname": "fn_get_security_matrix",
+    "signature": "",
+    "args": "",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 2,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\staff\\page.tsx",
+      "src\\services\\securityService.ts"
+    ]
+  },
+  {
+    "oid": 71538,
+    "proname": "fn_get_security_settings",
+    "signature": "",
+    "args": "",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\services\\page.tsx"
+    ]
+  },
+  {
+    "oid": 71539,
+    "proname": "fn_get_system_setting",
+    "signature": "p_key text",
+    "args": "p_key text",
+    "return_type": "text",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 72488,
+    "proname": "fn_get_tenant_id",
+    "signature": "",
+    "args": "",
+    "return_type": "uuid",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "change_room",
+      "fn_adjust_wallet_balance",
+      "fn_can_access_tenant",
+      "fn_create_approval_request",
+      "fn_create_cash_flow",
+      "fn_delete_cash_flow",
+      "fn_get_all_user_floors_map",
+      "fn_get_available_floors",
+      "fn_get_cash_flow_categories",
+      "fn_get_current_night_audit_threshold",
+      "fn_get_daily_expected_ledger",
+      "fn_get_daily_expected_revenue",
+      "fn_get_dashboard_data",
+      "fn_get_money_page_stats",
+      "fn_manage_cash_flow_category",
+      "fn_manage_staff",
+      "fn_perform_night_audit",
+      "get_last_shift_balance",
+      "get_system_settings",
+      "open_shift"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71540,
+    "proname": "fn_get_user_floors",
+    "signature": "p_user_id uuid",
+    "args": "p_user_id uuid",
+    "return_type": "TABLE(floor integer)",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71541,
+    "proname": "fn_guard_cash_flow",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71542,
+    "proname": "fn_has_permission",
+    "signature": "p_staff_id uuid, p_permission_key text",
+    "args": "p_staff_id uuid, p_permission_key text",
+    "return_type": "boolean",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71543,
+    "proname": "fn_manage_cash_flow_category",
+    "signature": "p_action text, p_id uuid, p_name text, p_type text, p_description text, p_is_revenue boolean",
+    "args": "p_action text, p_id uuid DEFAULT NULL::uuid, p_name text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_description text DEFAULT NULL::text, p_is_revenue boolean DEFAULT true",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 111270,
+    "proname": "fn_manage_staff",
+    "signature": "p_action text, p_id uuid, p_username text, p_full_name text, p_role text, p_pin_hash text, p_is_active boolean, p_hotel_id uuid",
+    "args": "p_action text, p_id uuid DEFAULT NULL::uuid, p_username text DEFAULT NULL::text, p_full_name text DEFAULT NULL::text, p_role text DEFAULT NULL::text, p_pin_hash text DEFAULT NULL::text, p_is_active boolean DEFAULT true, p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 4,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\staff\\page.tsx",
+      "src\\components\\dashboard\\DashboardHeader.tsx",
+      "src\\components\\layout\\AppShell.tsx",
+      "src\\providers\\AuthProvider.tsx"
+    ]
+  },
+  {
+    "oid": 72486,
+    "proname": "fn_onboard_new_hotel",
+    "signature": "p_hotel_name text, p_admin_name text, p_admin_phone text, p_admin_pin text, p_hotel_slug text",
+    "args": "p_hotel_name text, p_admin_name text, p_admin_phone text, p_admin_pin text, p_hotel_slug text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\saas-admin\\page.tsx"
+    ]
+  },
+  {
+    "oid": 80646,
+    "proname": "fn_perform_night_audit",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\page.tsx"
+    ]
+  },
+  {
+    "oid": 71546,
+    "proname": "fn_prevent_modification",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "audit_logs:trg_protect_audit_logs",
+      "cash_flow:trg_protect_cash_flow"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 111256,
+    "proname": "fn_realtime_dashboard_notify",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "rooms:trg_notify_rooms_realtime",
+      "bookings:trg_notify_bookings_realtime",
+      "booking_services:trg_notify_booking_services_realtime",
+      "cash_flow:trg_notify_cash_flow_realtime"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 87494,
+    "proname": "fn_refresh_expected_revenue",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid",
+    "return_type": "numeric",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71547,
+    "proname": "fn_resolve_policy",
+    "signature": "p_staff_id uuid, p_action_key text",
+    "args": "p_staff_id uuid, p_action_key text",
+    "return_type": "text",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "fn_delete_cash_flow",
+      "fn_get_security_context_v2",
+      "fn_update_cash_flow"
+    ],
+    "matchingFiles": [
+      "src\\services\\securityService.ts"
+    ]
+  },
+  {
+    "oid": 71548,
+    "proname": "fn_reverse_cash_flow_on_cancel",
+    "signature": "p_booking_id uuid",
+    "args": "p_booking_id uuid",
+    "return_type": "jsonb",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "cancel_booking"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71549,
+    "proname": "fn_set_policy_override",
+    "signature": "p_scope text, p_target_id text, p_action_key text, p_policy_type text",
+    "args": "p_scope text, p_target_id text, p_action_key text, p_policy_type text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\staff\\page.tsx"
+    ]
+  },
+  {
+    "oid": 71550,
+    "proname": "fn_set_updated_at",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "cash_flow:tr_cash_flow_updated_at"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71551,
+    "proname": "fn_set_user_floors",
+    "signature": "p_user_id uuid, p_floors integer[]",
+    "args": "p_user_id uuid, p_floors integer[]",
+    "return_type": "void",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\settings\\staff\\page.tsx"
+    ]
+  },
+  {
+    "oid": 72508,
+    "proname": "fn_staff_login",
+    "signature": "p_username text, p_pin text, p_hotel_id uuid",
+    "args": "p_username text, p_pin text, p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\providers\\AuthProvider.tsx"
+    ]
+  },
+  {
+    "oid": 71553,
+    "proname": "fn_staff_override_login",
+    "signature": "p_username text, p_pin text",
+    "args": "p_username text, p_pin text",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71554,
+    "proname": "fn_sync_booking_to_ledger",
+    "signature": "p_booking_id uuid",
+    "args": "p_booking_id uuid",
+    "return_type": "void",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "refresh_active_ledgers",
+      "trg_sync_booking_to_cash_flow",
+      "trg_sync_service_to_cash_flow"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 87493,
+    "proname": "fn_sync_stayover_milestones",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid",
+    "return_type": "void",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "fn_get_daily_expected_revenue",
+      "fn_refresh_expected_revenue"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71555,
+    "proname": "fn_sync_wallets",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "cash_flow:trg_sync_wallets_master"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 77099,
+    "proname": "fn_update_booking_snapshot",
+    "signature": "p_booking_id uuid",
+    "args": "p_booking_id uuid",
+    "return_type": "void",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "change_room",
+      "tr_fn_sync_booking_snapshot"
+    ],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts"
+    ]
+  },
+  {
+    "oid": 71557,
+    "proname": "fn_update_cash_flow",
+    "signature": "p_id uuid, p_amount numeric, p_description text, p_occurred_at timestamp with time zone, p_category text, p_payment_method_code text, p_verified_by_staff_id uuid, p_verified_by_staff_name text",
+    "args": "p_id uuid, p_amount numeric DEFAULT NULL::numeric, p_description text DEFAULT NULL::text, p_occurred_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_category text DEFAULT NULL::text, p_payment_method_code text DEFAULT NULL::text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 72507,
+    "proname": "fn_update_hotel",
+    "signature": "p_hotel_id uuid, p_name text, p_phone text, p_slug text",
+    "args": "p_hotel_id uuid, p_name text, p_phone text, p_slug text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\saas-admin\\page.tsx"
+    ]
+  },
+  {
+    "oid": 71560,
+    "proname": "fn_update_security_setting",
+    "signature": "p_key text, p_policy_type text",
+    "args": "p_key text, p_policy_type text",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71561,
+    "proname": "fn_verify_staff_pin",
+    "signature": "p_staff_id uuid, p_pin_hash text",
+    "args": "p_staff_id uuid, p_pin_hash text",
+    "return_type": "boolean",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 5,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\components\\dashboard\\DashboardHeader.tsx",
+      "src\\components\\layout\\AppShell.tsx",
+      "src\\components\\shared\\PinValidationModal.tsx",
+      "src\\providers\\AuthProvider.tsx",
+      "src\\services\\securityService.ts"
+    ]
+  },
+  {
+    "oid": 71562,
+    "proname": "force_staff_logout",
+    "signature": "p_staff_id uuid",
+    "args": "p_staff_id uuid",
+    "return_type": "void",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71565,
+    "proname": "get_financial_health_check",
+    "signature": "",
+    "args": "",
+    "return_type": "json",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71566,
+    "proname": "get_group_details",
+    "signature": "p_booking_id uuid, p_selected_child_ids uuid[]",
+    "args": "p_booking_id uuid, p_selected_child_ids uuid[] DEFAULT NULL::uuid[]",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 2,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts",
+      "src\\services\\groupBookingService.ts"
+    ]
+  },
+  {
+    "oid": 71568,
+    "proname": "get_last_shift_balance",
+    "signature": "",
+    "args": "",
+    "return_type": "numeric",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": true,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "open_shift"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 111247,
+    "proname": "get_last_shift_balance",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "numeric",
+    "category": "INTERNAL_STORED_PROC",
+    "isOverloaded": true,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [
+      "open_shift"
+    ],
+    "matchingFiles": []
+  },
+  {
+    "oid": 70627,
+    "proname": "get_my_shift",
+    "signature": "staff_uuid uuid",
+    "args": "staff_uuid uuid",
+    "return_type": "TABLE(shift_id uuid, start_cash numeric, status text, started_at timestamp with time zone, expected_cash numeric, cash_variance numeric)",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71596,
+    "proname": "get_room_categories",
+    "signature": "",
+    "args": "",
+    "return_type": "SETOF room_categories",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71634,
+    "proname": "get_settings",
+    "signature": "",
+    "args": "",
+    "return_type": "SETOF settings",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71635,
+    "proname": "get_system_settings",
+    "signature": "",
+    "args": "",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\page.tsx"
+    ]
+  },
+  {
+    "oid": 74804,
+    "proname": "get_system_settings",
+    "signature": "p_hotel_id uuid",
+    "args": "p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": true,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\app\\[slug]\\page.tsx"
+    ]
+  },
+  {
+    "oid": 71636,
+    "proname": "group_rooms",
+    "signature": "p_master_id uuid, p_child_ids uuid[]",
+    "args": "p_master_id uuid, p_child_ids uuid[]",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\groupBookingService.ts"
+    ]
+  },
+  {
+    "oid": 71637,
+    "proname": "handle_service_inventory",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "booking_services:tr_handle_service_inventory",
+      "booking_services:tr_handle_service_inventory_delete"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71640,
+    "proname": "import_inventory",
+    "signature": "p_service_id uuid, p_qty_buy numeric, p_total_amount numeric, p_payment_method_code text, p_shift_id uuid, p_notes text, p_verified_by_staff_id uuid",
+    "args": "p_service_id uuid, p_qty_buy numeric, p_total_amount numeric, p_payment_method_code text DEFAULT 'cash'::text, p_shift_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text, p_verified_by_staff_id uuid DEFAULT NULL::uuid",
+    "return_type": "json",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 1,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\serviceService.ts"
+    ]
+  },
+  {
+    "oid": 70701,
+    "proname": "open_shift",
+    "signature": "staff_uuid uuid, initial_cash numeric",
+    "args": "staff_uuid uuid, initial_cash numeric",
+    "return_type": "uuid",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": true,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 111248,
+    "proname": "open_shift",
+    "signature": "staff_uuid uuid, initial_cash numeric, p_hotel_id uuid",
+    "args": "staff_uuid uuid, initial_cash numeric, p_hotel_id uuid DEFAULT NULL::uuid",
+    "return_type": "uuid",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": true,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 74801,
+    "proname": "process_checkout",
+    "signature": "p_booking_id uuid, p_payment_method text, p_amount_paid numeric, p_discount numeric, p_surcharge numeric, p_notes text, p_verified_by_staff_id uuid, p_verified_by_staff_name text, p_selected_child_ids uuid[]",
+    "args": "p_booking_id uuid, p_payment_method text, p_amount_paid numeric, p_discount numeric, p_surcharge numeric, p_notes text, p_verified_by_staff_id uuid DEFAULT NULL::uuid, p_verified_by_staff_name text DEFAULT NULL::text, p_selected_child_ids uuid[] DEFAULT NULL::uuid[]",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts"
+    ]
+  },
+  {
+    "oid": 71646,
+    "proname": "record_owner_expense",
+    "signature": "p_amount numeric, p_description text, p_creditor_name text, p_evidence_url text",
+    "args": "p_amount numeric, p_description text, p_creditor_name text DEFAULT 'Chủ đầu tư'::text, p_evidence_url text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 71647,
+    "proname": "refresh_active_ledgers",
+    "signature": "",
+    "args": "",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71649,
+    "proname": "register_service_usage",
+    "signature": "p_booking_id uuid, p_service_id uuid, p_quantity integer, p_notes text",
+    "args": "p_booking_id uuid, p_service_id uuid, p_quantity integer, p_notes text DEFAULT NULL::text",
+    "return_type": "json",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\serviceService.ts"
+    ]
+  },
+  {
+    "oid": 71657,
+    "proname": "repay_owner_debt",
+    "signature": "p_payable_id uuid, p_payment_method text, p_pin text",
+    "args": "p_payable_id uuid, p_payment_method text, p_pin text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\cashFlowService.ts"
+    ]
+  },
+  {
+    "oid": 71658,
+    "proname": "resolve_shift_variance",
+    "signature": "p_shift_id uuid, p_resolution_type text, p_notes text, p_admin_id uuid",
+    "args": "p_shift_id uuid, p_resolution_type text, p_notes text, p_admin_id uuid",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 70712,
+    "proname": "settle_debt",
+    "signature": "debt_uuid uuid, payment_amount numeric",
+    "args": "debt_uuid uuid, payment_amount numeric",
+    "return_type": "json",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 77100,
+    "proname": "tr_fn_sync_booking_snapshot",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "bookings:tr_bookings_snapshot",
+      "booking_services:tr_booking_services_snapshot"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71659,
+    "proname": "transfer_group_master",
+    "signature": "p_old_master_booking_id uuid, p_new_master_booking_id uuid, p_action_for_old_master text",
+    "args": "p_old_master_booking_id uuid, p_new_master_booking_id uuid, p_action_for_old_master text DEFAULT 'ungroup'::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts"
+    ]
+  },
+  {
+    "oid": 87533,
+    "proname": "trg_expected_revenue_bookings_engine",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "bookings:trg_expected_revenue_bookings"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 78382,
+    "proname": "trg_expected_revenue_services",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "booking_services:tr_expected_revenue_services"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 87534,
+    "proname": "trg_expected_revenue_services_engine",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "booking_services:trg_expected_revenue_services"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71660,
+    "proname": "trg_sync_booking_to_cash_flow",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "bookings:trg_sync_booking_to_cash_flow_master"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71661,
+    "proname": "trg_sync_service_to_cash_flow",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "booking_services:tr_sync_service_to_cash_flow"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 78363,
+    "proname": "trg_update_wallets_dml",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71662,
+    "proname": "ungroup_room",
+    "signature": "p_booking_id uuid",
+    "args": "p_booking_id uuid",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\groupBookingService.ts"
+    ]
+  },
+  {
+    "oid": 71664,
+    "proname": "update_booking_details",
+    "signature": "p_booking_id uuid, p_customer_name text, p_check_in_at timestamp with time zone, p_custom_price numeric, p_price_apply_mode text, p_reason text, p_staff_id uuid, p_customer_id uuid, p_notes text",
+    "args": "p_booking_id uuid, p_customer_name text DEFAULT NULL::text, p_check_in_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_custom_price numeric DEFAULT NULL::numeric, p_price_apply_mode text DEFAULT 'all'::text, p_reason text DEFAULT NULL::text, p_staff_id uuid DEFAULT NULL::uuid, p_customer_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text",
+    "return_type": "jsonb",
+    "category": "CLIENT_RPC",
+    "isOverloaded": false,
+    "rpcCalls": 1,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": [
+      "src\\services\\bookingService.ts"
+    ]
+  },
+  {
+    "oid": 71665,
+    "proname": "update_room_category",
+    "signature": "p_id uuid, p_category jsonb",
+    "args": "p_id uuid, p_category jsonb",
+    "return_type": "room_categories",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71666,
+    "proname": "update_settings",
+    "signature": "p_check_in_time time without time zone, p_check_out_time time without time zone, p_overnight_start time without time zone, p_overnight_end time without time zone, p_overnight_checkout_enabled boolean, p_overnight_checkout_time time without time zone, p_night_audit_hour time without time zone, p_late_checkout_limit time without time zone, p_early_checkin_limit time without time zone, p_auto_surcharge_enabled boolean, p_surcharge_rules jsonb, p_grace_in_enabled boolean, p_grace_out_enabled boolean, p_grace_minutes integer, p_vat_enabled boolean, p_vat_percent numeric, p_service_fee_enabled boolean, p_service_fee_percent numeric, p_auto_deduct_inventory boolean, p_enable_print_bill boolean, p_allow_manual_price_override boolean",
+    "args": "p_check_in_time time without time zone, p_check_out_time time without time zone, p_overnight_start time without time zone, p_overnight_end time without time zone, p_overnight_checkout_enabled boolean, p_overnight_checkout_time time without time zone, p_night_audit_hour time without time zone, p_late_checkout_limit time without time zone, p_early_checkin_limit time without time zone, p_auto_surcharge_enabled boolean, p_surcharge_rules jsonb, p_grace_in_enabled boolean, p_grace_out_enabled boolean, p_grace_minutes integer, p_vat_enabled boolean, p_vat_percent numeric, p_service_fee_enabled boolean, p_service_fee_percent numeric, p_auto_deduct_inventory boolean, p_enable_print_bill boolean, p_allow_manual_price_override boolean",
+    "return_type": "SETOF settings",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 71667,
+    "proname": "update_system_settings",
+    "signature": "p_settings jsonb",
+    "args": "p_settings jsonb",
+    "return_type": "jsonb",
+    "category": "POTENTIALLY_DEAD",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [],
+    "calledByProcs": [],
+    "matchingFiles": []
+  },
+  {
+    "oid": 70722,
+    "proname": "update_updated_at_column",
+    "signature": "",
+    "args": "",
+    "return_type": "trigger",
+    "category": "TRIGGER_FUNCTION",
+    "isOverloaded": false,
+    "rpcCalls": 0,
+    "sqlCalls": 0,
+    "triggerNames": [
+      "shifts:shifts_updated_at_trigger",
+      "staff_debts:staff_debts_updated_at_trigger"
+    ],
+    "calledByProcs": [],
+    "matchingFiles": []
+  }
+]

@@ -81,11 +81,11 @@ export default function SystemSettingsPage() {
       
       {/* 1. TOP NAV */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
-        <div className="max-w-[1200px] mx-auto px-4 md:px-10 h-20 md:h-24 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => router.back()}
-              className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-90"
+              className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-white rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-90"
             >
               <ArrowLeft size={20} />
             </button>
@@ -349,7 +349,7 @@ export default function SystemSettingsPage() {
       </main>
 
       {/* 6. MOBILE FLOATING ACTION */}
-      <div className="fixed bottom-10 left-0 right-0 px-6 md:hidden z-50">
+      <div className="fixed bottom-16 left-0 right-0 px-4 md:hidden z-40">
         <button 
           onClick={handleSave}
           disabled={saving}
