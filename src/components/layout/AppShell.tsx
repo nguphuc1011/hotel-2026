@@ -503,8 +503,8 @@ export default function AppShell({
 
       {/* Mobile Bottom Nav - Show on mobile and iPad Pro Portrait (xl:hidden) */}
       {mounted && (
-        <nav className="xl:hidden fixed bottom-0 left-0 right-0 z-50 h-[80px] flex items-end px-4 pb-4">
-          <div className="relative w-full h-[64px] flex items-center justify-between px-2 bg-white rounded-[28px] shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-slate-100">
+        <nav className="xl:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-slate-200/80 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
+          <div className="relative w-full h-[58px] flex items-center justify-between px-2 max-w-lg mx-auto">
             
             <div className="flex-1 flex justify-around items-center h-full">
               {leftItems.map((item) => {
@@ -532,10 +532,10 @@ export default function AppShell({
             {homeItem && (
                <Link 
                  href={homeItem.href}
-                 className="flex flex-col items-center justify-center active:scale-95 transition-all group px-2 relative -top-5"
+                 className="flex flex-col items-center justify-center active:scale-95 transition-all group px-2 relative -top-3.5"
                >
                  <div className={cn(
-                   "w-[58px] h-[58px] flex items-center justify-center rounded-[20px] transition-all duration-300 shadow-xl relative overflow-hidden",
+                   "w-[52px] h-[52px] flex items-center justify-center rounded-2xl transition-all duration-300 shadow-lg relative overflow-hidden ring-4 ring-white",
                    pathname === homeItem.href 
                      ? "bg-slate-900 text-white shadow-slate-200" 
                      : "bg-white text-slate-500 border border-slate-100 shadow-lg shadow-slate-100"
