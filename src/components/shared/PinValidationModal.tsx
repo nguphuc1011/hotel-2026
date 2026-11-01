@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Lock, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -25,9 +26,11 @@ export default function PinValidationModal({
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setMounted(true);
     if (isOpen) {
       setPin('');
       setError(null);
@@ -77,11 +80,14 @@ export default function PinValidationModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[70000] flex items-center justify-center p-4 bg-main/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-accent/10">
+  return createPortal(
+    <div className="fixed inset-0 z-[90000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div 
+        className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">
             <div className="w-12 h-12 bg-accent/5 rounded-2xl flex items-center justify-center text-accent">
@@ -152,6 +158,7 @@ export default function PinValidationModal({
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

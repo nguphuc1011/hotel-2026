@@ -111,28 +111,26 @@ export const bookingService = {
       }
 
       if (isGroupBill && !groupMembers.length && bookingInfo?.id === masterId) {
-        // If I am the master, calculate total for all children
-        const memberIds = (allMembers || []).filter(m => m.id !== masterId);
-        
-        if (memberIds.length > 0) {
-           try {
-             const memberBills = await Promise.all(
-                memberIds.map(m => bookingService.calculateBill(m.id, nowOverride))
-             );
-             
-             const validBills = memberBills.filter(b => b !== null) as BookingBill[];
-             
-             groupTotal = validBills.reduce((sum, b) => sum + (b.total_amount || 0), 0);
-             groupMembers = validBills.map(b => ({
-                booking_id: b.booking_id,
-                room_name: b.room_number || 'Phòng ?',
-                amount: b.total_amount,
-                service_total: b.service_total,
-                room_charge: b.room_charge
-             }));
-           } catch (err) {
-             console.error('Error calculating member bills:', err);
-           }
+        // Tối ưu hóa Backend: Gọi RPC get_group_details thay vì lặp N request tính từng phòng con
+        try {
+          const { data: groupData } = await supabase.rpc('get_group_details', {
+            p_booking_id: masterId,
+            p_selected_child_ids: null
+          });
+
+          if (groupData && groupData.rooms) {
+            const childRooms = (groupData.rooms as any[]).filter(r => r.booking_id !== masterId);
+            groupTotal = childRooms.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0);
+            groupMembers = childRooms.map(r => ({
+              booking_id: r.booking_id,
+              room_name: r.room_name || 'Phòng ?',
+              amount: Number(r.total_amount) || 0,
+              service_total: 0,
+              room_charge: Number(r.total_amount) || 0
+            }));
+          }
+        } catch (err) {
+          console.error('Error calculating backend group details:', err);
         }
       }
 

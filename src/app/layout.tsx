@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   title: 'MANA PMS - Quản lý khách sạn',
   description: 'Hệ thống quản lý khách sạn chuyên nghiệp',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon-192x192.png',
+    shortcut: '/icon-192x192.png',
+    apple: '/apple-touch-icon.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

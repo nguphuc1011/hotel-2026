@@ -74,6 +74,10 @@ export default function AppShell({
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
     setIsIOS(isIOSDevice && !isStandalone);
 
+    if (isIOSDevice && !isStandalone) {
+      setShowInstallBtn(true);
+    }
+
     if ((window as any).deferredPWAInstallPrompt) {
       setShowInstallBtn(true);
     }
@@ -83,30 +87,32 @@ export default function AppShell({
     };
 
     window.addEventListener('pwa-install-available', handlePWAAvailable);
-
-    const updateManifest = () => {
-      let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'manifest';
-        document.head.appendChild(link);
-      }
-      link.href = `/manifest.json?slug=${slug}`;
-    };
-    updateManifest();
-
     return () => window.removeEventListener('pwa-install-available', handlePWAAvailable);
-  }, [slug]);
+  }, []);
 
   const handleInstallApp = async () => {
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    if (isIOSDevice) {
+      toast.info('Để cài đặt trên iPhone/iPad: Nhấn nút "Chia sẻ" (biểu tượng mũi tên đi lên ở thanh dưới Safari) -> Chọn "Thêm vào MH chính" (Add to Home Screen).', {
+        duration: 8000
+      });
+      return;
+    }
+
     const prompt = (window as any).deferredPWAInstallPrompt;
-    if (!prompt) return;
+    if (!prompt) {
+      toast.info('Bạn có thể cài đặt bằng cách nhấn biểu tượng Cài đặt (Install) ở góc trên thanh địa chỉ trình duyệt Chrome/Edge.', {
+        duration: 5000
+      });
+      return;
+    }
     
     prompt.prompt();
     const { outcome } = await prompt.userChoice;
     if (outcome === 'accepted') {
       (window as any).deferredPWAInstallPrompt = null;
       setShowInstallBtn(false);
+      toast.success('Đã bắt đầu cài đặt ứng dụng!');
     }
   };
 
@@ -207,7 +213,7 @@ export default function AppShell({
   };
 
 
-  if (pathname === `/${slug}/login` || pathname === '/login' || pathname.startsWith('/saas-admin')) {
+  if (pathname === `/${slug}/login` || pathname === '/login') {
     return <>{children}</>;
   }
 
@@ -362,6 +368,16 @@ export default function AppShell({
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5">Tài khoản</p>
                 <p className="text-xs font-black text-slate-900 truncate">{user?.full_name}</p>
               </div>
+              <button 
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  handleInstallApp();
+                }}
+                className="w-full flex flex-col 2xl:flex-row items-center gap-1 2xl:gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-600 font-bold text-[10px] 2xl:text-xs transition-all text-center 2xl:text-left group"
+              >
+                <Download size={14} className="text-slate-400 group-hover:text-blue-500" />
+                <span>Cài đặt App</span>
+              </button>
               <button 
                 onClick={() => {
                   setIsChangePinModalOpen(true);

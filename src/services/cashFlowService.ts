@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getActiveHotelId } from '@/utils/tenant';
 import { useWalletNotificationStore } from '@/stores/walletNotificationStore';
 
 export interface CashFlowTransaction {
@@ -51,11 +52,17 @@ export interface Wallet {
 
 export const cashFlowService = {
   // --- Wallet Management ---
-  async getWallets() {
-    const { data, error } = await supabase
+  async getWallets(hotelId?: string) {
+    const targetHotelId = hotelId || getActiveHotelId();
+    let query = supabase
       .from('wallets')
       .select('*')
       .order('id');
+
+    if (targetHotelId) {
+      query = query.eq('hotel_id', targetHotelId);
+    }
+    const { data, error } = await query;
       
     if (error) throw error;
     return data as Wallet[];
@@ -232,6 +239,18 @@ export const cashFlowService = {
 
     if (error) throw error;
     return data as CashFlowStats;
+  },
+
+  // Lấy toàn bộ số dư đầu kỳ, thu, chi, cuối kỳ của tất cả các ví (Tối ưu hóa 1 lần gọi DB)
+  async getMoneyPageStats(startDate: Date, endDate: Date, hotelId?: string) {
+    const targetHotelId = hotelId || getActiveHotelId();
+    const { data, error } = await supabase.rpc('fn_get_money_page_stats', {
+      p_hotel_id: targetHotelId || null,
+      p_start_date: startDate.toISOString(),
+      p_end_date: endDate.toISOString()
+    });
+    if (error) throw error;
+    return data;
   },
 
   // Tính số dư ví tại một thời điểm nhất định (Rule: Opening Balance)

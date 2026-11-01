@@ -389,7 +389,7 @@ export default function AdminCommandCenter({ hotelId, initialTab = 'stats' }: Ad
       {activeTab === 'stats' ? (
         <div className="space-y-8">
           {/* 1. Daily Summary Card */}
-          <section className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden p-6 md:p-10">
+          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden p-5 md:p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
               <div>
                 <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
@@ -446,7 +446,7 @@ export default function AdminCommandCenter({ hotelId, initialTab = 'stats' }: Ad
           </section>
 
           {/* Staff Sensitive Stats Table */}
-          <section className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden p-6 md:p-8">
+          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden p-5 md:p-6">
             <div className="flex items-center gap-3 mb-6 md:mb-8">
               <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
                 <Users size={20} />
@@ -518,7 +518,7 @@ export default function AdminCommandCenter({ hotelId, initialTab = 'stats' }: Ad
       ) : (
         <div className="grid grid-cols-1 gap-8 animate-in slide-in-from-bottom-4 duration-500">
           {/* Detailed Activity Stream */}
-          <section className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden flex flex-col h-[70vh] md:h-[800px]">
+          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-[65vh] md:h-[700px]">
             <div className="p-6 md:p-8 border-b border-slate-50 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">

@@ -31,6 +31,7 @@ import { PERMISSION_METADATA } from '@/constants/permissions';
 import { permissionService, RolePermission, PERMISSION_KEYS } from '@/services/permissionService';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuthStore } from '@/stores/authStore';
+import { getActiveHotelId } from '@/utils/tenant';
 import { cn } from '@/lib/utils';
 
 interface Staff {
@@ -119,10 +120,12 @@ export default function StaffSettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUserId(user?.id || null);
 
-      const { data: staffData, error: staffError } = await supabase
-        .from('staff')
-        .select('*')
-        .order('full_name');
+      const currentHotelId = getActiveHotelId();
+      let staffQuery = supabase.from('staff').select('*').order('full_name');
+      if (currentHotelId) {
+        staffQuery = staffQuery.eq('hotel_id', currentHotelId);
+      }
+      const { data: staffData, error: staffError } = await staffQuery;
       if (staffError) throw staffError;
       setStaffList(staffData);
 
@@ -133,10 +136,10 @@ export default function StaffSettingsPage() {
       const rolesData = await permissionService.getAllRoles();
       setRolePermissions(rolesData);
 
-      const { data: floorsData } = await supabase.rpc('fn_get_available_floors');
+      const { data: floorsData } = await supabase.rpc('fn_get_available_floors', { p_hotel_id: currentHotelId || null });
       setAvailableFloors(floorsData?.map((f: any) => f.floor) || []);
 
-      const { data: userFloorsData } = await supabase.rpc('fn_get_all_user_floors_map');
+      const { data: userFloorsData } = await supabase.rpc('fn_get_all_user_floors_map', { p_hotel_id: currentHotelId || null });
       const map: Record<string, number[]> = {};
       userFloorsData?.forEach((item: any) => {
           map[item.user_id] = item.floors;
@@ -253,7 +256,8 @@ export default function StaffSettingsPage() {
         p_username: staffFormData.username,
         p_full_name: staffFormData.full_name,
         p_role: staffFormData.role,
-        p_is_active: staffFormData.is_active
+        p_is_active: staffFormData.is_active,
+        p_hotel_id: getActiveHotelId()
       });
 
       if (error) throw error;

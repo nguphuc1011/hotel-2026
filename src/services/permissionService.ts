@@ -1,3 +1,4 @@
+import { getActiveHotelId } from '@/utils/tenant';
 import { supabase } from '@/lib/supabase';
 
 export interface RolePermission {

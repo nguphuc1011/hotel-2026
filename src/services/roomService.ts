@@ -1,6 +1,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { RoomCategory } from './settingsService';
+import { getActiveHotelId } from '@/utils/tenant';
 
 export interface Room {
   id: string;
@@ -16,15 +17,22 @@ export interface Room {
 }
 
 export const roomService = {
-  async getRooms(): Promise<Room[]> {
+  async getRooms(hotelId?: string): Promise<Room[]> {
     try {
-      const { data, error } = await supabase
+      const targetHotelId = hotelId || getActiveHotelId();
+      let query = supabase
         .from('rooms')
         .select(`
           *,
           category:room_categories(*)
         `)
         .order('room_number', { ascending: true });
+
+      if (targetHotelId) {
+        query = query.eq('hotel_id', targetHotelId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

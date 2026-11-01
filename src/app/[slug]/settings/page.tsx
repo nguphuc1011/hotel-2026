@@ -146,9 +146,9 @@ export default function SettingsPage() {
       
       {/* 1. TOP NAV / HEADER */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-10 h-20 md:h-24 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-20 flex items-center justify-between">
           <div className="flex items-baseline gap-3">
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">Cài đặt</h1>
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">Cài đặt</h1>
             <span className="hidden md:block text-slate-400 font-medium text-sm tracking-tight">Cấu hình hệ thống & vận hành</span>
           </div>
           
@@ -159,7 +159,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <main className="max-w-[1600px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-12 md:space-y-20">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         
         {SETTINGS_GROUPS.map((group, gIdx) => (
           <section key={gIdx} className="space-y-6 md:space-y-8">
@@ -168,7 +168,7 @@ export default function SettingsPage() {
               <div className="h-1 w-12 bg-slate-200 rounded-full" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
               {group.items.map((item) => {
                 if (!can(item.permission)) return null;
 
@@ -177,13 +177,13 @@ export default function SettingsPage() {
                     key={item.id}
                     href={item.href}
                     className={cn(
-                      "bg-white/80 backdrop-blur-md rounded-[32px] p-8 md:p-10 border border-white shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-500 group relative overflow-hidden flex flex-col justify-between min-h-[220px]",
-                      item.featured && "lg:col-span-2 md:min-h-[260px] bg-slate-900 text-white border-slate-800 shadow-slate-200"
+                      "bg-white rounded-2xl p-5 md:p-6 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 group relative overflow-hidden flex flex-col justify-between min-h-[180px]",
+                      item.featured && "lg:col-span-2 md:min-h-[200px] bg-slate-900 text-white border-slate-800 shadow-sm"
                     )}
                   >
                     <div className="relative z-10">
                       <div className={cn(
-                        "w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center mb-6 md:mb-8 shadow-sm transition-transform duration-500 group-hover:scale-110",
+                        "w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center mb-4 shadow-sm transition-transform duration-500 group-hover:scale-110",
                         item.featured ? "bg-white/10 text-white" : 
                         item.color === 'blue' ? "bg-blue-50 text-blue-500" :
                         item.color === 'emerald' ? "bg-emerald-50 text-emerald-500" :

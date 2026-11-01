@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabase';
+import { getActiveHotelId } from '@/utils/tenant';
 
 // Helper to safely format errors for logging
 const formatError = (err: any) => {
@@ -48,14 +49,20 @@ export interface CustomerFilter {
   is_banned?: boolean;
   page?: number;
   limit?: number;
+  hotelId?: string;
 }
 
 export const customerService = {
   async getCustomers(filter: CustomerFilter = {}) {
     try {
+      const targetHotelId = filter.hotelId || getActiveHotelId();
       let query = supabase
         .from('customers')
         .select('*', { count: 'exact' });
+
+      if (targetHotelId) {
+        query = query.eq('hotel_id', targetHotelId);
+      }
 
       if (filter.search) {
         query = query.or(`full_name.ilike.%${filter.search}%,phone.ilike.%${filter.search}%,id_card.ilike.%${filter.search}%`);
@@ -294,13 +301,19 @@ export const customerService = {
     }
   },
 
-  async getDebtors() {
+  async getDebtors(hotelId?: string) {
     try {
-      const { data, error } = await supabase
+      const targetHotelId = hotelId || getActiveHotelId();
+      let query = supabase
         .from('customers')
         .select('*')
-        .lt('balance', 0)
-        .order('balance', { ascending: true }); // Most debt first (negative numbers)
+        .lt('balance', 0);
+
+      if (targetHotelId) {
+        query = query.eq('hotel_id', targetHotelId);
+      }
+
+      const { data, error } = await query.order('balance', { ascending: true });
         
       if (error) throw error;
       return data as Customer[];

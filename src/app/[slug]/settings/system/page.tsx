@@ -106,17 +106,17 @@ export default function SystemSettingsPage() {
         </div>
       </div>
 
-      <main className="max-w-[1200px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-10 md:space-y-16">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         
         {/* 2. NIGHT AUDIT & FINANCIAL DAY */}
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] relative overflow-hidden group">
+          <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200/80 shadow-sm relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12">
               <BellRing size={200} strokeWidth={0.5} />
             </div>
             
             <div className="relative z-10 flex items-center gap-5 mb-10 md:mb-12">
-              <div className="w-16 h-16 rounded-3xl bg-rose-50 text-rose-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
+              <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
                 <BellRing size={32} />
               </div>
               <div>
@@ -126,7 +126,7 @@ export default function SystemSettingsPage() {
             </div>
 
             <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
-              <div className="p-8 rounded-[32px] bg-slate-50/50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="p-5 md:p-6 rounded-xl bg-slate-50/50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <p className="text-base font-black text-slate-900 tracking-tight">Mốc Night Audit</p>
                   <p className="text-xs font-bold text-slate-400 leading-relaxed">Thời điểm hệ thống tự động chốt doanh thu và tính thêm ngày</p>
@@ -139,7 +139,7 @@ export default function SystemSettingsPage() {
                 />
               </div>
 
-              <div className="p-8 rounded-[32px] bg-slate-50/50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="p-5 md:p-6 rounded-xl bg-slate-50/50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <p className="text-base font-black text-slate-900 tracking-tight">Mốc tính thêm ngày (Trễ)</p>
                   <p className="text-xs font-bold text-slate-400 leading-relaxed">Sau mốc này sẽ tự động tính thêm 1 ngày tiền phòng</p>
@@ -154,14 +154,14 @@ export default function SystemSettingsPage() {
             </div>
 
             <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
-                <div className="p-8 rounded-[32px] bg-white border border-slate-100 flex items-center justify-between shadow-sm group-hover:shadow-md transition-all">
+                <div className="p-5 md:p-6 rounded-xl bg-white border border-slate-100 flex items-center justify-between shadow-sm hover:shadow-md transition-all">
                   <div className="space-y-1">
                     <p className="text-base font-black text-slate-900 tracking-tight">Tự động cộng sớm</p>
                     <p className="text-xs font-bold text-slate-400">Check-in trước mốc audit tính thêm ngày</p>
                   </div>
                   <Switch checked={settings.auto_full_day_early} onChange={(val: boolean) => setSettings({...settings, auto_full_day_early: val})} />
                 </div>
-                <div className="p-8 rounded-[32px] bg-white border border-slate-100 flex items-center justify-between shadow-sm group-hover:shadow-md transition-all">
+                <div className="p-5 md:p-6 rounded-xl bg-white border border-slate-100 flex items-center justify-between shadow-sm hover:shadow-md transition-all">
                   <div className="space-y-1">
                     <p className="text-base font-black text-slate-900 tracking-tight">Tự động cộng trễ</p>
                     <p className="text-xs font-bold text-slate-400">Check-out sau mốc trễ tính thêm ngày</p>
@@ -174,13 +174,13 @@ export default function SystemSettingsPage() {
 
         {/* 3. TAX & SERVICE FEES */}
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] relative overflow-hidden group">
+          <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200/80 shadow-sm relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12">
               <Calculator size={200} strokeWidth={0.5} />
             </div>
             
             <div className="relative z-10 flex items-center gap-5 mb-10 md:mb-12">
-              <div className="w-16 h-16 rounded-3xl bg-orange-50 text-orange-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
+              <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
                 <Percent size={32} />
               </div>
               <div>
@@ -191,7 +191,7 @@ export default function SystemSettingsPage() {
 
             <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
               <div className={cn(
-                "p-10 rounded-[40px] border transition-all duration-500",
+                "p-5 md:p-6 rounded-xl border transition-all duration-300",
                 settings.vat_enabled ? "bg-orange-50/50 border-orange-100 shadow-sm" : "bg-slate-50 border-slate-100 opacity-60"
               )}>
                 <div className="flex items-center justify-between mb-8">
@@ -215,7 +215,7 @@ export default function SystemSettingsPage() {
               </div>
 
               <div className={cn(
-                "p-10 rounded-[40px] border transition-all duration-500",
+                "p-5 md:p-6 rounded-xl border transition-all duration-300",
                 settings.service_fee_enabled ? "bg-amber-50/50 border-amber-100 shadow-sm" : "bg-slate-50 border-slate-100 opacity-60"
               )}>
                 <div className="flex items-center justify-between mb-8">
@@ -243,13 +243,13 @@ export default function SystemSettingsPage() {
 
         {/* 4. AUTOMATION & OPERATION */}
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] relative overflow-hidden group">
+          <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200/80 shadow-sm relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12">
               <Settings2 size={200} strokeWidth={0.5} />
             </div>
             
             <div className="relative z-10 flex items-center gap-5 mb-10 md:mb-12">
-              <div className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
+              <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
                 <Settings2 size={32} />
               </div>
               <div>
@@ -264,7 +264,7 @@ export default function SystemSettingsPage() {
                 { key: 'allow_manual_price_override', label: 'Cho phép sửa giá', desc: 'Nhân viên có thể chỉnh giá thủ công', icon: Wallet, color: 'text-indigo-500', bg: 'bg-indigo-50' },
                 { key: 'enable_print_bill', label: 'Tự động in hóa đơn', desc: 'Hiện hộp thoại in khi thanh toán', icon: Info, color: 'text-slate-500', bg: 'bg-slate-100' },
               ].map((item) => (
-                <div key={item.key} className="p-8 rounded-[32px] bg-slate-50/50 border border-slate-100 flex flex-col justify-between gap-8 hover:bg-white hover:shadow-xl hover:scale-[1.02] transition-all duration-500">
+                <div key={item.key} className="p-5 md:p-6 rounded-xl bg-slate-50/50 border border-slate-100 flex flex-col justify-between gap-6 hover:bg-white hover:shadow-md transition-all duration-300">
                   <div className="space-y-4">
                     <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm", item.bg, item.color)}>
                       <item.icon size={24} />
@@ -288,13 +288,13 @@ export default function SystemSettingsPage() {
 
         {/* 5. TELEGRAM INTEGRATION */}
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] relative overflow-hidden group">
+          <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200/80 shadow-sm relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12">
               <Bot size={200} strokeWidth={0.5} />
             </div>
             
             <div className="relative z-10 flex items-center gap-5 mb-10 md:mb-12">
-              <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
                 <Bot size={32} />
               </div>
               <div>
@@ -331,7 +331,7 @@ export default function SystemSettingsPage() {
               </div>
             </div>
             
-            <div className="relative z-10 mt-10 p-8 rounded-[32px] bg-blue-50/30 border border-blue-100/50">
+            <div className="relative z-10 mt-6 p-5 rounded-xl bg-blue-50/30 border border-blue-100/50">
                 <div className="flex gap-4">
                   <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
                     <span className="text-[10px] font-black">?</span>

@@ -24,7 +24,7 @@ import { DashboardRoom } from '@/types/dashboard';
 import { format, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 import LiveTimer from './LiveTimer';
 
-import { formatMoney, getContrastTextColor } from '@/utils/format';
+import { formatMoney } from '@/utils/format';
 import { calculateLiveRoomCharge } from '@/utils/billing';
 
 interface RoomCardProps {
@@ -344,12 +344,21 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         
         {/* Top Row: Room Number & Rental Type */}
         <div className="flex justify-between items-end">
-          <span className={cn(
-            "text-4xl font-black tracking-tighter block",
-            "transition-colors duration-300 group-hover:brightness-110"
-          )}>
-            {room.name}
-          </span>
+          <div className="flex items-center gap-2">
+            {room.group_color && (room.is_group_master || room.current_booking?.is_group_member) && (
+              <span
+                className="h-3 w-3 rounded-full ring-2 ring-white/40 shrink-0"
+                style={{ backgroundColor: room.group_color }}
+                title={room.is_group_master ? `Nhóm ${room.name}` : `Nhóm ${room.current_booking?.master_room_name || '?'}`}
+              />
+            )}
+            <span className={cn(
+              "text-4xl font-black tracking-tighter block",
+              "transition-colors duration-300 group-hover:brightness-110"
+            )}>
+              {room.name}
+            </span>
+          </div>
 
           {room.status === 'occupied' && room.current_booking && (
             <div className="ml-auto">
@@ -378,17 +387,18 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, settings, onClick, onStatusCh
         {/* Category Badge & Group Indicator */}
         <div className="mt-2 flex flex-col items-start gap-1">
               
-              {/* Group Indicator - Color Box */}
+              {/* Group Indicator - Neutral pill + color dot */}
               {room.group_color && (room.is_group_master || room.current_booking?.is_group_member) && (
-                <div 
-                  className="px-2 py-1 rounded-lg backdrop-blur-md flex items-center gap-1" 
-                  style={{ backgroundColor: room.group_color, color: getContrastTextColor(room.group_color) }} // Áp dụng màu chữ tương phản
-                >
+                <div className="px-2 py-1 rounded-lg bg-black/10 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: room.group_color }}
+                  />
                   {room.is_group_master ? (
                     <>
                       <Crown size={10} />
                       <span className="text-[9px] font-black uppercase tracking-wider block whitespace-nowrap">
-                        CHỦ NHÓM {room.name}
+                        CHỦ NHÓM
                       </span>
                     </>
                   ) : (

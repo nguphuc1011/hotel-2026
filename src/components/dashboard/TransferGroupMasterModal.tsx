@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2, ArrowRight, ArrowRightLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/format';
@@ -25,8 +26,10 @@ const TransferGroupMasterModal: React.FC<TransferGroupMasterModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newMasterBookingId, setNewMasterBookingId] = useState<string | null>(null);
   const [actionForOldMaster, setActionForOldMaster] = useState<'become_child' | 'ungroup' | 'cancel'>('ungroup');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (isOpen) {
       // Reset state when modal opens
       setNewMasterBookingId(null);
@@ -34,7 +37,7 @@ const TransferGroupMasterModal: React.FC<TransferGroupMasterModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const handleSubmit = async () => {
     if (!newMasterBookingId) {
@@ -65,7 +68,7 @@ const TransferGroupMasterModal: React.FC<TransferGroupMasterModalProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <div 
       className="fixed inset-0 z-[70000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
       onClick={onClose}
@@ -208,7 +211,8 @@ const TransferGroupMasterModal: React.FC<TransferGroupMasterModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

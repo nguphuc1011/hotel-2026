@@ -87,6 +87,22 @@ export default function DashboardPage() {
     return color;
   }, []); // Dependencies stable
 
+  // Channel ref for immediate peer-to-peer real-time broadcasting
+  const realtimeChannelRef = useRef<any>(null);
+  const broadcastDashboardUpdate = useCallback((action: string = 'update') => {
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'dashboard_refresh',
+          payload: { action, timestamp: Date.now() }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to broadcast realtime event:', err);
+    }
+  }, []);
+
   const [settings, setSettings] = useState<any>(null);
 
   // Fetch System Settings (Optimized: Fetch only once or when needed)
@@ -287,7 +303,10 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [can, getRandomColor, user?.hotel_id]); // Added user?.hotel_id to dependencies
+  }, [can, getRandomColor, user?.hotel_id]);
+
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
 
   // Combined initialization logic for Dashboard
   const initDashboard = useCallback(async () => {
@@ -362,10 +381,14 @@ export default function DashboardPage() {
     }
   };
 
-  // Initial Load (One dependency, stable for HMR)
+  // Initial Load (Ổn định không lặp lại khi hàm thay đổi con trỏ)
+  const hasMountedRef = useRef(false);
   useEffect(() => {
-    initDashboard();
-  }, [initDashboard]);
+    if (!hasMountedRef.current || user?.hotel_id) {
+      hasMountedRef.current = true;
+      initDashboard();
+    }
+  }, [user?.hotel_id, initDashboard]);
 
   // TỐI ƯU HÓA DASHBOARD: Sử dụng Smart Update tập trung
   useEffect(() => {
@@ -421,40 +444,54 @@ export default function DashboardPage() {
       if (timeoutId) clearTimeout(timeoutId);
       clearInterval(fallbackInterval);
     };
-  }, [rooms, settings, can, isAuthLoading, fetchData]);
+  }, [rooms, settings, can, isAuthLoading]);
 
-  // Real-time Subscription with Debounced Refresh
+  // Real-time Subscription with Instant Peer Broadcast & DB Push
   useEffect(() => {
-    if (isAuthLoading || !can(PERMISSION_KEYS.VIEW_DASHBOARD)) return;
+    if (!user?.hotel_id) return;
 
+    const hotelId = user.hotel_id;
     let refreshTimeout: NodeJS.Timeout;
 
-    const debouncedFetch = () => {
+    const triggerSync = (instant: boolean = true) => {
       clearTimeout(refreshTimeout);
-      // Increase debounce time on Mobile to reduce performance impact
-      const debounceMs = window.innerWidth < 768 ? 3000 : 1000;
+      const delay = instant ? 0 : 50; // 0ms: Cập nhật ngay lập tức không có độ trễ
       refreshTimeout = setTimeout(() => {
-        console.log('Real-time Update triggered at', new Date().toLocaleTimeString());
-        fetchData(true); // Silent update
-      }, debounceMs);
+        fetchDataRef.current(true); // Silent update
+      }, delay);
     };
 
+    const channelName = `dashboard_updates_${hotelId}`;
     const channel = supabase
-      .channel('dashboard_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => debouncedFetch())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => debouncedFetch())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_services' }, () => debouncedFetch())
+      .channel(channelName, {
+        config: {
+          broadcast: { self: false } // Nhận từ các máy khác trong cùng khách sạn
+        }
+      })
+      .on('broadcast', { event: 'dashboard_refresh' }, (payload) => {
+        console.log('[Realtime] Nhận tín hiệu đồng bộ tức thì:', payload);
+        triggerSync(true); // Đồng bộ ngay lập tức 0ms!
+      })
+      .on('broadcast', { event: 'db_change' }, () => {
+        triggerSync(true);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `hotel_id=eq.${hotelId}` }, () => triggerSync(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `hotel_id=eq.${hotelId}` }, () => triggerSync(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_services', filter: `hotel_id=eq.${hotelId}` }, () => triggerSync(true))
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-            console.log('Real-time: Connected to dashboard_updates');
+            console.log(`Real-time: Connected to ${channelName}`);
         }
       });
 
+    realtimeChannelRef.current = channel;
+
     return () => {
       clearTimeout(refreshTimeout);
+      realtimeChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [isAuthLoading, can, fetchData]);
+  }, [user?.hotel_id]);
 
   // Filtering Logic
   const filteredRooms = useMemo(() => {
@@ -560,7 +597,8 @@ export default function DashboardPage() {
       }
       
       await supabase.from('rooms').update(updates).eq('id', roomId);
-      fetchData(true); // Khôi phục gọi trực tiếp để UI cập nhật tức thì
+      fetchData(true);
+      broadcastDashboardUpdate('room_status');
     } catch (e) {
       console.error(e);
       toast.error('Lỗi cập nhật trạng thái');
@@ -601,10 +639,8 @@ export default function DashboardPage() {
 
       toast.success('Nhận phòng thành công');
       setIsCheckInOpen(false);
-      
-      // Khôi phục gọi trực tiếp fetchData để UI cập nhật tức thì sau khi Check-in
-      // (Bên cạnh cơ chế Real-time để đảm bảo trải nghiệm người dùng tốt nhất)
-      fetchData(true); 
+      fetchData(true);
+      broadcastDashboardUpdate('check_in'); 
     } catch (error: any) {
       // Robust error logging for Next.js 16 / Turbopack
       const detailedError = error instanceof Error 
@@ -696,7 +732,7 @@ export default function DashboardPage() {
         <RoomFolioModal
           isOpen={isFolioOpen}
           onClose={() => setIsFolioOpen(false)}
-          onUpdate={() => fetchData(true)}
+          onUpdate={() => { fetchData(true); broadcastDashboardUpdate('folio_update'); }}
           room={selectedRoom!}
           booking={selectedRoom?.current_booking!}
           onGroupRoom={() => {
@@ -709,7 +745,7 @@ export default function DashboardPage() {
           isOpen={isGroupModalOpen}
           onClose={() => setIsGroupModalOpen(false)}
           masterRoom={selectedRoom!}
-          onSuccess={() => fetchData()}
+          onSuccess={() => { fetchData(); broadcastDashboardUpdate('group_update'); }}
           rooms={rooms}
         />
 

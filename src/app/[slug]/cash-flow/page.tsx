@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Plus, Filter, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Trash2, Eye, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
@@ -13,8 +14,19 @@ import { customerService } from '@/services/customerService';
 import CashFlowStatsComponent from './components/CashFlowStats';
 import { toLocalISOString, parseLocalISO, getEndOfDay } from '@/lib/dateUtils';
 import { formatMoney } from '@/utils/format';
+import { getActiveHotelId } from '@/utils/tenant';
 
 export default function CashFlowPage() {
+  const params = useParams();
+  const router = useRouter();
+  const slug = params?.slug as string;
+
+  useEffect(() => {
+    if (slug) {
+      router.replace(`/${slug}/tien`);
+    }
+  }, [slug, router]);
+
   const [transactions, setTransactions] = useState<CashFlowTransaction[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -71,12 +83,19 @@ export default function CashFlowPage() {
   useEffect(() => {
     fetchData();
     
-    // Subscribe to Realtime changes
+    // Subscribe to Realtime changes scoped by hotelId
+    const hotelId = getActiveHotelId();
+    const channelName = hotelId ? `cash-flow-changes-${hotelId}` : 'cash-flow-changes';
     const channel = supabase
-      .channel('cash-flow-changes')
+      .channel(channelName)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'cash_flow' },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'cash_flow',
+          ...(hotelId ? { filter: `hotel_id=eq.${hotelId}` } : {})
+        },
         (payload) => {
           console.log('Realtime update:', payload);
           fetchData(true);
@@ -84,7 +103,12 @@ export default function CashFlowPage() {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'wallets' },
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'wallets',
+          ...(hotelId ? { filter: `hotel_id=eq.${hotelId}` } : {})
+        },
         (payload) => {
            // Wallet balance update
            fetchData(true);

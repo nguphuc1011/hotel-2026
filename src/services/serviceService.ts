@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabase';
+import { getActiveHotelId } from '@/utils/tenant';
 
 // Helper to safely format errors for logging
 const formatError = (err: any) => {
@@ -63,12 +64,17 @@ export interface BookingServiceItem {
 
 export const serviceService = {
   // --- Service Management ---
-  async getServices() {
+  async getServices(hotelId?: string) {
     try {
+      const targetHotelId = hotelId || getActiveHotelId();
       let query = supabase
         .from('services')
         .select('*')
         .order('name');
+
+      if (targetHotelId) {
+        query = query.eq('hotel_id', targetHotelId);
+      }
 
       const { data, error } = await query;
 
@@ -92,12 +98,18 @@ export const serviceService = {
     }
   },
 
-  async getAllServices() { // Include inactive
+  async getAllServices(hotelId?: string) { // Include inactive
     try {
-        const { data, error } = await supabase
+        const targetHotelId = hotelId || getActiveHotelId();
+        let query = supabase
           .from('services')
           .select('*')
           .order('name');
+
+        if (targetHotelId) {
+          query = query.eq('hotel_id', targetHotelId);
+        }
+        const { data, error } = await query;
         
         if (error) throw error;
         return (data || []).map((s: any) => ({

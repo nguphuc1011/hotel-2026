@@ -60,7 +60,7 @@ export default function SmartAlerts({ kpis, topItem }: SmartAlertsProps) {
   }
 
   return (
-    <div className="bento-card bg-slate-50 p-6 rounded-[24px] border border-slate-200 h-full">
+    <div className="bento-card bg-slate-50 p-6 rounded-2xl border border-slate-200/80 h-full">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
             <Lightbulb size={20} />

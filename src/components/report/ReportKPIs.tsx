@@ -17,11 +17,11 @@ export default function ReportKPIs({ data, onDrillDown }: ReportKPIsProps) {
   const margin = data.revenue > 0 ? (data.net_profit / data.revenue) * 100 : 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
       {/* Revenue Card */}
       <div 
         onClick={() => onDrillDown('REVENUE')}
-        className="bento-card bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group relative overflow-hidden"
+        className="bento-card bg-white p-5 md:p-6 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between"
       >
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <TrendingUp size={80} className="text-blue-600" />
@@ -33,7 +33,7 @@ export default function ReportKPIs({ data, onDrillDown }: ReportKPIsProps) {
                 </div>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tổng thu nhập</span>
             </div>
-            <h3 className="text-3xl font-black text-slate-800 tracking-tight mb-1">
+            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight mb-1">
                 {formatMoney(data.revenue)}
             </h3>
             <div className="flex items-center text-xs font-bold text-blue-600 gap-1 group-hover:translate-x-1 transition-transform">
@@ -45,7 +45,7 @@ export default function ReportKPIs({ data, onDrillDown }: ReportKPIsProps) {
       {/* Costs Card */}
       <div 
         onClick={() => onDrillDown('COSTS')}
-        className="bento-card bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group relative overflow-hidden"
+        className="bento-card bg-white p-5 md:p-6 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between"
       >
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <TrendingDown size={80} className="text-orange-600" />
@@ -70,7 +70,7 @@ export default function ReportKPIs({ data, onDrillDown }: ReportKPIsProps) {
 
       {/* Net Profit Card */}
       <div 
-        className="bento-card bg-slate-900 p-6 rounded-[24px] shadow-lg shadow-slate-900/20 group relative overflow-hidden"
+        className="bento-card bg-slate-900 p-5 md:p-6 rounded-2xl shadow-md border border-slate-800 group relative overflow-hidden flex flex-col justify-between"
       >
         <div className="absolute top-0 right-0 p-4 opacity-10">
             <Wallet size={80} className="text-white" />
@@ -82,7 +82,7 @@ export default function ReportKPIs({ data, onDrillDown }: ReportKPIsProps) {
                 </div>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Lợi nhuận ròng</span>
             </div>
-            <h3 className={`text-4xl font-black tracking-tight mb-4 ${data.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <h3 className={`text-2xl md:text-3xl font-bold tracking-tight mb-3 ${data.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatMoney(data.net_profit)}
             </h3>
             

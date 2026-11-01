@@ -54,9 +54,9 @@ export default function ProfitCharts({ kpis, onDrillDown }: ProfitChartsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
       {/* Pie Chart */}
-      <div className="bento-card bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm">
+      <div className="bento-card bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm border border-slate-100 shadow-sm">
         <h3 className="text-lg font-black text-slate-800 mb-6 uppercase tracking-tight">Cơ cấu dòng tiền</h3>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -89,7 +89,7 @@ export default function ProfitCharts({ kpis, onDrillDown }: ProfitChartsProps) {
       </div>
 
       {/* Waterfall Chart */}
-      <div className="bento-card bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm">
+      <div className="bento-card bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm border border-slate-100 shadow-sm">
         <h3 className="text-lg font-black text-slate-800 mb-6 uppercase tracking-tight">Thác nước lợi nhuận</h3>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">

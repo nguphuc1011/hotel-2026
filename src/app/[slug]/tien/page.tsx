@@ -114,7 +114,7 @@ export default function MoneyPage() {
       setWallets(currentWallets);
 
       try {
-        const debtors = await customerService.getDebtors();
+        const debtors = await customerService.getDebtors(user?.hotel_id);
         const totalCustomerDebt = debtors.reduce((sum, d) => sum + Math.abs(d.balance), 0);
         setCustomerDebt(totalCustomerDebt);
       } catch (err) { console.error(err); }
@@ -133,43 +133,11 @@ export default function MoneyPage() {
       const revenueWallet = currentWallets.find(w => w.id === 'REVENUE');
 
       if (cashWallet && bankWallet) {
-        const [cashOpening, bankOpening, receivableOpening, debtOpening, revenueOpening] = await Promise.all([
-          cashFlowService.getWalletBalanceAt('CASH', actualStart),
-          cashFlowService.getWalletBalanceAt('BANK', actualStart),
-          receivableWallet ? cashFlowService.getWalletBalanceAt('RECEIVABLE', actualStart) : 0,
-          debtWallet ? cashFlowService.getWalletBalanceAt('DEBT', actualStart) : 0,
-          revenueWallet ? cashFlowService.getWalletBalanceAt('REVENUE', actualStart) : 0
-        ]);
-
-        const cashTxs = data.filter(t => !t.payment_method_code || t.payment_method_code === 'cash');
-        const bankTxs = data.filter(t => t.payment_method_code === 'bank' || t.payment_method_code === 'transfer' || t.payment_method_code === 'qr');
-
-        const calcStats = (opening: number, closing: number) => {
-             const net = closing - opening;
-             return { opening, in: net > 0 ? net : 0, out: net < 0 ? -net : 0, closing };
-        };
-        
-        const calcDetailedStats = (opening: number, closing: number, txs: CashFlowTransaction[]) => {
-             const totalIn = txs.filter(t => t.flow_type === 'IN').reduce((sum, t) => sum + t.amount, 0);
-             const totalOut = txs.filter(t => t.flow_type === 'OUT').reduce((sum, t) => sum + t.amount, 0);
-             return { opening, in: totalIn, out: totalOut, closing };
-        };
-
-        const [cashClosing, bankClosing, receivableClosing, debtClosing, revenueClosing] = await Promise.all([
-             cashFlowService.getWalletBalanceAt('CASH', actualEnd),
-             cashFlowService.getWalletBalanceAt('BANK', actualEnd),
-             cashFlowService.getWalletBalanceAt('RECEIVABLE', actualEnd),
-             cashFlowService.getWalletBalanceAt('DEBT', actualEnd),
-             cashFlowService.getWalletBalanceAt('REVENUE', actualEnd)
-        ]);
-
-        setBalanceStats({
-          cash: calcDetailedStats(cashOpening, cashClosing, cashTxs),
-          bank: calcDetailedStats(bankOpening, bankClosing, bankTxs),
-          receivable: calcStats(receivableOpening, receivableClosing),
-          debt: calcStats(debtOpening, debtClosing),
-          revenue: calcStats(revenueOpening, revenueClosing)
-        });
+        // Tối ưu hóa Backend: Tính toàn bộ số dư và thu chi các ví trong 1 lần gọi DB duy nhất
+        const stats = await cashFlowService.getMoneyPageStats(actualStart, actualEnd, user?.hotel_id);
+        if (stats) {
+          setBalanceStats(stats);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -181,13 +149,18 @@ export default function MoneyPage() {
 
   useEffect(() => {
     fetchData();
+    const hotelId = user?.hotel_id;
+    if (!hotelId) return;
+
+    const channelName = `money-page-changes-${hotelId}`;
     const channel = supabase
-    .channel('money-page-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_flow' }, () => fetchData(true))
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'wallets' }, () => fetchData(true))
-    .subscribe();
+      .channel(channelName)
+      .on('broadcast', { event: 'money_refresh' }, () => fetchData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_flow', filter: `hotel_id=eq.${hotelId}` }, () => fetchData(true))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'wallets', filter: `hotel_id=eq.${hotelId}` }, () => fetchData(true))
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [dateRange]);
+  }, [dateRange, user?.hotel_id]);
 
   if (isAuthLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div></div>;
@@ -241,7 +214,7 @@ export default function MoneyPage() {
       
       {/* 1. TOP NAV / HEADER */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-10 h-20 md:h-24 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-20 flex items-center justify-between">
           <div className="flex items-baseline gap-3">
             <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">Quỹ tiền</h1>
             <span className="hidden md:block text-slate-400 font-medium text-sm">Quản lý dòng tiền khách sạn</span>
@@ -270,14 +243,14 @@ export default function MoneyPage() {
         </div>
       </div>
 
-      <main className="max-w-[1600px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-10 md:space-y-16">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         
         {/* 2. HERO SECTION - CASH WALLET */}
         <section className="relative">
-          <div className="bg-white rounded-[32px] md:rounded-[48px] p-8 md:p-16 border border-slate-200/60 shadow-[0_20px_50px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col md:flex-row items-center justify-between gap-10">
+          <div className="bg-white rounded-2xl md:rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-sm overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
             {/* Background Accent */}
             <div className="absolute top-0 right-0 p-10 opacity-[0.02] pointer-events-none">
-              <Banknote size={400} strokeWidth={0.5} />
+              <Banknote size={260} strokeWidth={0.5} />
             </div>
 
             <div className="relative z-10 text-center md:text-left space-y-6 md:space-y-8 flex-1">
@@ -287,7 +260,7 @@ export default function MoneyPage() {
                   Tiền mặt thực tế
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl md:text-[80px] font-black tracking-tighter text-slate-900 leading-none">
+                  <span className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-none">
                     {displayRawBalance(balanceStats.cash.closing)}
                   </span>
                   <span className="text-xl md:text-4xl font-black text-slate-200 tracking-tighter uppercase">₫</span>
@@ -296,25 +269,25 @@ export default function MoneyPage() {
               </div>
             </div>
 
-            <div className="relative z-10 w-full md:w-auto grid grid-cols-3 md:flex md:flex-col gap-4 md:gap-10 min-w-[300px]">
+            <div className="relative z-10 w-full md:w-auto grid grid-cols-3 md:flex md:flex-col gap-3 md:gap-4 min-w-[260px]">
               <div className="space-y-1 text-center md:text-right">
                 <p className="text-[10px] md:text-[13px] font-black text-slate-400 uppercase tracking-widest">Tồn đầu</p>
-                <p className="text-sm md:text-3xl font-black text-slate-800 tracking-tight">{formatMoney(balanceStats.cash.opening)}</p>
+                <p className="text-sm md:text-xl font-bold text-slate-800 tracking-tight">{formatMoney(balanceStats.cash.opening)}</p>
               </div>
-              <div className="space-y-1 text-center md:text-right border-x md:border-x-0 md:border-y border-slate-100 py-0 md:py-8 px-2 md:px-0">
+              <div className="space-y-1 text-center md:text-right border-x md:border-x-0 md:border-y border-slate-100 py-0 md:py-3 px-2 md:px-0">
                 <p className="text-[10px] md:text-[13px] font-black text-emerald-500/70 uppercase tracking-widest">Tổng thu</p>
-                <p className="text-sm md:text-3xl font-black text-emerald-600 tracking-tight">+{formatMoney(balanceStats.cash.in)}</p>
+                <p className="text-sm md:text-xl font-bold text-emerald-600 tracking-tight">+{formatMoney(balanceStats.cash.in)}</p>
               </div>
               <div className="space-y-1 text-center md:text-right">
                 <p className="text-[10px] md:text-[13px] font-black text-rose-500/70 uppercase tracking-widest">Tổng chi</p>
-                <p className="text-sm md:text-3xl font-black text-rose-600 tracking-tight">-{formatMoney(balanceStats.cash.out)}</p>
+                <p className="text-sm md:text-xl font-bold text-rose-600 tracking-tight">-{formatMoney(balanceStats.cash.out)}</p>
               </div>
             </div>
           </div>
         </section>
 
         {/* 3. SECONDARY WALLETS ROW */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
           {['BANK', 'DEBT', 'RECEIVABLE', 'REVENUE'].map((id) => {
             const config = walletConfigs[id];
             const stats = id === 'BANK' ? balanceStats.bank : id === 'DEBT' ? balanceStats.debt : id === 'RECEIVABLE' ? balanceStats.receivable : balanceStats.revenue;
@@ -328,11 +301,11 @@ export default function MoneyPage() {
                   if (id === 'RECEIVABLE') setIsReceivableModalOpen(true);
                 }}
                 className={cn(
-                  "bg-white rounded-[24px] md:rounded-[32px] p-5 md:p-8 border border-slate-200/60 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-500 group relative overflow-hidden",
+                  "bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 group relative overflow-hidden",
                   isClickable && "cursor-pointer"
                 )}
               >
-                <div className="flex items-center justify-between mb-6 md:mb-8">
+                <div className="flex items-center justify-between mb-3 md:mb-4">
                   <div className={cn("p-2.5 md:p-3 rounded-xl md:rounded-2xl text-white shadow-lg", `bg-gradient-to-br ${config.gradient}`)}>
                     {config.icon}
                   </div>
@@ -342,7 +315,7 @@ export default function MoneyPage() {
                 <div className="space-y-1">
                   <h3 className="text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest">{config.label}</h3>
                   <div className="flex items-baseline gap-1">
-                    <span className={cn("text-xl md:text-3xl font-black tracking-tight", stats.closing < 0 ? "text-rose-600" : "text-slate-900")}>
+                    <span className={cn("text-lg md:text-2xl font-bold tracking-tight", stats.closing < 0 ? "text-rose-600" : "text-slate-900")}>
                       {displayRawBalance(stats.closing)}
                     </span>
                     <span className="text-[10px] md:text-xs font-black text-slate-300 uppercase">₫</span>
@@ -400,7 +373,7 @@ export default function MoneyPage() {
 
           {/* List Card */}
           {can(PERMISSION_KEYS.VIEW_MONEY_TRANSACTION_HISTORY) && (
-            <div className="bg-white rounded-[40px] border border-slate-200/60 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="min-w-full">
                 {loading ? (
                   <div className="py-32 text-center"><div className="inline-block w-10 h-10 border-4 border-slate-100 border-t-slate-900 rounded-full animate-spin" /></div>
@@ -417,7 +390,7 @@ export default function MoneyPage() {
                         <div
                           key={tx.id}
                           onClick={() => tx.ref_id ? setHistoryModal({ open: true, bookingId: tx.ref_id }) : null}
-                          className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer flex items-center p-6 md:p-8 gap-6 md:gap-10"
+                          className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer flex items-center p-4 md:p-5 gap-4 md:gap-6"
                         >
                           {/* Mobile Layout (Stacked) / Desktop Layout (Row) */}
                           <div className="flex flex-col md:flex-row flex-1 p-5 md:p-8 gap-4 md:gap-10">
@@ -529,7 +502,7 @@ export default function MoneyPage() {
       />
       <WalletAdjustmentModal isOpen={isAdjustmentModalOpen} onClose={() => setIsAdjustmentModalOpen(false)} onSuccess={() => fetchData()} wallets={wallets} />
       <ReceivableDetailModal isOpen={isReceivableModalOpen} onClose={() => setIsReceivableModalOpen(false)} />
-      <CustomerDebtModal isOpen={isCustomerDebtModalOpen} onClose={() => setIsCustomerDebtModalOpen(false)} />
+      <CustomerDebtModal isOpen={isCustomerDebtModalOpen} onClose={() => setIsCustomerDebtModalOpen(false)} hotelId={user?.hotel_id} />
       {historyModal.bookingId && <BookingHistoryModal isOpen={historyModal.open} onClose={() => setHistoryModal({ open: false, bookingId: null })} bookingId={historyModal.bookingId} />}
 
       {/* Floating Action Button for Mobile */}

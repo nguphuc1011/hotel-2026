@@ -12,6 +12,7 @@ import CustomerDebtModal from './CustomerDebtModal';
 import { customerService } from '@/services/customerService';
 import { toLocalISOString, parseLocalISO, getEndOfDay } from '@/lib/dateUtils';
 import { formatMoney } from '@/utils/format';
+import { getActiveHotelId } from '@/utils/tenant';
 
 export default function CashFlowPage() {
   const [transactions, setTransactions] = useState<CashFlowTransaction[]>([]);
@@ -71,11 +72,18 @@ export default function CashFlowPage() {
     fetchData();
     
     // Subscribe to Realtime changes
+    const hotelId = getActiveHotelId();
+    const channelName = hotelId ? `cash-flow-changes-${hotelId}` : 'cash-flow-changes';
     const channel = supabase
-      .channel('cash-flow-changes')
+      .channel(channelName)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'cash_flow' },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'cash_flow',
+          ...(hotelId ? { filter: `hotel_id=eq.${hotelId}` } : {})
+        },
         (payload) => {
           console.log('Realtime update:', payload);
           fetchData(true);
@@ -83,7 +91,12 @@ export default function CashFlowPage() {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'wallets' },
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'wallets',
+          ...(hotelId ? { filter: `hotel_id=eq.${hotelId}` } : {})
+        },
         (payload) => {
            // Wallet balance update
            fetchData(true);

@@ -1,48 +1,60 @@
 # 📊 CHỨC NĂNG: DỰ THU THỰC TẾ TRONG NGÀY (EXPECTED REVENUE)
 
-> **Mục tiêu:** Trả lời chính xác câu hỏi của Chủ khách sạn tại bất kỳ thời điểm nào: *"Hôm nay dự trù có thể kiếm được bao nhiêu tiền?"*
+> **⚠️ QUY ĐỊNH TỐI CAO:** KHI SỬA BẤT KỲ DÒNG, TỪ NÀO TRONG FILE NÀY THÌ PHẢI HỎI Ý KIẾN CỦA TA.
+> **Mục tiêu:** Trả lời chính xác câu hỏi của Chủ khách sạn: *"Hôm nay dự trù có thể kiếm được bao nhiêu tiền?"* dựa trên mốc kế toán Night Audit.
 
 ---
 
-## 1. Định nghĩa & Ý nghĩa
-- **Bản chất:** Đây là con số **Tham khảo nhanh** về dòng tiền tiềm năng trong ngày. 
-- **Đặc điểm:** Không ảnh hưởng đến logic tính tiền thực tế trên hóa đơn hay sổ sách kế toán chính thống.
-- **Chu kỳ:** Bắt đầu từ 0 và tự động Reset về 0 sau mỗi mốc **Night Audit** (được quy định trong cài đặt khách sạn).
+## 1. Nguyên tắc cốt lõi
+1. **Độc lập tuyệt đối:** Công thức Dự thu không liên quan đến bất kỳ logic nghiệp vụ tính toán nào khác (như báo cáo doanh thu thực tế, kế toán thuế). Nó chỉ lấy dữ liệu (Read-only) để phục vụ hiển thị tham khảo, không làm thay đổi dữ liệu gốc của Booking hay Bill.
+2. **Mốc thời gian (Reset):** Con số này bắt đầu từ 0 và tự động Reset về 0 tại thời điểm được quy định trong **Night Audit** (Cài đặt khách sạn).
+3. **Phân vùng ngày kế toán:** Mọi sự kiện phát sinh (Check-in, Check-out, Milestone, Dịch vụ) thuộc về ngày kế toán nào (dựa trên mốc Night Audit) thì sẽ được tính vào Dự thu của ngày đó. 
+4. **Kỷ luật hoàn trả (Subtract Rule):** Trước khi trừ bất kỳ khoản nào (do Hủy phòng hoặc Xóa dịch vụ), hệ thống BẮT BUỘC phải kiểm tra xem khoản đó đã được cộng vào con số Dự thu của "ngày kế toán hiện tại" chưa? Chỉ được phép trừ khi khoản đó đã được ghi nhận (cộng) trước đó trong cùng kỳ.
 
 ---
 
-## 2. Công thức tính toán (Mật lệnh vận hành)
+## 2. Bảng mô tả chi tiết chức năng (Kim chỉ nam)
 
-Hệ thống ghi nhận biến động vào một sổ cái riêng (`daily_expected_ledger`) dựa trên các sự kiện sau:
-
-### A. Các sự kiện làm TĂNG con số (+)
-1. **Check-in (Mọi loại phòng):** Cộng ngay `[Tiền phòng ban đầu]` + `[Phụ thu sớm]`. (Tiền phòng ban đầu là 1 ngày/đêm hoặc giờ đầu tiên).
-2. **Check-out (Phòng Giờ):** Cộng thêm phần chênh lệch giữa `[Tiền phòng thực tế]` và số tiền đã ghi nhận lúc Check-in.
-3. **Phát sinh Dịch vụ/Phụ thu:** Cộng ngay giá trị dịch vụ/phụ thu mới vào thời điểm nhân viên nhập máy.
-4. **Mốc tính thêm ngày (Stay-over):** Khi hệ thống tự động nhảy tiền phòng cho khách ở nhiều ngày, cộng thêm `[Tiền phòng 1 ngày]`.
-
-### B. Các sự kiện làm GIẢM con số (-)
-1. **Hủy phòng:** Trừ lại toàn bộ số tiền đã từng được cộng vào dự thu của booking đó.
-2. **Sửa giá:** Trừ đi/Cộng thêm phần chênh lệch khi nhân viên thay đổi giá phòng thủ công.
-3. **Xóa dịch vụ:** Trừ đi giá trị của dịch vụ vừa xóa khỏi hóa đơn.
-
-### C. Các trường hợp GIỮ NGUYÊN (0)
-1. **Phụ thu quá giờ (Ngày/Đêm):** Không tự động cộng vào dự thu (theo yêu cầu đơn giản hóa, đây chỉ là số tham khảo).
-2. **Check-out (Phòng Ngày/Đêm):** Không tác động.
+| Sự kiện | Loại phòng | Tác động | Điều kiện & Ghi chú |
+| :--- | :--- | :--- | :--- |
+| **Check-in** | Giờ (Hourly) | **0** | Không ghi nhận gì cả. |
+| **Check-in** | Ngày (Daily) | **+** | Cộng [01 ngày tiền phòng] + [Phụ thu vào sớm] (nếu bật cấu hình). |
+| **Check-out** | Giờ (Hourly) | **+** | Cộng [Toàn bộ tiền phòng thực tế] + [Toàn bộ dịch vụ]. |
+| **Check-out** | Ngày (Daily) | **0** | Không làm gì cả (Tiền đã cộng lúc Check-in/Milestone). |
+| **Stay-over (Milestone)** | Ngày (Daily) | **+** | Đợi đến mốc "Tính thêm 1 ngày" trong cài đặt. Chỉ cộng nếu đã qua ít nhất 01 ngày kể từ lúc Check-in. |
+| **Thêm Dịch vụ** | Tất cả | **+** | Cộng ngay giá trị dịch vụ [Số lượng x Đơn giá]. |
+| **Xóa Dịch vụ** | Tất cả | **-** | **CHỈ TRỪ** nếu dịch vụ này được thêm trong cùng ngày kế toán hiện tại. |
+| **Hủy phòng** | Giờ (Hourly) | **0** | Không làm gì cả. |
+| **Hủy phòng** | Ngày (Daily) | **-** | **CHỈ TRỪ** đúng số tiền đã cộng vào Dự thu của ngày kế toán hiện tại. |
 
 ---
 
-## 3. Quy trình kỹ thuật (Database First)
+## 3. Công thức vận hành chi tiết
 
-- **Lưu trữ:** Sử dụng bảng độc lập `daily_expected_ledger` để lưu vết biến động (Audit Trail).
-- **Tự động hóa:** 03 Trigger ngầm (`trg_expected_revenue_bookings`, `trg_expected_revenue_services`, `trg_expected_revenue_milestones`) trực tiếp lắng nghe thay đổi dữ liệu để cập nhật sổ cái.
-- **Truy vấn:** RPC `fn_get_daily_expected_revenue` tự động tìm mốc Night Audit trong `settings` để tính tổng số tiền từ mốc đó đến hiện tại.
+### A. Đối với Phòng Giờ (Hourly)
+1. **Check-in:** Dự thu giữ nguyên.
+2. **Check-out:** Toàn bộ tiền phát sinh (Phòng + DV) sẽ được tính cho ngày kế toán tại thời điểm bấm Check-out.
+   - *Ví dụ:* Night Audit là 06:00. Khách vào 04:00 (Ngày 1), Out 07:00 (Ngày 1) -> Toàn bộ tiền tính vào Dự thu **Ngày 2**.
+3. **Hủy phòng:** Không làm gì cả.
+
+### B. Đối với Phòng Ngày (Daily/Overnight)
+1. **Check-in:** Ghi nhận ngay doanh thu "cam kết" của ngày đầu tiên.
+2. **Stay-over:** 
+   - Không cộng dồn 2 ngày trong cùng 1 ngày thực tế.
+   - *Ví dụ:* Check-in 14:00 (Ngày 1). Mốc cộng thêm là 18:00. Đến 18:00 (Ngày 1) -> KHÔNG CỘNG. Phải đến 18:00 (Ngày 2) mới được cộng thêm ngày thứ 2.
+3. **Hủy phòng:** Hệ thống kiểm tra sổ cái Dự thu hiện tại, nếu thấy có dòng cộng tiền của Booking này thì mới thực hiện dòng trừ tương ứng để bù trừ về 0 cho ngày hôm đó.
+
+### C. Dịch vụ (Service)
+1. **Ghi nhận:** Mọi dịch vụ thêm vào đều làm tăng Dự thu ngay lập tức.
+2. **Xóa/Sửa:** Chỉ được phép trừ vào Dự thu hiện tại nếu dịch vụ đó "sinh ra và mất đi" trong cùng một chu kỳ Night Audit.
 
 ---
 
-## 4. Hiển thị giao diện
-- **Vị trí:** Hiển thị tại `DashboardHeader` với biểu tượng **TrendingUp** màu xanh lá.
-- **Cập nhật:** Tự động làm mới mỗi khi nhấn nút "Cập nhật" trên Dashboard hoặc khi có biến động dữ liệu thời gian thực.
+## 4. Quy trình kỹ thuật (Database First)
+
+- **Lưu trữ:** Bảng độc lập `daily_expected_ledger` lưu vết Audit Trail từng dòng tiền (+/-).
+- **Tự động hóa:** Trigger ngầm điều phối việc ghi sổ dựa trên các bảng `bookings` và `booking_services`.
+- **Đồng bộ:** RPC `fn_refresh_expected_revenue` thực hiện quét các phòng Stay-over để tự động cộng tiền Milestone khi đến mốc quy định.
 
 ---
 *Tuân thủ Hiến pháp Dự án 1HOTEL2 - Bảo tồn di sản & Nhất thống mật lệnh.*

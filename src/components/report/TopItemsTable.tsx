@@ -16,7 +16,7 @@ interface TopItemsTableProps {
 
 export default function TopItemsTable({ items }: TopItemsTableProps) {
   return (
-    <div className="bento-card bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm h-full">
+    <div className="bento-card bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm h-full">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center">
             <Trophy size={20} />

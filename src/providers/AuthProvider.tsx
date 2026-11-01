@@ -56,8 +56,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.cookie = `1hotel_session=1; path=/; max-age=${60 * 60 * 24 * 7}`;
         document.cookie = `1hotel_role=${encodeURIComponent(role)}; path=/; max-age=${60 * 60 * 24 * 7}`;
         document.cookie = `1hotel_id=${encodeURIComponent(hotelId)}; path=/; max-age=${60 * 60 * 24 * 7}`;
+        if (parsedUser.hotel_slug) {
+          document.cookie = `1hotel_slug=${encodeURIComponent(parsedUser.hotel_slug)}; path=/; max-age=${60 * 60 * 24 * 7}`;
+        }
+
+        // Dong bo Signed JWT Session Token len Server
+        fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user: parsedUser, slug: parsedUser.hotel_slug })
+        }).catch(() => {});
       } catch (e) {
         localStorage.removeItem('1hotel_user');
+    fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
       }
     }
     setLoading(false);
@@ -126,11 +137,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setUser(userData);
         localStorage.setItem('1hotel_user', JSON.stringify(userData));
+
+        // Ky va cap Session Token (JWT) an toan HttpOnly
+        await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user: userData, slug: userData.hotel_slug || currentSlug })
+        }).catch(err => console.error('Loi cap session JWT:', err));
         const role = (userData.role || '').toLowerCase();
         const hId = userData.hotel_id || '';
         document.cookie = `1hotel_session=1; path=/; max-age=${60 * 60 * 24 * 7}`;
         document.cookie = `1hotel_role=${encodeURIComponent(role)}; path=/; max-age=${60 * 60 * 24 * 7}`;
         document.cookie = `1hotel_id=${encodeURIComponent(hId)}; path=/; max-age=${60 * 60 * 24 * 7}`;
+        if (userData.hotel_slug) {
+          document.cookie = `1hotel_slug=${encodeURIComponent(userData.hotel_slug)}; path=/; max-age=${60 * 60 * 24 * 7}`;
+        }
         
         // Cập nhật authStore ngay lập tức để đồng bộ quyền hạn
         await fetchUser();
@@ -158,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     document.cookie = '1hotel_session=; path=/; max-age=0';
     document.cookie = '1hotel_role=; path=/; max-age=0';
     document.cookie = '1hotel_id=; path=/; max-age=0';
+    document.cookie = '1hotel_slug=; path=/; max-age=0';
     toast.info('Đã đăng xuất');
     router.push(slug ? `/${slug}/login` : '/login');
   };

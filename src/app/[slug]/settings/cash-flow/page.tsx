@@ -198,7 +198,7 @@ export default function CashFlowSettingsPage() {
         </div>
       </div>
 
-      <main className="max-w-[1200px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-10 md:space-y-16">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         
         {/* 2. TAB NAVIGATION */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -232,7 +232,7 @@ export default function CashFlowSettingsPage() {
         {/* 3. LIST OF CATEGORIES */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {filteredCategories.length === 0 ? (
-            <div className="col-span-full py-32 text-center bg-white/50 backdrop-blur-sm rounded-[40px] border border-dashed border-slate-200">
+            <div className="col-span-full py-32 text-center bg-white/50 backdrop-blur-sm rounded-2xl border border-dashed border-slate-200">
               <Wallet size={48} className="mx-auto text-slate-200 mb-4" />
               <p className="text-slate-400 font-black uppercase tracking-widest">Chưa có danh mục nào</p>
             </div>
@@ -240,12 +240,12 @@ export default function CashFlowSettingsPage() {
             filteredCategories.map((cat) => (
               <div 
                 key={cat.id}
-                className="bg-white/80 backdrop-blur-xl rounded-[32px] p-8 border border-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.04)] hover:scale-[1.02] transition-all duration-500 group relative overflow-hidden flex flex-col justify-between min-h-[180px]"
+                className="bg-white rounded-2xl p-5 md:p-6 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 group relative overflow-hidden flex flex-col justify-between min-h-[160px]"
               >
                 <div className="relative z-10">
                   <div className="flex justify-between items-start mb-6">
                     <div className={cn(
-                      "w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-transform duration-500 group-hover:scale-110",
+                      "w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-105",
                       cat.type === 'IN' ? "bg-emerald-50 text-emerald-500" : "bg-rose-50 text-rose-500"
                     )}>
                       {cat.type === 'IN' ? <ArrowDownCircle size={24} /> : <ArrowUpCircle size={24} />}

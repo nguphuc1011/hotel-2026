@@ -16,9 +16,10 @@ import TransactionModal from '@/components/cash-flow/TransactionModal';
 interface CustomerDebtModalProps {
   isOpen: boolean;
   onClose: () => void;
+  hotelId?: string;
 }
 
-export default function CustomerDebtModal({ isOpen, onClose }: CustomerDebtModalProps) {
+export default function CustomerDebtModal({ isOpen, onClose, hotelId }: CustomerDebtModalProps) {
   const [debtors, setDebtors] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,7 +37,7 @@ export default function CustomerDebtModal({ isOpen, onClose }: CustomerDebtModal
   const fetchDebtors = async () => {
     setLoading(true);
     try {
-      const data = await customerService.getDebtors();
+      const data = await customerService.getDebtors(hotelId);
       setDebtors(data);
     } catch (error) {
       console.error('Error fetching debtors:', error);

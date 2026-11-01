@@ -200,7 +200,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       
       {/* 1. TOP NAV */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-10 h-20 md:h-24 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => router.back()}
@@ -232,18 +232,18 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      <main className="max-w-[1600px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-10 md:space-y-16">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         
         {/* 2. HERO PROFILE SECTION */}
         <section className="flex flex-col lg:grid lg:grid-cols-3 gap-8 md:gap-12">
           {/* Main Info Card */}
           <div className="lg:col-span-1">
-            <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-8 md:p-12 border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] flex flex-col items-center text-center relative overflow-hidden group">
+            <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200/80 shadow-sm flex flex-col items-center text-center relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700 pointer-events-none -rotate-12 group-hover:rotate-0">
                 <User size={200} strokeWidth={0.5} />
               </div>
 
-              <div className="relative z-10 w-24 h-24 md:w-32 md:h-32 rounded-[32px] md:rounded-[40px] bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-900 font-black text-4xl md:text-5xl shadow-sm mb-6 md:mb-8 group-hover:scale-105 transition-transform duration-500">
+              <div className="relative z-10 w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-900 font-black text-3xl md:text-4xl shadow-sm mb-4 md:mb-5 group-hover:scale-105 transition-transform duration-300">
                 {customer.full_name.charAt(0).toUpperCase()}
               </div>
               
@@ -262,7 +262,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
 
-              <div className="relative z-10 w-full bg-slate-50/50 rounded-[32px] p-8 border border-slate-100/50">
+              <div className="relative z-10 w-full bg-slate-50/50 rounded-xl p-5 border border-slate-100">
                 <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Số dư hiện tại</p>
                 <div className={cn(
                   "text-4xl md:text-5xl font-black tracking-tighter leading-none mb-3",
@@ -279,7 +279,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Contact & Meta Details Grid */}
           <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-            <div className="bg-white/80 backdrop-blur-xl rounded-[32px] p-8 md:p-10 border border-white shadow-sm flex flex-col justify-between">
+            <div className="bg-white rounded-2xl p-5 md:p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between">
               <div className="space-y-6">
                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Thông tin liên hệ</h3>
                 <div className="space-y-5">
@@ -308,7 +308,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               </div>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-xl rounded-[32px] p-8 md:p-10 border border-white shadow-sm flex flex-col justify-between">
+            <div className="bg-white rounded-2xl p-5 md:p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between">
               <div className="space-y-6">
                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Thông tin bổ sung</h3>
                 <div className="space-y-5">
@@ -374,7 +374,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           </div>
 
           {/* List Card View (Responsive Table) */}
-          <div className="bg-white/80 backdrop-blur-2xl rounded-[40px] md:rounded-[60px] border border-white shadow-[0_20px_80px_rgba(0,0,0,0.04)] overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             {activeTab === 'transactions' && (
               <div className="overflow-x-auto">
                 {isMobile ? (
@@ -421,9 +421,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-slate-100">
-                        <th className="px-10 py-8 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Thời gian</th>
-                        <th className="px-10 py-8 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Loại giao dịch</th>
-                        <th className="px-10 py-8 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Nội dung</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">Thời gian</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">Loại giao dịch</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">Nội dung</th>
                         <th className="px-10 py-8 text-right text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Số tiền</th>
                       </tr>
                     </thead>
@@ -519,9 +519,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-slate-100">
-                        <th className="px-10 py-8 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Phòng</th>
-                        <th className="px-10 py-8 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Thời gian đến</th>
-                        <th className="px-10 py-8 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Thời gian đi</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">Phòng</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">Thời gian đến</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">Thời gian đi</th>
                         <th className="px-10 py-8 text-center text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Trạng thái</th>
                         <th className="px-10 py-8 text-right text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Tổng hóa đơn</th>
                       </tr>

@@ -143,7 +143,7 @@ export default function CustomersPage() {
       
       {/* 1. APPLE STYLE HEADER */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-10 h-20 md:h-24 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-20 flex items-center justify-between">
           <div className="flex items-baseline gap-3">
             <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">Khách hàng</h1>
             <span className="hidden md:block text-slate-400 font-medium text-sm tracking-tight">Quản lý hồ sơ & công nợ</span>
@@ -162,17 +162,17 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <main className="max-w-[1600px] mx-auto px-4 md:px-10 py-8 md:py-12 space-y-10 md:space-y-16">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         
         {/* 2. STATS SECTION (BENTO LIGHT) */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
           {[
             { label: 'Tổng số khách', value: stats.total, icon: <Users size={20} />, color: 'slate' },
             { label: 'Đang hoạt động', value: stats.active, icon: <UserCheck size={20} />, color: 'emerald' },
             { label: 'Khách bị cấm', value: stats.banned, icon: <UserX size={20} />, color: 'rose' },
             { label: 'Đang nợ tiền', value: stats.withDebt, icon: <CreditCard size={20} />, color: 'amber' },
           ].map((item, idx) => (
-            <div key={idx} className="bg-white/80 backdrop-blur-md rounded-[24px] md:rounded-[32px] p-5 md:p-8 border border-white shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-500 group">
+            <div key={idx} className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300 group">
               <div className={cn(
                 "w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center mb-4 md:mb-6 shadow-sm",
                 item.color === 'slate' ? "bg-slate-100 text-slate-600" :
@@ -184,7 +184,7 @@ export default function CustomersPage() {
               </div>
               <p className="text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">{item.label}</p>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl md:text-4xl font-black tracking-tight">{item.value}</span>
+                <span className="text-xl md:text-3xl font-bold tracking-tight">{item.value}</span>
                 <span className="text-[10px] md:text-xs font-black text-slate-300 uppercase">Hồ sơ</span>
               </div>
             </div>
@@ -230,14 +230,14 @@ export default function CustomersPage() {
           </div>
 
           {/* 4. CUSTOMER LIST (TABLE FOR PC, CARDS FOR MOBILE) */}
-          <div className="bg-white/80 backdrop-blur-2xl rounded-[32px] md:rounded-[48px] border border-white shadow-[0_20px_80px_rgba(0,0,0,0.03)] overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             
             {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="px-10 py-8 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Khách hàng</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">Khách hàng</th>
                     <th className="px-10 py-8 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Liên hệ</th>
                     <th className="px-10 py-8 text-right text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Số dư ví</th>
                     <th className="px-10 py-8 text-center text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Trạng thái</th>

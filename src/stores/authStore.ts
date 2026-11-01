@@ -89,7 +89,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       };
 
       // 2. Load Modular Settings Cache
-      const { data: modSettings } = await supabase.from('permission_settings').select('*');
+      let modQuery = supabase.from('permission_settings').select('*');
+      if (profile.hotel_id) {
+        modQuery = modQuery.eq('hotel_id', profile.hotel_id);
+      }
+      const { data: modSettings } = await modQuery;
       const settingsMap: Record<string, any> = {};
       if (modSettings) {
         modSettings.forEach(s => settingsMap[s.module_id] = s);

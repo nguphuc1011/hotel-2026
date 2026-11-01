@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabase';
+import { getActiveHotelId } from '@/utils/tenant';
 
 export interface SurchargeRule {
   type: 'Early' | 'Late';
@@ -239,12 +240,19 @@ export const settingsService = {
     }
   },
 
-  async getRoomCategories(): Promise<RoomCategory[]> {
+  async getRoomCategories(hotelId?: string): Promise<RoomCategory[]> {
     try {
-      const { data, error } = await supabase
+      const targetHotelId = hotelId || getActiveHotelId();
+      let query = supabase
         .from('room_categories')
         .select('*')
         .order('name');
+
+      if (targetHotelId) {
+        query = query.eq('hotel_id', targetHotelId);
+      }
+
+      const { data, error } = await query;
       
       if (error) throw error;
       
